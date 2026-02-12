@@ -159,7 +159,14 @@ export default function CompanyDetail() {
           <ScoreCell score={company.last_score_total} size="lg" />
           <StatusBadge status={company.snapshot_status} />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {snap && company.partner && (
+            <Button size="sm" variant="default" className="gap-1.5 text-xs" asChild>
+              <a href={`/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories`} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="w-3.5 h-3.5" /> View Story
+              </a>
+            </Button>
+          )}
           <Button variant="outline" size="sm" className="gap-1.5 text-xs" disabled={!!activeAction} onClick={() => runAction("signals_only")}>
             {activeAction === "signals_only" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Refresh Signals
           </Button>
@@ -170,7 +177,7 @@ export default function CompanyDetail() {
             {findingContact ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserSearch className="w-3.5 h-3.5" />} Find Contact
           </Button>
           <Button size="sm" className="gap-1.5 text-xs" disabled={!!activeAction} onClick={() => runAction("full")}>
-            {activeAction === "full" || activeAction === "snapshot_only" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />} Regenerate Snapshot
+            {activeAction === "full" || activeAction === "snapshot_only" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />} {snap ? "Regenerate Story" : "Generate Story"}
           </Button>
         </div>
       </div>
