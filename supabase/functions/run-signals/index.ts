@@ -164,28 +164,42 @@ Deno.serve(async (req) => {
 
     const offset = body.offset || 0;
     const jobId = body.job_id || null;
+    const singleCompanyId = body.company_id || null;
+    const mode = body.mode || "full"; // "full" | "signals_only" | "score_only" | "snapshot_only"
 
-    // Get 1 company at the given offset
-    const { data: companies, error: compErr } = await supabase
-      .from("companies")
-      .select("id, name, domain, industry, partner")
-      .order("last_processed_at", { ascending: true, nullsFirst: true })
-      .range(offset, offset);
+    let company: CompanyRow;
 
-    if (compErr) throw compErr;
-    if (!companies || companies.length === 0) {
-      // Done — finalize job if exists
-      if (jobId) {
-        await supabase.from("processing_jobs")
-          .update({ status: "completed", finished_at: new Date().toISOString() })
-          .eq("id", jobId);
+    if (singleCompanyId) {
+      // Single company mode
+      const { data, error: compErr } = await supabase
+        .from("companies")
+        .select("id, name, domain, industry, partner")
+        .eq("id", singleCompanyId)
+        .maybeSingle();
+      if (compErr) throw compErr;
+      if (!data) throw new Error("Company not found");
+      company = data;
+    } else {
+      // Batch mode — get 1 company at the given offset
+      const { data: companies, error: compErr } = await supabase
+        .from("companies")
+        .select("id, name, domain, industry, partner")
+        .order("last_processed_at", { ascending: true, nullsFirst: true })
+        .range(offset, offset);
+
+      if (compErr) throw compErr;
+      if (!companies || companies.length === 0) {
+        if (jobId) {
+          await supabase.from("processing_jobs")
+            .update({ status: "completed", finished_at: new Date().toISOString() })
+            .eq("id", jobId);
+        }
+        return new Response(JSON.stringify({ done: true, job_id: jobId }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
-      return new Response(JSON.stringify({ done: true, job_id: jobId }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      company = companies[0];
     }
-
-    const company = companies[0];
 
     // Create job on first call
     let activeJobId = jobId;
@@ -215,50 +229,73 @@ Deno.serve(async (req) => {
     let errorMsg: string | null = null;
 
     try {
-      console.log(`Processing: ${company.name}`);
+      console.log(`Processing: ${company.name} (mode: ${mode})`);
 
-      // 1. Search signals
-      const signals = await searchSignals(company, firecrawlKey);
-      signalsCount = signals.length;
+      let signals: { title: string; url: string; type: string; excerpt: string }[] = [];
 
-      // 2. Save signals
-      for (const sig of signals) {
-        await supabase.from("signals").upsert(
-          {
-            company_id: company.id,
-            title: sig.title,
-            url: sig.url,
-            type: sig.type,
-            raw_excerpt: sig.excerpt,
-            evidence_snippets: [],
-            last_seen_at: new Date().toISOString(),
-          },
-          { onConflict: "company_id,url" }
-        );
+      // Step 1: Search signals (unless score_only or snapshot_only)
+      if (mode === "full" || mode === "signals_only") {
+        signals = await searchSignals(company, firecrawlKey);
+        signalsCount = signals.length;
+
+        for (const sig of signals) {
+          await supabase.from("signals").upsert(
+            {
+              company_id: company.id,
+              title: sig.title,
+              url: sig.url,
+              type: sig.type,
+              raw_excerpt: sig.excerpt,
+              evidence_snippets: [],
+              last_seen_at: new Date().toISOString(),
+            },
+            { onConflict: "company_id,url" }
+          );
+        }
       }
 
-      // 3. Score
-      const result = await scoreSignals(company, signals, lovableKey);
-      snapshotStatus = result.snapshot_status;
+      // For score/snapshot modes, load existing signals from DB
+      if (mode === "score_only" || mode === "snapshot_only") {
+        const { data: dbSignals } = await supabase
+          .from("signals")
+          .select("title, url, type, raw_excerpt")
+          .eq("company_id", company.id);
+        signals = (dbSignals || []).map(s => ({
+          title: s.title,
+          url: s.url,
+          type: s.type,
+          excerpt: s.raw_excerpt || "",
+        }));
+        signalsCount = signals.length;
+      }
 
-      // 4. Snapshot
-      await supabase.from("snapshots").insert({
-        company_id: company.id,
-        score_total: result.score_total,
-        score_breakdown: result.score_breakdown,
-        snapshot_json: result.snapshot_json,
-        model_version: "gemini-2.5-flash-lite",
-        prompt_version: "v1",
-      });
+      // Step 2: Score + Snapshot (unless signals_only)
+      if (mode !== "signals_only") {
+        const result = await scoreSignals(company, signals, lovableKey);
+        snapshotStatus = result.snapshot_status;
 
-      // 5. Update company
-      await supabase.from("companies").update({
-        last_processed_at: new Date().toISOString(),
-        last_score_total: result.score_total,
-        snapshot_status: result.snapshot_status,
-      }).eq("id", company.id);
+        await supabase.from("snapshots").insert({
+          company_id: company.id,
+          score_total: result.score_total,
+          score_breakdown: result.score_breakdown,
+          snapshot_json: result.snapshot_json,
+          model_version: "gemini-2.5-flash",
+          prompt_version: "v2-iorad",
+        });
 
-      console.log(`Done: ${company.name} — score ${result.score_total}, ${signalsCount} signals`);
+        await supabase.from("companies").update({
+          last_processed_at: new Date().toISOString(),
+          last_score_total: result.score_total,
+          snapshot_status: result.snapshot_status,
+        }).eq("id", company.id);
+      } else {
+        // signals_only — just update last_processed_at
+        await supabase.from("companies").update({
+          last_processed_at: new Date().toISOString(),
+        }).eq("id", company.id);
+      }
+
+      console.log(`Done: ${company.name} — ${signalsCount} signals, status: ${snapshotStatus}`);
     } catch (e) {
       status = "failed";
       errorMsg = e.message;
