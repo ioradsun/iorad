@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { buildIoradPrompt } from "./prompt.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,6 +12,7 @@ interface CompanyRow {
   name: string;
   domain: string | null;
   industry: string | null;
+  partner: string | null;
 }
 
 async function searchSignals(
@@ -84,6 +86,13 @@ async function scoreSignals(
     .join("\n");
 
   try {
+    const prompt = buildIoradPrompt(
+      company.name,
+      company.industry || "unknown",
+      company.partner,
+      signalSummary
+    );
+
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -91,18 +100,10 @@ async function scoreSignals(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
+        model: "google/gemini-2.5-flash",
         messages: [
-          { role: "system", content: "Return only valid JSON. No markdown." },
-          {
-            role: "user",
-            content: `Score these signals for "${company.name}" (${company.industry || "unknown"} industry).
-
-SIGNALS:
-${signalSummary}
-
-Return JSON: {"score_total":<0-100>,"score_breakdown":{"hiring":<0-30>,"news":<0-40>,"expansion":<0-30>},"why_now":"<2 sentences>","evidence":[{"signal_type":"<type>","detail":"<finding>","url":"<url>"}]}`,
-          },
+          { role: "system", content: "Return only valid JSON. No markdown fences." },
+          { role: "user", content: prompt },
         ],
       }),
     });
@@ -119,10 +120,14 @@ Return JSON: {"score_total":<0-100>,"score_breakdown":{"hiring":<0-30>,"news":<0
 
     const parsed = JSON.parse(jsonMatch[0]);
     const score = Math.min(100, Math.max(0, parsed.score_total || 0));
+    
+    // Store the full enterprise analysis in snapshot_json
+    const { score_total: _st, score_breakdown: _sb, ...analysisFields } = parsed;
+    
     return {
       score_total: score,
       score_breakdown: parsed.score_breakdown || { hiring: 0, news: 0, expansion: 0 },
-      snapshot_json: { why_now: parsed.why_now || "", evidence: parsed.evidence || [] },
+      snapshot_json: analysisFields,
       snapshot_status: score >= 40 ? "Generated" : "Low Signal",
     };
   } catch {
@@ -163,7 +168,7 @@ Deno.serve(async (req) => {
     // Get 1 company at the given offset
     const { data: companies, error: compErr } = await supabase
       .from("companies")
-      .select("id, name, domain, industry")
+      .select("id, name, domain, industry, partner")
       .order("last_processed_at", { ascending: true, nullsFirst: true })
       .range(offset, offset);
 
