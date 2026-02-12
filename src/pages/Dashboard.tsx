@@ -16,6 +16,7 @@ export default function Dashboard() {
   const { data: signalCounts = {} } = useSignalCounts();
   const { data: jobs = [] } = useProcessingJobs();
   const runSignals = useRunSignals();
+  const [runProgress, setRunProgress] = useState<string | null>(null);
 
   const [sortKey, setSortKey] = useState<SortKey>("last_score_total");
   const [sortAsc, setSortAsc] = useState(false);
@@ -94,13 +95,26 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {runProgress && (
+            <span className="text-xs text-muted-foreground font-mono">{runProgress}</span>
+          )}
           <Button
             className="gap-2"
             disabled={runSignals.isPending}
             onClick={() => {
-              runSignals.mutate(undefined, {
-                onSuccess: (data) => toast.success(`Job complete: ${data?.succeeded ?? 0} companies processed`),
-                onError: (err) => toast.error(`Run failed: ${err.message}`),
+              setRunProgress("Starting…");
+              const progressCb = (processed: number, total: number, name: string) => {
+                setRunProgress(`${processed}/${total} — ${name}`);
+              };
+              runSignals.mutate(progressCb, {
+                onSuccess: (data) => {
+                  setRunProgress(null);
+                  toast.success(`Job complete: ${data?.total_processed ?? 0} companies processed`);
+                },
+                onError: (err: any) => {
+                  setRunProgress(null);
+                  toast.error(`Run failed: ${err.message}`);
+                },
               });
             }}
           >

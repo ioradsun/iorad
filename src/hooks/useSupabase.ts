@@ -153,16 +153,38 @@ export function useJobItems(jobId: string | undefined) {
   });
 }
 
-// ---- Run Signals (trigger edge function) ----
+// ---- Run Signals (one company per call, loops on frontend) ----
 export function useRunSignals() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("run-signals", {
-        method: "POST",
-      });
-      if (error) throw error;
-      return data;
+    mutationFn: async (onProgress?: (processed: number, total: number, companyName: string) => void) => {
+      let offset = 0;
+      let jobId: string | null = null;
+      let totalProcessed = 0;
+
+      const { count } = await supabase
+        .from("companies")
+        .select("id", { count: "exact", head: true });
+      const total = count || 0;
+
+      while (true) {
+        const { data, error } = await supabase.functions.invoke("run-signals", {
+          body: { offset, job_id: jobId },
+        });
+
+        if (error) throw error;
+        if (data.error) throw new Error(data.error);
+
+        jobId = data.job_id || jobId;
+        totalProcessed++;
+
+        if (onProgress) onProgress(totalProcessed, total, data.company || "");
+
+        if (data.done) break;
+        offset = data.next_offset ?? offset + 1;
+      }
+
+      return { job_id: jobId, total_processed: totalProcessed };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["companies"] });
@@ -189,3 +211,4 @@ export function useSignalCounts() {
     },
   });
 }
+
