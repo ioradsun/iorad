@@ -4,11 +4,14 @@ import { useCompanies, useSignalCounts, useProcessingJobs, useRunSignals } from 
 import { toast } from "sonner";
 import StatusBadge from "@/components/StatusBadge";
 import ScoreCell from "@/components/ScoreCell";
-import { ArrowUpDown, Play, ExternalLink, Search, SlidersHorizontal, Loader2 } from "lucide-react";
+import { ArrowUpDown, Play, ExternalLink, Search, SlidersHorizontal, Loader2, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { motion } from "framer-motion";
+import { customers } from "@/data/customers";
+
+const storyIds = new Set(customers.map(c => c.id));
 
 type SortKey = "name" | "last_score_total" | "signals_count" | "snapshot_status" | "updated_at";
 
@@ -228,10 +231,15 @@ export default function Dashboard() {
                   <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground">
                     {company.last_processed_at ? new Date(company.last_processed_at).toLocaleDateString() : "—"}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 flex items-center gap-2">
                     <Link to={`/company/${company.id}`} className="text-muted-foreground hover:text-primary transition-colors">
                       <ExternalLink className="w-4 h-4" />
                     </Link>
+                    {storyIds.has(company.name.toLowerCase()) && (
+                      <Link to={`/stories/${company.name.toLowerCase()}`} className="text-muted-foreground hover:text-primary transition-colors" title="Open Story">
+                        <BookOpen className="w-4 h-4" />
+                      </Link>
+                    )}
                   </td>
                 </motion.tr>
               ))}
