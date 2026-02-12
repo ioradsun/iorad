@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { useCompanies, useSignalCounts, useProcessingJobs } from "@/hooks/useSupabase";
+import { useCompanies, useSignalCounts, useProcessingJobs, useRunSignals } from "@/hooks/useSupabase";
+import { toast } from "sonner";
 import StatusBadge from "@/components/StatusBadge";
 import ScoreCell from "@/components/ScoreCell";
 import { ArrowUpDown, Play, ExternalLink, Search, SlidersHorizontal, Loader2 } from "lucide-react";
@@ -14,6 +15,7 @@ export default function Dashboard() {
   const { data: companies = [], isLoading } = useCompanies();
   const { data: signalCounts = {} } = useSignalCounts();
   const { data: jobs = [] } = useProcessingJobs();
+  const runSignals = useRunSignals();
 
   const [sortKey, setSortKey] = useState<SortKey>("last_score_total");
   const [sortAsc, setSortAsc] = useState(false);
@@ -92,8 +94,21 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button className="gap-2">
-            <Play className="w-4 h-4" /> Run Now
+          <Button
+            className="gap-2"
+            disabled={runSignals.isPending}
+            onClick={() => {
+              runSignals.mutate(undefined, {
+                onSuccess: (data) => toast.success(`Job complete: ${data?.succeeded ?? 0} companies processed`),
+                onError: (err) => toast.error(`Run failed: ${err.message}`),
+              });
+            }}
+          >
+            {runSignals.isPending ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Running…</>
+            ) : (
+              <><Play className="w-4 h-4" /> Run Now</>
+            )}
           </Button>
         </div>
       </div>

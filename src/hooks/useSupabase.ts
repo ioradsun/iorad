@@ -153,6 +153,25 @@ export function useJobItems(jobId: string | undefined) {
   });
 }
 
+// ---- Run Signals (trigger edge function) ----
+export function useRunSignals() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("run-signals", {
+        method: "POST",
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["companies"] });
+      qc.invalidateQueries({ queryKey: ["processing_jobs"] });
+      qc.invalidateQueries({ queryKey: ["signal_counts"] });
+    },
+  });
+}
+
 // ---- Signal counts for dashboard (aggregated) ----
 export function useSignalCounts() {
   return useQuery({
