@@ -67,6 +67,10 @@ export type Database = {
       }
       companies: {
         Row: {
+          buyer_email: string | null
+          buyer_linkedin: string | null
+          buyer_name: string | null
+          buyer_title: string | null
           created_at: string
           domain: string | null
           headcount: number | null
@@ -85,6 +89,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          buyer_email?: string | null
+          buyer_linkedin?: string | null
+          buyer_name?: string | null
+          buyer_title?: string | null
           created_at?: string
           domain?: string | null
           headcount?: number | null
@@ -103,6 +111,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          buyer_email?: string | null
+          buyer_linkedin?: string | null
+          buyer_name?: string | null
+          buyer_title?: string | null
           created_at?: string
           domain?: string | null
           headcount?: number | null
