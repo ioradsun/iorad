@@ -34,12 +34,6 @@ export default function CustomerStory() {
     <div className="min-h-screen bg-[#0A0A0F] text-white">
       <StoryNav />
 
-      {/* Back link */}
-      <div className="max-w-5xl mx-auto px-6 pt-6">
-        <Link to="/stories" className="inline-flex items-center gap-1.5 text-sm text-white/40 hover:text-white/70 transition-colors">
-          <ArrowLeft className="w-3.5 h-3.5" /> All customers
-        </Link>
-      </div>
 
       {/* HERO */}
       <section className="relative overflow-hidden">
