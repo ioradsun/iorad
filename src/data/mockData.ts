@@ -15,51 +15,53 @@ export const mockSettings: AppSettings = {
   snapshot_max_age_days: 30,
 };
 
+const defaults = { partner: null, partner_rep_email: null, partner_rep_name: null, hq_country: null, industry: null, headcount: null, is_existing_customer: false, persona: null };
+
 export const mockCompanies: Company[] = [
   {
-    id: "c1", name: "Acme Corp", domain: "acme.com", created_at: "2025-01-15T10:00:00Z",
+    ...defaults, id: "c1", name: "Acme Corp", domain: "acme.com", created_at: "2025-01-15T10:00:00Z",
     updated_at: "2025-02-10T14:30:00Z", last_processed_at: "2025-02-10T14:30:00Z",
     last_score_total: 85, snapshot_status: "Generated", signals_count: 7,
     score_breakdown: { relevance: 50, urgency: 25, buyer_signal: 10, rules_fired: ["onboarding_mention", "enablement_mention", "recent_job", "multiple_roles", "senior_title"], evidence_urls: ["https://acme.com/careers/123", "https://acme.com/news/launch"] },
   },
   {
-    id: "c2", name: "TechStart Inc", domain: "techstart.io", created_at: "2025-01-15T10:00:00Z",
+    ...defaults, id: "c2", name: "TechStart Inc", domain: "techstart.io", created_at: "2025-01-15T10:00:00Z",
     updated_at: "2025-02-10T14:30:00Z", last_processed_at: "2025-02-10T14:30:00Z",
     last_score_total: 72, snapshot_status: "Generated", signals_count: 5,
     score_breakdown: { relevance: 30, urgency: 22, buyer_signal: 20, rules_fired: ["onboarding_mention", "recent_job", "news_signal", "senior_title", "buyer_org"], evidence_urls: ["https://techstart.io/careers/456"] },
   },
   {
-    id: "c3", name: "GlobalEd Solutions", domain: "globaled.com", created_at: "2025-01-15T10:00:00Z",
+    ...defaults, id: "c3", name: "GlobalEd Solutions", domain: "globaled.com", created_at: "2025-01-15T10:00:00Z",
     updated_at: "2025-02-09T11:00:00Z", last_processed_at: "2025-02-09T11:00:00Z",
     last_score_total: 65, snapshot_status: "Generated", signals_count: 4,
     score_breakdown: { relevance: 30, urgency: 15, buyer_signal: 20, rules_fired: ["customer_education_mention", "recent_job", "buyer_org"], evidence_urls: ["https://globaled.com/jobs/789"] },
   },
   {
-    id: "c4", name: "Nimbus SaaS", domain: "nimbus.cloud", created_at: "2025-01-15T10:00:00Z",
+    ...defaults, id: "c4", name: "Nimbus SaaS", domain: "nimbus.cloud", created_at: "2025-01-15T10:00:00Z",
     updated_at: "2025-02-08T09:00:00Z", last_processed_at: "2025-02-08T09:00:00Z",
     last_score_total: 45, snapshot_status: "Generated", signals_count: 3,
     score_breakdown: { relevance: 20, urgency: 15, buyer_signal: 10, rules_fired: ["knowledge_base_mention", "recent_job", "senior_title"], evidence_urls: [] },
   },
   {
-    id: "c5", name: "Orbit Finance", domain: "orbitfin.co", created_at: "2025-01-15T10:00:00Z",
+    ...defaults, id: "c5", name: "Orbit Finance", domain: "orbitfin.co", created_at: "2025-01-15T10:00:00Z",
     updated_at: "2025-02-07T16:00:00Z", last_processed_at: "2025-02-07T16:00:00Z",
     last_score_total: 30, snapshot_status: "Low Signal", signals_count: 1,
     score_breakdown: { relevance: 10, urgency: 10, buyer_signal: 10, rules_fired: ["self_serve_mention"], evidence_urls: [] },
   },
   {
-    id: "c6", name: "DataVault", domain: "datavault.io", created_at: "2025-01-16T10:00:00Z",
+    ...defaults, id: "c6", name: "DataVault", domain: "datavault.io", created_at: "2025-01-16T10:00:00Z",
     updated_at: "2025-02-10T14:30:00Z", last_processed_at: "2025-02-10T14:30:00Z",
     last_score_total: 55, snapshot_status: "Generated", signals_count: 4,
     score_breakdown: { relevance: 30, urgency: 15, buyer_signal: 10, rules_fired: ["onboarding_mention", "recent_job", "senior_title"], evidence_urls: [] },
   },
   {
-    id: "c7", name: "CloudPeak", domain: "cloudpeak.dev", created_at: "2025-01-16T10:00:00Z",
+    ...defaults, id: "c7", name: "CloudPeak", domain: "cloudpeak.dev", created_at: "2025-01-16T10:00:00Z",
     updated_at: "2025-02-06T12:00:00Z", last_processed_at: "2025-02-06T12:00:00Z",
     last_score_total: 20, snapshot_status: "Low Signal", signals_count: 1,
     score_breakdown: { relevance: 10, urgency: 5, buyer_signal: 5, rules_fired: [], evidence_urls: [] },
   },
   {
-    id: "c8", name: "Pinnacle HR", domain: "pinnaclehr.com", created_at: "2025-01-17T10:00:00Z",
+    ...defaults, id: "c8", name: "Pinnacle HR", domain: "pinnaclehr.com", created_at: "2025-01-17T10:00:00Z",
     updated_at: "2025-02-10T14:30:00Z", last_processed_at: null,
     last_score_total: null, snapshot_status: null, signals_count: 0,
     score_breakdown: undefined,
