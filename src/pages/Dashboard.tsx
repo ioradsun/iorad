@@ -7,6 +7,7 @@ import ScoreCell from "@/components/ScoreCell";
 import { ArrowUpDown, Play, ExternalLink, Search, SlidersHorizontal, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { motion } from "framer-motion";
 
 type SortKey = "name" | "last_score_total" | "signals_count" | "snapshot_status" | "updated_at";
@@ -23,6 +24,7 @@ export default function Dashboard() {
   const [search, setSearch] = useState("");
   const [minScore, setMinScore] = useState(0);
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [partnerFilter, setPartnerFilter] = useState<string>("all");
 
   const lastJob = jobs[0];
 
@@ -38,6 +40,7 @@ export default function Dashboard() {
     }
     if (minScore > 0) list = list.filter(c => (c.last_score_total ?? 0) >= minScore);
     if (statusFilter.length > 0) list = list.filter(c => c.snapshot_status && statusFilter.includes(c.snapshot_status));
+    if (partnerFilter !== "all") list = list.filter(c => c.partner === partnerFilter);
 
     list.sort((a, b) => {
       let av: any, bv: any;
@@ -54,7 +57,12 @@ export default function Dashboard() {
       return 0;
     });
     return list;
-  }, [search, minScore, statusFilter, sortKey, sortAsc, companiesWithSignals]);
+  }, [search, minScore, statusFilter, partnerFilter, sortKey, sortAsc, companiesWithSignals]);
+
+  const partners = useMemo(() => {
+    const set = new Set(companies.map(c => c.partner).filter(Boolean) as string[]);
+    return Array.from(set).sort();
+  }, [companies]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -148,6 +156,17 @@ export default function Dashboard() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Search companies..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 bg-secondary border-border" />
         </div>
+        <Select value={partnerFilter} onValueChange={setPartnerFilter}>
+          <SelectTrigger className="w-[180px] h-8 text-xs bg-secondary border-border">
+            <SelectValue placeholder="All Partners" />
+          </SelectTrigger>
+          <SelectContent className="bg-popover border-border z-50">
+            <SelectItem value="all">All Partners</SelectItem>
+            {partners.map(p => (
+              <SelectItem key={p} value={p}>{p}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <div className="flex items-center gap-2 text-xs">
           <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
           <span className="text-muted-foreground">Min Score:</span>
@@ -174,7 +193,8 @@ export default function Dashboard() {
                 <th className="text-left px-4 py-3"><SortHeader label="Company" field="name" /></th>
                 <th className="text-left px-4 py-3"><SortHeader label="Score" field="last_score_total" /></th>
                 <th className="text-left px-4 py-3 hidden md:table-cell"><span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Industry</span></th>
-                <th className="text-left px-4 py-3 hidden lg:table-cell"><span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Country</span></th>
+                <th className="text-left px-4 py-3 hidden md:table-cell"><span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Partner</span></th>
+                <th className="text-left px-4 py-3 hidden lg:table-cell"><span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Partner Rep</span></th>
                 <th className="text-left px-4 py-3"><SortHeader label="Status" field="snapshot_status" /></th>
                 <th className="text-left px-4 py-3 hidden sm:table-cell"><SortHeader label="Signals" field="signals_count" /></th>
                 <th className="text-left px-4 py-3 hidden lg:table-cell"><SortHeader label="Updated" field="updated_at" /></th>
@@ -198,7 +218,11 @@ export default function Dashboard() {
                   </td>
                   <td className="px-4 py-3"><ScoreCell score={company.last_score_total} /></td>
                   <td className="px-4 py-3 hidden md:table-cell text-xs text-muted-foreground">{company.industry?.replace(/_/g, " ").toLowerCase() || "—"}</td>
-                  <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground">{company.hq_country || "—"}</td>
+                  <td className="px-4 py-3 hidden md:table-cell text-xs text-muted-foreground">{company.partner || "—"}</td>
+                  <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground">
+                    {company.partner_rep_name || "—"}
+                    {company.partner_rep_email && <div className="text-[10px] text-muted-foreground/60">{company.partner_rep_email}</div>}
+                  </td>
                   <td className="px-4 py-3"><StatusBadge status={company.snapshot_status} /></td>
                   <td className="px-4 py-3 hidden sm:table-cell data-cell text-muted-foreground">{company.signals_count}</td>
                   <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground">
@@ -213,7 +237,7 @@ export default function Dashboard() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
+                  <td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">
                     {companies.length === 0 ? "No companies yet. Upload a CSV to get started." : "No companies match your filters."}
                   </td>
                 </tr>
