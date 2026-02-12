@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useCompany, useSignals, useSnapshots } from "@/hooks/useSupabase";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 import ScoreCell from "@/components/ScoreCell";
 import StatusBadge from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -7,6 +10,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { ArrowLeft, RefreshCw, RotateCcw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote } from "lucide-react";
 import { motion } from "framer-motion";
 import { Json } from "@/integrations/supabase/types";
+import { toast } from "sonner";
 
 interface ScoreBreakdown {
   relevance?: number;
@@ -83,7 +87,29 @@ export default function CompanyDetail() {
   const { data: company, isLoading } = useCompany(id);
   const { data: signals = [] } = useSignals(id);
   const { data: snapshots = [] } = useSnapshots(id);
+  const queryClient = useQueryClient();
+  const [activeAction, setActiveAction] = useState<string | null>(null);
 
+  const runAction = async (mode: "signals_only" | "score_only" | "snapshot_only" | "full") => {
+    if (!id) return;
+    setActiveAction(mode);
+    try {
+      const { data, error } = await supabase.functions.invoke("run-signals", {
+        body: { company_id: id, mode },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success(`Done — ${data?.company || "company"}`);
+      queryClient.invalidateQueries({ queryKey: ["company", id] });
+      queryClient.invalidateQueries({ queryKey: ["signals", id] });
+      queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
+      queryClient.invalidateQueries({ queryKey: ["companies"] });
+    } catch (e: any) {
+      toast.error(e.message || "Action failed");
+    } finally {
+      setActiveAction(null);
+    }
+  };
   if (isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
   }
@@ -115,9 +141,15 @@ export default function CompanyDetail() {
           <StatusBadge status={company.snapshot_status} />
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5 text-xs"><RefreshCw className="w-3.5 h-3.5" /> Refresh Signals</Button>
-          <Button variant="outline" size="sm" className="gap-1.5 text-xs"><RotateCcw className="w-3.5 h-3.5" /> Recalculate Score</Button>
-          <Button size="sm" className="gap-1.5 text-xs"><RotateCcw className="w-3.5 h-3.5" /> Regenerate Snapshot</Button>
+          <Button variant="outline" size="sm" className="gap-1.5 text-xs" disabled={!!activeAction} onClick={() => runAction("signals_only")}>
+            {activeAction === "signals_only" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Refresh Signals
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5 text-xs" disabled={!!activeAction} onClick={() => runAction("score_only")}>
+            {activeAction === "score_only" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />} Recalculate Score
+          </Button>
+          <Button size="sm" className="gap-1.5 text-xs" disabled={!!activeAction} onClick={() => runAction("full")}>
+            {activeAction === "full" || activeAction === "snapshot_only" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />} Regenerate Snapshot
+          </Button>
         </div>
       </div>
 
