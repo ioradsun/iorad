@@ -1,9 +1,9 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { mockCompanies, mockJobs } from "@/data/mockData";
+import { useCompanies, useSignalCounts, useProcessingJobs } from "@/hooks/useSupabase";
 import StatusBadge from "@/components/StatusBadge";
 import ScoreCell from "@/components/ScoreCell";
-import { ArrowUpDown, Play, ExternalLink, Search, SlidersHorizontal } from "lucide-react";
+import { ArrowUpDown, Play, ExternalLink, Search, SlidersHorizontal, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
@@ -11,19 +11,27 @@ import { motion } from "framer-motion";
 type SortKey = "name" | "last_score_total" | "signals_count" | "snapshot_status" | "updated_at";
 
 export default function Dashboard() {
+  const { data: companies = [], isLoading } = useCompanies();
+  const { data: signalCounts = {} } = useSignalCounts();
+  const { data: jobs = [] } = useProcessingJobs();
+
   const [sortKey, setSortKey] = useState<SortKey>("last_score_total");
   const [sortAsc, setSortAsc] = useState(false);
   const [search, setSearch] = useState("");
   const [minScore, setMinScore] = useState(0);
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
 
-  const lastJob = mockJobs[0];
+  const lastJob = jobs[0];
+
+  const companiesWithSignals = useMemo(() => {
+    return companies.map(c => ({ ...c, signals_count: signalCounts[c.id] || 0 }));
+  }, [companies, signalCounts]);
 
   const filtered = useMemo(() => {
-    let list = [...mockCompanies];
+    let list = [...companiesWithSignals];
     if (search) {
       const q = search.toLowerCase();
-      list = list.filter(c => c.name.toLowerCase().includes(q) || c.domain.toLowerCase().includes(q));
+      list = list.filter(c => c.name.toLowerCase().includes(q) || (c.domain || "").toLowerCase().includes(q));
     }
     if (minScore > 0) list = list.filter(c => (c.last_score_total ?? 0) >= minScore);
     if (statusFilter.length > 0) list = list.filter(c => c.snapshot_status && statusFilter.includes(c.snapshot_status));
@@ -43,7 +51,7 @@ export default function Dashboard() {
       return 0;
     });
     return list;
-  }, [search, minScore, statusFilter, sortKey, sortAsc]);
+  }, [search, minScore, statusFilter, sortKey, sortAsc, companiesWithSignals]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -61,15 +69,25 @@ export default function Dashboard() {
   );
 
   const statuses = ["Generated", "Low Signal", "No Change", "Error"];
+  const scored = companiesWithSignals.filter(c => c.last_score_total !== null);
+  const avgScore = scored.length > 0 ? Math.round(scored.reduce((s, c) => s + (c.last_score_total ?? 0), 0) / scored.length) : 0;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        <span className="ml-2 text-muted-foreground">Loading companies…</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Signal Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {mockCompanies.length} companies tracked · Last run{" "}
+            {companies.length} companies tracked · Last run{" "}
             {lastJob ? new Date(lastJob.started_at).toLocaleDateString() : "never"}
           </p>
         </div>
@@ -80,13 +98,12 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Stats bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Total Companies", value: mockCompanies.length },
-          { label: "Avg Score", value: Math.round(mockCompanies.reduce((s, c) => s + (c.last_score_total ?? 0), 0) / mockCompanies.filter(c => c.last_score_total !== null).length) },
-          { label: "Snapshots Generated", value: mockCompanies.filter(c => c.snapshot_status === "Generated").length },
-          { label: "Low Signal", value: mockCompanies.filter(c => c.snapshot_status === "Low Signal").length },
+          { label: "Total Companies", value: companies.length },
+          { label: "Avg Score", value: avgScore },
+          { label: "Snapshots Generated", value: companies.filter(c => c.snapshot_status === "Generated").length },
+          { label: "Low Signal", value: companies.filter(c => c.snapshot_status === "Low Signal").length },
         ].map(({ label, value }) => (
           <motion.div key={label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="panel">
             <div className="panel-header">{label}</div>
@@ -97,36 +114,22 @@ export default function Dashboard() {
 
       <div className="glow-line" />
 
-      {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search companies..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-9 bg-secondary border-border"
-          />
+          <Input placeholder="Search companies..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 bg-secondary border-border" />
         </div>
         <div className="flex items-center gap-2 text-xs">
           <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
           <span className="text-muted-foreground">Min Score:</span>
-          <Input
-            type="number" min={0} max={100} value={minScore}
-            onChange={e => setMinScore(Number(e.target.value))}
-            className="w-16 h-8 bg-secondary border-border text-xs"
-          />
+          <Input type="number" min={0} max={100} value={minScore} onChange={e => setMinScore(Number(e.target.value))} className="w-16 h-8 bg-secondary border-border text-xs" />
         </div>
         <div className="flex items-center gap-1.5">
           {statuses.map(s => (
             <button
               key={s}
               onClick={() => setStatusFilter(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])}
-              className={`text-xs px-2.5 py-1 rounded border transition-colors ${
-                statusFilter.includes(s)
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border text-muted-foreground hover:text-foreground"
-              }`}
+              className={`text-xs px-2.5 py-1 rounded border transition-colors ${statusFilter.includes(s) ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
             >
               {s}
             </button>
@@ -134,7 +137,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Table */}
       <div className="border rounded-md overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -142,7 +144,8 @@ export default function Dashboard() {
               <tr className="border-b bg-secondary/50">
                 <th className="text-left px-4 py-3"><SortHeader label="Company" field="name" /></th>
                 <th className="text-left px-4 py-3"><SortHeader label="Score" field="last_score_total" /></th>
-                <th className="text-left px-4 py-3 hidden md:table-cell"><span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Rel / Urg / Buy</span></th>
+                <th className="text-left px-4 py-3 hidden md:table-cell"><span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Industry</span></th>
+                <th className="text-left px-4 py-3 hidden lg:table-cell"><span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Country</span></th>
                 <th className="text-left px-4 py-3"><SortHeader label="Status" field="snapshot_status" /></th>
                 <th className="text-left px-4 py-3 hidden sm:table-cell"><SortHeader label="Signals" field="signals_count" /></th>
                 <th className="text-left px-4 py-3 hidden lg:table-cell"><SortHeader label="Updated" field="updated_at" /></th>
@@ -155,29 +158,18 @@ export default function Dashboard() {
                   key={company.id}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  transition={{ delay: i * 0.03 }}
+                  transition={{ delay: Math.min(i * 0.02, 0.5) }}
                   className="border-b border-border/50 hover:bg-secondary/30 transition-colors"
                 >
                   <td className="px-4 py-3">
                     <Link to={`/company/${company.id}`} className="group">
                       <div className="font-medium text-foreground group-hover:text-primary transition-colors">{company.name}</div>
-                      <div className="text-xs text-muted-foreground">{company.domain}</div>
+                      <div className="text-xs text-muted-foreground">{company.domain || "—"}</div>
                     </Link>
                   </td>
-                  <td className="px-4 py-3">
-                    <ScoreCell score={company.last_score_total} />
-                  </td>
-                  <td className="px-4 py-3 hidden md:table-cell">
-                    {company.score_breakdown ? (
-                      <div className="flex items-center gap-2 data-cell text-muted-foreground">
-                        <span>{company.score_breakdown.relevance}</span>
-                        <span className="text-border">/</span>
-                        <span>{company.score_breakdown.urgency}</span>
-                        <span className="text-border">/</span>
-                        <span>{company.score_breakdown.buyer_signal}</span>
-                      </div>
-                    ) : <span className="text-xs text-muted-foreground">—</span>}
-                  </td>
+                  <td className="px-4 py-3"><ScoreCell score={company.last_score_total} /></td>
+                  <td className="px-4 py-3 hidden md:table-cell text-xs text-muted-foreground">{company.industry?.replace(/_/g, " ").toLowerCase() || "—"}</td>
+                  <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground">{company.hq_country || "—"}</td>
                   <td className="px-4 py-3"><StatusBadge status={company.snapshot_status} /></td>
                   <td className="px-4 py-3 hidden sm:table-cell data-cell text-muted-foreground">{company.signals_count}</td>
                   <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground">
@@ -191,7 +183,11 @@ export default function Dashboard() {
                 </motion.tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">No companies match your filters.</td></tr>
+                <tr>
+                  <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
+                    {companies.length === 0 ? "No companies yet. Upload a CSV to get started." : "No companies match your filters."}
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
