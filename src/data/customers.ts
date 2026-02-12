@@ -10,6 +10,22 @@ export interface QuantifiedImpactItem {
   result: string;
 }
 
+export interface CompellingEvents {
+  matched: string[];
+  buyerLanguage: string[];
+}
+
+export interface MetaPattern {
+  type: "adoption weak after rollout" | "avoiding chaos before rollout" | "drowning in repeat questions/manual training";
+  description: string;
+}
+
+export interface OutboundPositioning {
+  executiveFraming?: string;
+  efficiencyRevenue?: string;
+  riskMitigation?: string;
+}
+
 export interface Customer {
   id: string;
   name: string;
@@ -17,10 +33,13 @@ export interface Customer {
   persona: string;
   whyNow: string;
   signals: CustomerSignal[];
+  compellingEvents: CompellingEvents;
+  metaPattern: MetaPattern;
   friction: CustomerSignal[];
   partnerPlatform: {
     strengths: string[];
     executionGaps: string[];
+    keyInsight: string;
   };
   embeddedIorad: {
     situation: string;
@@ -30,11 +49,7 @@ export interface Customer {
   };
   quantifiedImpact: QuantifiedImpactItem[];
   executiveNarrative: string[];
-  outboundPositioning?: {
-    executiveFraming?: string;
-    efficiencyRevenue?: string;
-    riskMitigation?: string;
-  };
+  outboundPositioning?: OutboundPositioning;
 }
 
 export const customers: Customer[] = [
@@ -67,6 +82,23 @@ export const customers: Customer[] = [
           "Intermedia is partnering with Focus Group to deliver AI-powered communication solutions in the UK, requiring rapid knowledge distribution to new markets.",
       },
     ],
+    compellingEvents: {
+      matched: [
+        "rapid stack expansion",
+        "new product/feature release",
+        "support burden pressure",
+      ],
+      buyerLanguage: [
+        "We're onboarding partners in Europe now and need them productive in weeks, not months…",
+        "Every time we launch a new product, the enablement team drowns in screenshare requests…",
+        "Our partners keep asking the same how-to questions — we need something that scales without adding headcount.",
+      ],
+    },
+    metaPattern: {
+      type: "drowning in repeat questions/manual training",
+      description:
+        "Intermedia's enablement team runs recurring live screenshare sessions for every new partner cohort and product launch. Knowledge lives in people's heads, not in the platform. Each new region or product multiplies the manual training burden without adding capacity.",
+    },
     friction: [
       {
         title: "Manual content creation bottleneck",
@@ -90,6 +122,7 @@ export const customers: Customer[] = [
         "Reliance on video and text that doesn't operationalize workflows",
         "Challenges measuring practical application of learned skills",
       ],
+      keyInsight: "Docebo organizes knowledge. iorad operationalizes knowledge.",
     },
     embeddedIorad: {
       situation:
@@ -123,5 +156,10 @@ export const customers: Customer[] = [
       "Embedding iorad within Docebo transforms operational guidance creation into an instantaneous interactive experience, integrated directly into courses and learning paths.",
       "Partners learn by doing — accelerating ramp and reducing how-to support queries while ensuring consistency across regions. This strengthens revenue via the channel and hardens the value of Docebo as the strategic learning platform.",
     ],
+    outboundPositioning: {
+      executiveFraming: "Your partners shouldn't need a human to walk them through every workflow.",
+      efficiencyRevenue: "Cut partner ramp time by 5% and capture $625K in accelerated revenue.",
+      riskMitigation: "Without embedded execution, every new region multiplies your enablement bottleneck.",
+    },
   },
 ];
