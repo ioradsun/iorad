@@ -1,0 +1,202 @@
+import { useState, useMemo } from "react";
+import { Link } from "react-router-dom";
+import { mockCompanies, mockJobs } from "@/data/mockData";
+import StatusBadge from "@/components/StatusBadge";
+import ScoreCell from "@/components/ScoreCell";
+import { ArrowUpDown, Play, ExternalLink, Search, SlidersHorizontal } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { motion } from "framer-motion";
+
+type SortKey = "name" | "last_score_total" | "signals_count" | "snapshot_status" | "updated_at";
+
+export default function Dashboard() {
+  const [sortKey, setSortKey] = useState<SortKey>("last_score_total");
+  const [sortAsc, setSortAsc] = useState(false);
+  const [search, setSearch] = useState("");
+  const [minScore, setMinScore] = useState(0);
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+
+  const lastJob = mockJobs[0];
+
+  const filtered = useMemo(() => {
+    let list = [...mockCompanies];
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(c => c.name.toLowerCase().includes(q) || c.domain.toLowerCase().includes(q));
+    }
+    if (minScore > 0) list = list.filter(c => (c.last_score_total ?? 0) >= minScore);
+    if (statusFilter.length > 0) list = list.filter(c => c.snapshot_status && statusFilter.includes(c.snapshot_status));
+
+    list.sort((a, b) => {
+      let av: any, bv: any;
+      switch (sortKey) {
+        case "name": av = a.name; bv = b.name; break;
+        case "last_score_total": av = a.last_score_total ?? -1; bv = b.last_score_total ?? -1; break;
+        case "signals_count": av = a.signals_count; bv = b.signals_count; break;
+        case "snapshot_status": av = a.snapshot_status ?? ""; bv = b.snapshot_status ?? ""; break;
+        case "updated_at": av = a.updated_at; bv = b.updated_at; break;
+        default: av = 0; bv = 0;
+      }
+      if (av < bv) return sortAsc ? -1 : 1;
+      if (av > bv) return sortAsc ? 1 : -1;
+      return 0;
+    });
+    return list;
+  }, [search, minScore, statusFilter, sortKey, sortAsc]);
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortAsc(!sortAsc);
+    else { setSortKey(key); setSortAsc(false); }
+  };
+
+  const SortHeader = ({ label, field }: { label: string; field: SortKey }) => (
+    <button
+      onClick={() => toggleSort(field)}
+      className="flex items-center gap-1 text-xs font-mono uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+    >
+      {label}
+      <ArrowUpDown className={`w-3 h-3 ${sortKey === field ? "text-primary" : ""}`} />
+    </button>
+  );
+
+  const statuses = ["Generated", "Low Signal", "No Change", "Error"];
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Signal Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {mockCompanies.length} companies tracked · Last run{" "}
+            {lastJob ? new Date(lastJob.started_at).toLocaleDateString() : "never"}
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button className="gap-2">
+            <Play className="w-4 h-4" /> Run Now
+          </Button>
+        </div>
+      </div>
+
+      {/* Stats bar */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "Total Companies", value: mockCompanies.length },
+          { label: "Avg Score", value: Math.round(mockCompanies.reduce((s, c) => s + (c.last_score_total ?? 0), 0) / mockCompanies.filter(c => c.last_score_total !== null).length) },
+          { label: "Snapshots Generated", value: mockCompanies.filter(c => c.snapshot_status === "Generated").length },
+          { label: "Low Signal", value: mockCompanies.filter(c => c.snapshot_status === "Low Signal").length },
+        ].map(({ label, value }) => (
+          <motion.div key={label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="panel">
+            <div className="panel-header">{label}</div>
+            <div className="text-2xl font-display font-bold text-foreground">{value}</div>
+          </motion.div>
+        ))}
+      </div>
+
+      <div className="glow-line" />
+
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search companies..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-9 bg-secondary border-border"
+          />
+        </div>
+        <div className="flex items-center gap-2 text-xs">
+          <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-muted-foreground">Min Score:</span>
+          <Input
+            type="number" min={0} max={100} value={minScore}
+            onChange={e => setMinScore(Number(e.target.value))}
+            className="w-16 h-8 bg-secondary border-border text-xs"
+          />
+        </div>
+        <div className="flex items-center gap-1.5">
+          {statuses.map(s => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])}
+              className={`text-xs px-2.5 py-1 rounded border transition-colors ${
+                statusFilter.includes(s)
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="border rounded-md overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b bg-secondary/50">
+                <th className="text-left px-4 py-3"><SortHeader label="Company" field="name" /></th>
+                <th className="text-left px-4 py-3"><SortHeader label="Score" field="last_score_total" /></th>
+                <th className="text-left px-4 py-3 hidden md:table-cell"><span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Rel / Urg / Buy</span></th>
+                <th className="text-left px-4 py-3"><SortHeader label="Status" field="snapshot_status" /></th>
+                <th className="text-left px-4 py-3 hidden sm:table-cell"><SortHeader label="Signals" field="signals_count" /></th>
+                <th className="text-left px-4 py-3 hidden lg:table-cell"><SortHeader label="Updated" field="updated_at" /></th>
+                <th className="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((company, i) => (
+                <motion.tr
+                  key={company.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: i * 0.03 }}
+                  className="border-b border-border/50 hover:bg-secondary/30 transition-colors"
+                >
+                  <td className="px-4 py-3">
+                    <Link to={`/company/${company.id}`} className="group">
+                      <div className="font-medium text-foreground group-hover:text-primary transition-colors">{company.name}</div>
+                      <div className="text-xs text-muted-foreground">{company.domain}</div>
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3">
+                    <ScoreCell score={company.last_score_total} />
+                  </td>
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    {company.score_breakdown ? (
+                      <div className="flex items-center gap-2 data-cell text-muted-foreground">
+                        <span>{company.score_breakdown.relevance}</span>
+                        <span className="text-border">/</span>
+                        <span>{company.score_breakdown.urgency}</span>
+                        <span className="text-border">/</span>
+                        <span>{company.score_breakdown.buyer_signal}</span>
+                      </div>
+                    ) : <span className="text-xs text-muted-foreground">—</span>}
+                  </td>
+                  <td className="px-4 py-3"><StatusBadge status={company.snapshot_status} /></td>
+                  <td className="px-4 py-3 hidden sm:table-cell data-cell text-muted-foreground">{company.signals_count}</td>
+                  <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground">
+                    {company.last_processed_at ? new Date(company.last_processed_at).toLocaleDateString() : "—"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Link to={`/company/${company.id}`} className="text-muted-foreground hover:text-primary transition-colors">
+                      <ExternalLink className="w-4 h-4" />
+                    </Link>
+                  </td>
+                </motion.tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">No companies match your filters.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
