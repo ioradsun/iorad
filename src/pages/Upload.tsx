@@ -4,7 +4,11 @@ import Papa from "papaparse";
 import { CSVRow, ValidationError } from "@/types";
 import { useInsertCompanies } from "@/hooks/useSupabase";
 import { Button } from "@/components/ui/button";
-import { Upload as UploadIcon, FileText, AlertTriangle, CheckCircle2, X, Building2, Globe, Users } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Upload as UploadIcon, FileText, AlertTriangle, CheckCircle2, X, Building2, Globe, Users, Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
@@ -158,12 +162,23 @@ export default function UploadPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Upload Companies</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Add Companies</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Upload a CSV with an <code className="font-mono text-xs bg-secondary px-1.5 py-0.5 rounded">Account Name</code> or{" "}
-          <code className="font-mono text-xs bg-secondary px-1.5 py-0.5 rounded">company_name</code> column. Max 1,000 rows.
+          Upload a CSV or manually add a single company.
         </p>
       </div>
+
+      <Tabs defaultValue="upload" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="upload">CSV Upload</TabsTrigger>
+          <TabsTrigger value="manual">Add Manually</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="manual">
+          <ManualAddForm />
+        </TabsContent>
+
+        <TabsContent value="upload" className="space-y-6">
 
       <div
         onDrop={handleDrop}
@@ -286,6 +301,140 @@ export default function UploadPage() {
           </Button>
         </motion.div>
       )}
+        </TabsContent>
+      </Tabs>
     </div>
+  );
+}
+
+const PARTNERS = ["seismic", "workramp", "360learning", "docebo", "gainsight"];
+
+function ManualAddForm() {
+  const navigate = useNavigate();
+  const insertCompanies = useInsertCompanies();
+  const [form, setForm] = useState({
+    name: "",
+    domain: "",
+    partner: "",
+    industry: "",
+    hq_country: "",
+    persona: "",
+    headcount: "",
+  });
+  const [saving, setSaving] = useState(false);
+
+  const update = (key: string, value: string) => setForm(prev => ({ ...prev, [key]: value }));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = form.name.trim();
+    if (!name) { toast.error("Company name is required"); return; }
+    if (name.length > 200) { toast.error("Company name is too long"); return; }
+
+    const domain = form.domain.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "") || null;
+
+    setSaving(true);
+    try {
+      await insertCompanies.mutateAsync([{
+        name,
+        domain,
+        partner: form.partner || null,
+        industry: form.industry.trim() || null,
+        hq_country: form.hq_country.trim() || null,
+        persona: form.persona.trim() || null,
+        headcount: form.headcount ? parseInt(form.headcount, 10) || null : null,
+        is_existing_customer: false,
+        partner_rep_email: null,
+        partner_rep_name: null,
+      }]);
+      toast.success(`Added ${name}`);
+      navigate("/");
+    } catch (err: any) {
+      toast.error(`Failed: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="panel space-y-4">
+      <div className="panel-header">Add a Company</div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2 col-span-2 sm:col-span-1">
+          <Label className="text-xs">Company Name *</Label>
+          <Input
+            value={form.name}
+            onChange={e => update("name", e.target.value)}
+            placeholder="Acme Corp"
+            className="bg-secondary"
+            maxLength={200}
+            required
+          />
+        </div>
+        <div className="space-y-2 col-span-2 sm:col-span-1">
+          <Label className="text-xs">Domain</Label>
+          <Input
+            value={form.domain}
+            onChange={e => update("domain", e.target.value)}
+            placeholder="acme.com"
+            className="bg-secondary"
+            maxLength={255}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label className="text-xs">Partner</Label>
+          <Select value={form.partner} onValueChange={v => update("partner", v)}>
+            <SelectTrigger className="bg-secondary"><SelectValue placeholder="Select partner" /></SelectTrigger>
+            <SelectContent>
+              {PARTNERS.map(p => <SelectItem key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label className="text-xs">Industry</Label>
+          <Input
+            value={form.industry}
+            onChange={e => update("industry", e.target.value)}
+            placeholder="SaaS, Healthcare…"
+            className="bg-secondary"
+            maxLength={100}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label className="text-xs">HQ Country</Label>
+          <Input
+            value={form.hq_country}
+            onChange={e => update("hq_country", e.target.value)}
+            placeholder="US"
+            className="bg-secondary"
+            maxLength={100}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label className="text-xs">Headcount</Label>
+          <Input
+            type="number"
+            value={form.headcount}
+            onChange={e => update("headcount", e.target.value)}
+            placeholder="500"
+            className="bg-secondary"
+            min={1}
+          />
+        </div>
+        <div className="space-y-2 col-span-2">
+          <Label className="text-xs">Persona</Label>
+          <Input
+            value={form.persona}
+            onChange={e => update("persona", e.target.value)}
+            placeholder="VP of Enablement"
+            className="bg-secondary"
+            maxLength={200}
+          />
+        </div>
+      </div>
+      <Button type="submit" disabled={saving || !form.name.trim()} className="w-full gap-2">
+        {saving ? <>Adding…</> : <><Plus className="w-4 h-4" />Add Company</>}
+      </Button>
+    </form>
   );
 }
