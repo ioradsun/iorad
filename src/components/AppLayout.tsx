@@ -1,10 +1,11 @@
 import { Link, useLocation } from "react-router-dom";
-import { Upload, LayoutDashboard, Settings, History, Zap } from "lucide-react";
+import { Upload, LayoutDashboard, Settings, History, Zap, BookOpen } from "lucide-react";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/upload", label: "Upload", icon: Upload },
   { to: "/jobs", label: "Jobs", icon: History },
+  { to: "/stories", label: "Stories", icon: BookOpen },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
