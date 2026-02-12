@@ -18,8 +18,9 @@ const fade = {
 const SIGNATURE = "If a workflow requires a human to explain it, you don't have scale — you have dependency.";
 
 export default function CustomerStory() {
-  const { id } = useParams<{ id: string }>();
-  const customer = customers.find((c) => c.id === id);
+  const { id, customer: customerParam } = useParams<{ id: string; partner: string; customer: string }>();
+  const customerId = customerParam || id;
+  const customer = customers.find((c) => c.id === customerId);
   if (!customer) return <NotFoundStory />;
   const pm = partnerMeta[customer.partner];
 

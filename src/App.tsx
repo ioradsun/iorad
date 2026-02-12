@@ -24,6 +24,7 @@ const App = () => (
         <Routes>
           <Route path="/stories" element={<CustomerList />} />
           <Route path="/stories/:id" element={<CustomerStory />} />
+          <Route path="/:partner/:customer/stories" element={<CustomerStory />} />
           <Route path="*" element={
             <AppLayout>
               <Routes>
