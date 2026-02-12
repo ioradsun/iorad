@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_config: {
+        Row: {
+          id: number
+          model: string
+          system_prompt: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          model?: string
+          system_prompt?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          model?: string
+          system_prompt?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           batch_size: number
@@ -130,6 +151,66 @@ export type Database = {
           partner_rep_name?: string | null
           persona?: string | null
           snapshot_status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      compelling_events: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          label: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      partner_config: {
+        Row: {
+          color: string
+          embed_bullets: string[]
+          gradient: string
+          id: string
+          is_active: boolean
+          label: string
+          positioning: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          embed_bullets?: string[]
+          gradient?: string
+          id: string
+          is_active?: boolean
+          label: string
+          positioning?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          embed_bullets?: string[]
+          gradient?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+          positioning?: string
+          sort_order?: number
           updated_at?: string
         }
         Relationships: []

@@ -1,45 +1,23 @@
-export const COMPELLING_EVENTS = [
-  "platform rollout/migration",
-  "tool consolidation/replacement",
-  "rapid stack expansion",
-  "hiring surge",
-  "new enablement/L&D leader",
-  "LMS launch/migration",
-  "certification/compliance push",
-  "customer education launch",
-  "new product/feature release",
-  "support burden pressure",
-  "tech consolidation/cost pressure",
-  "lightweight in-app guidance interest",
-  "M&A integration",
-] as const;
-
-export const META_PATTERNS = [
-  "adoption weak after rollout",
-  "avoiding chaos before rollout",
-  "drowning in repeat questions/manual training",
-] as const;
-
 export function buildIoradPrompt(
   companyName: string,
   industry: string,
   partner: string | null,
-  signalSummary: string
+  signalSummary: string,
+  systemPrompt: string,
+  compellingEvents: string[]
 ): string {
   const partnerPlatform = partner || "Unknown Partner Platform";
 
-  return `You are an elite enterprise storyteller and GTM strategist for iorad.
-Style: confident, precise, "Don Draper convincing" — never hypey. No generic enablement fluff.
+  const eventsBlock = compellingEvents.map((e, i) => `${i + 1}. ${e}`).join("\n");
 
-iorad integrates natively inside: Seismic, WorkRamp, 360Learning, Docebo, Gainsight.
-Frame iorad as: unlock more value inside what they already use — turning static knowledge into embedded execution.
+  return `${systemPrompt}
 
 The target company "${companyName}" (${industry} industry) uses ${partnerPlatform}.
 
 We have a signal engine from real demo calls that maps compelling events to buyer intent.
 
 COMPELLING EVENT TAXONOMY:
-${COMPELLING_EVENTS.map((e, i) => `${i + 1}. ${e}`).join("\n")}
+${eventsBlock}
 
 META-PATTERNS (the underlying truth behind every compelling event):
 1. Rolled something out and adoption is weak
@@ -61,12 +39,12 @@ Return ONLY valid JSON with this exact structure:
 
   "compelling_events": {
     "matched": ["<event from taxonomy>"],
-    "buyer_language": ["<1-2 lines of what the buyer would say on a call, e.g. 'We just rolled out Salesforce and need onboarding docs fast…'>"]
+    "buyer_language": ["<1-2 lines of what the buyer would say on a call>"]
   },
 
   "meta_pattern": {
     "type": "<adoption weak after rollout | avoiding chaos before rollout | drowning in repeat questions/manual training>",
-    "description": "<2-3 sentences describing the operational failure mode in concrete terms: meetings, shadowing, repeated screenshares, inconsistent execution>"
+    "description": "<2-3 sentences describing the operational failure mode>"
   },
 
   "operational_friction": [
