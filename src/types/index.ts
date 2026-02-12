@@ -10,7 +10,15 @@ export type WeekDay = "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday"
 export interface Company {
   id: string;
   name: string;
-  domain: string;
+  domain: string | null;
+  partner: string | null;
+  partner_rep_email: string | null;
+  partner_rep_name: string | null;
+  hq_country: string | null;
+  industry: string | null;
+  headcount: number | null;
+  is_existing_customer: boolean;
+  persona: string | null;
   created_at: string;
   updated_at: string;
   last_processed_at: string | null;
@@ -112,7 +120,15 @@ export interface AppSettings {
 
 export interface CSVRow {
   company_name: string;
-  domain: string;
+  domain: string | null;
+  partner: string | null;
+  partner_rep_email: string | null;
+  partner_rep_name: string | null;
+  hq_country: string | null;
+  industry: string | null;
+  headcount: number | null;
+  is_existing_customer: boolean;
+  persona: string | null;
 }
 
 export interface ValidationError {
