@@ -65,7 +65,9 @@ async function searchSignals(
 async function scoreSignals(
   company: CompanyRow,
   signals: { title: string; url: string; type: string; excerpt: string }[],
-  lovableKey: string
+  lovableKey: string,
+  aiConfig: { system_prompt: string; model: string },
+  compellingEvents: string[]
 ): Promise<{
   score_total: number;
   score_breakdown: Record<string, number>;
@@ -90,7 +92,9 @@ async function scoreSignals(
       company.name,
       company.industry || "unknown",
       company.partner,
-      signalSummary
+      signalSummary,
+      aiConfig.system_prompt,
+      compellingEvents
     );
 
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -100,7 +104,7 @@ async function scoreSignals(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: aiConfig.model,
         messages: [
           { role: "system", content: "Return only valid JSON. No markdown fences." },
           { role: "user", content: prompt },
@@ -158,6 +162,13 @@ Deno.serve(async (req) => {
 
     if (!firecrawlKey) throw new Error("FIRECRAWL_API_KEY not configured");
     if (!lovableKey) throw new Error("LOVABLE_API_KEY not configured");
+
+    // Load AI config and compelling events from DB
+    const { data: aiConfigRow } = await supabase.from("ai_config").select("system_prompt, model").eq("id", 1).single();
+    const aiConfig = aiConfigRow || { system_prompt: "You are a GTM strategist for iorad.", model: "google/gemini-2.5-flash" };
+
+    const { data: eventsRows } = await supabase.from("compelling_events").select("label").eq("is_active", true).order("sort_order");
+    const compellingEvents = (eventsRows || []).map((e: any) => e.label);
 
     let body: any = {};
     try { body = await req.json(); } catch { /* ok */ }
@@ -271,7 +282,7 @@ Deno.serve(async (req) => {
 
       // Step 2: Score + Snapshot (unless signals_only)
       if (mode !== "signals_only") {
-        const result = await scoreSignals(company, signals, lovableKey);
+        const result = await scoreSignals(company, signals, lovableKey, aiConfig, compellingEvents);
         snapshotStatus = result.snapshot_status;
 
         await supabase.from("snapshots").insert({
