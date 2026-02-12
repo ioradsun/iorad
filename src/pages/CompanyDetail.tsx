@@ -439,7 +439,12 @@ export default function CompanyDetail() {
                 </AccordionTrigger>
                 <AccordionContent>
                   <div className="prose prose-sm dark:prose-invert max-w-none">
-                    {snap.executive_narrative.split("\n\n").map((p, i) => (
+                    {(Array.isArray(snap.executive_narrative)
+                      ? snap.executive_narrative
+                      : typeof snap.executive_narrative === 'string'
+                        ? snap.executive_narrative.split("\n\n")
+                        : []
+                    ).map((p: string, i: number) => (
                       <p key={i} className="text-sm text-foreground/90 leading-relaxed mb-3">{p}</p>
                     ))}
                   </div>
