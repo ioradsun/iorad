@@ -11,19 +11,28 @@ interface ScoreBreakdown {
   relevance?: number;
   urgency?: number;
   buyer_signal?: number;
+  hiring?: number;
+  news?: number;
+  expansion?: number;
   rules_fired?: string[];
   evidence_urls?: string[];
 }
 
 interface SnapshotJSON {
   trigger_summary?: string;
-  evidence?: { snippet: string; source_url: string; source_type: string; date: string | null }[];
-  why_now?: string[];
+  evidence?: { snippet?: string; detail?: string; signal_type?: string; source_url?: string; url?: string; source_type?: string; date?: string | null }[];
+  why_now?: string | string[];
   likely_initiative?: string;
   suggested_persona_targets?: string[];
   confidence_level?: string;
   confidence_reason?: string;
   missing_data_questions?: string[];
+}
+
+function toArray(val: unknown): string[] {
+  if (Array.isArray(val)) return val.map(String);
+  if (typeof val === "string" && val) return [val];
+  return [];
 }
 
 function parseJson<T>(val: Json | null | undefined): T | null {
@@ -107,9 +116,9 @@ export default function CompanyDetail() {
           {bd ? (
             <div className="space-y-4">
               {[
-                { label: "Relevance", value: bd.relevance || 0, max: 50 },
-                { label: "Urgency", value: bd.urgency || 0, max: 30 },
-                { label: "Buyer Signal", value: bd.buyer_signal || 0, max: 20 },
+                { label: "Relevance / Hiring", value: bd.relevance || bd.hiring || 0, max: 50 },
+                { label: "Urgency / News", value: bd.urgency || bd.news || 0, max: 40 },
+                { label: "Buyer Signal / Expansion", value: bd.buyer_signal || bd.expansion || 0, max: 30 },
               ].map(({ label, value, max }) => (
                 <div key={label}>
                   <div className="flex justify-between text-sm mb-1">
@@ -191,10 +200,10 @@ export default function CompanyDetail() {
             {snapJson.trigger_summary && (
               <div><div className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1">Trigger Summary</div><p className="text-sm text-foreground leading-relaxed">{snapJson.trigger_summary}</p></div>
             )}
-            {snapJson.why_now && snapJson.why_now.length > 0 && (
+            {snapJson.why_now && toArray(snapJson.why_now).length > 0 && (
               <div>
                 <div className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">Why Now</div>
-                <ul className="space-y-1.5">{snapJson.why_now.map((item, i) => <li key={i} className="flex items-start gap-2 text-sm"><span className="text-primary mt-0.5">→</span><span className="text-foreground/90">{item}</span></li>)}</ul>
+                <ul className="space-y-1.5">{toArray(snapJson.why_now).map((item, i) => <li key={i} className="flex items-start gap-2 text-sm"><span className="text-primary mt-0.5">→</span><span className="text-foreground/90">{item}</span></li>)}</ul>
               </div>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -223,9 +232,9 @@ export default function CompanyDetail() {
                 <div className="space-y-2">
                   {snapJson.evidence.map((ev, i) => (
                     <div key={i} className="text-xs border-l-2 border-primary/40 pl-3 py-1">
-                      <p className="text-foreground/80 italic">"{ev.snippet}"</p>
-                      <a href={ev.source_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1 mt-0.5">
-                        <ExternalLink className="w-3 h-3" /> {ev.source_type} · {ev.date || "no date"}
+                      <p className="text-foreground/80 italic">"{ev.snippet || ev.detail || ""}"</p>
+                      <a href={ev.source_url || ev.url || "#"} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1 mt-0.5">
+                        <ExternalLink className="w-3 h-3" /> {ev.source_type || ev.signal_type || "source"} · {ev.date || "no date"}
                       </a>
                     </div>
                   ))}
