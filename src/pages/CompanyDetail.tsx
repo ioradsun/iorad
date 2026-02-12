@@ -7,7 +7,7 @@ import ScoreCell from "@/components/ScoreCell";
 import StatusBadge from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { ArrowLeft, RefreshCw, RotateCcw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote } from "lucide-react";
+import { ArrowLeft, RefreshCw, RotateCcw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail } from "lucide-react";
 import { motion } from "framer-motion";
 import { Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
@@ -89,6 +89,25 @@ export default function CompanyDetail() {
   const { data: snapshots = [] } = useSnapshots(id);
   const queryClient = useQueryClient();
   const [activeAction, setActiveAction] = useState<string | null>(null);
+  const [findingContact, setFindingContact] = useState(false);
+
+  const findContact = async () => {
+    if (!id) return;
+    setFindingContact(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("find-contacts", {
+        body: { company_id: id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success(`Found contact: ${data?.contact?.buyer_name || "unknown"}`);
+      queryClient.invalidateQueries({ queryKey: ["company", id] });
+    } catch (e: any) {
+      toast.error(e.message || "Failed to find contact");
+    } finally {
+      setFindingContact(false);
+    }
+  };
 
   const runAction = async (mode: "signals_only" | "score_only" | "snapshot_only" | "full") => {
     if (!id) return;
@@ -147,11 +166,38 @@ export default function CompanyDetail() {
           <Button variant="outline" size="sm" className="gap-1.5 text-xs" disabled={!!activeAction} onClick={() => runAction("score_only")}>
             {activeAction === "score_only" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />} Recalculate Score
           </Button>
+          <Button variant="outline" size="sm" className="gap-1.5 text-xs" disabled={!!activeAction || findingContact} onClick={findContact}>
+            {findingContact ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserSearch className="w-3.5 h-3.5" />} Find Contact
+          </Button>
           <Button size="sm" className="gap-1.5 text-xs" disabled={!!activeAction} onClick={() => runAction("full")}>
             {activeAction === "full" || activeAction === "snapshot_only" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />} Regenerate Snapshot
           </Button>
         </div>
       </div>
+
+      {/* Buyer Contact */}
+      {(company as any).buyer_name && (
+        <div className="panel">
+          <div className="panel-header">Buyer Contact</div>
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <UserSearch className="w-5 h-5 text-primary" />
+            </div>
+            <div className="space-y-0.5">
+              <div className="text-sm font-medium">{(company as any).buyer_name}</div>
+              {(company as any).buyer_title && <div className="text-xs text-muted-foreground">{(company as any).buyer_title}</div>}
+            </div>
+            <div className="ml-auto flex items-center gap-2">
+              {(company as any).buyer_email && (
+                <a href={`mailto:${(company as any).buyer_email}`} className="text-muted-foreground hover:text-primary"><Mail className="w-4 h-4" /></a>
+              )}
+              {(company as any).buyer_linkedin && (
+                <a href={(company as any).buyer_linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary"><Linkedin className="w-4 h-4" /></a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Company metadata */}
       {(company.partner || company.industry || company.hq_country || company.persona) && (
