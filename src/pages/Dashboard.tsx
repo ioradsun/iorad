@@ -235,11 +235,14 @@ export default function Dashboard() {
                     <Link to={`/company/${company.id}`} className="text-muted-foreground hover:text-primary transition-colors">
                       <ExternalLink className="w-4 h-4" />
                     </Link>
-                    {storyIds.has(company.name.toLowerCase()) && (
-                      <Link to={`/stories/${company.name.toLowerCase()}`} className="text-muted-foreground hover:text-primary transition-colors" title="Open Story">
-                        <BookOpen className="w-4 h-4" />
-                      </Link>
-                    )}
+                    {storyIds.has(company.name.toLowerCase()) && (() => {
+                      const cust = customers.find(c => c.id === company.name.toLowerCase());
+                      return cust ? (
+                        <a href={`/${cust.partner}/${cust.id}/stories`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors" title="Open Story">
+                          <BookOpen className="w-4 h-4" />
+                        </a>
+                      ) : null;
+                    })()}
                   </td>
                 </motion.tr>
               ))}

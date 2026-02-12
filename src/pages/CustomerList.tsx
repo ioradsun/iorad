@@ -55,13 +55,15 @@ export default function CustomerList() {
                     </div>
                     <p className="text-sm text-white/40">{c.persona}</p>
                   </div>
-                  <Link
-                    to={`/stories/${c.id}`}
+                  <a
+                    href={`/${c.partner}/${c.id}/stories`}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-[#0A0A0F] font-medium text-sm hover:bg-white/90 transition-colors group-hover:shadow-lg group-hover:shadow-white/5"
                   >
                     Open
                     <ArrowRight className="w-4 h-4" />
-                  </Link>
+                  </a>
                 </div>
               </motion.div>
             );
