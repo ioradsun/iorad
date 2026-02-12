@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
     const partnerPlatform = company.partner || "unknown";
     const persona = company.persona || "Learning & Development";
 
-    const query = `Who is the person responsible for ${persona} or training technology purchasing decisions at ${company.name}${company.domain ? ` (${company.domain})` : ""}? They would be the buyer for tools like ${partnerPlatform}. I need their full name, job title, email if available, and LinkedIn profile URL. Focus on VP, Director, or Head of ${persona}, Learning, Training, or Enablement roles.`;
+    const query = `Find the person at ${company.name}${company.domain ? ` (website: ${company.domain})` : ""} who is responsible for learning and development, training technology, or employee enablement. This person would be the decision-maker for purchasing tools like ${partnerPlatform}. Look for titles like VP of Learning, Director of L&D, Head of Training, Chief Learning Officer, Director of Enablement, or similar. Give me their full name, exact job title, LinkedIn profile URL, and work email if publicly available.`;
 
     console.log(`Finding contacts for: ${company.name}`);
 
@@ -46,23 +46,24 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "sonar",
+        model: "sonar-pro",
         messages: [
           {
             role: "system",
-            content: `You are a B2B contact researcher. Return ONLY valid JSON with no markdown fences. Find the most likely buyer/decision-maker for learning & enablement technology at the specified company. Return this exact JSON structure:
+            content: `You are a B2B sales researcher finding the right buyer contact at a company. Search thoroughly using LinkedIn and company websites. Return ONLY a JSON object (no markdown fences, no extra text). Use this exact structure:
 {
-  "buyer_name": "Full Name",
-  "buyer_title": "Their Job Title",
-  "buyer_email": "email@company.com or null if unknown",
-  "buyer_linkedin": "https://linkedin.com/in/profile or null if unknown",
-  "confidence": "high|medium|low",
-  "reasoning": "Brief explanation of why this person is the right contact"
+  "buyer_name": "First Last",
+  "buyer_title": "Their Exact Job Title",
+  "buyer_email": "email@company.com",
+  "buyer_linkedin": "https://www.linkedin.com/in/their-profile",
+  "confidence": "high",
+  "reasoning": "Why this person is the right contact"
 }
-If you cannot find a specific person, return your best guess based on typical org structures with confidence: "low".`,
+If email is unknown, set it to null. If LinkedIn is unknown, set it to null. But you MUST find a real person's name and title - never return null for buyer_name. If you cannot find the exact person, find the closest match (e.g., CHRO, VP HR, Head of People) and explain in reasoning.`,
           },
           { role: "user", content: query },
         ],
+        search_domain_filter: ["linkedin.com", company.domain].filter(Boolean) as string[],
       }),
     });
 
