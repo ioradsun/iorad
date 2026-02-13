@@ -300,6 +300,46 @@ Deno.serve(async (req) => {
           last_score_total: result.score_total,
           snapshot_status: result.snapshot_status,
         }).eq("id", company.id);
+
+        // Push to Clay for contact enrichment
+        const clayApiKey = Deno.env.get("CLAY_API_KEY");
+        const clayTableId = Deno.env.get("CLAY_TABLE_ID");
+        if (clayApiKey && clayTableId) {
+          try {
+            const clayPayload = {
+              records: [{
+                id: company.id,
+                cells: {
+                  "Company Name": company.name,
+                  "Domain": company.domain || "",
+                  "Industry": company.industry || "",
+                  "Partner": company.partner || "",
+                  "Score": result.score_total,
+                  "Snapshot Status": result.snapshot_status,
+                  "Why Now": result.snapshot_json?.why_now || result.snapshot_json?.executive_summary || "",
+                },
+              }],
+            };
+
+            const clayResp = await fetch(`https://api.clay.com/v3/tables/${clayTableId}/records`, {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${clayApiKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(clayPayload),
+            });
+
+            if (!clayResp.ok) {
+              const errText = await clayResp.text();
+              console.error(`Clay push failed for ${company.name}: ${clayResp.status} ${errText}`);
+            } else {
+              console.log(`Pushed ${company.name} to Clay table`);
+            }
+          } catch (clayErr: any) {
+            console.error(`Clay push error for ${company.name}: ${clayErr.message}`);
+          }
+        }
       } else {
         // signals_only — just update last_processed_at
         await supabase.from("companies").update({
