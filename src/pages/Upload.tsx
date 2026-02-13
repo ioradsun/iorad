@@ -459,11 +459,14 @@ function ClayImportInfo() {
     { clay: "Country / HQ Country", field: "hq_country" },
     { clay: "Headcount / Employee Count", field: "headcount" },
     { clay: "Partner", field: "partner" },
-    { clay: "Buyer Name / Contact Name", field: "buyer_name" },
-    { clay: "Buyer Title / Contact Title", field: "buyer_title" },
-    { clay: "Buyer Email / Contact Email", field: "buyer_email" },
-    { clay: "Buyer LinkedIn / LinkedIn URL", field: "buyer_linkedin" },
     { clay: "Persona", field: "persona" },
+  ];
+
+  const contactFields = [
+    { clay: "contacts[].name / Contact Name", field: "contacts[].name" },
+    { clay: "contacts[].title / Job Title", field: "contacts[].title" },
+    { clay: "contacts[].email / Contact Email", field: "contacts[].email" },
+    { clay: "contacts[].linkedin / LinkedIn URL", field: "contacts[].linkedin" },
   ];
 
   return (
@@ -511,6 +514,13 @@ function ClayImportInfo() {
             <tbody>
               {fieldMapping.map((m, i) => (
                 <tr key={i} className="border-b border-border/30">
+                  <td className="py-1.5 px-2 text-xs text-muted-foreground">{m.clay}</td>
+                  <td className="py-1.5 px-2 text-xs font-mono text-primary">{m.field}</td>
+                </tr>
+              ))}
+              <tr className="border-b"><td colSpan={2} className="py-2 px-2 text-xs font-mono uppercase tracking-wider text-muted-foreground bg-secondary/50">Contacts (multiple per company)</td></tr>
+              {contactFields.map((m, i) => (
+                <tr key={`c-${i}`} className="border-b border-border/30">
                   <td className="py-1.5 px-2 text-xs text-muted-foreground">{m.clay}</td>
                   <td className="py-1.5 px-2 text-xs font-mono text-primary">{m.field}</td>
                 </tr>

@@ -182,6 +182,56 @@ export type Database = {
         }
         Relationships: []
       }
+      contacts: {
+        Row: {
+          company_id: string
+          confidence: string | null
+          created_at: string
+          email: string | null
+          id: string
+          linkedin: string | null
+          name: string
+          reasoning: string | null
+          source: string | null
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          confidence?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          linkedin?: string | null
+          name: string
+          reasoning?: string | null
+          source?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          confidence?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          linkedin?: string | null
+          name?: string
+          reasoning?: string | null
+          source?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contacts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       partner_config: {
         Row: {
           color: string

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { useCompany, useSignals, useSnapshots } from "@/hooks/useSupabase";
+import { useCompany, useSignals, useSnapshots, useContacts } from "@/hooks/useSupabase";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import ScoreCell from "@/components/ScoreCell";
@@ -87,6 +87,7 @@ export default function CompanyDetail() {
   const { data: company, isLoading } = useCompany(id);
   const { data: signals = [] } = useSignals(id);
   const { data: snapshots = [] } = useSnapshots(id);
+  const { data: contacts = [] } = useContacts(id);
   const queryClient = useQueryClient();
   const [regenerating, setRegenerating] = useState(false);
 
@@ -114,6 +115,7 @@ export default function CompanyDetail() {
       queryClient.invalidateQueries({ queryKey: ["company", id] });
       queryClient.invalidateQueries({ queryKey: ["signals", id] });
       queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
+      queryClient.invalidateQueries({ queryKey: ["contacts", id] });
       queryClient.invalidateQueries({ queryKey: ["companies"] });
     } catch (e: any) {
       toast.error(e.message || "Regeneration failed");
@@ -165,26 +167,56 @@ export default function CompanyDetail() {
         </div>
       </div>
 
-      {/* Buyer Contact */}
-      {(company as any).buyer_name && (
+      {/* Contacts */}
+      {(contacts.length > 0 || (company as any).buyer_name) && (
         <div className="panel">
-          <div className="panel-header">Buyer Contact</div>
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <UserSearch className="w-5 h-5 text-primary" />
-            </div>
-            <div className="space-y-0.5">
-              <div className="text-sm font-medium">{(company as any).buyer_name}</div>
-              {(company as any).buyer_title && <div className="text-xs text-muted-foreground">{(company as any).buyer_title}</div>}
-            </div>
-            <div className="ml-auto flex items-center gap-2">
-              {(company as any).buyer_email && (
-                <a href={`mailto:${(company as any).buyer_email}`} className="text-muted-foreground hover:text-primary"><Mail className="w-4 h-4" /></a>
-              )}
-              {(company as any).buyer_linkedin && (
-                <a href={(company as any).buyer_linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary"><Linkedin className="w-4 h-4" /></a>
-              )}
-            </div>
+          <div className="panel-header">Contacts ({contacts.length || 1})</div>
+          <div className="space-y-3">
+            {contacts.length > 0 ? contacts.map((contact) => (
+              <div key={contact.id} className="flex items-center gap-4 p-2 rounded-md hover:bg-secondary/30 transition-colors">
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <UserSearch className="w-4 h-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0 space-y-0.5">
+                  <div className="text-sm font-medium truncate">{contact.name}</div>
+                  {contact.title && <div className="text-xs text-muted-foreground truncate">{contact.title}</div>}
+                  {contact.source && (
+                    <span className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-muted-foreground">{contact.source}</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {contact.email && (
+                    <a href={`mailto:${contact.email}`} className="text-muted-foreground hover:text-primary" title={contact.email}>
+                      <Mail className="w-4 h-4" />
+                    </a>
+                  )}
+                  {contact.linkedin && (
+                    <a href={contact.linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary">
+                      <Linkedin className="w-4 h-4" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            )) : (
+              // Fallback to legacy single buyer
+              <div className="flex items-center gap-4">
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
+                  <UserSearch className="w-4 h-4 text-primary" />
+                </div>
+                <div className="space-y-0.5">
+                  <div className="text-sm font-medium">{(company as any).buyer_name}</div>
+                  {(company as any).buyer_title && <div className="text-xs text-muted-foreground">{(company as any).buyer_title}</div>}
+                </div>
+                <div className="ml-auto flex items-center gap-2">
+                  {(company as any).buyer_email && (
+                    <a href={`mailto:${(company as any).buyer_email}`} className="text-muted-foreground hover:text-primary"><Mail className="w-4 h-4" /></a>
+                  )}
+                  {(company as any).buyer_linkedin && (
+                    <a href={(company as any).buyer_linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary"><Linkedin className="w-4 h-4" /></a>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

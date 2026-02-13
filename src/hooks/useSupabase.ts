@@ -76,6 +76,23 @@ export function useSignals(companyId: string | undefined) {
   });
 }
 
+// ---- Contacts ----
+export function useContacts(companyId: string | undefined) {
+  return useQuery({
+    queryKey: ["contacts", companyId],
+    enabled: !!companyId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("contacts")
+        .select("*")
+        .eq("company_id", companyId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 // ---- Snapshots ----
 export function useSnapshots(companyId: string | undefined) {
   return useQuery({
