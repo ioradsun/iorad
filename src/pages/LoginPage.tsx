@@ -1,7 +1,7 @@
 import { lovable } from "@/integrations/lovable/index";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
-import { Zap } from "lucide-react";
+import ioradLogo from "@/assets/iorad-logo.png";
 
 export default function LoginPage() {
   const { user, loading } = useAuth();
@@ -34,14 +34,9 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="w-full max-w-sm mx-auto text-center space-y-8 px-6">
-        <div className="flex items-center justify-center gap-2.5">
-          <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
-            <Zap className="w-6 h-6 text-primary" />
-          </div>
-          <div className="text-left">
-            <p className="font-display text-lg font-bold tracking-tight text-foreground">DEAL SIGNAL</p>
-            <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">Intelligence</p>
-          </div>
+        <div className="flex items-center justify-center gap-3">
+          <img src={ioradLogo} alt="iorad" className="h-8" />
+          <span className="font-display text-xl font-bold tracking-tight text-foreground">Scout</span>
         </div>
 
         <div className="space-y-2">

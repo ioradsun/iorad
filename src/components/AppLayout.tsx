@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
-import { Upload, LayoutDashboard, Settings, History, BookOpen, Zap, LogOut } from "lucide-react";
+import { Upload, LayoutDashboard, Settings, History, BookOpen, LogOut } from "lucide-react";
+import ioradLogo from "@/assets/iorad-logo.png";
 import { useAuth } from "@/hooks/useAuth";
 
 const navItems = [
@@ -19,14 +20,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-[1600px] mx-auto px-6 h-14 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded bg-primary/20 flex items-center justify-center">
-              <Zap className="w-4 h-4 text-primary" />
-            </div>
+            <img src={ioradLogo} alt="iorad" className="h-6" />
             <span className="font-display text-sm font-bold tracking-tight text-foreground">
-              DEAL SIGNAL
-            </span>
-            <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground hidden sm:block">
-              Intelligence
+              Scout
             </span>
           </Link>
           <div className="flex items-center gap-4">
