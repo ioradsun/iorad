@@ -24,6 +24,8 @@ const menuItems = [
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuth();
   const isAdmin = useIsAdmin();
+  const { theme } = useTheme();
+  const ioradLogo = theme === "light" ? ioradLogoLight : ioradLogoDark;
 
   const displayName =
     user?.user_metadata?.full_name ||
