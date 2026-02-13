@@ -10,6 +10,7 @@ interface Props {
 }
 
 export default function StoryCTA({ customer, pm }: Props) {
+  const greeting = customer.contactName || "there";
   const mailSubject = encodeURIComponent(`Interested in embedded iorad via ${pm.label}`);
   const mailBody = encodeURIComponent(
     `Hi Kate, I saw the ${customer.name} embedded iorad page and want to learn more about how this could work for us.`
@@ -20,7 +21,7 @@ export default function StoryCTA({ customer, pm }: Props) {
     <section className="max-w-5xl mx-auto px-6 py-24" id="cta">
       <motion.div {...fade} className="text-center">
         <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
-          Ready to unlock more value inside {pm.label}?
+          {customer.contactName ? `${customer.contactName}, ready` : "Ready"} to unlock more value inside {pm.label}?
         </h2>
         <p className="text-white/50 max-w-xl mx-auto mb-2 leading-relaxed">
           {customer.name}'s partner enablement can move faster with iorad embedded directly inside {pm.label}.
