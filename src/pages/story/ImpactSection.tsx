@@ -17,7 +17,8 @@ export default function ImpactSection({ items }: Props) {
             key={i}
             {...fade}
             transition={{ ...fade.transition, delay: i * 0.15 }}
-            className="rounded-2xl border border-emerald-500/10 bg-emerald-500/[0.03] p-6"
+            className="rounded-2xl p-6"
+            style={{ border: "1px solid var(--story-accent-border)", background: "var(--story-accent-dim)" }}
           >
             <h4 className="font-semibold mb-3">{q.title}</h4>
             <div className="space-y-3 text-sm">
@@ -27,10 +28,10 @@ export default function ImpactSection({ items }: Props) {
               </div>
               <div>
                 <p className="text-xs font-mono uppercase tracking-wider mb-1" style={{ color: "var(--story-subtle)" }}>Calculation</p>
-                <p className="font-mono text-emerald-400 text-xs">{q.math}</p>
+                <p className="font-mono text-xs" style={{ color: "var(--story-accent)" }}>{q.math}</p>
               </div>
               <div className="pt-2" style={{ borderTop: "1px solid var(--story-border)" }}>
-                <p className="font-semibold text-emerald-300">{q.result}</p>
+                <p className="font-semibold" style={{ color: "var(--story-accent-strong)" }}>{q.result}</p>
               </div>
             </div>
           </motion.div>

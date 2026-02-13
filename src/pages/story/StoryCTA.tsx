@@ -31,7 +31,8 @@ export default function StoryCTA({ customer, pm }: Props) {
         </p>
         <a
           href={mailto}
-          className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-emerald-500 text-black font-semibold text-base hover:bg-emerald-400 transition-colors shadow-lg shadow-emerald-500/20"
+          className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl font-semibold text-base transition-colors shadow-lg"
+          style={{ background: "var(--story-cta-bg)", color: "var(--story-cta-fg)" }}
         >
           <Mail className="w-5 h-5" />
           Get in touch with Kate to learn more
