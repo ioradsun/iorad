@@ -7,7 +7,10 @@ import ScoreCell from "@/components/ScoreCell";
 import StatusBadge from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail } from "lucide-react";
+import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail, Plus } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { motion } from "framer-motion";
 import { Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
@@ -90,6 +93,33 @@ export default function CompanyDetail() {
   const { data: contacts = [] } = useContacts(id);
   const queryClient = useQueryClient();
   const [regenerating, setRegenerating] = useState(false);
+  const [addContactOpen, setAddContactOpen] = useState(false);
+  const [newContact, setNewContact] = useState({ name: "", title: "", email: "", linkedin: "" });
+  const [savingContact, setSavingContact] = useState(false);
+
+  const handleAddContact = async () => {
+    if (!id || !newContact.name.trim()) return;
+    setSavingContact(true);
+    try {
+      const { error } = await supabase.from("contacts").insert({
+        company_id: id,
+        name: newContact.name.trim(),
+        title: newContact.title.trim() || null,
+        email: newContact.email.trim() || null,
+        linkedin: newContact.linkedin.trim() || null,
+        source: "manual",
+      });
+      if (error) throw error;
+      toast.success("Contact added");
+      setNewContact({ name: "", title: "", email: "", linkedin: "" });
+      setAddContactOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["contacts", id] });
+    } catch (e: any) {
+      toast.error(e.message || "Failed to add contact");
+    } finally {
+      setSavingContact(false);
+    }
+  };
 
   const regenerate = async () => {
     if (!id) return;
@@ -161,9 +191,28 @@ export default function CompanyDetail() {
       </div>
 
       {/* Contacts */}
-      {(contacts.length > 0 || (company as any).buyer_name) && (
+      {(contacts.length > 0 || (company as any).buyer_name) ? (
         <div className="panel">
-          <div className="panel-header">Contacts ({contacts.length || 1})</div>
+          <div className="panel-header flex items-center justify-between">
+            <span>Contacts ({contacts.length || 1})</span>
+            <Dialog open={addContactOpen} onOpenChange={setAddContactOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="ghost" className="gap-1 text-xs h-7"><Plus className="w-3.5 h-3.5" /> Add</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>Add Contact</DialogTitle></DialogHeader>
+                <div className="space-y-3">
+                  <div><Label>Name *</Label><Input value={newContact.name} onChange={e => setNewContact(p => ({ ...p, name: e.target.value }))} placeholder="Jane Smith" /></div>
+                  <div><Label>Title</Label><Input value={newContact.title} onChange={e => setNewContact(p => ({ ...p, title: e.target.value }))} placeholder="VP of Learning" /></div>
+                  <div><Label>Email</Label><Input type="email" value={newContact.email} onChange={e => setNewContact(p => ({ ...p, email: e.target.value }))} placeholder="jane@company.com" /></div>
+                  <div><Label>LinkedIn</Label><Input value={newContact.linkedin} onChange={e => setNewContact(p => ({ ...p, linkedin: e.target.value }))} placeholder="https://linkedin.com/in/..." /></div>
+                  <Button onClick={handleAddContact} disabled={!newContact.name.trim() || savingContact} className="w-full">
+                    {savingContact ? <Loader2 className="w-4 h-4 animate-spin" /> : "Add Contact"}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
           <div className="space-y-3">
             {contacts.length > 0 ? contacts.map((contact) => {
               const firstName = contact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "");
@@ -222,6 +271,30 @@ export default function CompanyDetail() {
               </div>
             )}
           </div>
+        </div>
+      ) : (
+        <div className="panel">
+          <div className="panel-header flex items-center justify-between">
+            <span>Contacts (0)</span>
+            <Dialog open={addContactOpen} onOpenChange={setAddContactOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="ghost" className="gap-1 text-xs h-7"><Plus className="w-3.5 h-3.5" /> Add</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>Add Contact</DialogTitle></DialogHeader>
+                <div className="space-y-3">
+                  <div><Label>Name *</Label><Input value={newContact.name} onChange={e => setNewContact(p => ({ ...p, name: e.target.value }))} placeholder="Jane Smith" /></div>
+                  <div><Label>Title</Label><Input value={newContact.title} onChange={e => setNewContact(p => ({ ...p, title: e.target.value }))} placeholder="VP of Learning" /></div>
+                  <div><Label>Email</Label><Input type="email" value={newContact.email} onChange={e => setNewContact(p => ({ ...p, email: e.target.value }))} placeholder="jane@company.com" /></div>
+                  <div><Label>LinkedIn</Label><Input value={newContact.linkedin} onChange={e => setNewContact(p => ({ ...p, linkedin: e.target.value }))} placeholder="https://linkedin.com/in/..." /></div>
+                  <Button onClick={handleAddContact} disabled={!newContact.name.trim() || savingContact} className="w-full">
+                    {savingContact ? <Loader2 className="w-4 h-4 animate-spin" /> : "Add Contact"}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+          <p className="text-sm text-muted-foreground">No contacts yet. Add one manually or run enrichment.</p>
         </div>
       )}
 
