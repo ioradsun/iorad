@@ -22,14 +22,14 @@ export default function ImpactSection({ items }: Props) {
             <h4 className="font-semibold mb-3">{q.title}</h4>
             <div className="space-y-3 text-sm">
               <div>
-                <p className="text-xs font-mono uppercase tracking-wider text-white/30 mb-1">Assumptions</p>
-                <p className="text-white/50">{q.assumptions}</p>
+                <p className="text-xs font-mono uppercase tracking-wider mb-1" style={{ color: "var(--story-subtle)" }}>Assumptions</p>
+                <p style={{ color: "var(--story-muted)" }}>{q.assumptions}</p>
               </div>
               <div>
-                <p className="text-xs font-mono uppercase tracking-wider text-white/30 mb-1">Calculation</p>
+                <p className="text-xs font-mono uppercase tracking-wider mb-1" style={{ color: "var(--story-subtle)" }}>Calculation</p>
                 <p className="font-mono text-emerald-400 text-xs">{q.math}</p>
               </div>
-              <div className="pt-2 border-t border-white/[0.06]">
+              <div className="pt-2" style={{ borderTop: "1px solid var(--story-border)" }}>
                 <p className="font-semibold text-emerald-300">{q.result}</p>
               </div>
             </div>

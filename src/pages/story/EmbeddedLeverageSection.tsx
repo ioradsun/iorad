@@ -26,20 +26,20 @@ export default function EmbeddedLeverageSection({ customer, pm }: Props) {
             key={i}
             {...fade}
             transition={{ ...fade.transition, delay: i * 0.12 }}
-            className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5"
+            className="rounded-xl p-5" style={{ border: "1px solid var(--story-border)", background: "var(--story-surface)" }}
           >
             <p className={`text-xs font-mono uppercase tracking-widest ${item.color} mb-2`}>{item.label}</p>
-            <p className="text-sm text-white/60 leading-relaxed">{item.text}</p>
+            <p className="text-sm leading-relaxed" style={{ color: "var(--story-muted)" }}>{item.text}</p>
           </motion.div>
         ))}
       </div>
       <div className="mt-8">
-        <h4 className="text-xs font-mono uppercase tracking-widest text-white/30 mb-3">
+        <h4 className="text-xs font-mono uppercase tracking-widest mb-3" style={{ color: "var(--story-subtle)" }}>
           Where iorad embeds inside {pm.label}
         </h4>
         <ul className="space-y-2">
           {pm.embedBullets.map((b, i) => (
-            <li key={i} className="flex items-start gap-2.5 text-sm text-white/50">
+            <li key={i} className="flex items-start gap-2.5 text-sm" style={{ color: "var(--story-muted)" }}>
               <ArrowRight className="w-3.5 h-3.5 text-emerald-500 mt-0.5 shrink-0" />
               {b}
             </li>

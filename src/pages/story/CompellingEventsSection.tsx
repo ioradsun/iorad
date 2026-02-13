@@ -19,17 +19,17 @@ export default function CompellingEventsSection({ signals, compellingEvents }: P
             key={i}
             {...fade}
             transition={{ ...fade.transition, delay: i * 0.1 }}
-            className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5"
+            className="rounded-xl p-5" style={{ border: "1px solid var(--story-border)", background: "var(--story-surface)" }}
           >
             <h4 className="font-semibold text-sm mb-2 text-emerald-400">{s.title}</h4>
-            <p className="text-sm text-white/50 leading-relaxed">{s.detail}</p>
+            <p className="text-sm leading-relaxed" style={{ color: "var(--story-muted)" }}>{s.detail}</p>
           </motion.div>
         ))}
       </div>
 
       {/* Compelling Events */}
       <div className="mb-8">
-        <p className="text-xs font-mono uppercase tracking-widest text-white/30 mb-3">Compelling Events Detected</p>
+        <p className="text-xs font-mono uppercase tracking-widest mb-3" style={{ color: "var(--story-subtle)" }}>Compelling Events Detected</p>
         <div className="flex flex-wrap gap-2">
           {compellingEvents.matched.map((event, i) => (
             <span
@@ -45,8 +45,8 @@ export default function CompellingEventsSection({ signals, compellingEvents }: P
       {/* Buyer Language */}
       <div>
         <div className="flex items-center gap-2 mb-3">
-          <MessageCircle className="w-3.5 h-3.5 text-white/30" />
-          <p className="text-xs font-mono uppercase tracking-widest text-white/30">What buyers say on calls</p>
+          <MessageCircle className="w-3.5 h-3.5" style={{ color: "var(--story-subtle)" }} />
+          <p className="text-xs font-mono uppercase tracking-widest" style={{ color: "var(--story-subtle)" }}>What buyers say on calls</p>
         </div>
         <div className="space-y-3">
           {compellingEvents.buyerLanguage.map((line, i) => (
@@ -54,7 +54,7 @@ export default function CompellingEventsSection({ signals, compellingEvents }: P
               key={i}
               {...fade}
               transition={{ ...fade.transition, delay: i * 0.1 }}
-              className="text-sm text-white/50 italic border-l-2 border-white/[0.08] pl-4 leading-relaxed"
+              className="text-sm italic pl-4 leading-relaxed" style={{ color: "var(--story-muted)", borderLeft: "2px solid var(--story-border)" }}
             >
               "{line}"
             </motion.p>

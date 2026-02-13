@@ -21,7 +21,7 @@ export default function MetaPatternSection({ metaPattern, friction }: Props) {
       {/* Meta-pattern diagnosis */}
       <div className="rounded-xl border border-amber-500/10 bg-amber-500/[0.03] p-6 mb-8">
         <p className="text-xs font-mono uppercase tracking-widest text-amber-400 mb-3">Root Pattern</p>
-        <p className="text-white/60 leading-relaxed">{metaPattern.description}</p>
+        <p className="leading-relaxed" style={{ color: "var(--story-muted)" }}>{metaPattern.description}</p>
       </div>
 
       {/* Friction points */}
@@ -34,7 +34,7 @@ export default function MetaPatternSection({ metaPattern, friction }: Props) {
             className="rounded-xl border border-red-500/10 bg-red-500/[0.03] p-5"
           >
             <h4 className="font-semibold text-sm mb-2 text-red-400">{f.title}</h4>
-            <p className="text-sm text-white/50 leading-relaxed">{f.detail}</p>
+            <p className="text-sm leading-relaxed" style={{ color: "var(--story-muted)" }}>{f.detail}</p>
           </motion.div>
         ))}
       </div>
