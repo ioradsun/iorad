@@ -2,8 +2,9 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { customers } from "@/data/customers";
 import { partnerMeta } from "@/data/partnerMeta";
-import { ArrowRight, ExternalLink, Upload, LayoutDashboard, Settings, History, BookOpen, LogOut } from "lucide-react";
+import { ArrowRight, ExternalLink, Upload, LayoutDashboard, Settings, History, BookOpen, LogOut, Shield } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -93,7 +94,7 @@ const profileMenuItems = [
 
 export function StoryNav() {
   const { user, signOut } = useAuth();
-
+  const isAdmin = useIsAdmin();
   const displayName =
     user?.user_metadata?.full_name ||
     user?.user_metadata?.name ||
@@ -159,15 +160,18 @@ export function StoryNav() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48 bg-[#1a1a24] border-white/10 text-white">
                 <div className="px-3 py-2 text-xs text-white/50 truncate">{user.email}</div>
-                <DropdownMenuSeparator className="bg-white/10" />
-                {profileMenuItems.map(({ to, label, icon: Icon }) => (
-                  <DropdownMenuItem key={to} asChild className="text-white/80 focus:bg-white/10 focus:text-white">
-                    <Link to={to} className="flex items-center gap-2 cursor-pointer">
-                      <Icon className="w-4 h-4" />
-                      {label}
-                    </Link>
-                  </DropdownMenuItem>
-                ))}
+                {isAdmin && (
+                  <>
+                    {profileMenuItems.map(({ to, label, icon: Icon }) => (
+                      <DropdownMenuItem key={to} asChild className="text-white/80 focus:bg-white/10 focus:text-white">
+                        <Link to={to} className="flex items-center gap-2 cursor-pointer">
+                          <Icon className="w-4 h-4" />
+                          {label}
+                        </Link>
+                      </DropdownMenuItem>
+                    ))}
+                  </>
+                )}
                 <DropdownMenuSeparator className="bg-white/10" />
                 <DropdownMenuItem
                   onClick={signOut}
