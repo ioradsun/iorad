@@ -175,17 +175,6 @@ export default function Dashboard() {
           <span className="text-muted-foreground">Min Score:</span>
           <Input type="number" min={0} max={100} value={minScore} onChange={e => setMinScore(Number(e.target.value))} className="w-16 h-8 bg-secondary border-border text-xs" />
         </div>
-        <div className="flex items-center gap-1.5">
-          {statuses.map(s => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])}
-              className={`text-xs px-2.5 py-1 rounded border transition-colors ${statusFilter.includes(s) ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
       </div>
 
       <div className="border rounded-md overflow-hidden">
