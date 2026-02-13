@@ -13,6 +13,7 @@ interface CompanyRow {
   domain: string | null;
   industry: string | null;
   partner: string | null;
+  persona: string | null;
 }
 
 async function searchSignals(
@@ -185,7 +186,7 @@ Deno.serve(async (req) => {
       // Single company mode
       const { data, error: compErr } = await supabase
         .from("companies")
-        .select("id, name, domain, industry, partner")
+        .select("id, name, domain, industry, partner, persona")
         .eq("id", singleCompanyId)
         .maybeSingle();
       if (compErr) throw compErr;
@@ -195,7 +196,7 @@ Deno.serve(async (req) => {
       // Batch mode — get 1 company at the given offset
       const { data: companies, error: compErr } = await supabase
         .from("companies")
-        .select("id, name, domain, industry, partner")
+        .select("id, name, domain, industry, partner, persona")
         .order("last_processed_at", { ascending: true, nullsFirst: true })
         .range(offset, offset);
 
@@ -317,6 +318,8 @@ Deno.serve(async (req) => {
                   "Score": result.score_total,
                   "Snapshot Status": result.snapshot_status,
                   "Why Now": result.snapshot_json?.why_now || result.snapshot_json?.executive_summary || "",
+                  "Min Contacts": 3,
+                  "Persona": company.persona || "",
                 },
               }],
             };
