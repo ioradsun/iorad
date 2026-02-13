@@ -138,10 +138,9 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {[
           { label: "Total Companies", value: companies.length },
-          { label: "Avg Score", value: avgScore },
           { label: "Snapshots Generated", value: companies.filter(c => c.snapshot_status === "Generated").length },
           { label: "Low Signal", value: companies.filter(c => c.snapshot_status === "Low Signal").length },
         ].map(({ label, value }) => (
