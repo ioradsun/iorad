@@ -50,6 +50,7 @@ export type Database = {
           run_time_local: string
           snapshot_max_age_days: number
           snapshot_threshold: number
+          theme: string
           timezone: string
           top_n: number
           updated_at: string
@@ -66,6 +67,7 @@ export type Database = {
           run_time_local?: string
           snapshot_max_age_days?: number
           snapshot_threshold?: number
+          theme?: string
           timezone?: string
           top_n?: number
           updated_at?: string
@@ -82,6 +84,7 @@ export type Database = {
           run_time_local?: string
           snapshot_max_age_days?: number
           snapshot_threshold?: number
+          theme?: string
           timezone?: string
           top_n?: number
           updated_at?: string

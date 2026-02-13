@@ -1,0 +1,1 @@
+ALTER TABLE public.app_settings ADD COLUMN theme text NOT NULL DEFAULT 'dark';
