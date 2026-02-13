@@ -1,10 +1,11 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useCompanies, useSignalCounts, useProcessingJobs, useRunSignals } from "@/hooks/useSupabase";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import StatusBadge from "@/components/StatusBadge";
 import ScoreCell from "@/components/ScoreCell";
-import { ArrowUpDown, Play, Search, SlidersHorizontal, Loader2, BookOpen } from "lucide-react";
+import { ArrowUpDown, Play, Search, SlidersHorizontal, Loader2, BookOpen, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,14 +14,16 @@ import { customers } from "@/data/customers";
 
 const storyIds = new Set(customers.map(c => c.id));
 
-type SortKey = "name" | "last_score_total" | "signals_count" | "snapshot_status" | "updated_at";
+type SortKey = "name" | "last_score_total" | "signals_count" | "updated_at";
 
 export default function Dashboard() {
   const { data: companies = [], isLoading } = useCompanies();
   const { data: signalCounts = {} } = useSignalCounts();
   const { data: jobs = [] } = useProcessingJobs();
   const runSignals = useRunSignals();
+  const queryClient = useQueryClient();
   const [runProgress, setRunProgress] = useState<string | null>(null);
+  const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
 
   const [sortKey, setSortKey] = useState<SortKey>("last_score_total");
   const [sortAsc, setSortAsc] = useState(false);
@@ -51,7 +54,7 @@ export default function Dashboard() {
         case "name": av = a.name; bv = b.name; break;
         case "last_score_total": av = a.last_score_total ?? -1; bv = b.last_score_total ?? -1; break;
         case "signals_count": av = a.signals_count; bv = b.signals_count; break;
-        case "snapshot_status": av = a.snapshot_status ?? ""; bv = b.snapshot_status ?? ""; break;
+        case "updated_at": av = a.updated_at; bv = b.updated_at; break;
         case "updated_at": av = a.updated_at; bv = b.updated_at; break;
         default: av = 0; bv = 0;
       }
@@ -82,9 +85,29 @@ export default function Dashboard() {
     </button>
   );
 
-  const statuses = ["Generated", "Low Signal", "No Change", "Error"];
-  const scored = companiesWithSignals.filter(c => c.last_score_total !== null);
-  const avgScore = scored.length > 0 ? Math.round(scored.reduce((s, c) => s + (c.last_score_total ?? 0), 0) / scored.length) : 0;
+  const regenerateCompany = async (companyId: string) => {
+    setRegeneratingId(companyId);
+    try {
+      const { data, error } = await supabase.functions.invoke("run-signals", {
+        body: { company_id: companyId, mode: "full" },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      // Find contacts (best-effort)
+      try {
+        await supabase.functions.invoke("find-contacts", { body: { company_id: companyId } });
+      } catch {}
+
+      toast.success(`Done — ${data?.company || "company"}`);
+      queryClient.invalidateQueries({ queryKey: ["companies"] });
+      queryClient.invalidateQueries({ queryKey: ["signalCounts"] });
+    } catch (e: any) {
+      toast.error(e.message || "Regeneration failed");
+    } finally {
+      setRegeneratingId(null);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -186,10 +209,9 @@ export default function Dashboard() {
                 <th className="text-left px-4 py-3 hidden md:table-cell"><span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Industry</span></th>
                 <th className="text-left px-4 py-3 hidden md:table-cell"><span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Partner</span></th>
                 <th className="text-left px-4 py-3 hidden lg:table-cell"><span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Partner Rep</span></th>
-                <th className="text-left px-4 py-3"><SortHeader label="Status" field="snapshot_status" /></th>
                 <th className="text-left px-4 py-3 hidden sm:table-cell"><SortHeader label="Signals" field="signals_count" /></th>
                 <th className="text-left px-4 py-3 hidden lg:table-cell"><SortHeader label="Updated" field="updated_at" /></th>
-                <th className="px-4 py-3 w-10"></th>
+                <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
@@ -214,26 +236,41 @@ export default function Dashboard() {
                     {company.partner_rep_name || "—"}
                     {company.partner_rep_email && <div className="text-[10px] text-muted-foreground/60">{company.partner_rep_email}</div>}
                   </td>
-                  <td className="px-4 py-3"><StatusBadge status={company.snapshot_status} /></td>
                   <td className="px-4 py-3 hidden sm:table-cell data-cell text-muted-foreground">{company.signals_count}</td>
                   <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground">
                     {company.last_processed_at ? new Date(company.last_processed_at).toLocaleDateString() : "—"}
                   </td>
                   <td className="px-4 py-3">
-                    {storyIds.has(company.name.toLowerCase()) && (() => {
-                      const cust = customers.find(c => c.id === company.name.toLowerCase());
-                      return cust ? (
-                        <a href={`/${cust.partner}/${cust.id}/stories`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors" title="Open Story">
-                          <BookOpen className="w-4 h-4" />
-                        </a>
-                      ) : null;
-                    })()}
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 text-xs h-7"
+                        disabled={regeneratingId === company.id}
+                        onClick={(e) => { e.stopPropagation(); regenerateCompany(company.id); }}
+                      >
+                        {regeneratingId === company.id ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-3 h-3" />
+                        )}
+                        {company.snapshot_status === "Generated" ? "Regenerate" : "Generate"}
+                      </Button>
+                      {storyIds.has(company.name.toLowerCase()) && (() => {
+                        const cust = customers.find(c => c.id === company.name.toLowerCase());
+                        return cust ? (
+                          <a href={`/${cust.partner}/${cust.id}/stories`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors" title="Open Story">
+                            <BookOpen className="w-4 h-4" />
+                          </a>
+                        ) : null;
+                      })()}
+                    </div>
                   </td>
                 </motion.tr>
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">
+                  <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
                     {companies.length === 0 ? "No companies yet. Upload a CSV to get started." : "No companies match your filters."}
                   </td>
                 </tr>
