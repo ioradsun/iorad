@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import ScoreCell from "@/components/ScoreCell";
-import { ArrowUpDown, Play, Search, SlidersHorizontal, Loader2, BookOpen, RefreshCw } from "lucide-react";
+import { ArrowUpDown, Play, Search, SlidersHorizontal, Loader2, BookOpen, RefreshCw, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -129,6 +129,11 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <Link to="/upload">
+            <Button variant="outline" className="gap-2">
+              <Plus className="w-4 h-4" /> Add Company
+            </Button>
+          </Link>
           {runProgress && (
             <span className="text-xs text-muted-foreground font-mono">{runProgress}</span>
           )}
