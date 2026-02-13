@@ -252,23 +252,36 @@ export default function CompanyDetail() {
               );
             }) : (
               // Fallback to legacy single buyer
-              <div className="flex items-center gap-4">
-                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
-                  <UserSearch className="w-4 h-4 text-primary" />
-                </div>
-                <div className="space-y-0.5">
-                  <div className="text-sm font-medium">{(company as any).buyer_name}</div>
-                  {(company as any).buyer_title && <div className="text-xs text-muted-foreground">{(company as any).buyer_title}</div>}
-                </div>
-                <div className="ml-auto flex items-center gap-2">
-                  {(company as any).buyer_email && (
-                    <a href={`mailto:${(company as any).buyer_email}`} className="text-muted-foreground hover:text-primary"><Mail className="w-4 h-4" /></a>
-                  )}
-                  {(company as any).buyer_linkedin && (
-                    <a href={(company as any).buyer_linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary"><Linkedin className="w-4 h-4" /></a>
-                  )}
-                </div>
-              </div>
+              (() => {
+                const legacyFirstName = ((company as any).buyer_name || "").split(" ")[0].toLowerCase().replace(/[^a-z]/g, "");
+                const legacyStoryUrl = company.partner && legacyFirstName
+                  ? `/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories/${legacyFirstName}`
+                  : null;
+                return (
+                  <div className="flex items-center gap-4 p-2 rounded-md hover:bg-secondary/30 transition-colors">
+                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
+                      <UserSearch className="w-4 h-4 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-0.5">
+                      <div className="text-sm font-medium">{(company as any).buyer_name}</div>
+                      {(company as any).buyer_title && <div className="text-xs text-muted-foreground">{(company as any).buyer_title}</div>}
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {legacyStoryUrl && snap && (
+                        <a href={legacyStoryUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" title="View personalized story">
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                      )}
+                      {(company as any).buyer_email && (
+                        <a href={`mailto:${(company as any).buyer_email}`} className="text-muted-foreground hover:text-primary"><Mail className="w-4 h-4" /></a>
+                      )}
+                      {(company as any).buyer_linkedin && (
+                        <a href={(company as any).buyer_linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary"><Linkedin className="w-4 h-4" /></a>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()
             )}
           </div>
         </div>
