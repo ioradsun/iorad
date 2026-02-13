@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Libre+Franklin:wght@400;500;600;700&display=swap');
 
 @layer base {
   :root {
@@ -59,42 +59,54 @@
     --font-display: 'JetBrains Mono', monospace;
     --font-body: 'Inter', sans-serif;
 
+    /* Story page tokens — dark */
     --story-bg: #0A0A0F;
     --story-fg: #ffffff;
     --story-muted: rgba(255,255,255,0.50);
     --story-subtle: rgba(255,255,255,0.30);
     --story-border: rgba(255,255,255,0.06);
     --story-surface: rgba(255,255,255,0.02);
+    --story-accent: #34d399;
+    --story-accent-dim: rgba(52,211,153,0.15);
+    --story-accent-border: rgba(52,211,153,0.20);
+    --story-accent-strong: #6ee7b7;
+    --story-gradient-from: #34d399;
+    --story-gradient-to: #5eead4;
+    --story-cta-bg: #10b981;
+    --story-cta-fg: #000000;
+    --story-cta-hover: #34d399;
+    --story-btn-bg: #ffffff;
+    --story-btn-fg: #0A0A0F;
   }
 
   .light {
-    --background: 0 0% 98%;
-    --foreground: 220 15% 15%;
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 15% 15%;
+    --card-foreground: 0 0% 0%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 15% 15%;
+    --popover-foreground: 0 0% 0%;
 
-    --primary: 168 80% 38%;
+    --primary: 308 100% 42%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 14% 93%;
-    --secondary-foreground: 220 15% 30%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 22%;
 
-    --muted: 220 14% 95%;
-    --muted-foreground: 215 15% 45%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 44%;
 
-    --accent: 168 50% 92%;
-    --accent-foreground: 168 80% 25%;
+    --accent: 308 100% 96%;
+    --accent-foreground: 308 100% 30%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 355 100% 45%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 13% 87%;
-    --input: 220 13% 87%;
-    --ring: 168 80% 38%;
+    --border: 0 0% 0% / 0.10;
+    --input: 0 0% 0% / 0.10;
+    --ring: 308 100% 42%;
 
     --success: 142 70% 40%;
     --success-foreground: 0 0% 100%;
@@ -103,25 +115,40 @@
     --info: 210 80% 50%;
     --info-foreground: 0 0% 100%;
 
-    --score-high: 168 80% 38%;
+    --score-high: 308 100% 42%;
     --score-medium: 38 90% 50%;
     --score-low: 0 70% 50%;
 
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 220 15% 30%;
-    --sidebar-primary: 168 80% 38%;
+    --sidebar-foreground: 0 0% 22%;
+    --sidebar-primary: 308 100% 42%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 14% 95%;
-    --sidebar-accent-foreground: 220 15% 30%;
-    --sidebar-border: 220 13% 90%;
-    --sidebar-ring: 168 80% 38%;
+    --sidebar-accent: 0 0% 96%;
+    --sidebar-accent-foreground: 0 0% 22%;
+    --sidebar-border: 0 0% 0% / 0.10;
+    --sidebar-ring: 308 100% 42%;
 
+    --font-display: 'Libre Franklin', sans-serif;
+    --font-body: 'Libre Franklin', sans-serif;
+
+    /* Story page tokens — light (iorad spec) */
     --story-bg: #ffffff;
-    --story-fg: #1a1a2e;
-    --story-muted: rgba(26,26,46,0.55);
-    --story-subtle: rgba(26,26,46,0.35);
-    --story-border: rgba(26,26,46,0.08);
-    --story-surface: rgba(26,26,46,0.03);
+    --story-fg: #000000;
+    --story-muted: #000000bf;
+    --story-subtle: #00000066;
+    --story-border: #0000001a;
+    --story-surface: #f4f4f4;
+    --story-accent: #ff00d6;
+    --story-accent-dim: rgba(255,0,214,0.08);
+    --story-accent-border: rgba(255,0,214,0.20);
+    --story-accent-strong: #cc00ab;
+    --story-gradient-from: #ff00d6;
+    --story-gradient-to: #ff66e0;
+    --story-cta-bg: #000000;
+    --story-cta-fg: #ffffff;
+    --story-cta-hover: #383838;
+    --story-btn-bg: #000000;
+    --story-btn-fg: #ffffff;
   }
 }
 
@@ -149,9 +176,9 @@
   }
 
   .score-badge-high {
-    background: hsl(168 80% 45% / 0.15);
-    color: hsl(168 80% 65%);
-    border: 1px solid hsl(168 80% 45% / 0.3);
+    background: hsl(var(--score-high) / 0.15);
+    color: hsl(var(--score-high));
+    border: 1px solid hsl(var(--score-high) / 0.3);
   }
 
   .score-badge-medium {
@@ -171,8 +198,8 @@
   }
 
   .status-generated {
-    background: hsl(168 80% 45% / 0.12);
-    color: hsl(168 80% 65%);
+    background: hsl(var(--score-high) / 0.12);
+    color: hsl(var(--score-high));
   }
 
   .status-low-signal {
@@ -197,7 +224,7 @@
 
   .glow-line {
     height: 1px;
-    background: linear-gradient(90deg, transparent, hsl(168 80% 45% / 0.5), transparent);
+    background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.5), transparent);
   }
 
   .data-cell {

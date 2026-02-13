@@ -12,7 +12,7 @@ interface StoryHeroProps {
 export default function StoryHero({ customer, pm }: StoryHeroProps) {
   return (
     <section className="relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/[0.04] via-transparent to-transparent" />
+      <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, var(--story-accent-dim), transparent, transparent)" }} />
       <div className="max-w-5xl mx-auto px-6 pt-16 pb-20 relative">
         <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>
           <span
@@ -25,14 +25,14 @@ export default function StoryHero({ customer, pm }: StoryHeroProps) {
             {customer.contactName ? (
               <>
                 {customer.contactName}, unlock more value from {pm.label} at{" "}
-                <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
+                <span style={{ backgroundImage: `linear-gradient(to right, var(--story-gradient-from), var(--story-gradient-to))`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                   {customer.name}
                 </span>
               </>
             ) : (
               <>
                 Unlock more value from {pm.label} at{" "}
-                <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
+                <span style={{ backgroundImage: `linear-gradient(to right, var(--story-gradient-from), var(--story-gradient-to))`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                   {customer.name}
                 </span>
               </>
@@ -41,7 +41,7 @@ export default function StoryHero({ customer, pm }: StoryHeroProps) {
           <p className="text-lg md:text-xl max-w-2xl leading-relaxed mb-8" style={{ color: "var(--story-muted)" }}>
             {customer.whyNow}
           </p>
-          <p className="text-sm italic border-l-2 border-emerald-500/30 pl-4 max-w-xl" style={{ color: "var(--story-subtle)" }}>
+          <p className="text-sm italic pl-4 max-w-xl" style={{ color: "var(--story-subtle)", borderLeft: "2px solid var(--story-accent-border)" }}>
             "{SIGNATURE}"
           </p>
         </motion.div>

@@ -19,9 +19,10 @@ export default function CompellingEventsSection({ signals, compellingEvents }: P
             key={i}
             {...fade}
             transition={{ ...fade.transition, delay: i * 0.1 }}
-            className="rounded-xl p-5" style={{ border: "1px solid var(--story-border)", background: "var(--story-surface)" }}
+            className="rounded-xl p-5"
+            style={{ border: "1px solid var(--story-border)", background: "var(--story-surface)" }}
           >
-            <h4 className="font-semibold text-sm mb-2 text-emerald-400">{s.title}</h4>
+            <h4 className="font-semibold text-sm mb-2" style={{ color: "var(--story-accent)" }}>{s.title}</h4>
             <p className="text-sm leading-relaxed" style={{ color: "var(--story-muted)" }}>{s.detail}</p>
           </motion.div>
         ))}
@@ -34,7 +35,8 @@ export default function CompellingEventsSection({ signals, compellingEvents }: P
           {compellingEvents.matched.map((event, i) => (
             <span
               key={i}
-              className="text-xs font-mono px-3 py-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-400"
+              className="text-xs font-mono px-3 py-1.5 rounded-full"
+              style={{ border: "1px solid var(--story-accent-border)", background: "var(--story-accent-dim)", color: "var(--story-accent)" }}
             >
               {event}
             </span>
@@ -54,7 +56,8 @@ export default function CompellingEventsSection({ signals, compellingEvents }: P
               key={i}
               {...fade}
               transition={{ ...fade.transition, delay: i * 0.1 }}
-              className="text-sm italic pl-4 leading-relaxed" style={{ color: "var(--story-muted)", borderLeft: "2px solid var(--story-border)" }}
+              className="text-sm italic pl-4 leading-relaxed"
+              style={{ color: "var(--story-muted)", borderLeft: "2px solid var(--story-border)" }}
             >
               "{line}"
             </motion.p>
