@@ -317,7 +317,7 @@ Deno.serve(async (req) => {
                   "Partner": company.partner || "",
                   "Score": result.score_total,
                   "Snapshot Status": result.snapshot_status,
-                  "Why Now": result.snapshot_json?.why_now || result.snapshot_json?.executive_summary || "",
+                  "Executive Framing": result.snapshot_json?.outbound_positioning?.executive_framing || result.snapshot_json?.executive_narrative || "",
                   "Min Contacts": 3,
                   "Persona": company.persona || "",
                 },
