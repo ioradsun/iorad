@@ -319,7 +319,7 @@ Deno.serve(async (req) => {
                   "Snapshot Status": result.snapshot_status,
                   "Executive Framing": result.snapshot_json?.outbound_positioning?.executive_framing || result.snapshot_json?.executive_narrative || "",
                   "Min Contacts": 3,
-                  "Persona": company.persona || "",
+                  
                 },
               }],
             };
