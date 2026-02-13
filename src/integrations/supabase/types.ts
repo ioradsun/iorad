@@ -18,18 +18,21 @@ export type Database = {
         Row: {
           id: number
           model: string
+          prompt_template: string
           system_prompt: string
           updated_at: string
         }
         Insert: {
           id?: number
           model?: string
+          prompt_template?: string
           system_prompt?: string
           updated_at?: string
         }
         Update: {
           id?: number
           model?: string
+          prompt_template?: string
           system_prompt?: string
           updated_at?: string
         }

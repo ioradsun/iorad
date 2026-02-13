@@ -4,12 +4,25 @@ export function buildIoradPrompt(
   partner: string | null,
   signalSummary: string,
   systemPrompt: string,
-  compellingEvents: string[]
+  compellingEvents: string[],
+  promptTemplate?: string
 ): string {
   const partnerPlatform = partner || "Unknown Partner Platform";
-
   const eventsBlock = compellingEvents.map((e, i) => `${i + 1}. ${e}`).join("\n");
 
+  // If a custom prompt template is stored, use it with placeholder substitution
+  if (promptTemplate && promptTemplate.trim()) {
+    const filled = promptTemplate
+      .replace(/\{\{company_name\}\}/g, companyName)
+      .replace(/\{\{industry\}\}/g, industry)
+      .replace(/\{\{partner_platform\}\}/g, partnerPlatform)
+      .replace(/\{\{compelling_events\}\}/g, eventsBlock)
+      .replace(/\{\{signals\}\}/g, signalSummary);
+
+    return `${systemPrompt}\n\n${filled}`;
+  }
+
+  // Fallback hardcoded template
   return `${systemPrompt}
 
 The target company "${companyName}" (${industry} industry) uses ${partnerPlatform}.
