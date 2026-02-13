@@ -138,10 +138,10 @@
     --story-subtle: #00000066;
     --story-border: #0000001a;
     --story-surface: #f4f4f4;
-    --story-accent: #ff00d6;
+    --story-accent: #1a1a1a;
     --story-accent-dim: rgba(255,0,214,0.08);
     --story-accent-border: rgba(255,0,214,0.20);
-    --story-accent-strong: #cc00ab;
+    --story-accent-strong: #1a1a1a;
     --story-gradient-from: #ff00d6;
     --story-gradient-to: #ff66e0;
     --story-cta-bg: #000000;
