@@ -3,7 +3,9 @@ import { motion } from "framer-motion";
 import { customers } from "@/data/customers";
 import { partnerMeta } from "@/data/partnerMeta";
 import { ArrowRight, ExternalLink, Upload, LayoutDashboard, Settings, History, BookOpen, LogOut, Shield } from "lucide-react";
-import ioradLogo from "@/assets/iorad-logo-new.png";
+import ioradLogoDark from "@/assets/iorad-logo-new.png";
+import ioradLogoLight from "@/assets/iorad-logo-light.png";
+import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -100,6 +102,8 @@ const profileMenuItems = [
 export function StoryNav() {
   const { user, signOut } = useAuth();
   const isAdmin = useIsAdmin();
+  const { theme } = useTheme();
+  const ioradLogo = theme === "light" ? ioradLogoLight : ioradLogoDark;
   const displayName =
     user?.user_metadata?.full_name ||
     user?.user_metadata?.name ||
