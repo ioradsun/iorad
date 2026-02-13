@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
-import { Upload, LayoutDashboard, Settings, History, BookOpen, LogOut } from "lucide-react";
+import { Upload, LayoutDashboard, Settings, History, BookOpen, LogOut, Shield } from "lucide-react";
 import ioradLogo from "@/assets/iorad-logo-new.png";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -21,6 +22,7 @@ const menuItems = [
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuth();
+  const isAdmin = useIsAdmin();
 
   const displayName =
     user?.user_metadata?.full_name ||
@@ -75,6 +77,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </Link>
                   </DropdownMenuItem>
                 ))}
+                {isAdmin && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link to="/settings" className="flex items-center gap-2 cursor-pointer">
+                        <Shield className="w-4 h-4" />
+                        Admin
+                      </Link>
+                    </DropdownMenuItem>
+                  </>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={signOut} className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive">
                   <LogOut className="w-4 h-4" />
