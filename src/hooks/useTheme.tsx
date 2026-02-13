@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 type Theme = "dark" | "light";
 
@@ -10,13 +11,26 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue>({ theme: "dark", setTheme: () => {} });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof window !== "undefined") {
-      return (localStorage.getItem("iorad-theme") as Theme) || "dark";
-    }
-    return "dark";
-  });
+  const [theme, setThemeState] = useState<Theme>("dark");
+  const [loaded, setLoaded] = useState(false);
 
+  // Fetch theme from DB on mount
+  useEffect(() => {
+    supabase
+      .from("app_settings")
+      .select("theme")
+      .eq("id", 1)
+      .single()
+      .then(({ data }) => {
+        const dbTheme = (data as any)?.theme as Theme | undefined;
+        if (dbTheme === "light" || dbTheme === "dark") {
+          setThemeState(dbTheme);
+        }
+        setLoaded(true);
+      });
+  }, []);
+
+  // Apply class to <html>
   useEffect(() => {
     const root = document.documentElement;
     if (theme === "light") {
@@ -24,10 +38,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     } else {
       root.classList.remove("light");
     }
-    localStorage.setItem("iorad-theme", theme);
   }, [theme]);
 
-  const setTheme = (t: Theme) => setThemeState(t);
+  const setTheme = async (t: Theme) => {
+    setThemeState(t);
+    // Persist to DB
+    await supabase
+      .from("app_settings")
+      .update({ theme: t } as any)
+      .eq("id", 1);
+  };
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme }}>
