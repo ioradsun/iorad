@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { customers } from "@/data/customers";
 import { partnerMeta } from "@/data/partnerMeta";
 import { ArrowRight, ExternalLink, Upload, LayoutDashboard, Settings, History, BookOpen, LogOut, Shield } from "lucide-react";
+import ioradLogo from "@/assets/iorad-logo.png";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -116,8 +117,9 @@ export function StoryNav() {
   return (
     <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#0A0A0F]/80 backdrop-blur-xl">
       <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-        <Link to="/stories" className="font-bold text-lg tracking-tight">
-          <span className="text-emerald-400">iorad</span>
+        <Link to="/stories" className="flex items-center gap-2">
+          <img src={ioradLogo} alt="iorad" className="h-5" />
+          <span className="font-display text-sm font-bold tracking-tight text-white">Scout</span>
         </Link>
         <nav className="flex items-center gap-6 text-sm">
           <Link to="/stories" className="text-white/60 hover:text-white transition-colors">
