@@ -7,7 +7,7 @@ import ScoreCell from "@/components/ScoreCell";
 import StatusBadge from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { ArrowLeft, RefreshCw, RotateCcw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail } from "lucide-react";
+import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail } from "lucide-react";
 import { motion } from "framer-motion";
 import { Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
@@ -88,45 +88,37 @@ export default function CompanyDetail() {
   const { data: signals = [] } = useSignals(id);
   const { data: snapshots = [] } = useSnapshots(id);
   const queryClient = useQueryClient();
-  const [activeAction, setActiveAction] = useState<string | null>(null);
-  const [findingContact, setFindingContact] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
 
-  const findContact = async () => {
+  const regenerate = async () => {
     if (!id) return;
-    setFindingContact(true);
+    setRegenerating(true);
     try {
-      const { data, error } = await supabase.functions.invoke("find-contacts", {
-        body: { company_id: id },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      toast.success(`Found contact: ${data?.contact?.buyer_name || "unknown"}`);
-      queryClient.invalidateQueries({ queryKey: ["company", id] });
-    } catch (e: any) {
-      toast.error(e.message || "Failed to find contact");
-    } finally {
-      setFindingContact(false);
-    }
-  };
-
-  const runAction = async (mode: "signals_only" | "score_only" | "snapshot_only" | "full") => {
-    if (!id) return;
-    setActiveAction(mode);
-    try {
+      // Run full pipeline: signals + score + snapshot
       const { data, error } = await supabase.functions.invoke("run-signals", {
-        body: { company_id: id, mode },
+        body: { company_id: id, mode: "full" },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      toast.success(`Done — ${data?.company || "company"}`);
+
+      // Find contacts
+      try {
+        await supabase.functions.invoke("find-contacts", {
+          body: { company_id: id },
+        });
+      } catch {
+        // non-fatal — contact enrichment is best-effort
+      }
+
+      toast.success(`Regenerated — ${data?.company || "company"}`);
       queryClient.invalidateQueries({ queryKey: ["company", id] });
       queryClient.invalidateQueries({ queryKey: ["signals", id] });
       queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
       queryClient.invalidateQueries({ queryKey: ["companies"] });
     } catch (e: any) {
-      toast.error(e.message || "Action failed");
+      toast.error(e.message || "Regeneration failed");
     } finally {
-      setActiveAction(null);
+      setRegenerating(false);
     }
   };
   if (isLoading) {
@@ -160,24 +152,8 @@ export default function CompanyDetail() {
           <StatusBadge status={company.snapshot_status} />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {snap && company.partner && (
-            <Button size="sm" variant="default" className="gap-1.5 text-xs" asChild>
-              <a href={`/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories`} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="w-3.5 h-3.5" /> View Story
-              </a>
-            </Button>
-          )}
-          <Button variant="outline" size="sm" className="gap-1.5 text-xs" disabled={!!activeAction} onClick={() => runAction("signals_only")}>
-            {activeAction === "signals_only" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Refresh Signals
-          </Button>
-          <Button variant="outline" size="sm" className="gap-1.5 text-xs" disabled={!!activeAction} onClick={() => runAction("score_only")}>
-            {activeAction === "score_only" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />} Recalculate Score
-          </Button>
-          <Button variant="outline" size="sm" className="gap-1.5 text-xs" disabled={!!activeAction || findingContact} onClick={findContact}>
-            {findingContact ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserSearch className="w-3.5 h-3.5" />} Find Contact
-          </Button>
-          <Button size="sm" className="gap-1.5 text-xs" disabled={!!activeAction} onClick={() => runAction("full")}>
-            {activeAction === "full" || activeAction === "snapshot_only" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />} {snap ? "Regenerate Story" : "Generate Story"}
+          <Button size="sm" className="gap-1.5 text-xs" disabled={regenerating} onClick={regenerate}>
+            {regenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Regenerate
           </Button>
         </div>
       </div>
