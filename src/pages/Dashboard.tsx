@@ -4,7 +4,7 @@ import { useCompanies, useSignalCounts, useProcessingJobs, useRunSignals } from 
 import { toast } from "sonner";
 import StatusBadge from "@/components/StatusBadge";
 import ScoreCell from "@/components/ScoreCell";
-import { ArrowUpDown, Play, ExternalLink, Search, SlidersHorizontal, Loader2, BookOpen } from "lucide-react";
+import { ArrowUpDown, Play, Search, SlidersHorizontal, Loader2, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -201,7 +201,7 @@ export default function Dashboard() {
                 <th className="text-left px-4 py-3"><SortHeader label="Status" field="snapshot_status" /></th>
                 <th className="text-left px-4 py-3 hidden sm:table-cell"><SortHeader label="Signals" field="signals_count" /></th>
                 <th className="text-left px-4 py-3 hidden lg:table-cell"><SortHeader label="Updated" field="updated_at" /></th>
-                <th className="px-4 py-3"></th>
+                <th className="px-4 py-3 w-10"></th>
               </tr>
             </thead>
             <tbody>
@@ -231,10 +231,7 @@ export default function Dashboard() {
                   <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground">
                     {company.last_processed_at ? new Date(company.last_processed_at).toLocaleDateString() : "—"}
                   </td>
-                  <td className="px-4 py-3 flex items-center gap-2">
-                    <Link to={`/company/${company.id}`} className="text-muted-foreground hover:text-primary transition-colors">
-                      <ExternalLink className="w-4 h-4" />
-                    </Link>
+                  <td className="px-4 py-3">
                     {storyIds.has(company.name.toLowerCase()) && (() => {
                       const cust = customers.find(c => c.id === company.name.toLowerCase());
                       return cust ? (
