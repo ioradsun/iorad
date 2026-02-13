@@ -2,7 +2,16 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { customers } from "@/data/customers";
 import { partnerMeta } from "@/data/partnerMeta";
-import { ArrowRight, ExternalLink } from "lucide-react";
+import { ArrowRight, ExternalLink, Upload, LayoutDashboard, Settings, History, BookOpen, LogOut } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function CustomerList() {
   return (
@@ -74,7 +83,35 @@ export default function CustomerList() {
   );
 }
 
+const profileMenuItems = [
+  { to: "/", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/upload", label: "Upload", icon: Upload },
+  { to: "/jobs", label: "Jobs", icon: History },
+  { to: "/stories", label: "Stories", icon: BookOpen },
+  { to: "/settings", label: "Settings", icon: Settings },
+];
+
 export function StoryNav() {
+  const { user, signOut } = useAuth();
+
+  const displayName =
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    user?.email?.split("@")[0] ||
+    "User";
+
+  const avatarUrl =
+    user?.user_metadata?.avatar_url ||
+    user?.user_metadata?.picture ||
+    undefined;
+
+  const initials = displayName
+    .split(" ")
+    .map((n: string) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
   return (
     <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#0A0A0F]/80 backdrop-blur-xl">
       <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
@@ -107,6 +144,41 @@ export function StoryNav() {
           >
             Get in touch
           </a>
+
+          {user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 rounded-full p-1 hover:bg-white/10 transition-colors focus:outline-none">
+                  <Avatar className="h-8 w-8">
+                    {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
+                    <AvatarFallback className="text-xs bg-emerald-500/20 text-emerald-400">
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 bg-[#1a1a24] border-white/10 text-white">
+                <div className="px-3 py-2 text-xs text-white/50 truncate">{user.email}</div>
+                <DropdownMenuSeparator className="bg-white/10" />
+                {profileMenuItems.map(({ to, label, icon: Icon }) => (
+                  <DropdownMenuItem key={to} asChild className="text-white/80 focus:bg-white/10 focus:text-white">
+                    <Link to={to} className="flex items-center gap-2 cursor-pointer">
+                      <Icon className="w-4 h-4" />
+                      {label}
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem
+                  onClick={signOut}
+                  className="flex items-center gap-2 cursor-pointer text-red-400 focus:bg-white/10 focus:text-red-400"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </nav>
       </div>
     </header>
