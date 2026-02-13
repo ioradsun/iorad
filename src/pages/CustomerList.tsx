@@ -17,7 +17,7 @@ import {
 
 export default function CustomerList() {
   return (
-    <div className="min-h-screen bg-[#0A0A0F] text-white">
+    <div className="min-h-screen" style={{ background: "var(--story-bg)", color: "var(--story-fg)" }}>
       <StoryNav />
       <main className="max-w-5xl mx-auto px-6 py-20">
         <motion.div
@@ -47,7 +47,7 @@ export default function CustomerList() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 * i, duration: 0.5 }}
               >
-                <div className="group relative rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-sm hover:border-white/[0.12] hover:bg-white/[0.04] transition-all duration-300 p-6 flex items-center justify-between gap-6">
+                <div className="group relative rounded-2xl p-6 flex items-center justify-between gap-6 transition-all duration-300" style={{ border: "1px solid var(--story-border)", background: "var(--story-surface)" }}>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-1.5">
                       <h2 className="text-xl font-semibold tracking-tight truncate">
@@ -64,7 +64,7 @@ export default function CustomerList() {
                         {pm?.label}
                       </span>
                     </div>
-                    <p className="text-sm text-white/40">{c.persona}</p>
+                    <p className="text-sm" style={{ color: "var(--story-muted)" }}>{c.persona}</p>
                   </div>
                   <a
                     href={`/${c.partner}/${c.id}/stories`}
@@ -115,21 +115,22 @@ export function StoryNav() {
     .slice(0, 2);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#0A0A0F]/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 backdrop-blur-xl" style={{ borderBottom: "1px solid var(--story-border)", background: "color-mix(in srgb, var(--story-bg) 80%, transparent)" }}>
       <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
         <Link to="/stories" className="flex items-center gap-2">
           <img src={ioradLogo} alt="iorad" className="h-5" />
-          <span className="font-display text-sm font-bold tracking-tight text-white">Scout</span>
+          <span className="font-display text-sm font-bold tracking-tight" style={{ color: "var(--story-fg)" }}>Scout</span>
         </Link>
         <nav className="flex items-center gap-6 text-sm">
-          <Link to="/stories" className="text-white/60 hover:text-white transition-colors">
+          <Link to="/stories" className="hover:opacity-80 transition-colors" style={{ color: "var(--story-muted)" }}>
             Customers
           </Link>
           <a
             href="https://www.iorad.com/use-cases"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-white/60 hover:text-white transition-colors flex items-center gap-1"
+            className="hover:opacity-80 transition-colors flex items-center gap-1"
+            style={{ color: "var(--story-muted)" }}
           >
             Use cases <ExternalLink className="w-3 h-3" />
           </a>
@@ -137,7 +138,8 @@ export function StoryNav() {
             href="https://www.iorad.com/demo"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-white/60 hover:text-white transition-colors flex items-center gap-1"
+            className="hover:opacity-80 transition-colors flex items-center gap-1"
+            style={{ color: "var(--story-muted)" }}
           >
             Schedule demo <ExternalLink className="w-3 h-3" />
           </a>
@@ -160,12 +162,12 @@ export function StoryNav() {
                   </Avatar>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48 bg-[#1a1a24] border-white/10 text-white">
-                <div className="px-3 py-2 text-xs text-white/50 truncate">{user.email}</div>
+              <DropdownMenuContent align="end" className="w-48 bg-popover border-border text-foreground">
+                <div className="px-3 py-2 text-xs text-muted-foreground truncate">{user.email}</div>
                 {isAdmin && (
                   <>
                     {profileMenuItems.map(({ to, label, icon: Icon }) => (
-                      <DropdownMenuItem key={to} asChild className="text-white/80 focus:bg-white/10 focus:text-white">
+                      <DropdownMenuItem key={to} asChild className="text-foreground/80 focus:bg-accent focus:text-foreground">
                         <Link to={to} className="flex items-center gap-2 cursor-pointer">
                           <Icon className="w-4 h-4" />
                           {label}
@@ -174,10 +176,10 @@ export function StoryNav() {
                     ))}
                   </>
                 )}
-                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuSeparator className="bg-border" />
                 <DropdownMenuItem
                   onClick={signOut}
-                  className="flex items-center gap-2 cursor-pointer text-red-400 focus:bg-white/10 focus:text-red-400"
+                  className="flex items-center gap-2 cursor-pointer text-destructive focus:bg-accent focus:text-destructive"
                 >
                   <LogOut className="w-4 h-4" />
                   Sign out

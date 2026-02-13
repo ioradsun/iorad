@@ -176,8 +176,8 @@ export default function CustomerStory() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#0A0A0F] text-white flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-emerald-400" />
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -195,7 +195,7 @@ export default function CustomerStory() {
 
 function StoryPage({ customer, pm }: { customer: Customer; pm: PartnerMeta }) {
   return (
-    <div className="min-h-screen bg-[#0A0A0F] text-white">
+    <div className="min-h-screen" style={{ background: "var(--story-bg)", color: "var(--story-fg)" }}>
       <StoryHero customer={customer} pm={pm} />
       {(customer.signals.length > 0 || customer.compellingEvents.matched.length > 0) && (
         <CompellingEventsSection signals={customer.signals} compellingEvents={customer.compellingEvents} />
@@ -218,7 +218,7 @@ function StoryPage({ customer, pm }: { customer: Customer; pm: PartnerMeta }) {
       )}
       <StoryCTA customer={customer} pm={pm} />
 
-      <footer className="border-t border-white/[0.06] py-8 text-center text-xs text-white/20">
+      <footer className="py-8 text-center text-xs" style={{ borderTop: "1px solid var(--story-border)", color: "var(--story-subtle)" }}>
         <p>© {new Date().getFullYear()} iorad · This analysis is confidential and prepared for {customer.name}.</p>
       </footer>
     </div>
@@ -227,11 +227,11 @@ function StoryPage({ customer, pm }: { customer: Customer; pm: PartnerMeta }) {
 
 function NotFoundStory() {
   return (
-    <div className="min-h-screen bg-[#0A0A0F] text-white flex items-center justify-center">
+    <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
       <div className="text-center">
         <h1 className="text-3xl font-bold mb-4">Customer not found</h1>
-        <p className="text-white/40 mb-4">No story has been generated for this customer yet.</p>
-        <Link to="/stories" className="text-emerald-400 hover:underline">Back to customers</Link>
+        <p className="text-muted-foreground mb-4">No story has been generated for this customer yet.</p>
+        <Link to="/stories" className="text-primary hover:underline">Back to customers</Link>
       </div>
     </div>
   );

@@ -38,10 +38,10 @@ export default function StoryHero({ customer, pm }: StoryHeroProps) {
               </>
             )}
           </h1>
-          <p className="text-lg md:text-xl text-white/50 max-w-2xl leading-relaxed mb-8">
+          <p className="text-lg md:text-xl max-w-2xl leading-relaxed mb-8" style={{ color: "var(--story-muted)" }}>
             {customer.whyNow}
           </p>
-          <p className="text-sm italic text-white/30 border-l-2 border-emerald-500/30 pl-4 max-w-xl">
+          <p className="text-sm italic border-l-2 border-emerald-500/30 pl-4 max-w-xl" style={{ color: "var(--story-subtle)" }}>
             "{SIGNATURE}"
           </p>
         </motion.div>

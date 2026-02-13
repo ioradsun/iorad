@@ -16,7 +16,7 @@ export default function NarrativeSection({ paragraphs }: Props) {
             key={i}
             {...fade}
             transition={{ ...fade.transition, delay: i * 0.1 }}
-            className="text-white/55 leading-relaxed"
+            className="leading-relaxed" style={{ color: "var(--story-muted)" }}
           >
             {para}
           </motion.p>

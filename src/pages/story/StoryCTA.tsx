@@ -23,10 +23,10 @@ export default function StoryCTA({ customer, pm }: Props) {
         <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
           {customer.contactName ? `${customer.contactName}, ready` : "Ready"} to unlock more value inside {pm.label}?
         </h2>
-        <p className="text-white/50 max-w-xl mx-auto mb-2 leading-relaxed">
+        <p className="max-w-xl mx-auto mb-2 leading-relaxed" style={{ color: "var(--story-muted)" }}>
           {customer.name}'s partner enablement can move faster with iorad embedded directly inside {pm.label}.
         </p>
-        <p className="text-sm text-white/30 mb-8">
+        <p className="text-sm mb-8" style={{ color: "var(--story-subtle)" }}>
           See how iorad embeds inside {pm.label} for {customer.name}.
         </p>
         <a

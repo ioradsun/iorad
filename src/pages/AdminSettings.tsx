@@ -8,8 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Save, Loader2, Plus, Trash2, GripVertical } from "lucide-react";
+import { Save, Loader2, Plus, Trash2, GripVertical, Sun, Moon, Palette } from "lucide-react";
 import { toast } from "sonner";
+import { useTheme } from "@/hooks/useTheme";
 
 const AVAILABLE_MODELS = [
   { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash (default)" },
@@ -29,18 +30,59 @@ export default function AdminSettings() {
         <h1 className="text-2xl font-bold tracking-tight">Admin Settings</h1>
         <p className="text-sm text-muted-foreground mt-1">Configure AI, processing, partners, and compelling events.</p>
       </div>
-      <Tabs defaultValue="ai" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+      <Tabs defaultValue="appearance" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="appearance">Appearance</TabsTrigger>
           <TabsTrigger value="ai">AI & Prompt</TabsTrigger>
           <TabsTrigger value="events">Compelling Events</TabsTrigger>
           <TabsTrigger value="partners">Partners</TabsTrigger>
           <TabsTrigger value="processing">Processing</TabsTrigger>
         </TabsList>
+        <TabsContent value="appearance"><AppearanceTab /></TabsContent>
         <TabsContent value="ai"><AIConfigTab /></TabsContent>
         <TabsContent value="events"><CompellingEventsTab /></TabsContent>
         <TabsContent value="partners"><PartnersTab /></TabsContent>
         <TabsContent value="processing"><ProcessingTab /></TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+// ─── APPEARANCE TAB ───
+function AppearanceTab() {
+  const { theme, setTheme } = useTheme();
+  return (
+    <div className="space-y-6">
+      <div className="panel space-y-4">
+        <div className="panel-header">Theme</div>
+        <p className="text-xs text-muted-foreground">Choose between iorad dark theme and the clean light theme.</p>
+        <div className="grid grid-cols-2 gap-4">
+          <button
+            onClick={() => setTheme("dark")}
+            className={`flex flex-col items-center gap-3 p-6 rounded-xl border-2 transition-all ${
+              theme === "dark"
+                ? "border-primary bg-primary/10"
+                : "border-border hover:border-muted-foreground/30"
+            }`}
+          >
+            <Moon className="w-8 h-8 text-primary" />
+            <span className="text-sm font-medium">iorad Dark</span>
+            <span className="text-xs text-muted-foreground">Default dark theme</span>
+          </button>
+          <button
+            onClick={() => setTheme("light")}
+            className={`flex flex-col items-center gap-3 p-6 rounded-xl border-2 transition-all ${
+              theme === "light"
+                ? "border-primary bg-primary/10"
+                : "border-border hover:border-muted-foreground/30"
+            }`}
+          >
+            <Sun className="w-8 h-8 text-primary" />
+            <span className="text-sm font-medium">Clean Light</span>
+            <span className="text-xs text-muted-foreground">Light, corporate theme</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

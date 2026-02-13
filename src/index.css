@@ -58,6 +58,70 @@
 
     --font-display: 'JetBrains Mono', monospace;
     --font-body: 'Inter', sans-serif;
+
+    --story-bg: #0A0A0F;
+    --story-fg: #ffffff;
+    --story-muted: rgba(255,255,255,0.50);
+    --story-subtle: rgba(255,255,255,0.30);
+    --story-border: rgba(255,255,255,0.06);
+    --story-surface: rgba(255,255,255,0.02);
+  }
+
+  .light {
+    --background: 0 0% 98%;
+    --foreground: 220 15% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 15% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 15% 15%;
+
+    --primary: 168 80% 38%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 93%;
+    --secondary-foreground: 220 15% 30%;
+
+    --muted: 220 14% 95%;
+    --muted-foreground: 215 15% 45%;
+
+    --accent: 168 50% 92%;
+    --accent-foreground: 168 80% 25%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 87%;
+    --input: 220 13% 87%;
+    --ring: 168 80% 38%;
+
+    --success: 142 70% 40%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 90% 50%;
+    --warning-foreground: 38 90% 15%;
+    --info: 210 80% 50%;
+    --info-foreground: 0 0% 100%;
+
+    --score-high: 168 80% 38%;
+    --score-medium: 38 90% 50%;
+    --score-low: 0 70% 50%;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 220 15% 30%;
+    --sidebar-primary: 168 80% 38%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 95%;
+    --sidebar-accent-foreground: 220 15% 30%;
+    --sidebar-border: 220 13% 90%;
+    --sidebar-ring: 168 80% 38%;
+
+    --story-bg: #ffffff;
+    --story-fg: #1a1a2e;
+    --story-muted: rgba(26,26,46,0.55);
+    --story-subtle: rgba(26,26,46,0.35);
+    --story-border: rgba(26,26,46,0.08);
+    --story-surface: rgba(26,26,46,0.03);
   }
 }
 
