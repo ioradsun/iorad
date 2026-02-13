@@ -22,7 +22,6 @@ Deno.serve(async (req) => {
     const { company_id } = await req.json();
     if (!company_id) throw new Error("company_id is required");
 
-    // Get company info
     const { data: company, error: compErr } = await supabase
       .from("companies")
       .select("id, name, domain, partner, industry, persona")
@@ -35,9 +34,9 @@ Deno.serve(async (req) => {
     const partnerPlatform = company.partner || "unknown";
     const persona = company.persona || "Learning & Development";
 
-    const query = `Find the person at ${company.name}${company.domain ? ` (website: ${company.domain})` : ""} who is responsible for learning and development, training technology, or employee enablement. This person would be the decision-maker for purchasing tools like ${partnerPlatform}. Look for titles like VP of Learning, Director of L&D, Head of Training, Chief Learning Officer, Director of Enablement, or similar. Give me their full name, exact job title, LinkedIn profile URL, and work email if publicly available.`;
+    const query = `Find at least 3 people at ${company.name}${company.domain ? ` (website: ${company.domain})` : ""} who are responsible for ${persona}, training technology, or employee enablement. These people would be decision-makers or influencers for purchasing tools like ${partnerPlatform}. Look for titles like VP of Learning, Director of L&D, Head of Training, Chief Learning Officer, Director of Enablement, or similar roles. For each person, find: their full name, exact job title, LinkedIn profile URL, work email if publicly available, and whether they mention "${partnerPlatform}" anywhere on their LinkedIn profile (experience, skills, recommendations, posts).`;
 
-    console.log(`Finding contacts for: ${company.name}`);
+    console.log(`Finding contacts for: ${company.name} (partner: ${partnerPlatform})`);
 
     const resp = await fetch("https://api.perplexity.ai/chat/completions", {
       method: "POST",
@@ -50,16 +49,27 @@ Deno.serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are a B2B sales researcher finding the right buyer contact at a company. Search thoroughly using LinkedIn and company websites. Return ONLY a JSON object (no markdown fences, no extra text). Use this exact structure:
+            content: `You are a B2B sales researcher finding buyer contacts at a company. Search thoroughly using LinkedIn and company websites. Return ONLY a JSON object (no markdown fences, no extra text). Use this exact structure:
 {
-  "buyer_name": "First Last",
-  "buyer_title": "Their Exact Job Title",
-  "buyer_email": "email@company.com",
-  "buyer_linkedin": "https://www.linkedin.com/in/their-profile",
-  "confidence": "high",
-  "reasoning": "Why this person is the right contact"
+  "contacts": [
+    {
+      "name": "First Last",
+      "title": "Their Exact Job Title",
+      "email": "email@company.com or null if unknown",
+      "linkedin": "https://www.linkedin.com/in/their-profile or null",
+      "has_partner_on_linkedin": true/false,
+      "partner_linkedin_detail": "e.g. 'Lists ${partnerPlatform} as a skill' or 'Mentions ${partnerPlatform} in current role description' or null",
+      "confidence": "high/medium/low",
+      "reasoning": "Why this person is relevant"
+    }
+  ]
 }
-If email is unknown, set it to null. If LinkedIn is unknown, set it to null. But you MUST find a real person's name and title - never return null for buyer_name. If you cannot find the exact person, find the closest match (e.g., CHRO, VP HR, Head of People) and explain in reasoning.`,
+Rules:
+- Return at least 3 contacts, ideally 5. Never return fewer than 3.
+- has_partner_on_linkedin should be true ONLY if "${partnerPlatform}" appears on their LinkedIn profile (in experience, skills, about, posts, etc.)
+- For emails: try common patterns like first.last@domain, first@domain, flast@domain. Only include if you have reasonable confidence.
+- Prioritize people who mention "${partnerPlatform}" on their LinkedIn — they are warm leads.
+- Sort results: contacts with has_partner_on_linkedin=true first, then by seniority.`,
           },
           { role: "user", content: query },
         ],
@@ -77,43 +87,99 @@ If email is unknown, set it to null. If LinkedIn is unknown, set it to null. But
     const content = aiResult.choices?.[0]?.message?.content || "";
     const citations = aiResult.citations || [];
 
-    console.log(`Perplexity response for ${company.name}: ${content.slice(0, 200)}`);
+    console.log(`Perplexity response for ${company.name}: ${content.slice(0, 300)}`);
 
-    // Parse JSON from response
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       throw new Error("Could not parse contact info from AI response");
     }
 
-    const contact = JSON.parse(jsonMatch[0]);
+    const parsed = JSON.parse(jsonMatch[0]);
+    const contacts = parsed.contacts || [];
 
-    // Update company with contact info
-    const updateData: Record<string, string | null> = {};
-    if (contact.buyer_name) updateData.buyer_name = contact.buyer_name;
-    if (contact.buyer_title) updateData.buyer_title = contact.buyer_title;
-    if (contact.buyer_email) updateData.buyer_email = contact.buyer_email;
-    if (contact.buyer_linkedin) updateData.buyer_linkedin = contact.buyer_linkedin;
-
-    if (Object.keys(updateData).length > 0) {
-      const { error: updateErr } = await supabase
-        .from("companies")
-        .update(updateData)
-        .eq("id", company_id);
-      if (updateErr) throw updateErr;
+    if (contacts.length === 0) {
+      throw new Error("No contacts found in AI response");
     }
 
-    console.log(`Contact found for ${company.name}: ${contact.buyer_name} (${contact.buyer_title})`);
+    // Upsert contacts into the contacts table
+    let added = 0;
+    for (const c of contacts) {
+      if (!c.name) continue;
+
+      const partnerNote = c.has_partner_on_linkedin
+        ? `🟢 ${partnerPlatform} on LinkedIn: ${c.partner_linkedin_detail || "Yes"}`
+        : `⚪ No ${partnerPlatform} on LinkedIn`;
+
+      const reasoning = [c.reasoning, partnerNote].filter(Boolean).join(" | ");
+
+      const contactData = {
+        company_id: company.id,
+        name: c.name,
+        title: c.title || null,
+        email: c.email || null,
+        linkedin: c.linkedin || null,
+        source: "perplexity",
+        confidence: c.confidence || null,
+        reasoning,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Upsert by company_id + email (if email exists), otherwise by company_id + name
+      if (c.email) {
+        const { data: existing } = await supabase
+          .from("contacts")
+          .select("id")
+          .eq("company_id", company.id)
+          .eq("email", c.email)
+          .maybeSingle();
+
+        if (existing) {
+          await supabase.from("contacts").update(contactData).eq("id", existing.id);
+        } else {
+          await supabase.from("contacts").insert(contactData);
+        }
+      } else {
+        // Check by name to avoid duplicates
+        const { data: existing } = await supabase
+          .from("contacts")
+          .select("id")
+          .eq("company_id", company.id)
+          .eq("name", c.name)
+          .maybeSingle();
+
+        if (existing) {
+          await supabase.from("contacts").update(contactData).eq("id", existing.id);
+        } else {
+          await supabase.from("contacts").insert(contactData);
+        }
+      }
+      added++;
+    }
+
+    // Also update legacy buyer fields with the top contact for backwards compat
+    const top = contacts[0];
+    if (top?.name) {
+      await supabase.from("companies").update({
+        buyer_name: top.name,
+        buyer_title: top.title || null,
+        buyer_email: top.email || null,
+        buyer_linkedin: top.linkedin || null,
+      }).eq("id", company_id);
+    }
+
+    console.log(`Found ${added} contacts for ${company.name}`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        contact,
+        contacts_found: added,
+        contacts,
         citations,
         company: company.name,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (err) {
+  } catch (err: any) {
     console.error("find-contacts error:", err);
     return new Response(
       JSON.stringify({ error: err.message }),
