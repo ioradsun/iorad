@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Upload, LayoutDashboard, Settings, History, BookOpen, LogOut, Shield } from "lucide-react";
+import { Upload, LayoutDashboard, History, BookOpen, LogOut, Shield } from "lucide-react";
 import ioradLogo from "@/assets/iorad-logo-new.png";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
@@ -17,7 +17,6 @@ const menuItems = [
   { to: "/upload", label: "Upload", icon: Upload },
   { to: "/jobs", label: "Jobs", icon: History },
   { to: "/stories", label: "Stories", icon: BookOpen },
-  { to: "/settings", label: "Settings", icon: Settings },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
