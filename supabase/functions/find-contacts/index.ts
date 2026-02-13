@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
     const partnerPlatform = company.partner || "unknown";
     const persona = company.persona || "Learning & Development";
 
-    const query = `Find at least 3 people at ${company.name}${company.domain ? ` (website: ${company.domain})` : ""} who are responsible for ${persona}, training technology, or employee enablement. These people would be decision-makers or influencers for purchasing tools like ${partnerPlatform}. Look for titles like VP of Learning, Director of L&D, Head of Training, Chief Learning Officer, Director of Enablement, or similar roles. For each person, find: their full name, exact job title, LinkedIn profile URL, work email if publicly available, and whether they mention "${partnerPlatform}" anywhere on their LinkedIn profile (experience, skills, recommendations, posts).`;
+    const query = `Find at least 3 people at ${company.name}${company.domain ? ` (${company.domain})` : ""} who are responsible for ${persona}, training technology, or employee enablement. These people would be decision-makers or influencers for purchasing tools like ${partnerPlatform}. Look for titles like VP of Learning, Director of L&D, Head of Training, Chief Learning Officer, Director of Enablement, or similar. For each person find: full name, job title, LinkedIn URL, work email if available, and whether "${partnerPlatform}" appears on their LinkedIn profile.`;
 
     console.log(`Finding contacts for: ${company.name} (partner: ${partnerPlatform})`);
 
@@ -49,31 +49,30 @@ Deno.serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are a B2B sales researcher finding buyer contacts at a company. Search thoroughly using LinkedIn and company websites. Return ONLY a JSON object (no markdown fences, no extra text). Use this exact structure:
+            content: `You are a B2B sales researcher. Search LinkedIn and the web thoroughly. Return ONLY valid JSON, no markdown fences. Structure:
 {
   "contacts": [
     {
       "name": "First Last",
-      "title": "Their Exact Job Title",
-      "email": "email@company.com or null if unknown",
-      "linkedin": "https://www.linkedin.com/in/their-profile or null",
-      "has_partner_on_linkedin": true/false,
-      "partner_linkedin_detail": "e.g. 'Lists ${partnerPlatform} as a skill' or 'Mentions ${partnerPlatform} in current role description' or null",
+      "title": "Job Title",
+      "email": "email@company.com or null",
+      "linkedin": "https://www.linkedin.com/in/profile or null",
+      "has_partner_on_linkedin": true or false,
+      "partner_linkedin_detail": "e.g. 'Lists ${partnerPlatform} as skill' or null",
       "confidence": "high/medium/low",
-      "reasoning": "Why this person is relevant"
+      "reasoning": "Why relevant"
     }
   ]
 }
 Rules:
-- Return at least 3 contacts, ideally 5. Never return fewer than 3.
-- has_partner_on_linkedin should be true ONLY if "${partnerPlatform}" appears on their LinkedIn profile (in experience, skills, about, posts, etc.)
-- For emails: try common patterns like first.last@domain, first@domain, flast@domain. Only include if you have reasonable confidence.
-- Prioritize people who mention "${partnerPlatform}" on their LinkedIn — they are warm leads.
-- Sort results: contacts with has_partner_on_linkedin=true first, then by seniority.`,
+- Return at least 3 contacts. If you cannot find exact L&D roles, broaden to HR, People, Operations, or IT leadership.
+- has_partner_on_linkedin: true only if "${partnerPlatform}" appears on their LinkedIn.
+- For emails: try patterns like first.last@${company.domain || "company.com"}. Set null if uncertain.
+- Sort: contacts with has_partner_on_linkedin=true first, then by seniority.
+- NEVER return an empty contacts array. Always find at least 3 people.`,
           },
           { role: "user", content: query },
         ],
-        search_domain_filter: ["linkedin.com", company.domain].filter(Boolean) as string[],
       }),
     });
 
@@ -84,21 +83,25 @@ Rules:
     }
 
     const aiResult = await resp.json();
-    const content = aiResult.choices?.[0]?.message?.content || "";
+    let content = aiResult.choices?.[0]?.message?.content || "";
     const citations = aiResult.citations || [];
 
-    console.log(`Perplexity response for ${company.name}: ${content.slice(0, 300)}`);
+    // Strip markdown fences if present
+    content = content.replace(/```json\s*/gi, "").replace(/```\s*/g, "");
+
+    console.log(`Perplexity response for ${company.name}: ${content.slice(0, 400)}`);
 
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      throw new Error("Could not parse contact info from AI response");
+      throw new Error("Could not parse contact JSON from AI response: " + content.slice(0, 200));
     }
 
     const parsed = JSON.parse(jsonMatch[0]);
     const contacts = parsed.contacts || [];
 
     if (contacts.length === 0) {
-      throw new Error("No contacts found in AI response");
+      console.warn(`AI returned 0 contacts for ${company.name} — response may need broader search`);
+      // Don't throw — just return empty result gracefully
     }
 
     // Upsert contacts into the contacts table
