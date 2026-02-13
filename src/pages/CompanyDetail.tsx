@@ -132,14 +132,7 @@ export default function CompanyDetail() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      // Find contacts
-      try {
-        await supabase.functions.invoke("find-contacts", {
-          body: { company_id: id },
-        });
-      } catch {
-        // non-fatal — contact enrichment is best-effort
-      }
+      // Contacts are enriched by Clay via webhook — no separate call needed
 
       toast.success(`Regenerated — ${data?.company || "company"}`);
       queryClient.invalidateQueries({ queryKey: ["company", id] });
