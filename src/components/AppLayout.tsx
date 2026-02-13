@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Upload, LayoutDashboard, Settings, History, BookOpen, LogOut } from "lucide-react";
-import ioradLogo from "@/assets/iorad-logo.png";
+import ioradLogo from "@/assets/iorad-logo-new.png";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {

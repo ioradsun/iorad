@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { customers } from "@/data/customers";
 import { partnerMeta } from "@/data/partnerMeta";
 import { ArrowRight, ExternalLink, Upload, LayoutDashboard, Settings, History, BookOpen, LogOut, Shield } from "lucide-react";
-import ioradLogo from "@/assets/iorad-logo.png";
+import ioradLogo from "@/assets/iorad-logo-new.png";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";

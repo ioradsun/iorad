@@ -1,7 +1,7 @@
 import { lovable } from "@/integrations/lovable/index";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
-import ioradLogo from "@/assets/iorad-logo.png";
+import ioradLogo from "@/assets/iorad-logo-new.png";
 
 export default function LoginPage() {
   const { user, loading } = useAuth();
