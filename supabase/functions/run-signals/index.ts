@@ -318,8 +318,8 @@ Deno.serve(async (req) => {
                   "Score": result.score_total,
                   "Snapshot Status": result.snapshot_status,
                   "Executive Framing": result.snapshot_json?.outbound_positioning?.executive_framing || result.snapshot_json?.executive_narrative || "",
-                  "Min Contacts": 3,
-                  
+                   "Min Contacts": 5,
+                   "Job Title Keywords": "enablement, learning, change management, L&D, education, Customer Education, Partner enablement, readiness, sales enablement, revenue enablement",
                 },
               }],
             };
