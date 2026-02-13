@@ -154,13 +154,6 @@ export default function CompanyDetail() {
           <StatusBadge status={company.snapshot_status} />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {snap && company.partner && (
-            <Button size="sm" variant="outline" className="gap-1.5 text-xs" asChild>
-              <a href={`/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories`} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="w-3.5 h-3.5" /> View Story
-              </a>
-            </Button>
-          )}
           <Button size="sm" className="gap-1.5 text-xs" disabled={regenerating} onClick={regenerate}>
             {regenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Regenerate
           </Button>
@@ -172,32 +165,43 @@ export default function CompanyDetail() {
         <div className="panel">
           <div className="panel-header">Contacts ({contacts.length || 1})</div>
           <div className="space-y-3">
-            {contacts.length > 0 ? contacts.map((contact) => (
-              <div key={contact.id} className="flex items-center gap-4 p-2 rounded-md hover:bg-secondary/30 transition-colors">
-                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <UserSearch className="w-4 h-4 text-primary" />
+            {contacts.length > 0 ? contacts.map((contact) => {
+              const firstName = contact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "");
+              const storyUrl = company.partner
+                ? `/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories/${firstName}`
+                : null;
+              return (
+                <div key={contact.id} className="flex items-center gap-4 p-2 rounded-md hover:bg-secondary/30 transition-colors">
+                  <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <UserSearch className="w-4 h-4 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0 space-y-0.5">
+                    <div className="text-sm font-medium truncate">{contact.name}</div>
+                    {contact.title && <div className="text-xs text-muted-foreground truncate">{contact.title}</div>}
+                    {contact.source && (
+                      <span className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-muted-foreground">{contact.source}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {storyUrl && snap && (
+                      <a href={storyUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" title="View personalized story">
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    )}
+                    {contact.email && (
+                      <a href={`mailto:${contact.email}`} className="text-muted-foreground hover:text-primary" title={contact.email}>
+                        <Mail className="w-4 h-4" />
+                      </a>
+                    )}
+                    {contact.linkedin && (
+                      <a href={contact.linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary">
+                        <Linkedin className="w-4 h-4" />
+                      </a>
+                    )}
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0 space-y-0.5">
-                  <div className="text-sm font-medium truncate">{contact.name}</div>
-                  {contact.title && <div className="text-xs text-muted-foreground truncate">{contact.title}</div>}
-                  {contact.source && (
-                    <span className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-muted-foreground">{contact.source}</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {contact.email && (
-                    <a href={`mailto:${contact.email}`} className="text-muted-foreground hover:text-primary" title={contact.email}>
-                      <Mail className="w-4 h-4" />
-                    </a>
-                  )}
-                  {contact.linkedin && (
-                    <a href={contact.linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary">
-                      <Linkedin className="w-4 h-4" />
-                    </a>
-                  )}
-                </div>
-              </div>
-            )) : (
+              );
+            }) : (
               // Fallback to legacy single buyer
               <div className="flex items-center gap-4">
                 <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">

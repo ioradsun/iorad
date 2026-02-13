@@ -22,10 +22,21 @@ export default function StoryHero({ customer, pm }: StoryHeroProps) {
             Embedded inside {pm.label}
           </span>
           <h1 className="text-4xl md:text-6xl font-bold tracking-tight leading-[1.1] mb-6 max-w-3xl">
-            Unlock more value from {pm.label} at{" "}
-            <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
-              {customer.name}
-            </span>
+            {customer.contactName ? (
+              <>
+                {customer.contactName}, unlock more value from {pm.label} at{" "}
+                <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
+                  {customer.name}
+                </span>
+              </>
+            ) : (
+              <>
+                Unlock more value from {pm.label} at{" "}
+                <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
+                  {customer.name}
+                </span>
+              </>
+            )}
           </h1>
           <p className="text-lg md:text-xl text-white/50 max-w-2xl leading-relaxed mb-8">
             {customer.whyNow}

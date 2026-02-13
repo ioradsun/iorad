@@ -29,6 +29,7 @@ export interface OutboundPositioning {
 export interface Customer {
   id: string;
   name: string;
+  contactName?: string; // first name of the contact viewing this story
   partner: "seismic" | "workramp" | "360learning" | "docebo" | "gainsight";
   persona: string;
   whyNow: string;

@@ -156,13 +156,18 @@ function getPartnerMeta(partnerKey: string, dbConfig: any): PartnerMeta {
 }
 
 export default function CustomerStory() {
-  const { id, partner, customer: customerParam } = useParams<{ id: string; partner: string; customer: string }>();
+  const { id, partner, customer: customerParam, contactName } = useParams<{ id: string; partner: string; customer: string; contactName: string }>();
 
   // Legacy route: /stories/:id — look up from hardcoded data
   const legacyCustomer = id ? customers.find((c) => c.id === id) : null;
 
-  // DB route: /:partner/:customer/stories
+  // DB route: /:partner/:customer/stories or /:partner/:customer/stories/:contactName
   const { data: dbData, isLoading } = useDbStory(partner, customerParam);
+
+  // Capitalize first letter of contact name
+  const formattedContactName = contactName
+    ? contactName.charAt(0).toUpperCase() + contactName.slice(1).toLowerCase()
+    : undefined;
 
   if (legacyCustomer) {
     const pm = staticPartnerMeta[legacyCustomer.partner];
@@ -182,6 +187,7 @@ export default function CustomerStory() {
   }
 
   const customer = snapshotToCustomer(dbData.company, dbData.snapshot);
+  customer.contactName = formattedContactName;
   const pm = getPartnerMeta(partner || "", dbData.partnerConfig);
 
   return <StoryPage customer={customer} pm={pm} />;

@@ -5,14 +5,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import ScoreCell from "@/components/ScoreCell";
-import { ArrowUpDown, Play, Search, SlidersHorizontal, Loader2, BookOpen, RefreshCw, Plus } from "lucide-react";
+import { ArrowUpDown, Play, Search, SlidersHorizontal, Loader2, RefreshCw, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { motion } from "framer-motion";
-import { customers } from "@/data/customers";
-
-const storyIds = new Set(customers.map(c => c.id));
 
 type SortKey = "name" | "last_score_total" | "signals_count" | "updated_at";
 
@@ -256,14 +253,6 @@ export default function Dashboard() {
                         )}
                         {company.snapshot_status === "Generated" ? "Regenerate" : "Generate"}
                       </Button>
-                      {storyIds.has(company.name.toLowerCase()) && (() => {
-                        const cust = customers.find(c => c.id === company.name.toLowerCase());
-                        return cust ? (
-                          <a href={`/${cust.partner}/${cust.id}/stories`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors" title="Open Story">
-                            <BookOpen className="w-4 h-4" />
-                          </a>
-                        ) : null;
-                      })()}
                     </div>
                   </td>
                 </motion.tr>
