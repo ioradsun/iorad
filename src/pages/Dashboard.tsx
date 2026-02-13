@@ -192,11 +192,6 @@ export default function Dashboard() {
             ))}
           </SelectContent>
         </Select>
-        <div className="flex items-center gap-2 text-xs">
-          <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
-          <span className="text-muted-foreground">Min Score:</span>
-          <Input type="number" min={0} max={100} value={minScore} onChange={e => setMinScore(Number(e.target.value))} className="w-16 h-8 bg-secondary border-border text-xs" />
-        </div>
       </div>
 
       <div className="border rounded-md overflow-hidden">
