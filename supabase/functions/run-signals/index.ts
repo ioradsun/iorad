@@ -94,7 +94,8 @@ async function scoreSignals(
       company.partner,
       signalSummary,
       aiConfig.system_prompt,
-      compellingEvents
+      compellingEvents,
+      aiConfig.prompt_template
     );
 
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {

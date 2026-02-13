@@ -57,18 +57,20 @@ function AIConfigTab() {
   });
   const queryClient = useQueryClient();
   const [prompt, setPrompt] = useState("");
+  const [promptTemplate, setPromptTemplate] = useState("");
   const [model, setModel] = useState("");
 
   useEffect(() => {
     if (data) {
       setPrompt(data.system_prompt);
+      setPromptTemplate((data as any).prompt_template || "");
       setModel(data.model);
     }
   }, [data]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("ai_config").update({ system_prompt: prompt, model }).eq("id", 1);
+      const { error } = await supabase.from("ai_config").update({ system_prompt: prompt, prompt_template: promptTemplate, model } as any).eq("id", 1);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -95,11 +97,22 @@ function AIConfigTab() {
       </div>
       <div className="panel space-y-4">
         <div className="panel-header">System Prompt</div>
-        <p className="text-xs text-muted-foreground">This is the high-level system instruction prepended to every snapshot generation. The full prompt template with signal data and JSON schema is appended automatically.</p>
+        <p className="text-xs text-muted-foreground">High-level system instruction prepended to every snapshot generation.</p>
         <Textarea
           value={prompt}
           onChange={e => setPrompt(e.target.value)}
-          className="bg-secondary font-mono text-xs min-h-[300px]"
+          className="bg-secondary font-mono text-xs min-h-[200px]"
+        />
+      </div>
+      <div className="panel space-y-4">
+        <div className="panel-header">Prompt Template & JSON Schema</div>
+        <p className="text-xs text-muted-foreground">
+          Full prompt template with JSON schema. Use placeholders: <code className="text-primary">{"{{company_name}}"}</code>, <code className="text-primary">{"{{industry}}"}</code>, <code className="text-primary">{"{{partner_platform}}"}</code>, <code className="text-primary">{"{{compelling_events}}"}</code>, <code className="text-primary">{"{{signals}}"}</code>
+        </p>
+        <Textarea
+          value={promptTemplate}
+          onChange={e => setPromptTemplate(e.target.value)}
+          className="bg-secondary font-mono text-xs min-h-[400px]"
         />
       </div>
       <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="w-full gap-2">
