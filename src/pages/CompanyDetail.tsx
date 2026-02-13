@@ -152,6 +152,13 @@ export default function CompanyDetail() {
           <StatusBadge status={company.snapshot_status} />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {snap && company.partner && (
+            <Button size="sm" variant="outline" className="gap-1.5 text-xs" asChild>
+              <a href={`/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories`} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="w-3.5 h-3.5" /> View Story
+              </a>
+            </Button>
+          )}
           <Button size="sm" className="gap-1.5 text-xs" disabled={regenerating} onClick={regenerate}>
             {regenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Regenerate
           </Button>
