@@ -1,4 +1,4 @@
-import { AlertTriangle } from "lucide-react";
+import { Eye } from "lucide-react";
 import { motion } from "framer-motion";
 import { fade } from "./StorySection";
 import StorySection from "./StorySection";
@@ -9,7 +9,7 @@ interface Props {
 
 export default function ExecutionFrictionSection({ items }: Props) {
   return (
-    <StorySection icon={AlertTriangle} label="Pattern Recognition" title="Where execution friction usually emerges">
+    <StorySection icon={Eye} label="What We Typically See" title="When companies are at this stage, here's what usually happens">
       <div className="space-y-4 max-w-3xl">
         {items.map((item, i) => (
           <motion.div

@@ -13,7 +13,7 @@ import ExecutionFrictionSection from "./story/ExecutionFrictionSection";
 import OpportunityAreasSection from "./story/OpportunityAreasSection";
 import HowIoradHelpsSection from "./story/HowIoradHelpsSection";
 import EmbedDemo from "./story/EmbedDemo";
-import ConversationStartersSection from "./story/ConversationStartersSection";
+
 import StoryCTA from "./story/StoryCTA";
 import InternalSignalSummary from "./story/InternalSignalSummary";
 
@@ -214,7 +214,7 @@ function StoryPage({ customer, pm }: { customer: Customer; pm: PartnerMeta }) {
       )}
 
       <footer className="py-8 text-center text-xs" style={{ borderTop: "1px solid var(--story-border)", color: "var(--story-subtle)" }}>
-        <p>© {new Date().getFullYear()} iorad · This insight brief is prepared for {customer.name}.</p>
+        <p>© {new Date().getFullYear()} iorad · Prepared for {customer.name}.</p>
       </footer>
     </div>
   );

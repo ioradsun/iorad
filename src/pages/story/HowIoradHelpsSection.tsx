@@ -10,7 +10,7 @@ interface Props {
 
 export default function HowIoradHelpsSection({ items }: Props) {
   return (
-    <StorySection icon={Zap} label="How iorad Helps" title="How iorad could support these initiatives">
+    <StorySection icon={Zap} label="Where iorad Fits" title="What this looks like with iorad in the stack">
       <div className="grid md:grid-cols-2 gap-5">
         {items.map((item, i) => (
           <motion.div
