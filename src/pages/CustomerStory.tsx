@@ -206,14 +206,11 @@ function StoryPage({ customer, pm }: { customer: Customer; pm: PartnerMeta }) {
         <HowIoradHelpsSection items={customer.howIoradHelps} />
       )}
       <EmbedDemo />
-      {customer.conversationStarters.length > 0 && (
-        <ConversationStartersSection starters={customer.conversationStarters} />
-      )}
       <StoryCTA customer={customer} pm={pm} />
 
       {/* Internal signal summary — only visible to authenticated users */}
       {user && customer.internalSignals.signalTypes.length > 0 && (
-        <InternalSignalSummary signals={customer.internalSignals} />
+        <InternalSignalSummary signals={customer.internalSignals} conversationStarters={customer.conversationStarters} />
       )}
 
       <footer className="py-8 text-center text-xs" style={{ borderTop: "1px solid var(--story-border)", color: "var(--story-subtle)" }}>
