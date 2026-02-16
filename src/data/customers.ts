@@ -56,7 +56,7 @@ export const customers: Customer[] = [
   {
     id: "intermedia",
     name: "Intermedia",
-    domain: "intermedia.net",
+    domain: "intermedia.com",
     partner: "docebo",
     persona: "VP of Partner Enablement",
     whatsHappening: [
