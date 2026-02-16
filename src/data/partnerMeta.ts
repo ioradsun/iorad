@@ -1,6 +1,7 @@
 export interface PartnerMeta {
   key: string;
   label: string;
+  domain: string;
   positioning: string;
   embedBullets: string[];
   color: string;
@@ -11,6 +12,7 @@ export const partnerMeta: Record<string, PartnerMeta> = {
   seismic: {
     key: "seismic",
     label: "Seismic",
+    domain: "seismic.com",
     positioning: "Transforming sales enablement into operational execution",
     embedBullets: [
       "Interactive how-to guides embedded directly in Seismic content pages",
@@ -23,6 +25,7 @@ export const partnerMeta: Record<string, PartnerMeta> = {
   workramp: {
     key: "workramp",
     label: "WorkRamp",
+    domain: "workramp.com",
     positioning: "Closing the gap between learning completion and workflow execution",
     embedBullets: [
       "Interactive tutorials embedded within WorkRamp learning paths",
@@ -35,6 +38,7 @@ export const partnerMeta: Record<string, PartnerMeta> = {
   "360learning": {
     key: "360learning",
     label: "360Learning",
+    domain: "360learning.com",
     positioning: "Turning collaborative learning into operational competency",
     embedBullets: [
       "Step-by-step guides embedded in collaborative courses",
@@ -47,6 +51,7 @@ export const partnerMeta: Record<string, PartnerMeta> = {
   docebo: {
     key: "docebo",
     label: "Docebo",
+    domain: "docebo.com",
     positioning: "Operationalizing Docebo's learning infrastructure with execution-ready content",
     embedBullets: [
       "Interactive step-by-step guides embedded inside Docebo courses",
@@ -59,6 +64,7 @@ export const partnerMeta: Record<string, PartnerMeta> = {
   gainsight: {
     key: "gainsight",
     label: "Gainsight",
+    domain: "gainsight.com",
     positioning: "Converting customer success playbooks into self-serve execution",
     embedBullets: [
       "Interactive guides embedded within Gainsight success playbooks",

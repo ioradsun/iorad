@@ -139,6 +139,7 @@ function snapshotToCustomer(company: any, snap: any): Customer {
   return {
     id: company.id,
     name: company.name,
+    domain: company.domain || undefined,
     partner: (company.partner || "").toLowerCase() as Customer["partner"],
     persona: company.persona || "",
     whatsHappening,
@@ -164,6 +165,7 @@ function getPartnerMeta(partnerKey: string, dbConfig: any): PartnerMeta {
     return {
       key: dbConfig.id,
       label: dbConfig.label,
+      domain: dbConfig.domain || `${dbConfig.id}.com`,
       positioning: dbConfig.positioning || "",
       embedBullets: dbConfig.embed_bullets || [],
       color: dbConfig.color || "#10B981",
