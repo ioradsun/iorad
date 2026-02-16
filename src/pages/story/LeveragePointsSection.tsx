@@ -12,7 +12,13 @@ export default function LeveragePointsSection({ items }: Props) {
   const data = ctx?.isEditing ? ctx.editedCustomer.leveragePoints : items;
 
   return (
-    <StorySection icon={Wrench} label="Leverage Points" title="Under-optimized leverage points">
+    <StorySection
+      icon={Wrench}
+      label="Leverage Points"
+      labelField="overrides.leverage.label"
+      title="Under-optimized leverage points"
+      titleField="overrides.leverage.title"
+    >
       <div className="max-w-3xl">
         <ul className="space-y-3">
           {data.map((item, i) => (

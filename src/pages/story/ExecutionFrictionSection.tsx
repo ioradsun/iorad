@@ -14,7 +14,13 @@ export default function ExecutionFrictionSection({ items }: Props) {
   const data = ctx?.isEditing ? ctx.editedCustomer.executionFriction : items;
 
   return (
-    <StorySection icon={Eye} label="What We Typically See" title="When companies are at this stage, here's what usually happens">
+    <StorySection
+      icon={Eye}
+      label="What We Typically See"
+      labelField="overrides.friction.label"
+      title="When companies are at this stage, here's what usually happens"
+      titleField="overrides.friction.title"
+    >
       <div className="space-y-4 max-w-3xl">
         {data.map((item, i) => (
           <EditableListItemWrapper key={i} arrayPath="executionFriction" index={i}>

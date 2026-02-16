@@ -159,6 +159,7 @@ function snapshotToCustomer(company: any, snap: any): Customer {
     whyNow,
     conversationStarters,
     internalSignals,
+    overrides: json.text_overrides || {},
   };
 }
 
@@ -198,6 +199,7 @@ function customerToSnapshotJson(c: Customer): Record<string, any> {
       urgency: c.internalSignals.urgency,
       primary_persona: c.internalSignals.primaryPersona,
     },
+    text_overrides: c.overrides || {},
   };
 }
 

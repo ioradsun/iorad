@@ -50,6 +50,8 @@ export interface Customer {
   whyNow: string;
   conversationStarters: string[];
   internalSignals: InternalSignals;
+  /** Free-form text overrides keyed by path (e.g. "hero.subtitle", "section.friction.title") */
+  overrides?: Record<string, string>;
 }
 
 export const customers: Customer[] = [

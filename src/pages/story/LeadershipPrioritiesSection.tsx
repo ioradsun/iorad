@@ -11,12 +11,23 @@ export default function LeadershipPrioritiesSection({ items }: Props) {
   const ctx = useStoryEdit();
   const data = ctx?.isEditing ? ctx.editedCustomer.leadershipPriorities : items;
 
+  const defaultIntro = "When companies hit this stage, leadership usually focuses on:";
+  const intro = ctx?.editedCustomer.overrides?.["priorities.intro"] || defaultIntro;
+
   return (
-    <StorySection icon={Compass} label="Leadership Focus" title="What this usually signals about priorities">
+    <StorySection
+      icon={Compass}
+      label="Leadership Focus"
+      labelField="overrides.priorities.label"
+      title="What this usually signals about priorities"
+      titleField="overrides.priorities.title"
+    >
       <div className="max-w-3xl">
-        <p className="text-sm mb-5 leading-relaxed" style={{ color: "var(--story-subtle)" }}>
-          When companies hit this stage, leadership usually focuses on:
-        </p>
+        {ctx?.isEditing ? (
+          <EditableText value={intro} field="overrides.priorities.intro" as="p" className="text-sm mb-5 leading-relaxed" style={{ color: "var(--story-subtle)" }} />
+        ) : (
+          <p className="text-sm mb-5 leading-relaxed" style={{ color: "var(--story-subtle)" }}>{intro}</p>
+        )}
         <ul className="space-y-3">
           {data.map((item, i) => (
             <EditableListItemWrapper key={i} arrayPath="leadershipPriorities" index={i}>

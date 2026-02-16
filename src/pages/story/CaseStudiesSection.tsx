@@ -15,7 +15,13 @@ export default function CaseStudiesSection({ studies }: Props) {
   const data = ctx?.isEditing ? ctx.editedCustomer.caseStudies : studies;
 
   return (
-    <StorySection icon={Users} label="Similar Patterns" title="Patterns we've seen elsewhere">
+    <StorySection
+      icon={Users}
+      label="Similar Patterns"
+      labelField="overrides.cases.label"
+      title="Patterns we've seen elsewhere"
+      titleField="overrides.cases.title"
+    >
       <div className="space-y-5">
         {data.map((study, i) => (
           <EditableListItemWrapper key={i} arrayPath="caseStudies" index={i}>
