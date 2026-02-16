@@ -19,7 +19,7 @@ export default function StrategicPlaysSection({ plays }: Props) {
       icon={Layout}
       label="Strategic Plays"
       labelField="overrides.plays.label"
-      title="Plays to consider"
+      title="Four plays to consider"
       titleField="overrides.plays.title"
     >
       <div className="space-y-6">
@@ -42,8 +42,8 @@ export default function StrategicPlaysSection({ plays }: Props) {
                   <EditableText value={play.whyNow} field={`plays.${i}.whyNow`} as="p" className="leading-relaxed" style={{ color: "var(--story-muted)" }} />
                 </div>
                 <div>
-                  <p className="text-xs font-mono uppercase tracking-wider mb-1" style={{ color: "var(--story-accent)" }}>In Practice</p>
-                  <EditableText value={play.inPractice} field={`plays.${i}.inPractice`} as="p" className="leading-relaxed" style={{ color: "var(--story-muted)" }} />
+                  <p className="text-xs font-mono uppercase tracking-wider mb-1" style={{ color: "var(--story-accent)" }}>What It Looks Like</p>
+                  <EditableText value={play.whatItLooksLike} field={`plays.${i}.whatItLooksLike`} as="p" className="leading-relaxed" style={{ color: "var(--story-muted)" }} />
                 </div>
                 <div>
                   <p className="text-xs font-mono uppercase tracking-wider mb-1" style={{ color: "var(--story-accent)" }}>Expected Impact</p>

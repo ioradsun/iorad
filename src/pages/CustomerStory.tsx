@@ -4,22 +4,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { customers } from "@/data/customers";
 import { partnerMeta as staticPartnerMeta, PartnerMeta } from "@/data/partnerMeta";
 import { Loader2 } from "lucide-react";
-import type { Customer, InitiativeItem, InternalSignals, StrategicPlay, CaseStudy } from "@/data/customers";
+import type { Customer, InitiativeItem, InternalSignals, StrategicPlay, CaseStudy, EnterpriseSystem } from "@/data/customers";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
 import StoryHero from "./story/StoryHero";
 import WhatsHappeningSection from "./story/WhatsHappeningSection";
-import LeadershipPrioritiesSection from "./story/LeadershipPrioritiesSection";
+import FunctionalImplicationsSection from "./story/FunctionalImplicationsSection";
 import ExecutionFrictionSection from "./story/ExecutionFrictionSection";
-import LeadersAskedSection from "./story/LeadersAskedSection";
-import TwoPathsSection from "./story/TwoPathsSection";
-import CostUnaddressedSection from "./story/CostUnaddressedSection";
+import AccountabilityPressureSection from "./story/AccountabilityPressureSection";
+import RealCostSection from "./story/RealCostSection";
 import BlindSpotSection from "./story/BlindSpotSection";
-import LeveragePointsSection from "./story/LeveragePointsSection";
 import StrategicPlaysSection from "./story/StrategicPlaysSection";
+import ReinforcementJourneySection from "./story/ReinforcementJourneySection";
 import EmbedDemo from "./story/EmbedDemo";
-import SelfCheckSection from "./story/SelfCheckSection";
 import CaseStudiesSection from "./story/CaseStudiesSection";
 import WhyNowSection from "./story/WhyNowSection";
 import StoryCTA from "./story/StoryCTA";
@@ -78,26 +76,23 @@ function snapshotToCustomer(company: any, snap: any): Customer {
     detail: item.detail || "",
   }));
 
-  const leadershipPriorities: string[] = json.leadership_priorities || [];
+  // New fields
+  const functionalImplications: string = json.functional_implications || "";
+  const accountabilityPressure: string[] = json.accountability_pressure || json.leaders_asked || [];
+  const realCost: string[] = json.real_cost || json.cost_unaddressed || [];
+  const reinforcementJourney: string = json.reinforcement_journey || "";
+
+  // Existing fields
   const executionFriction: string[] = json.execution_friction || [];
-  const leadersAsked: string[] = json.leaders_asked || [];
-
-  const pathA: string = json.path_a || json.two_paths?.path_a || "";
-  const pathB: string = json.path_b || json.two_paths?.path_b || "";
-
-  const costUnaddressed: string[] = json.cost_unaddressed || [];
   const blindSpot: string = json.blind_spot || "";
-  const leveragePoints: string[] = json.leverage_points || [];
 
   const plays: StrategicPlay[] = (json.strategic_plays || []).map((p: any) => ({
     name: p.name || p.play_name || "",
     objective: p.objective || "",
     whyNow: p.why_now || "",
-    inPractice: p.in_practice || p.what_it_looks_like || "",
+    whatItLooksLike: p.what_it_looks_like || p.in_practice || "",
     expectedImpact: p.expected_impact || "",
   }));
-
-  const selfCheck: string[] = json.self_check || [];
 
   const caseStudies: CaseStudy[] = (json.case_studies || json.similar_patterns || []).map((c: any) => ({
     company: c.company || "",
@@ -111,8 +106,15 @@ function snapshotToCustomer(company: any, snap: any): Customer {
 
   const conversationStarters: string[] = json.conversation_starters || [];
 
+  const enterpriseSystems: EnterpriseSystem[] = (json.internal_signals?.enterprise_systems || []).map((e: any) => ({
+    system: e.system || "",
+    risk: e.risk || "",
+  }));
+
   const internalSignals: InternalSignals = {
     signalTypes: json.internal_signals?.signal_types || [],
+    enterpriseSystems,
+    operationalRisks: json.internal_signals?.operational_risks || [],
     hiringIntensity: json.internal_signals?.hiring_intensity || "",
     platformRollout: json.internal_signals?.platform_rollout || "",
     confidenceLevel: json.internal_signals?.confidence_level || "Medium",
@@ -120,6 +122,7 @@ function snapshotToCustomer(company: any, snap: any): Customer {
     primaryPersona: json.internal_signals?.primary_persona || company.persona || "",
   };
 
+  // Legacy fallbacks
   if (whatsHappening.length === 0 && json.signals) {
     for (const s of json.signals) {
       whatsHappening.push({ title: s.title || "", detail: s.detail || "" });
@@ -138,6 +141,13 @@ function snapshotToCustomer(company: any, snap: any): Customer {
     }
   }
 
+  // Build legacy path text into reinforcement journey if missing
+  if (!reinforcementJourney && (json.path_a || json.path_b)) {
+    // no-op — leave empty, those sections won't render
+  }
+
+  // Build accountability pressure from leaders_asked if needed (already handled above)
+
   return {
     id: company.id,
     name: company.name,
@@ -145,43 +155,45 @@ function snapshotToCustomer(company: any, snap: any): Customer {
     partner: (company.partner || "").toLowerCase() as Customer["partner"],
     persona: company.persona || "",
     whatsHappening,
-    leadershipPriorities,
+    functionalImplications,
     executionFriction,
-    leadersAsked,
-    pathA,
-    pathB,
-    costUnaddressed,
+    accountabilityPressure,
+    realCost,
     blindSpot,
-    leveragePoints,
     plays,
-    selfCheck,
+    reinforcementJourney,
     caseStudies,
     whyNow,
     conversationStarters,
     internalSignals,
     overrides: json.text_overrides || {},
+    // Legacy
+    leadershipPriorities: json.leadership_priorities || [],
+    leadersAsked: json.leaders_asked || [],
+    pathA: json.path_a || json.two_paths?.path_a || "",
+    pathB: json.path_b || json.two_paths?.path_b || "",
+    costUnaddressed: json.cost_unaddressed || [],
+    leveragePoints: json.leverage_points || [],
+    selfCheck: json.self_check || [],
   };
 }
 
 function customerToSnapshotJson(c: Customer): Record<string, any> {
   return {
     whats_happening: c.whatsHappening.map((w) => ({ title: w.title, detail: w.detail })),
-    leadership_priorities: c.leadershipPriorities,
+    functional_implications: c.functionalImplications,
     execution_friction: c.executionFriction,
-    leaders_asked: c.leadersAsked,
-    path_a: c.pathA,
-    path_b: c.pathB,
-    cost_unaddressed: c.costUnaddressed,
+    accountability_pressure: c.accountabilityPressure,
+    real_cost: c.realCost,
     blind_spot: c.blindSpot,
-    leverage_points: c.leveragePoints,
     strategic_plays: c.plays.map((p) => ({
       name: p.name,
       objective: p.objective,
       why_now: p.whyNow,
-      in_practice: p.inPractice,
+      what_it_looks_like: p.whatItLooksLike,
       expected_impact: p.expectedImpact,
     })),
-    self_check: c.selfCheck,
+    reinforcement_journey: c.reinforcementJourney,
     case_studies: c.caseStudies.map((s) => ({
       company: s.company,
       similarity: s.similarity,
@@ -193,6 +205,11 @@ function customerToSnapshotJson(c: Customer): Record<string, any> {
     conversation_starters: c.conversationStarters,
     internal_signals: {
       signal_types: c.internalSignals.signalTypes,
+      enterprise_systems: (c.internalSignals.enterpriseSystems || []).map((e) => ({
+        system: e.system,
+        risk: e.risk,
+      })),
+      operational_risks: c.internalSignals.operationalRisks || [],
       hiring_intensity: c.internalSignals.hiringIntensity,
       platform_rollout: c.internalSignals.platformRollout,
       confidence_level: c.internalSignals.confidenceLevel,
@@ -312,58 +329,63 @@ function StoryPageInner({
     <div className="min-h-screen" style={{ background: "var(--story-bg)", color: "var(--story-fg)" }}>
       <StoryHero customer={displayCustomer} pm={pm} />
 
+      {/* 1. What We're Seeing */}
       {displayCustomer.whatsHappening.length > 0 && (
         <WhatsHappeningSection companyName={displayCustomer.name} items={displayCustomer.whatsHappening} />
       )}
 
-      {displayCustomer.leadershipPriorities.length > 0 && (
-        <LeadershipPrioritiesSection items={displayCustomer.leadershipPriorities} />
+      {/* 2. What This Likely Means */}
+      {displayCustomer.functionalImplications && (
+        <FunctionalImplicationsSection text={displayCustomer.functionalImplications} contactName={displayCustomer.contactName} />
       )}
 
+      {/* 3. Where Adoption Friction Shows Up */}
       {displayCustomer.executionFriction.length > 0 && (
         <ExecutionFrictionSection items={displayCustomer.executionFriction} />
       )}
 
-      {displayCustomer.leadersAsked.length > 0 && (
-        <LeadersAskedSection items={displayCustomer.leadersAsked} persona={displayCustomer.persona} />
+      {/* 4. The Accountability Pressure */}
+      {displayCustomer.accountabilityPressure.length > 0 && (
+        <AccountabilityPressureSection items={displayCustomer.accountabilityPressure} />
       )}
 
-      {(displayCustomer.pathA || displayCustomer.pathB) && (
-        <TwoPathsSection pathA={displayCustomer.pathA} pathB={displayCustomer.pathB} />
+      {/* 5. The Real Cost */}
+      {displayCustomer.realCost.length > 0 && (
+        <RealCostSection items={displayCustomer.realCost} />
       )}
 
-      {displayCustomer.costUnaddressed.length > 0 && (
-        <CostUnaddressedSection items={displayCustomer.costUnaddressed} />
-      )}
-
+      {/* 6. The Common Blind Spot */}
       {displayCustomer.blindSpot && (
         <BlindSpotSection text={displayCustomer.blindSpot} />
       )}
 
-      {displayCustomer.leveragePoints.length > 0 && (
-        <LeveragePointsSection items={displayCustomer.leveragePoints} />
-      )}
-
+      {/* 7. Four Strategic Plays */}
       {displayCustomer.plays.length > 0 && (
         <StrategicPlaysSection plays={displayCustomer.plays} />
       )}
 
-      <EmbedDemo />
-
-      {displayCustomer.selfCheck.length > 0 && (
-        <SelfCheckSection items={displayCustomer.selfCheck} />
+      {/* 8. What Reinforcement Could Feel Like */}
+      {displayCustomer.reinforcementJourney && (
+        <ReinforcementJourneySection text={displayCustomer.reinforcementJourney} />
       )}
 
+      {/* Interactive Demo */}
+      <EmbedDemo />
+
+      {/* 9. Similar Patterns */}
       {displayCustomer.caseStudies.length > 0 && (
         <CaseStudiesSection studies={displayCustomer.caseStudies} />
       )}
 
+      {/* 10. Why This Matters Now */}
       {displayCustomer.whyNow && (
         <WhyNowSection text={displayCustomer.whyNow} />
       )}
 
+      {/* 11. Continue the Conversation */}
       <StoryCTA customer={displayCustomer} pm={pm} />
 
+      {/* 12. Internal Signal Context (hidden) */}
       {showInternal && displayCustomer.internalSignals.signalTypes.length > 0 && (
         <InternalSignalSummary signals={displayCustomer.internalSignals} conversationStarters={displayCustomer.conversationStarters} />
       )}

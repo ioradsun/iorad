@@ -1,4 +1,4 @@
-import { ShieldCheck, MessageCircle } from "lucide-react";
+import { ShieldCheck, MessageCircle, Server, AlertOctagon } from "lucide-react";
 import type { InternalSignals } from "@/data/customers";
 
 interface Props {
@@ -56,6 +56,46 @@ export default function InternalSignalSummary({ signals, conversationStarters }:
             <p className="font-semibold">{signals.primaryPersona}</p>
           </div>
         </div>
+
+        {/* Enterprise Systems Detected */}
+        {signals.enterpriseSystems && signals.enterpriseSystems.length > 0 && (
+          <div style={{ borderTop: "1px dashed var(--story-border)" }} className="pt-4 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Server className="w-3.5 h-3.5" style={{ color: "var(--story-subtle)" }} />
+              <p className="text-xs font-mono uppercase tracking-[0.2em]" style={{ color: "var(--story-subtle)" }}>
+                Enterprise Systems Detected
+              </p>
+            </div>
+            <div className="space-y-2">
+              {signals.enterpriseSystems.map((es, i) => (
+                <div key={i} className="flex items-start gap-3 text-sm">
+                  <span className="font-semibold min-w-[120px]">{es.system}</span>
+                  <span style={{ color: "var(--story-muted)" }}>→ {es.risk}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Operational Risks */}
+        {signals.operationalRisks && signals.operationalRisks.length > 0 && (
+          <div style={{ borderTop: "1px dashed var(--story-border)" }} className="pt-4 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertOctagon className="w-3.5 h-3.5" style={{ color: "var(--story-subtle)" }} />
+              <p className="text-xs font-mono uppercase tracking-[0.2em]" style={{ color: "var(--story-subtle)" }}>
+                Operational Risks Identified
+              </p>
+            </div>
+            <ul className="space-y-1.5">
+              {signals.operationalRisks.map((risk, i) => (
+                <li key={i} className="text-sm flex items-start gap-2" style={{ color: "var(--story-muted)" }}>
+                  <span className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 bg-red-400/60" />
+                  {risk}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {conversationStarters && conversationStarters.length > 0 && (
           <div style={{ borderTop: "1px dashed var(--story-border)" }} className="pt-4">
