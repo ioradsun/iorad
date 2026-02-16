@@ -115,10 +115,33 @@ From the detected enterprise tools:
 3. Prioritize: core revenue or operational systems, systems used by majority of employees, systems central to transformation initiatives.
 4. If no tool is confirmed, make a reasonable industry-based hypothesis and use cautious language.
 
-CASE STUDY REFERENCE COMPANIES (select 2-3 that align):
-- Internal L&D: Kantata, Border States, Home Trust Bank
-- Customer Education: Airtable, 5-Star Students, Pax8
-- Partner / Sales Enablement: Pax8, Kantata, Border States
+CASE STUDY REFERENCE COMPANIES (select 2-3 that best align with the company's situation):
+
+Internal L&D:
+- Kantata — used iorad to scale internal systems training
+- Border States Electric — accelerated training for 2,700 employee-owners on SAP ERP desktop systems using interactive walkthroughs
+- Home Trust Bank — standardized process training across distributed teams
+- ClearCompany — replaced lengthy screen recordings with concise tutorials embedded in Confluence and Rise; provided visual evidence of process complexity to stakeholders
+- Syneos Health — evaluated iorad as a more user-friendly and cost-effective alternative to Assima for simpler training needs
+- Deutsche Leasing — enterprise adoption with rigorous data privacy and IT approval for browser-based tooling
+
+Customer Education:
+- Airtable — scaled customer onboarding with self-service interactive tutorials
+- 5-Star Students — embedded iorad tutorials for end-user education
+- Pax8 — reduced partner onboarding friction with in-workflow reinforcement
+- Gorgias — built a complete customer academy as a one-person team; helped users adopt technology quickly without entry barriers
+- ACS Technologies — developed a 30-tutorial program in two months; customers called the safe practice environment a "game changer"
+- Collibra — shifted to iorad as primary onboarding tool; enabled self-service training and reduced manual follow-up support
+
+Partner / Sales Enablement:
+- Pax8 — consistent partner enablement across geographies
+- Kantata — partner and sales process reinforcement
+- Border States — multi-location system rollout with sustained adoption
+
+Sales-specific patterns:
+- Smart Demos — reps use iorad for "GPS-guided" demos with real-time talking points during live presentations instead of relying on memory
+- Follow-up Support — reps share interactive simulations with buying committees instead of static PDFs or long call recordings
+- Sales Engineering Efficiency — SEs create technical walkthroughs to scale themselves, eliminating repetitive one-off questions
 
 Return ONLY valid JSON with this exact structure:
 
