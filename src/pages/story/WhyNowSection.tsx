@@ -1,12 +1,17 @@
 import { Clock } from "lucide-react";
 import { motion } from "framer-motion";
 import { fade } from "./StorySection";
+import { EditableText } from "./EditableText";
+import { useStoryEdit } from "./EditContext";
 
 interface Props {
   text: string;
 }
 
 export default function WhyNowSection({ text }: Props) {
+  const ctx = useStoryEdit();
+  const val = ctx?.isEditing ? ctx.editedCustomer.whyNow : text;
+
   return (
     <section className="max-w-5xl mx-auto px-6 py-12">
       <motion.div
@@ -18,7 +23,7 @@ export default function WhyNowSection({ text }: Props) {
           <Clock className="w-4 h-4" style={{ color: "var(--story-accent)" }} />
           <p className="text-xs font-mono uppercase tracking-[0.2em]" style={{ color: "var(--story-accent)" }}>Why This Matters Now</p>
         </div>
-        <p className="text-sm leading-relaxed max-w-3xl" style={{ color: "var(--story-muted)" }}>{text}</p>
+        <EditableText value={val} field="whyNow" as="p" className="text-sm leading-relaxed max-w-3xl" style={{ color: "var(--story-muted)" }} />
       </motion.div>
     </section>
   );
