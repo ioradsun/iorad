@@ -1,4 +1,4 @@
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { customers } from "@/data/customers";
@@ -211,6 +211,8 @@ export default function CustomerStory() {
 
 function StoryPage({ customer, pm }: { customer: Customer; pm: PartnerMeta }) {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const showInternal = user && searchParams.get("internal") === "true";
 
   return (
     <div className="min-h-screen" style={{ background: "var(--story-bg)", color: "var(--story-fg)" }}>
@@ -268,7 +270,7 @@ function StoryPage({ customer, pm }: { customer: Customer; pm: PartnerMeta }) {
 
       <StoryCTA customer={customer} pm={pm} />
 
-      {user && customer.internalSignals.signalTypes.length > 0 && (
+      {showInternal && customer.internalSignals.signalTypes.length > 0 && (
         <InternalSignalSummary signals={customer.internalSignals} conversationStarters={customer.conversationStarters} />
       )}
 
