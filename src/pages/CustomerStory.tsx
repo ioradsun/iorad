@@ -1,11 +1,12 @@
 import { useParams, Link, useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { customers } from "@/data/customers";
 import { partnerMeta as staticPartnerMeta, PartnerMeta } from "@/data/partnerMeta";
 import { Loader2 } from "lucide-react";
 import type { Customer, InitiativeItem, InternalSignals, StrategicPlay, CaseStudy } from "@/data/customers";
 import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 import StoryHero from "./story/StoryHero";
 import WhatsHappeningSection from "./story/WhatsHappeningSection";
@@ -23,6 +24,8 @@ import CaseStudiesSection from "./story/CaseStudiesSection";
 import WhyNowSection from "./story/WhyNowSection";
 import StoryCTA from "./story/StoryCTA";
 import InternalSignalSummary from "./story/InternalSignalSummary";
+import { StoryEditProvider, useStoryEdit } from "./story/EditContext";
+import EditToolbar from "./story/EditToolbar";
 
 function slugToName(slug: string): string {
   return slug.replace(/-/g, " ");
@@ -117,7 +120,6 @@ function snapshotToCustomer(company: any, snap: any): Customer {
     primaryPersona: json.internal_signals?.primary_persona || company.persona || "",
   };
 
-  // Backward compat: old format fields
   if (whatsHappening.length === 0 && json.signals) {
     for (const s of json.signals) {
       whatsHappening.push({ title: s.title || "", detail: s.detail || "" });
@@ -160,6 +162,45 @@ function snapshotToCustomer(company: any, snap: any): Customer {
   };
 }
 
+function customerToSnapshotJson(c: Customer): Record<string, any> {
+  return {
+    whats_happening: c.whatsHappening.map((w) => ({ title: w.title, detail: w.detail })),
+    leadership_priorities: c.leadershipPriorities,
+    execution_friction: c.executionFriction,
+    leaders_asked: c.leadersAsked,
+    path_a: c.pathA,
+    path_b: c.pathB,
+    cost_unaddressed: c.costUnaddressed,
+    blind_spot: c.blindSpot,
+    leverage_points: c.leveragePoints,
+    strategic_plays: c.plays.map((p) => ({
+      name: p.name,
+      objective: p.objective,
+      why_now: p.whyNow,
+      in_practice: p.inPractice,
+      expected_impact: p.expectedImpact,
+    })),
+    self_check: c.selfCheck,
+    case_studies: c.caseStudies.map((s) => ({
+      company: s.company,
+      similarity: s.similarity,
+      challenge: s.challenge,
+      outcome: s.outcome,
+      relevance: s.relevance,
+    })),
+    why_now: c.whyNow,
+    conversation_starters: c.conversationStarters,
+    internal_signals: {
+      signal_types: c.internalSignals.signalTypes,
+      hiring_intensity: c.internalSignals.hiringIntensity,
+      platform_rollout: c.internalSignals.platformRollout,
+      confidence_level: c.internalSignals.confidenceLevel,
+      urgency: c.internalSignals.urgency,
+      primary_persona: c.internalSignals.primaryPersona,
+    },
+  };
+}
+
 function getPartnerMeta(partnerKey: string, dbConfig: any): PartnerMeta {
   if (dbConfig) {
     return {
@@ -187,7 +228,7 @@ export default function CustomerStory() {
 
   if (legacyCustomer) {
     const pm = staticPartnerMeta[legacyCustomer.partner];
-    return <StoryPage customer={legacyCustomer} pm={pm} />;
+    return <StoryPage customer={legacyCustomer} pm={pm} snapshotId={undefined} />;
   }
 
   if (isLoading) {
@@ -206,77 +247,132 @@ export default function CustomerStory() {
   customer.contactName = formattedContactName;
   const pm = getPartnerMeta(partner || "", dbData.partnerConfig);
 
-  return <StoryPage customer={customer} pm={pm} />;
+  return <StoryPage customer={customer} pm={pm} snapshotId={dbData.snapshot.id} />;
 }
 
-function StoryPage({ customer, pm }: { customer: Customer; pm: PartnerMeta }) {
+function StoryPage({ customer, pm, snapshotId }: { customer: Customer; pm: PartnerMeta; snapshotId?: string }) {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const showInternal = user && searchParams.get("internal") === "true";
+  const queryClient = useQueryClient();
+
+  const isIoradUser = user?.email?.endsWith("@iorad.com");
+
+  return (
+    <StoryEditProvider customer={customer}>
+      <StoryPageInner customer={customer} pm={pm} snapshotId={snapshotId} showInternal={!!showInternal} isIoradUser={!!isIoradUser} queryClient={queryClient} />
+    </StoryEditProvider>
+  );
+}
+
+function StoryPageInner({
+  customer,
+  pm,
+  snapshotId,
+  showInternal,
+  isIoradUser,
+  queryClient,
+}: {
+  customer: Customer;
+  pm: PartnerMeta;
+  snapshotId?: string;
+  showInternal: boolean;
+  isIoradUser: boolean;
+  queryClient: any;
+}) {
+  const ctx = useStoryEdit();
+  const displayCustomer = ctx?.isEditing ? ctx.editedCustomer : customer;
+
+  const handleSave = async () => {
+    if (!ctx || !snapshotId) {
+      toast.error("Cannot save — no snapshot ID available");
+      return;
+    }
+
+    const newJson = customerToSnapshotJson(ctx.editedCustomer);
+
+    const { error } = await supabase
+      .from("snapshots")
+      .update({ snapshot_json: newJson as any })
+      .eq("id", snapshotId);
+
+    if (error) {
+      toast.error("Failed to save: " + error.message);
+      return;
+    }
+
+    toast.success("Story updated successfully");
+    queryClient.invalidateQueries({ queryKey: ["story"] });
+    ctx.cancelEditing();
+  };
 
   return (
     <div className="min-h-screen" style={{ background: "var(--story-bg)", color: "var(--story-fg)" }}>
-      <StoryHero customer={customer} pm={pm} />
+      <StoryHero customer={displayCustomer} pm={pm} />
 
-      {customer.whatsHappening.length > 0 && (
-        <WhatsHappeningSection companyName={customer.name} items={customer.whatsHappening} />
+      {displayCustomer.whatsHappening.length > 0 && (
+        <WhatsHappeningSection companyName={displayCustomer.name} items={displayCustomer.whatsHappening} />
       )}
 
-      {customer.leadershipPriorities.length > 0 && (
-        <LeadershipPrioritiesSection items={customer.leadershipPriorities} />
+      {displayCustomer.leadershipPriorities.length > 0 && (
+        <LeadershipPrioritiesSection items={displayCustomer.leadershipPriorities} />
       )}
 
-      {customer.executionFriction.length > 0 && (
-        <ExecutionFrictionSection items={customer.executionFriction} />
+      {displayCustomer.executionFriction.length > 0 && (
+        <ExecutionFrictionSection items={displayCustomer.executionFriction} />
       )}
 
-      {customer.leadersAsked.length > 0 && (
-        <LeadersAskedSection items={customer.leadersAsked} persona={customer.persona} />
+      {displayCustomer.leadersAsked.length > 0 && (
+        <LeadersAskedSection items={displayCustomer.leadersAsked} persona={displayCustomer.persona} />
       )}
 
-      {(customer.pathA || customer.pathB) && (
-        <TwoPathsSection pathA={customer.pathA} pathB={customer.pathB} />
+      {(displayCustomer.pathA || displayCustomer.pathB) && (
+        <TwoPathsSection pathA={displayCustomer.pathA} pathB={displayCustomer.pathB} />
       )}
 
-      {customer.costUnaddressed.length > 0 && (
-        <CostUnaddressedSection items={customer.costUnaddressed} />
+      {displayCustomer.costUnaddressed.length > 0 && (
+        <CostUnaddressedSection items={displayCustomer.costUnaddressed} />
       )}
 
-      {customer.blindSpot && (
-        <BlindSpotSection text={customer.blindSpot} />
+      {displayCustomer.blindSpot && (
+        <BlindSpotSection text={displayCustomer.blindSpot} />
       )}
 
-      {customer.leveragePoints.length > 0 && (
-        <LeveragePointsSection items={customer.leveragePoints} />
+      {displayCustomer.leveragePoints.length > 0 && (
+        <LeveragePointsSection items={displayCustomer.leveragePoints} />
       )}
 
-      {customer.plays.length > 0 && (
-        <StrategicPlaysSection plays={customer.plays} />
+      {displayCustomer.plays.length > 0 && (
+        <StrategicPlaysSection plays={displayCustomer.plays} />
       )}
 
       <EmbedDemo />
 
-      {customer.selfCheck.length > 0 && (
-        <SelfCheckSection items={customer.selfCheck} />
+      {displayCustomer.selfCheck.length > 0 && (
+        <SelfCheckSection items={displayCustomer.selfCheck} />
       )}
 
-      {customer.caseStudies.length > 0 && (
-        <CaseStudiesSection studies={customer.caseStudies} />
+      {displayCustomer.caseStudies.length > 0 && (
+        <CaseStudiesSection studies={displayCustomer.caseStudies} />
       )}
 
-      {customer.whyNow && (
-        <WhyNowSection text={customer.whyNow} />
+      {displayCustomer.whyNow && (
+        <WhyNowSection text={displayCustomer.whyNow} />
       )}
 
-      <StoryCTA customer={customer} pm={pm} />
+      <StoryCTA customer={displayCustomer} pm={pm} />
 
-      {showInternal && customer.internalSignals.signalTypes.length > 0 && (
-        <InternalSignalSummary signals={customer.internalSignals} conversationStarters={customer.conversationStarters} />
+      {showInternal && displayCustomer.internalSignals.signalTypes.length > 0 && (
+        <InternalSignalSummary signals={displayCustomer.internalSignals} conversationStarters={displayCustomer.conversationStarters} />
       )}
 
       <footer className="py-8 text-center text-xs" style={{ borderTop: "1px solid var(--story-border)", color: "var(--story-subtle)" }}>
-        <p>© {new Date().getFullYear()} iorad · Prepared for {customer.name}.</p>
+        <p>© {new Date().getFullYear()} iorad · Prepared for {displayCustomer.name}.</p>
       </footer>
+
+      {isIoradUser && snapshotId && (
+        <EditToolbar onSave={handleSave} />
+      )}
     </div>
   );
 }
