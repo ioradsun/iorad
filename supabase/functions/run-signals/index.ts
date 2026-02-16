@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
-import { buildIoradPrompt } from "./prompt.ts";
+import { buildIoradPrompt, type LibraryLink } from "./prompt.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -67,8 +67,9 @@ async function scoreSignals(
   company: CompanyRow,
   signals: { title: string; url: string; type: string; excerpt: string }[],
   lovableKey: string,
-  aiConfig: { system_prompt: string; model: string },
-  compellingEvents: string[]
+  aiConfig: { system_prompt: string; model: string; prompt_template?: string },
+  compellingEvents: string[],
+  libraryLinks: LibraryLink[]
 ): Promise<{
   score_total: number;
   score_breakdown: Record<string, number>;
@@ -96,7 +97,11 @@ async function scoreSignals(
       signalSummary,
       aiConfig.system_prompt,
       compellingEvents,
-      aiConfig.prompt_template
+      aiConfig.prompt_template,
+      undefined, // contactName — could come from company row later
+      undefined, // contactTitle
+      company.persona || undefined,
+      libraryLinks
     );
 
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -165,12 +170,15 @@ Deno.serve(async (req) => {
     if (!firecrawlKey) throw new Error("FIRECRAWL_API_KEY not configured");
     if (!lovableKey) throw new Error("LOVABLE_API_KEY not configured");
 
-    // Load AI config and compelling events from DB
-    const { data: aiConfigRow } = await supabase.from("ai_config").select("system_prompt, model").eq("id", 1).single();
-    const aiConfig = aiConfigRow || { system_prompt: "You are a GTM strategist for iorad.", model: "google/gemini-2.5-flash" };
+    // Load AI config, compelling events, and library links from DB
+    const { data: aiConfigRow } = await supabase.from("ai_config").select("system_prompt, model, prompt_template").eq("id", 1).single();
+    const aiConfig = aiConfigRow || { system_prompt: "You are a GTM strategist for iorad.", model: "google/gemini-2.5-flash", prompt_template: "" };
 
     const { data: eventsRows } = await supabase.from("compelling_events").select("label").eq("is_active", true).order("sort_order");
     const compellingEvents = (eventsRows || []).map((e: any) => e.label);
+
+    const { data: libraryRows } = await supabase.from("iorad_libraries").select("label, help_center_url").order("label");
+    const libraryLinks: LibraryLink[] = (libraryRows || []).map((r: any) => ({ label: r.label, help_center_url: r.help_center_url }));
 
     let body: any = {};
     try { body = await req.json(); } catch { /* ok */ }
@@ -284,7 +292,7 @@ Deno.serve(async (req) => {
 
       // Step 2: Score + Snapshot (unless signals_only)
       if (mode !== "signals_only") {
-        const result = await scoreSignals(company, signals, lovableKey, aiConfig, compellingEvents);
+        const result = await scoreSignals(company, signals, lovableKey, aiConfig, compellingEvents, libraryLinks);
         snapshotStatus = result.snapshot_status;
 
         await supabase.from("snapshots").insert({

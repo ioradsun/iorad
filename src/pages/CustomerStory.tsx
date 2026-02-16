@@ -81,6 +81,12 @@ function snapshotToCustomer(company: any, snap: any): Customer {
   const accountabilityPressure: string[] = json.accountability_pressure || json.leaders_asked || [];
   const realCost: string[] = json.real_cost || json.cost_unaddressed || [];
   const reinforcementJourney: string = json.reinforcement_journey || "";
+  const reinforcementPreview = json.reinforcement_preview ? {
+    detectedTool: json.reinforcement_preview.detected_tool || "",
+    libraryUrl: json.reinforcement_preview.library_url || null,
+    description: json.reinforcement_preview.description || "",
+  } : undefined;
+  const cta: string = json.cta || "";
 
   // Existing fields
   const executionFriction: string[] = json.execution_friction || [];
@@ -162,8 +168,10 @@ function snapshotToCustomer(company: any, snap: any): Customer {
     blindSpot,
     plays,
     reinforcementJourney,
+    reinforcementPreview,
     caseStudies,
     whyNow,
+    cta,
     conversationStarters,
     internalSignals,
     overrides: json.text_overrides || {},

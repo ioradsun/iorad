@@ -235,6 +235,27 @@ export type Database = {
           },
         ]
       }
+      iorad_libraries: {
+        Row: {
+          created_at: string
+          help_center_url: string
+          id: string
+          label: string
+        }
+        Insert: {
+          created_at?: string
+          help_center_url: string
+          id?: string
+          label: string
+        }
+        Update: {
+          created_at?: string
+          help_center_url?: string
+          id?: string
+          label?: string
+        }
+        Relationships: []
+      }
       partner_config: {
         Row: {
           color: string
