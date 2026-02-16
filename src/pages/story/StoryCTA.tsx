@@ -10,9 +10,9 @@ interface Props {
 }
 
 export default function StoryCTA({ customer, pm }: Props) {
-  const mailSubject = encodeURIComponent(`Exploring iorad for ${customer.name}`);
+  const mailSubject = encodeURIComponent(`iorad + ${pm.label} for ${customer.name}`);
   const mailBody = encodeURIComponent(
-    `Hi Kate,\n\nI reviewed the insight brief for ${customer.name} and would love to explore how iorad could support our initiatives.\n\nLooking forward to connecting.`
+    `Hi,\n\nI saw the page you put together for ${customer.name} — I'd like to learn more about how iorad works with ${pm.label}.\n\nBest,\n${customer.contactName || ""}`
   );
   const mailto = `mailto:kate@iorad.com?subject=${mailSubject}&body=${mailBody}`;
 
@@ -20,10 +20,10 @@ export default function StoryCTA({ customer, pm }: Props) {
     <section className="max-w-5xl mx-auto px-6 py-24" id="cta">
       <motion.div {...fade} className="text-center">
         <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
-          {customer.contactName ? `${customer.contactName}, let's` : "Let's"} explore this together
+          Want to see this for {customer.name}?
         </h2>
         <p className="max-w-xl mx-auto mb-8 leading-relaxed" style={{ color: "var(--story-muted)" }}>
-          We'd love to walk through these insights with you and discuss how interactive process reinforcement could support {customer.name}'s current initiatives.
+          We can set up a quick walkthrough showing how iorad works inside {pm.label} — specifically for your team's workflows.
         </p>
         <a
           href={mailto}
@@ -31,7 +31,7 @@ export default function StoryCTA({ customer, pm }: Props) {
           style={{ background: "var(--story-cta-bg)", color: "var(--story-cta-fg)" }}
         >
           <Mail className="w-5 h-5" />
-          Start a conversation with Kate
+          Let's set up 15 minutes
         </a>
       </motion.div>
     </section>

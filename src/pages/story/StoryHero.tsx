@@ -8,8 +8,6 @@ interface StoryHeroProps {
 }
 
 export default function StoryHero({ customer, pm }: StoryHeroProps) {
-  const greeting = customer.contactName ? `${customer.contactName}, we` : "We";
-
   return (
     <section className="relative overflow-hidden">
       <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, var(--story-accent-dim), transparent, transparent)" }} />
@@ -19,16 +17,27 @@ export default function StoryHero({ customer, pm }: StoryHeroProps) {
             className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-[0.2em] px-3 py-1 rounded-full border mb-6"
             style={{ borderColor: pm.color + "50", color: pm.color, background: pm.color + "10" }}
           >
-            Account Insight Brief
+            Prepared for {customer.name}
           </span>
           <h1 className="text-4xl md:text-6xl font-bold tracking-tight leading-[1.1] mb-6 max-w-3xl">
-            {greeting} prepared some insights for{" "}
-            <span style={{ backgroundImage: `linear-gradient(to right, var(--story-gradient-from), var(--story-gradient-to))`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-              {customer.name}
-            </span>
+            {customer.contactName ? (
+              <>
+                {customer.contactName}, here's what we see at{" "}
+                <span style={{ backgroundImage: `linear-gradient(to right, var(--story-gradient-from), var(--story-gradient-to))`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                  {customer.name}
+                </span>
+              </>
+            ) : (
+              <>
+                Here's what we see at{" "}
+                <span style={{ backgroundImage: `linear-gradient(to right, var(--story-gradient-from), var(--story-gradient-to))`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                  {customer.name}
+                </span>
+              </>
+            )}
           </h1>
           <p className="text-lg md:text-xl max-w-2xl leading-relaxed" style={{ color: "var(--story-muted)" }}>
-            A strategic look at where {customer.name} is heading — and how interactive process reinforcement could accelerate what's already in motion.
+            You're investing in {pm.label}. Here's how companies like yours are getting more out of that investment.
           </p>
         </motion.div>
       </div>
