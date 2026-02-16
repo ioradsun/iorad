@@ -10,20 +10,20 @@ interface Props {
 }
 
 export default function StoryCTA({ customer, pm }: Props) {
-  const mailSubject = encodeURIComponent(`iorad + ${pm.label} for ${customer.name}`);
+  const mailSubject = encodeURIComponent(`Following up — ${customer.name} operating brief`);
   const mailBody = encodeURIComponent(
-    `Hi,\n\nI saw the page you put together for ${customer.name} — I'd like to learn more about how iorad works with ${pm.label}.\n\nBest,\n${customer.contactName || ""}`
+    `Hi,\n\nI reviewed the brief you put together for ${customer.name}. I'd like to compare notes on some of the patterns you identified — particularly around reinforcement and adoption.\n\nWould be great to find 15 minutes.\n\nBest,\n${customer.contactName || ""}`
   );
   const mailto = `mailto:kate@iorad.com?subject=${mailSubject}&body=${mailBody}`;
 
   return (
     <section className="max-w-5xl mx-auto px-6 py-24" id="cta">
       <motion.div {...fade} className="text-center">
-        <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
-          Want to see this for {customer.name}?
+        <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-4">
+          Continue the conversation
         </h2>
-        <p className="max-w-xl mx-auto mb-8 leading-relaxed" style={{ color: "var(--story-muted)" }}>
-          We can set up a quick walkthrough showing how iorad works inside {pm.label} — specifically for your team's workflows.
+        <p className="max-w-xl mx-auto mb-8 leading-relaxed text-sm" style={{ color: "var(--story-muted)" }}>
+          If this perspective reflects what you're navigating internally, we'd welcome a meeting to walk through these ideas together and compare notes on where reinforcement could reduce friction.
         </p>
         <a
           href={mailto}
@@ -31,7 +31,7 @@ export default function StoryCTA({ customer, pm }: Props) {
           style={{ background: "var(--story-cta-bg)", color: "var(--story-cta-fg)" }}
         >
           <Mail className="w-5 h-5" />
-          Let's set up 15 minutes
+          Let's find 15 minutes
         </a>
       </motion.div>
     </section>

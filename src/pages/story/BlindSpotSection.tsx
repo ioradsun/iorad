@@ -1,0 +1,27 @@
+import { Lightbulb } from "lucide-react";
+import { motion } from "framer-motion";
+import { fade } from "./StorySection";
+
+interface Props {
+  text: string;
+}
+
+export default function BlindSpotSection({ text }: Props) {
+  return (
+    <section className="max-w-5xl mx-auto px-6 py-16">
+      <motion.div
+        {...fade}
+        className="rounded-2xl p-8 md:p-10"
+        style={{ border: "1px solid var(--story-accent-border)", background: "var(--story-accent-dim)" }}
+      >
+        <div className="flex items-center gap-2 mb-4">
+          <Lightbulb className="w-4 h-4" style={{ color: "var(--story-accent)" }} />
+          <p className="text-xs font-mono uppercase tracking-[0.2em]" style={{ color: "var(--story-accent)" }}>A Common Blind Spot</p>
+        </div>
+        <p className="text-base md:text-lg leading-relaxed max-w-3xl" style={{ color: "var(--story-muted)" }}>
+          {text}
+        </p>
+      </motion.div>
+    </section>
+  );
+}
