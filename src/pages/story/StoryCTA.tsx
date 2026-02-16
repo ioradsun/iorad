@@ -10,10 +10,9 @@ interface Props {
 }
 
 export default function StoryCTA({ customer, pm }: Props) {
-  const greeting = customer.contactName || "there";
-  const mailSubject = encodeURIComponent(`Interested in embedded iorad via ${pm.label}`);
+  const mailSubject = encodeURIComponent(`Exploring iorad for ${customer.name}`);
   const mailBody = encodeURIComponent(
-    `Hi Kate, I saw the ${customer.name} embedded iorad page and want to learn more about how this could work for us.`
+    `Hi Kate,\n\nI reviewed the insight brief for ${customer.name} and would love to explore how iorad could support our initiatives.\n\nLooking forward to connecting.`
   );
   const mailto = `mailto:kate@iorad.com?subject=${mailSubject}&body=${mailBody}`;
 
@@ -21,13 +20,10 @@ export default function StoryCTA({ customer, pm }: Props) {
     <section className="max-w-5xl mx-auto px-6 py-24" id="cta">
       <motion.div {...fade} className="text-center">
         <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
-          {customer.contactName ? `${customer.contactName}, ready` : "Ready"} to unlock more value inside {pm.label}?
+          {customer.contactName ? `${customer.contactName}, let's` : "Let's"} explore this together
         </h2>
-        <p className="max-w-xl mx-auto mb-2 leading-relaxed" style={{ color: "var(--story-muted)" }}>
-          {customer.name}'s partner enablement can move faster with iorad embedded directly inside {pm.label}.
-        </p>
-        <p className="text-sm mb-8" style={{ color: "var(--story-subtle)" }}>
-          See how iorad embeds inside {pm.label} for {customer.name}.
+        <p className="max-w-xl mx-auto mb-8 leading-relaxed" style={{ color: "var(--story-muted)" }}>
+          We'd love to walk through these insights with you and discuss how interactive process reinforcement could support {customer.name}'s current initiatives.
         </p>
         <a
           href={mailto}
@@ -35,7 +31,7 @@ export default function StoryCTA({ customer, pm }: Props) {
           style={{ background: "var(--story-cta-bg)", color: "var(--story-cta-fg)" }}
         >
           <Mail className="w-5 h-5" />
-          Get in touch with Kate to learn more
+          Start a conversation with Kate
         </a>
       </motion.div>
     </section>

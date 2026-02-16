@@ -4,17 +4,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { customers } from "@/data/customers";
 import { partnerMeta as staticPartnerMeta, PartnerMeta } from "@/data/partnerMeta";
 import { Loader2 } from "lucide-react";
-import type { Customer, CustomerSignal, CompellingEvents, MetaPattern, QuantifiedImpactItem } from "@/data/customers";
+import type { Customer, InitiativeItem, InternalSignals } from "@/data/customers";
+import { useAuth } from "@/hooks/useAuth";
 
 import StoryHero from "./story/StoryHero";
-import CompellingEventsSection from "./story/CompellingEventsSection";
-import MetaPatternSection from "./story/MetaPatternSection";
-import PartnerCeilingSection from "./story/PartnerCeilingSection";
-import EmbeddedLeverageSection from "./story/EmbeddedLeverageSection";
+import WhatsHappeningSection from "./story/WhatsHappeningSection";
+import ExecutionFrictionSection from "./story/ExecutionFrictionSection";
+import OpportunityAreasSection from "./story/OpportunityAreasSection";
+import HowIoradHelpsSection from "./story/HowIoradHelpsSection";
 import EmbedDemo from "./story/EmbedDemo";
-import ImpactSection from "./story/ImpactSection";
-import NarrativeSection from "./story/NarrativeSection";
+import ConversationStartersSection from "./story/ConversationStartersSection";
 import StoryCTA from "./story/StoryCTA";
+import InternalSignalSummary from "./story/InternalSignalSummary";
 
 // Convert a slug like "onesource-virtual" to match a company name like "OneSource Virtual"
 function slugToName(slug: string): string {
@@ -26,7 +27,6 @@ function useDbStory(partner?: string, customerSlug?: string) {
     queryKey: ["story", partner, customerSlug],
     enabled: !!partner && !!customerSlug,
     queryFn: async () => {
-      // Find company by matching partner (case-insensitive) and name (slug)
       const { data: companies, error: compError } = await supabase
         .from("companies")
         .select("*")
@@ -35,14 +35,12 @@ function useDbStory(partner?: string, customerSlug?: string) {
 
       if (compError) throw compError;
 
-      // Try exact slug match first, then fuzzy
       const company = companies?.find(
         (c) => c.name.toLowerCase().replace(/\s+/g, "-") === customerSlug!.toLowerCase()
       ) || companies?.[0];
 
       if (!company) return null;
 
-      // Get latest snapshot
       const { data: snapshots, error: snapError } = await supabase
         .from("snapshots")
         .select("*")
@@ -52,7 +50,6 @@ function useDbStory(partner?: string, customerSlug?: string) {
 
       if (snapError) throw snapError;
 
-      // Get partner config from DB
       const { data: partnerConfig } = await supabase
         .from("partner_config")
         .select("*")
@@ -64,80 +61,81 @@ function useDbStory(partner?: string, customerSlug?: string) {
   });
 }
 
-// Map DB snapshot JSON to the Customer interface expected by story components
-function snapshotToCustomer(
-  company: any,
-  snap: any
-): Customer {
+// Map DB snapshot JSON to the Customer interface
+function snapshotToCustomer(company: any, snap: any): Customer {
   const json = snap?.snapshot_json || {};
 
-  const signals: CustomerSignal[] = (json.signals || json.evidence || []).map((s: any) => ({
-    title: s.title || s.snippet || s.detail || "",
-    detail: s.detail || s.snippet || "",
+  // New ABM format
+  const whatsHappening: InitiativeItem[] = (json.whats_happening || []).map((item: any) => ({
+    title: item.title || "",
+    detail: item.detail || "",
   }));
 
-  const compellingEvents: CompellingEvents = {
-    matched: json.compelling_events?.matched || [],
-    buyerLanguage: json.compelling_events?.buyer_language || [],
-  };
+  const executionFriction: string[] = json.execution_friction || [];
 
-  const metaPattern: MetaPattern = {
-    type: json.meta_pattern?.type || "drowning in repeat questions/manual training",
-    description: json.meta_pattern?.description || "",
-  };
-
-  const friction: CustomerSignal[] = (json.operational_friction || []).map((f: any) => ({
-    title: f.title || f.cause || "",
-    detail: f.detail || f.effect || "",
+  const opportunityAreas: InitiativeItem[] = (json.opportunity_areas || []).map((item: any) => ({
+    title: item.title || "",
+    detail: item.detail || "",
   }));
 
-  const partnerPlatform = {
-    strengths: json.partner_platform_ceiling?.platform_strengths || [],
-    executionGaps: json.partner_platform_ceiling?.execution_gaps || [],
-    keyInsight: json.partner_platform_ceiling?.key_insight || "",
-  };
-
-  const embeddedIorad = {
-    situation: json.embedded_leverage?.situation || "",
-    constraint: json.embedded_leverage?.constraint || "",
-    intervention: json.embedded_leverage?.intervention || "",
-    transformation: json.embedded_leverage?.transformation || "",
-  };
-
-  const quantifiedImpact: QuantifiedImpactItem[] = (json.quantified_impact || []).map((q: any) => ({
-    title: q.metric || q.title || "",
-    assumptions: q.assumptions || "",
-    math: q.calculation || q.math || "",
-    result: q.result || "",
+  const howIoradHelps: InitiativeItem[] = (json.how_iorad_helps || []).map((item: any) => ({
+    title: item.title || "",
+    detail: item.detail || "",
   }));
 
-  const executiveNarrative: string[] = Array.isArray(json.executive_narrative)
-    ? json.executive_narrative
-    : typeof json.executive_narrative === "string"
-      ? json.executive_narrative.split("\n\n")
-      : [];
+  const conversationStarters: string[] = json.conversation_starters || [];
+
+  const internalSignals: InternalSignals = {
+    signalTypes: json.internal_signals?.signal_types || [],
+    confidenceLevel: json.internal_signals?.confidence_level || "Medium",
+    urgency: json.internal_signals?.urgency || "Emerging",
+    primaryPersona: json.internal_signals?.primary_persona || company.persona || "",
+  };
+
+  // Backward compatibility: if old format fields exist, map them into new structure
+  if (whatsHappening.length === 0 && json.signals) {
+    for (const s of json.signals) {
+      whatsHappening.push({ title: s.title || "", detail: s.detail || "" });
+    }
+  }
+
+  if (executionFriction.length === 0 && json.operational_friction) {
+    for (const f of json.operational_friction) {
+      executionFriction.push(f.detail || f.title || "");
+    }
+  }
+
+  if (opportunityAreas.length === 0 && json.embedded_leverage) {
+    opportunityAreas.push({
+      title: "Platform adoption reinforcement",
+      detail: json.embedded_leverage.transformation || "",
+    });
+  }
+
+  if (howIoradHelps.length === 0 && json.partner_platform_ceiling?.key_insight) {
+    howIoradHelps.push({
+      title: "Embedded execution layer",
+      detail: json.partner_platform_ceiling.key_insight,
+    });
+  }
+
+  if (conversationStarters.length === 0 && json.compelling_events?.buyer_language) {
+    for (const line of json.compelling_events.buyer_language) {
+      conversationStarters.push(line);
+    }
+  }
 
   return {
     id: company.id,
     name: company.name,
     partner: (company.partner || "").toLowerCase() as Customer["partner"],
     persona: company.persona || "",
-    whyNow: typeof json.why_now === "string" ? json.why_now : Array.isArray(json.why_now) ? json.why_now.join(" ") : "",
-    signals,
-    compellingEvents,
-    metaPattern,
-    friction,
-    partnerPlatform,
-    embeddedIorad,
-    quantifiedImpact,
-    executiveNarrative,
-    outboundPositioning: json.outbound_positioning
-      ? {
-          executiveFraming: json.outbound_positioning.executive_framing,
-          efficiencyRevenue: json.outbound_positioning.efficiency_framing,
-          riskMitigation: json.outbound_positioning.risk_framing,
-        }
-      : undefined,
+    whatsHappening,
+    executionFriction,
+    opportunityAreas,
+    howIoradHelps,
+    conversationStarters,
+    internalSignals,
   };
 }
 
@@ -158,13 +156,9 @@ function getPartnerMeta(partnerKey: string, dbConfig: any): PartnerMeta {
 export default function CustomerStory() {
   const { id, partner, customer: customerParam, contactName } = useParams<{ id: string; partner: string; customer: string; contactName: string }>();
 
-  // Legacy route: /stories/:id — look up from hardcoded data
   const legacyCustomer = id ? customers.find((c) => c.id === id) : null;
-
-  // DB route: /:partner/:customer/stories or /:partner/:customer/stories/:contactName
   const { data: dbData, isLoading } = useDbStory(partner, customerParam);
 
-  // Capitalize first letter of contact name
   const formattedContactName = contactName
     ? contactName.charAt(0).toUpperCase() + contactName.slice(1).toLowerCase()
     : undefined;
@@ -194,32 +188,36 @@ export default function CustomerStory() {
 }
 
 function StoryPage({ customer, pm }: { customer: Customer; pm: PartnerMeta }) {
+  const { user } = useAuth();
+
   return (
     <div className="min-h-screen" style={{ background: "var(--story-bg)", color: "var(--story-fg)" }}>
       <StoryHero customer={customer} pm={pm} />
-      {(customer.signals.length > 0 || customer.compellingEvents.matched.length > 0) && (
-        <CompellingEventsSection signals={customer.signals} compellingEvents={customer.compellingEvents} />
+      {customer.whatsHappening.length > 0 && (
+        <WhatsHappeningSection companyName={customer.name} items={customer.whatsHappening} />
       )}
-      {customer.metaPattern.description && (
-        <MetaPatternSection metaPattern={customer.metaPattern} friction={customer.friction} />
+      {customer.executionFriction.length > 0 && (
+        <ExecutionFrictionSection items={customer.executionFriction} />
       )}
-      {(customer.partnerPlatform.strengths.length > 0 || customer.partnerPlatform.executionGaps.length > 0) && (
-        <PartnerCeilingSection customer={customer} pm={pm} />
+      {customer.opportunityAreas.length > 0 && (
+        <OpportunityAreasSection companyName={customer.name} items={customer.opportunityAreas} />
       )}
-      {customer.embeddedIorad.situation && (
-        <EmbeddedLeverageSection customer={customer} pm={pm} />
+      {customer.howIoradHelps.length > 0 && (
+        <HowIoradHelpsSection items={customer.howIoradHelps} />
       )}
       <EmbedDemo />
-      {customer.quantifiedImpact.length > 0 && (
-        <ImpactSection items={customer.quantifiedImpact} />
-      )}
-      {customer.executiveNarrative.length > 0 && (
-        <NarrativeSection paragraphs={customer.executiveNarrative} />
+      {customer.conversationStarters.length > 0 && (
+        <ConversationStartersSection starters={customer.conversationStarters} />
       )}
       <StoryCTA customer={customer} pm={pm} />
 
+      {/* Internal signal summary — only visible to authenticated users */}
+      {user && customer.internalSignals.signalTypes.length > 0 && (
+        <InternalSignalSummary signals={customer.internalSignals} />
+      )}
+
       <footer className="py-8 text-center text-xs" style={{ borderTop: "1px solid var(--story-border)", color: "var(--story-subtle)" }}>
-        <p>© {new Date().getFullYear()} iorad · This analysis is confidential and prepared for {customer.name}.</p>
+        <p>© {new Date().getFullYear()} iorad · This insight brief is prepared for {customer.name}.</p>
       </footer>
     </div>
   );
@@ -230,7 +228,7 @@ function NotFoundStory() {
     <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
       <div className="text-center">
         <h1 className="text-3xl font-bold mb-4">Customer not found</h1>
-        <p className="text-muted-foreground mb-4">No story has been generated for this customer yet.</p>
+        <p className="text-muted-foreground mb-4">No insight brief has been generated for this customer yet.</p>
         <Link to="/stories" className="text-primary hover:underline">Back to customers</Link>
       </div>
     </div>
