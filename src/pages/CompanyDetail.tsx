@@ -7,7 +7,8 @@ import ScoreCell from "@/components/ScoreCell";
 import StatusBadge from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail, Plus } from "lucide-react";
+import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail, Plus, ChevronDown, Search, Brain } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -93,6 +94,7 @@ export default function CompanyDetail() {
   const { data: contacts = [] } = useContacts(id);
   const queryClient = useQueryClient();
   const [regenerating, setRegenerating] = useState(false);
+  const [runMode, setRunMode] = useState<string | null>(null);
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [newContact, setNewContact] = useState({ name: "", title: "", email: "", linkedin: "" });
   const [savingContact, setSavingContact] = useState(false);
@@ -121,29 +123,33 @@ export default function CompanyDetail() {
     }
   };
 
-  const regenerate = async () => {
+  const regenerate = async (mode: string = "full") => {
     if (!id) return;
     setRegenerating(true);
+    setRunMode(mode);
+    const modeLabels: Record<string, string> = {
+      full: "Full refresh",
+      signals_only: "Signal search",
+      score_only: "Story regeneration",
+    };
     try {
-      // Run full pipeline: signals + score + snapshot
       const { data, error } = await supabase.functions.invoke("run-signals", {
-        body: { company_id: id, mode: "full" },
+        body: { company_id: id, mode },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      // Contacts are enriched by Clay via webhook — no separate call needed
-
-      toast.success(`Regenerated — ${data?.company || "company"}`);
+      toast.success(`${modeLabels[mode] || mode} complete — ${data?.company || "company"}`);
       queryClient.invalidateQueries({ queryKey: ["company", id] });
       queryClient.invalidateQueries({ queryKey: ["signals", id] });
       queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
       queryClient.invalidateQueries({ queryKey: ["contacts", id] });
       queryClient.invalidateQueries({ queryKey: ["companies"] });
     } catch (e: any) {
-      toast.error(e.message || "Regeneration failed");
+      toast.error(e.message || "Operation failed");
     } finally {
       setRegenerating(false);
+      setRunMode(null);
     }
   };
   if (isLoading) {
@@ -177,9 +183,29 @@ export default function CompanyDetail() {
           <StatusBadge status={company.snapshot_status} />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button size="sm" className="gap-1.5 text-xs" disabled={regenerating} onClick={regenerate}>
-            {regenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Regenerate
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" className="gap-1.5 text-xs" disabled={regenerating}>
+                {regenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                {runMode === "signals_only" ? "Searching signals…" : runMode === "score_only" ? "Regenerating story…" : regenerating ? "Running…" : "Run"}
+                <ChevronDown className="w-3 h-3 ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => regenerate("full")} className="gap-2 text-xs">
+                <RefreshCw className="w-3.5 h-3.5" /> Full Refresh
+                <span className="text-muted-foreground ml-auto">signals + story</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => regenerate("signals_only")} className="gap-2 text-xs">
+                <Search className="w-3.5 h-3.5" /> Signals Only
+                <span className="text-muted-foreground ml-auto">no AI call</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => regenerate("score_only")} className="gap-2 text-xs">
+                <Brain className="w-3.5 h-3.5" /> Regenerate Story
+                <span className="text-muted-foreground ml-auto">uses existing signals</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
