@@ -4,20 +4,26 @@ import { supabase } from "@/integrations/supabase/client";
 import { customers } from "@/data/customers";
 import { partnerMeta as staticPartnerMeta, PartnerMeta } from "@/data/partnerMeta";
 import { Loader2 } from "lucide-react";
-import type { Customer, InitiativeItem, InternalSignals } from "@/data/customers";
+import type { Customer, InitiativeItem, InternalSignals, StrategicPlay, CaseStudy } from "@/data/customers";
 import { useAuth } from "@/hooks/useAuth";
 
 import StoryHero from "./story/StoryHero";
 import WhatsHappeningSection from "./story/WhatsHappeningSection";
+import LeadershipPrioritiesSection from "./story/LeadershipPrioritiesSection";
 import ExecutionFrictionSection from "./story/ExecutionFrictionSection";
-import OpportunityAreasSection from "./story/OpportunityAreasSection";
-import HowIoradHelpsSection from "./story/HowIoradHelpsSection";
+import LeadersAskedSection from "./story/LeadersAskedSection";
+import TwoPathsSection from "./story/TwoPathsSection";
+import CostUnaddressedSection from "./story/CostUnaddressedSection";
+import BlindSpotSection from "./story/BlindSpotSection";
+import LeveragePointsSection from "./story/LeveragePointsSection";
+import StrategicPlaysSection from "./story/StrategicPlaysSection";
 import EmbedDemo from "./story/EmbedDemo";
-
+import SelfCheckSection from "./story/SelfCheckSection";
+import CaseStudiesSection from "./story/CaseStudiesSection";
+import WhyNowSection from "./story/WhyNowSection";
 import StoryCTA from "./story/StoryCTA";
 import InternalSignalSummary from "./story/InternalSignalSummary";
 
-// Convert a slug like "onesource-virtual" to match a company name like "OneSource Virtual"
 function slugToName(slug: string): string {
   return slug.replace(/-/g, " ");
 }
@@ -61,38 +67,57 @@ function useDbStory(partner?: string, customerSlug?: string) {
   });
 }
 
-// Map DB snapshot JSON to the Customer interface
 function snapshotToCustomer(company: any, snap: any): Customer {
   const json = snap?.snapshot_json || {};
 
-  // New ABM format
   const whatsHappening: InitiativeItem[] = (json.whats_happening || []).map((item: any) => ({
     title: item.title || "",
     detail: item.detail || "",
   }));
 
+  const leadershipPriorities: string[] = json.leadership_priorities || [];
   const executionFriction: string[] = json.execution_friction || [];
+  const leadersAsked: string[] = json.leaders_asked || [];
 
-  const opportunityAreas: InitiativeItem[] = (json.opportunity_areas || []).map((item: any) => ({
-    title: item.title || "",
-    detail: item.detail || "",
+  const pathA: string = json.path_a || json.two_paths?.path_a || "";
+  const pathB: string = json.path_b || json.two_paths?.path_b || "";
+
+  const costUnaddressed: string[] = json.cost_unaddressed || [];
+  const blindSpot: string = json.blind_spot || "";
+  const leveragePoints: string[] = json.leverage_points || [];
+
+  const plays: StrategicPlay[] = (json.strategic_plays || []).map((p: any) => ({
+    name: p.name || p.play_name || "",
+    objective: p.objective || "",
+    whyNow: p.why_now || "",
+    inPractice: p.in_practice || p.what_it_looks_like || "",
+    expectedImpact: p.expected_impact || "",
   }));
 
-  const howIoradHelps: InitiativeItem[] = (json.how_iorad_helps || []).map((item: any) => ({
-    title: item.title || "",
-    detail: item.detail || "",
+  const selfCheck: string[] = json.self_check || [];
+
+  const caseStudies: CaseStudy[] = (json.case_studies || json.similar_patterns || []).map((c: any) => ({
+    company: c.company || "",
+    similarity: c.similarity || "",
+    challenge: c.challenge || "",
+    outcome: c.outcome || "",
+    relevance: c.relevance || "",
   }));
+
+  const whyNow: string = typeof json.why_now === "string" ? json.why_now : Array.isArray(json.why_now) ? json.why_now.join(" ") : "";
 
   const conversationStarters: string[] = json.conversation_starters || [];
 
   const internalSignals: InternalSignals = {
     signalTypes: json.internal_signals?.signal_types || [],
+    hiringIntensity: json.internal_signals?.hiring_intensity || "",
+    platformRollout: json.internal_signals?.platform_rollout || "",
     confidenceLevel: json.internal_signals?.confidence_level || "Medium",
     urgency: json.internal_signals?.urgency || "Emerging",
     primaryPersona: json.internal_signals?.primary_persona || company.persona || "",
   };
 
-  // Backward compatibility: if old format fields exist, map them into new structure
+  // Backward compat: old format fields
   if (whatsHappening.length === 0 && json.signals) {
     for (const s of json.signals) {
       whatsHappening.push({ title: s.title || "", detail: s.detail || "" });
@@ -103,20 +128,6 @@ function snapshotToCustomer(company: any, snap: any): Customer {
     for (const f of json.operational_friction) {
       executionFriction.push(f.detail || f.title || "");
     }
-  }
-
-  if (opportunityAreas.length === 0 && json.embedded_leverage) {
-    opportunityAreas.push({
-      title: "Platform adoption reinforcement",
-      detail: json.embedded_leverage.transformation || "",
-    });
-  }
-
-  if (howIoradHelps.length === 0 && json.partner_platform_ceiling?.key_insight) {
-    howIoradHelps.push({
-      title: "Embedded execution layer",
-      detail: json.partner_platform_ceiling.key_insight,
-    });
   }
 
   if (conversationStarters.length === 0 && json.compelling_events?.buyer_language) {
@@ -131,9 +142,18 @@ function snapshotToCustomer(company: any, snap: any): Customer {
     partner: (company.partner || "").toLowerCase() as Customer["partner"],
     persona: company.persona || "",
     whatsHappening,
+    leadershipPriorities,
     executionFriction,
-    opportunityAreas,
-    howIoradHelps,
+    leadersAsked,
+    pathA,
+    pathB,
+    costUnaddressed,
+    blindSpot,
+    leveragePoints,
+    plays,
+    selfCheck,
+    caseStudies,
+    whyNow,
     conversationStarters,
     internalSignals,
   };
@@ -193,22 +213,59 @@ function StoryPage({ customer, pm }: { customer: Customer; pm: PartnerMeta }) {
   return (
     <div className="min-h-screen" style={{ background: "var(--story-bg)", color: "var(--story-fg)" }}>
       <StoryHero customer={customer} pm={pm} />
+
       {customer.whatsHappening.length > 0 && (
         <WhatsHappeningSection companyName={customer.name} items={customer.whatsHappening} />
       )}
+
+      {customer.leadershipPriorities.length > 0 && (
+        <LeadershipPrioritiesSection items={customer.leadershipPriorities} />
+      )}
+
       {customer.executionFriction.length > 0 && (
         <ExecutionFrictionSection items={customer.executionFriction} />
       )}
-      {customer.opportunityAreas.length > 0 && (
-        <OpportunityAreasSection companyName={customer.name} items={customer.opportunityAreas} />
+
+      {customer.leadersAsked.length > 0 && (
+        <LeadersAskedSection items={customer.leadersAsked} persona={customer.persona} />
       )}
-      {customer.howIoradHelps.length > 0 && (
-        <HowIoradHelpsSection items={customer.howIoradHelps} />
+
+      {(customer.pathA || customer.pathB) && (
+        <TwoPathsSection pathA={customer.pathA} pathB={customer.pathB} />
       )}
+
+      {customer.costUnaddressed.length > 0 && (
+        <CostUnaddressedSection items={customer.costUnaddressed} />
+      )}
+
+      {customer.blindSpot && (
+        <BlindSpotSection text={customer.blindSpot} />
+      )}
+
+      {customer.leveragePoints.length > 0 && (
+        <LeveragePointsSection items={customer.leveragePoints} />
+      )}
+
+      {customer.plays.length > 0 && (
+        <StrategicPlaysSection plays={customer.plays} />
+      )}
+
       <EmbedDemo />
+
+      {customer.selfCheck.length > 0 && (
+        <SelfCheckSection items={customer.selfCheck} />
+      )}
+
+      {customer.caseStudies.length > 0 && (
+        <CaseStudiesSection studies={customer.caseStudies} />
+      )}
+
+      {customer.whyNow && (
+        <WhyNowSection text={customer.whyNow} />
+      )}
+
       <StoryCTA customer={customer} pm={pm} />
 
-      {/* Internal signal summary — only visible to authenticated users */}
       {user && customer.internalSignals.signalTypes.length > 0 && (
         <InternalSignalSummary signals={customer.internalSignals} conversationStarters={customer.conversationStarters} />
       )}
@@ -225,7 +282,7 @@ function NotFoundStory() {
     <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
       <div className="text-center">
         <h1 className="text-3xl font-bold mb-4">Customer not found</h1>
-        <p className="text-muted-foreground mb-4">No insight brief has been generated for this customer yet.</p>
+        <p className="text-muted-foreground mb-4">No operating brief has been generated for this customer yet.</p>
         <Link to="/stories" className="text-primary hover:underline">Back to customers</Link>
       </div>
     </div>
