@@ -22,6 +22,7 @@ import CaseStudiesSection from "./story/CaseStudiesSection";
 import WhyNowSection from "./story/WhyNowSection";
 import StoryCTA from "./story/StoryCTA";
 import InternalSignalSummary from "./story/InternalSignalSummary";
+import DebugPanel from "./story/DebugPanel";
 import { StoryEditProvider, useStoryEdit } from "./story/EditContext";
 import EditToolbar from "./story/EditToolbar";
 
@@ -274,10 +275,10 @@ export default function CustomerStory() {
   customer.contactName = formattedContactName;
   const pm = getPartnerMeta(partner || "", dbData.partnerConfig);
 
-  return <StoryPage customer={customer} pm={pm} snapshotId={dbData.snapshot.id} />;
+  return <StoryPage customer={customer} pm={pm} snapshotId={dbData.snapshot.id} snapshotMeta={dbData.snapshot} companyId={dbData.company.id} />;
 }
 
-function StoryPage({ customer, pm, snapshotId }: { customer: Customer; pm: PartnerMeta; snapshotId?: string }) {
+function StoryPage({ customer, pm, snapshotId, snapshotMeta, companyId }: { customer: Customer; pm: PartnerMeta; snapshotId?: string; snapshotMeta?: any; companyId?: string }) {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const showInternal = user && searchParams.get("internal") === "true";
@@ -285,9 +286,23 @@ function StoryPage({ customer, pm, snapshotId }: { customer: Customer; pm: Partn
 
   const isIoradUser = user?.email?.endsWith("@iorad.com");
 
+  // Fetch raw signals for debug panel
+  const { data: rawSignals } = useQuery({
+    queryKey: ["debug-signals", companyId],
+    enabled: !!isIoradUser && !!companyId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("signals")
+        .select("id, type, title, url, date, raw_excerpt, discovered_at")
+        .eq("company_id", companyId!)
+        .order("discovered_at", { ascending: false });
+      return data || [];
+    },
+  });
+
   return (
     <StoryEditProvider customer={customer}>
-      <StoryPageInner customer={customer} pm={pm} snapshotId={snapshotId} showInternal={!!showInternal} isIoradUser={!!isIoradUser} queryClient={queryClient} />
+      <StoryPageInner customer={customer} pm={pm} snapshotId={snapshotId} showInternal={!!showInternal} isIoradUser={!!isIoradUser} queryClient={queryClient} snapshotMeta={snapshotMeta} rawSignals={rawSignals || []} />
     </StoryEditProvider>
   );
 }
@@ -299,6 +314,8 @@ function StoryPageInner({
   showInternal,
   isIoradUser,
   queryClient,
+  snapshotMeta,
+  rawSignals,
 }: {
   customer: Customer;
   pm: PartnerMeta;
@@ -306,6 +323,8 @@ function StoryPageInner({
   showInternal: boolean;
   isIoradUser: boolean;
   queryClient: any;
+  snapshotMeta?: any;
+  rawSignals: any[];
 }) {
   const ctx = useStoryEdit();
   const displayCustomer = ctx?.isEditing ? ctx.editedCustomer : customer;
@@ -403,7 +422,22 @@ function StoryPageInner({
       </footer>
 
       {isIoradUser && snapshotId && (
-        <EditToolbar onSave={handleSave} />
+        <>
+          <EditToolbar onSave={handleSave} />
+          {snapshotMeta && (
+            <DebugPanel
+              companyId={customer.id}
+              companyName={customer.name}
+              scoreTotal={snapshotMeta.score_total ?? 0}
+              scoreBreakdown={(snapshotMeta.score_breakdown as Record<string, number>) ?? {}}
+              modelVersion={snapshotMeta.model_version}
+              promptVersion={snapshotMeta.prompt_version}
+              snapshotCreatedAt={snapshotMeta.created_at}
+              snapshotJson={(snapshotMeta.snapshot_json as Record<string, any>) ?? {}}
+              signals={rawSignals}
+            />
+          )}
+        </>
       )}
     </div>
   );
