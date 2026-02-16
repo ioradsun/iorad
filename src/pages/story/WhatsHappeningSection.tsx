@@ -16,7 +16,13 @@ export default function WhatsHappeningSection({ companyName, items }: Props) {
   const data = ctx?.isEditing ? ctx.editedCustomer.whatsHappening : items;
 
   return (
-    <StorySection icon={TrendingUp} label="Current Initiatives" title={`What's happening at ${companyName}`}>
+    <StorySection
+      icon={TrendingUp}
+      label="Current Initiatives"
+      labelField="overrides.whatsHappening.label"
+      title={`What's happening at ${companyName}`}
+      titleField="overrides.whatsHappening.title"
+    >
       <div className="space-y-5 max-w-3xl">
         {data.map((item, i) => (
           <EditableListItemWrapper key={i} arrayPath="whatsHappening" index={i}>

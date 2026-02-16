@@ -4,13 +4,14 @@ import { Customer } from "@/data/customers";
 import ioradLogoDark from "@/assets/iorad-logo-new.png";
 import ioradLogoLight from "@/assets/iorad-logo-light.png";
 import { useState } from "react";
+import { EditableText } from "./EditableText";
+import { useStoryEdit } from "./EditContext";
 
 interface StoryHeroProps {
   customer: Customer;
   pm: PartnerMeta;
 }
 
-/** Map of known partner keys to local favicon files */
 const partnerLogoMap: Record<string, string> = {
   seismic: "/logos/seismic.png",
   workramp: "/logos/workramp.png",
@@ -25,23 +26,12 @@ function LogoPill({ src, alt, fallbackLabel }: { src?: string; alt: string; fall
   return (
     <div
       className="h-12 w-12 md:h-14 md:w-14 rounded-2xl flex items-center justify-center overflow-hidden"
-      style={{
-        background: "var(--story-surface)",
-        border: "1px solid var(--story-border)",
-      }}
+      style={{ background: "var(--story-surface)", border: "1px solid var(--story-border)" }}
     >
       {src && !failed ? (
-        <img
-          src={src}
-          alt={alt}
-          className="h-7 w-7 md:h-8 md:w-8 object-contain"
-          onError={() => setFailed(true)}
-        />
+        <img src={src} alt={alt} className="h-7 w-7 md:h-8 md:w-8 object-contain" onError={() => setFailed(true)} />
       ) : (
-        <span
-          className="text-xs font-bold uppercase tracking-wide"
-          style={{ color: "var(--story-muted)" }}
-        >
+        <span className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--story-muted)" }}>
           {fallbackLabel.slice(0, 2)}
         </span>
       )}
@@ -60,74 +50,33 @@ function Connector() {
 }
 
 export default function StoryHero({ customer, pm }: StoryHeroProps) {
-  const isDark = getComputedStyle(document.documentElement)
-    .getPropertyValue("--story-bg")
-    .trim() === "#0A0A0F";
+  const ctx = useStoryEdit();
+  const isEditing = ctx?.isEditing;
+
+  const isDark = getComputedStyle(document.documentElement).getPropertyValue("--story-bg").trim() === "#0A0A0F";
   const ioradLogo = isDark ? ioradLogoDark : ioradLogoLight;
 
-  // Customer logo: Google favicon (universally available)
-  const customerLogoUrl = customer.domain
-    ? `https://www.google.com/s2/favicons?domain=${customer.domain}&sz=128`
-    : undefined;
+  const customerLogoUrl = customer.domain ? `https://www.google.com/s2/favicons?domain=${customer.domain}&sz=128` : undefined;
+  const partnerLogoUrl = partnerLogoMap[pm.key] || (pm.domain ? `https://www.google.com/s2/favicons?domain=${pm.domain}&sz=128` : undefined);
 
-  // Partner logo: local file (pre-downloaded), fallback to Google favicon
-  const partnerLogoUrl = partnerLogoMap[pm.key] ||
-    (pm.domain ? `https://www.google.com/s2/favicons?domain=${pm.domain}&sz=128` : undefined);
+  const defaultSubtitle = `Based on public signals, here's a grounded look at where ${customer.name} is heading — and where reinforcement gaps typically show up at this stage.`;
+  const subtitle = customer.overrides?.["hero.subtitle"] || defaultSubtitle;
 
   return (
     <section className="relative overflow-hidden">
-      <div
-        className="absolute inset-0"
-        style={{ background: "linear-gradient(to bottom, var(--story-accent-dim), transparent, transparent)" }}
-      />
+      <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, var(--story-accent-dim), transparent, transparent)" }} />
       <div className="max-w-5xl mx-auto px-6 pt-16 pb-20 relative">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7 }}
-        >
+        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>
           {/* Logo lockup */}
-          <motion.div
-            className="flex items-center gap-0 mb-10"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, delay: 0.15 }}
-          >
-            <div
-              className="inline-flex items-center gap-1 md:gap-2 px-2 py-2 rounded-[1.25rem]"
-              style={{
-                background: "var(--story-surface)",
-                border: "1px solid var(--story-border)",
-              }}
-            >
-              {/* iorad */}
-              <div
-                className="h-12 w-12 md:h-14 md:w-14 rounded-2xl flex items-center justify-center overflow-hidden"
-                style={{
-                  background: "var(--story-bg)",
-                  border: "1px solid var(--story-border)",
-                }}
-              >
+          <motion.div className="flex items-center gap-0 mb-10" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6, delay: 0.15 }}>
+            <div className="inline-flex items-center gap-1 md:gap-2 px-2 py-2 rounded-[1.25rem]" style={{ background: "var(--story-surface)", border: "1px solid var(--story-border)" }}>
+              <div className="h-12 w-12 md:h-14 md:w-14 rounded-2xl flex items-center justify-center overflow-hidden" style={{ background: "var(--story-bg)", border: "1px solid var(--story-border)" }}>
                 <img src={ioradLogo} alt="iorad" className="h-5 md:h-6 object-contain" />
               </div>
-
               <Connector />
-
-              {/* Partner */}
-              <LogoPill
-                src={partnerLogoUrl}
-                alt={pm.label}
-                fallbackLabel={pm.label}
-              />
-
+              <LogoPill src={partnerLogoUrl} alt={pm.label} fallbackLabel={pm.label} />
               <Connector />
-
-              {/* Customer */}
-              <LogoPill
-                src={customerLogoUrl}
-                alt={customer.name}
-                fallbackLabel={customer.name}
-              />
+              <LogoPill src={customerLogoUrl} alt={customer.name} fallbackLabel={customer.name} />
             </div>
           </motion.div>
 
@@ -142,35 +91,31 @@ export default function StoryHero({ customer, pm }: StoryHeroProps) {
             {customer.contactName ? (
               <>
                 {customer.contactName}, here's what we're seeing at{" "}
-                <span
-                  style={{
-                    backgroundImage: `linear-gradient(to right, var(--story-gradient-from), var(--story-gradient-to))`,
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                  }}
-                >
+                <span style={{ backgroundImage: `linear-gradient(to right, var(--story-gradient-from), var(--story-gradient-to))`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                   {customer.name}
                 </span>
               </>
             ) : (
               <>
                 An operating brief for{" "}
-                <span
-                  style={{
-                    backgroundImage: `linear-gradient(to right, var(--story-gradient-from), var(--story-gradient-to))`,
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                  }}
-                >
+                <span style={{ backgroundImage: `linear-gradient(to right, var(--story-gradient-from), var(--story-gradient-to))`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                   {customer.name}
                 </span>
               </>
             )}
           </h1>
 
-          <p className="text-lg max-w-2xl leading-relaxed" style={{ color: "var(--story-muted)" }}>
-            Based on public signals, here's a grounded look at where {customer.name} is heading — and where reinforcement gaps typically show up at this stage.
-          </p>
+          {isEditing ? (
+            <EditableText
+              value={subtitle}
+              field="overrides.hero.subtitle"
+              as="p"
+              className="text-lg max-w-2xl leading-relaxed"
+              style={{ color: "var(--story-muted)" }}
+            />
+          ) : (
+            <p className="text-lg max-w-2xl leading-relaxed" style={{ color: "var(--story-muted)" }}>{subtitle}</p>
+          )}
         </motion.div>
       </div>
     </section>

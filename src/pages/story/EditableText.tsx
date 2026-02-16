@@ -5,24 +5,29 @@ import { X } from "lucide-react";
 interface EditableTextProps {
   value: string;
   field: string;
-  as?: "p" | "span" | "h4" | "h1" | "h2" | "li";
+  as?: "p" | "span" | "h1" | "h2" | "h3" | "h4" | "li";
   className?: string;
   style?: React.CSSProperties;
-  children?: React.ReactNode;
 }
 
 export function EditableText({ value, field, as: Tag = "span", className, style }: EditableTextProps) {
   const ctx = useStoryEdit();
   const ref = useRef<HTMLElement>(null);
 
+  // For override fields, check if there's an edited value
+  const isOverride = field.startsWith("overrides.");
+  const displayValue = ctx?.isEditing && isOverride
+    ? (ctx.editedCustomer.overrides?.[field.replace("overrides.", "")] ?? value)
+    : value;
+
   useEffect(() => {
-    if (ref.current && ref.current.textContent !== value) {
-      ref.current.textContent = value;
+    if (ref.current && ref.current.textContent !== displayValue) {
+      ref.current.textContent = displayValue;
     }
-  }, [value]);
+  }, [displayValue]);
 
   if (!ctx?.isEditing) {
-    return <Tag className={className} style={style}>{value}</Tag>;
+    return <Tag className={className} style={style}>{displayValue}</Tag>;
   }
 
   return (
@@ -30,13 +35,20 @@ export function EditableText({ value, field, as: Tag = "span", className, style 
       ref={ref as any}
       contentEditable
       suppressContentEditableWarning
-      className={`${className || ""} outline-none ring-1 ring-transparent focus:ring-[var(--story-accent-border)] rounded px-1 -mx-1`}
+      className={`${className || ""} editable-field`}
       style={{ ...style, minHeight: "1em" }}
       onBlur={(e) => {
-        ctx.setField(field, e.currentTarget.textContent || "");
+        const newVal = e.currentTarget.textContent || "";
+        if (isOverride) {
+          const key = field.replace("overrides.", "");
+          const overrides = { ...(ctx.editedCustomer.overrides || {}), [key]: newVal };
+          ctx.setField("overrides", overrides);
+        } else {
+          ctx.setField(field, newVal);
+        }
       }}
     >
-      {value}
+      {displayValue}
     </Tag>
   );
 }
@@ -57,11 +69,11 @@ export function EditableListItemWrapper({ arrayPath, index, children }: Editable
       {children}
       <button
         onClick={() => ctx.removeFromArray(arrayPath, index)}
-        className="absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-        style={{ background: "var(--story-accent)", color: "var(--story-bg)" }}
+        className="absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-md"
+        style={{ background: "#ef4444", color: "#fff" }}
         title="Remove item"
       >
-        <X className="w-3 h-3" />
+        <X className="w-3.5 h-3.5" />
       </button>
     </div>
   );

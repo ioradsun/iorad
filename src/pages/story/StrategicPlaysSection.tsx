@@ -15,7 +15,13 @@ export default function StrategicPlaysSection({ plays }: Props) {
   const data = ctx?.isEditing ? ctx.editedCustomer.plays : plays;
 
   return (
-    <StorySection icon={Layout} label="Strategic Plays" title="Plays to consider">
+    <StorySection
+      icon={Layout}
+      label="Strategic Plays"
+      labelField="overrides.plays.label"
+      title="Plays to consider"
+      titleField="overrides.plays.title"
+    >
       <div className="space-y-6">
         {data.map((play, i) => (
           <EditableListItemWrapper key={i} arrayPath="plays" index={i}>
