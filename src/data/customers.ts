@@ -31,6 +31,7 @@ export interface InternalSignals {
 export interface Customer {
   id: string;
   name: string;
+  domain?: string;
   contactName?: string;
   partner: "seismic" | "workramp" | "360learning" | "docebo" | "gainsight";
   persona: string;
@@ -55,6 +56,7 @@ export const customers: Customer[] = [
   {
     id: "intermedia",
     name: "Intermedia",
+    domain: "intermedia.net",
     partner: "docebo",
     persona: "VP of Partner Enablement",
     whatsHappening: [
