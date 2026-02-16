@@ -3,13 +3,25 @@ import { PartnerMeta } from "@/data/partnerMeta";
 import { Customer } from "@/data/customers";
 import ioradLogoDark from "@/assets/iorad-logo-new.png";
 import ioradLogoLight from "@/assets/iorad-logo-light.png";
+import { useState } from "react";
 
 interface StoryHeroProps {
   customer: Customer;
   pm: PartnerMeta;
 }
 
+/** Map of known partner keys to local favicon files */
+const partnerLogoMap: Record<string, string> = {
+  seismic: "/logos/seismic.png",
+  workramp: "/logos/workramp.png",
+  "360learning": "/logos/360learning.png",
+  docebo: "/logos/docebo.png",
+  gainsight: "/logos/gainsight.png",
+};
+
 function LogoPill({ src, alt, fallbackLabel }: { src?: string; alt: string; fallbackLabel: string }) {
+  const [failed, setFailed] = useState(false);
+
   return (
     <div
       className="h-12 w-12 md:h-14 md:w-14 rounded-2xl flex items-center justify-center overflow-hidden"
@@ -18,23 +30,21 @@ function LogoPill({ src, alt, fallbackLabel }: { src?: string; alt: string; fall
         border: "1px solid var(--story-border)",
       }}
     >
-      {src ? (
+      {src && !failed ? (
         <img
           src={src}
           alt={alt}
           className="h-7 w-7 md:h-8 md:w-8 object-contain"
-          onError={(e) => {
-            e.currentTarget.style.display = "none";
-            e.currentTarget.parentElement!.querySelector(".fallback")?.classList.remove("hidden");
-          }}
+          onError={() => setFailed(true)}
         />
-      ) : null}
-      <span
-        className={`fallback text-xs font-bold uppercase tracking-wide ${src ? "hidden" : ""}`}
-        style={{ color: "var(--story-muted)" }}
-      >
-        {fallbackLabel.slice(0, 2)}
-      </span>
+      ) : (
+        <span
+          className="text-xs font-bold uppercase tracking-wide"
+          style={{ color: "var(--story-muted)" }}
+        >
+          {fallbackLabel.slice(0, 2)}
+        </span>
+      )}
     </div>
   );
 }
@@ -55,13 +65,14 @@ export default function StoryHero({ customer, pm }: StoryHeroProps) {
     .trim() === "#0A0A0F";
   const ioradLogo = isDark ? ioradLogoDark : ioradLogoLight;
 
+  // Customer logo: Google favicon (universally available)
   const customerLogoUrl = customer.domain
-    ? `https://logo.clearbit.com/${customer.domain}`
+    ? `https://www.google.com/s2/favicons?domain=${customer.domain}&sz=128`
     : undefined;
 
-  const partnerLogoUrl = pm.domain
-    ? `https://logo.clearbit.com/${pm.domain}`
-    : undefined;
+  // Partner logo: local file (pre-downloaded), fallback to Google favicon
+  const partnerLogoUrl = partnerLogoMap[pm.key] ||
+    (pm.domain ? `https://www.google.com/s2/favicons?domain=${pm.domain}&sz=128` : undefined);
 
   return (
     <section className="relative overflow-hidden">
