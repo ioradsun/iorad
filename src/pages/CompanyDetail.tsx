@@ -613,22 +613,52 @@ export default function CompanyDetail() {
                   ? `/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories/${firstName}`
                   : null;
                 return (
-                  <div key={contact.id} className="flex items-center gap-4 p-2 rounded-md hover:bg-secondary/30 transition-colors">
-                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <UserSearch className="w-4 h-4 text-primary" />
+                  <div key={contact.id} className="p-2 rounded-md hover:bg-secondary/30 transition-colors space-y-2">
+                    <div className="flex items-center gap-4">
+                      <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <UserSearch className="w-4 h-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-0.5">
+                        <div className="text-sm font-medium truncate">{contact.name}</div>
+                        {contact.title && <div className="text-xs text-muted-foreground truncate">{contact.title}</div>}
+                        {contact.source && <span className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-muted-foreground">{contact.source}</span>}
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {storyUrl && snap && (
+                          <a href={storyUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" title="View personalized story"><ExternalLink className="w-4 h-4" /></a>
+                        )}
+                        {contact.email && <a href={`mailto:${contact.email}`} className="text-muted-foreground hover:text-primary" title={contact.email}><Mail className="w-4 h-4" /></a>}
+                        {contact.linkedin && <a href={contact.linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary"><Linkedin className="w-4 h-4" /></a>}
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0 space-y-0.5">
-                      <div className="text-sm font-medium truncate">{contact.name}</div>
-                      {contact.title && <div className="text-xs text-muted-foreground truncate">{contact.title}</div>}
-                      {contact.source && <span className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-muted-foreground">{contact.source}</span>}
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {storyUrl && snap && (
-                        <a href={storyUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" title="View personalized story"><ExternalLink className="w-4 h-4" /></a>
-                      )}
-                      {contact.email && <a href={`mailto:${contact.email}`} className="text-muted-foreground hover:text-primary" title={contact.email}><Mail className="w-4 h-4" /></a>}
-                      {contact.linkedin && <a href={contact.linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary"><Linkedin className="w-4 h-4" /></a>}
-                    </div>
+                    {/* Product usage metrics from HubSpot contact properties */}
+                    {(() => {
+                      const hp = (contact as any).hubspot_properties;
+                      if (!hp || Object.keys(hp).length === 0) return null;
+                      const metrics = [
+                        { label: "Plan", value: hp.plan_name },
+                        { label: "Tutorials", value: hp.tutorials_created },
+                        { label: "Valid", value: hp.tutorials_valid_owned },
+                        { label: "Learned", value: hp.tutorials_learned },
+                        { label: "Views", value: hp.tutorials_views },
+                        { label: "Libraries", value: hp.libraries_owned },
+                        { label: "Last Active", value: hp.last_active_date ? new Date(hp.last_active_date).toLocaleDateString() : null },
+                        { label: "Last Created", value: hp.last_tutorial_create_date ? new Date(hp.last_tutorial_create_date).toLocaleDateString() : null },
+                        { label: "Use Case", value: hp.creator_use_case },
+                        { label: "Category", value: hp.category },
+                      ].filter(m => m.value !== null && m.value !== undefined && m.value !== "" && m.value !== "--");
+                      if (metrics.length === 0) return null;
+                      return (
+                        <div className="flex flex-wrap gap-1.5 ml-[52px]">
+                          {metrics.map(m => (
+                            <span key={m.label} className="text-[10px] px-1.5 py-0.5 rounded border border-border/50 bg-secondary/30 text-muted-foreground">
+                              <span className="font-mono uppercase tracking-wider">{m.label}:</span>{" "}
+                              <span className="text-foreground font-medium">{String(m.value)}</span>
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               }) : companyAny?.buyer_name ? (

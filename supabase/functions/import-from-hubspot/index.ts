@@ -260,20 +260,37 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
 
     if (contactIds.length === 0) return;
 
-    // Fetch contact details in batch (up to 10)
-    for (const contactId of contactIds.slice(0, 10)) {
+    // Fetch contact details via batch read API (avoids 414 URL-too-long errors)
+    const allContactProps = await getAllContactPropertyNames(apiKey);
+    const batchIds = contactIds.slice(0, 10);
+    
+    // Use HubSpot batch read API (POST) to fetch all properties
+    const batchBody = {
+      inputs: batchIds.map((cid: string) => ({ id: String(cid) })),
+      properties: allContactProps.length > 0 ? allContactProps : ["firstname", "lastname", "email", "jobtitle", "hs_linkedin_url"],
+    };
+    
+    let batchContacts: any[] = [];
+    try {
+      const batchRes = await fetch("https://api.hubapi.com/crm/v3/objects/contacts/batch/read", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify(batchBody),
+      });
+      if (!batchRes.ok) {
+        const errText = await batchRes.text();
+        console.warn(`Batch contact read failed [${batchRes.status}]: ${errText.slice(0, 300)}`);
+      } else {
+        const batchData = await batchRes.json();
+        batchContacts = batchData.results || [];
+      }
+    } catch (err: any) {
+      console.warn(`Batch contact read error: ${err.message}`);
+    }
+
+    for (const contact of batchContacts) {
+      const contactId = contact.id;
       try {
-        // Fetch ALL properties for each contact
-        const allContactProps = await getAllContactPropertyNames(apiKey);
-        const propsParam = allContactProps.length > 0 ? allContactProps.join(",") : "firstname,lastname,email,jobtitle,hs_linkedin_url";
-        const contactRes = await fetch(
-          `https://api.hubapi.com/crm/v3/objects/contacts/${contactId}?properties=${encodeURIComponent(propsParam)}`,
-          { headers: { Authorization: `Bearer ${apiKey}` } }
-        );
-
-        if (!contactRes.ok) continue;
-
-        const contact = await contactRes.json();
         const cp = contact.properties || {};
         const contactName = [cp.firstname, cp.lastname].filter(Boolean).join(" ").trim();
         if (!contactName) continue;
