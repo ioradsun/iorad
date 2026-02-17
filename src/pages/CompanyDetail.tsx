@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useCompany, useSignals, useSnapshots, useContacts, useCompanyCards, useUpdateCompany } from "@/hooks/useSupabase";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail, Plus, Brain, Sparkles, Copy, ChevronRight, Video, BookOpen, Save, Eye, Building2, MapPin, Users, DollarSign, Globe } from "lucide-react";
+import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail, Plus, Brain, Sparkles, Copy, ChevronRight, Video, BookOpen, Eye, Building2, MapPin, Users, DollarSign, Globe } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -387,7 +387,19 @@ export default function CompanyDetail() {
   const [extraOpen, setExtraOpen] = useState(true);
   const [loomUrl, setLoomUrl] = useState<string | null>(null);
   const [ioradUrl, setIoradUrl] = useState<string | null>(null);
-  const [storyUrlsDirty, setStoryUrlsDirty] = useState(false);
+
+  // Autosave URL debounce
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autosaveUrls = useCallback((loom: string, iorad: string) => {
+    if (!id) return;
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = setTimeout(() => {
+      updateCompany.mutate({
+        id,
+        updates: { loom_url: loom || null, iorad_url: iorad || null },
+      });
+    }, 800);
+  }, [id, updateCompany]);
 
   // Sync local state with company data
   const companyAny = company as any;
@@ -443,17 +455,6 @@ export default function CompanyDetail() {
     finally { setGeneratingCards(false); }
   };
 
-  const saveStoryUrls = async () => {
-    if (!id) return;
-    try {
-      await updateCompany.mutateAsync({
-        id,
-        updates: { loom_url: effectiveLoomUrl || null, iorad_url: effectiveIoradUrl || null },
-      });
-      toast.success("Story URLs saved");
-      setStoryUrlsDirty(false);
-    } catch (e: any) { toast.error(e.message || "Failed to save"); }
-  };
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
@@ -1081,12 +1082,13 @@ export default function CompanyDetail() {
               )}
               <Button
                 size="sm"
+                variant="outline"
                 className="gap-1.5 text-xs"
-                onClick={saveStoryUrls}
-                disabled={!storyUrlsDirty || updateCompany.isPending}
+                onClick={generateCards}
+                disabled={generatingCards}
               >
-                {updateCompany.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                Save
+                {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                {generatingCards ? "Generating…" : (assets.story_assets ? "Regenerate" : "Generate")}
               </Button>
             </div>
           </div>
@@ -1109,7 +1111,7 @@ export default function CompanyDetail() {
                   <Input
                     placeholder="https://www.loom.com/share/abc123..."
                     value={effectiveLoomUrl}
-                    onChange={(e) => { setLoomUrl(e.target.value); setStoryUrlsDirty(true); }}
+                    onChange={(e) => { const v = e.target.value; setLoomUrl(v); autosaveUrls(v, effectiveIoradUrl); }}
                     className="mt-1"
                   />
                   <p className="text-[10px] text-muted-foreground mt-1">Paste your Loom share link. It will embed automatically at the top of the story page.</p>
@@ -1133,7 +1135,7 @@ export default function CompanyDetail() {
                   <Input
                     placeholder="https://ior.ad/..."
                     value={effectiveIoradUrl}
-                    onChange={(e) => { setIoradUrl(e.target.value); setStoryUrlsDirty(true); }}
+                    onChange={(e) => { const v = e.target.value; setIoradUrl(v); autosaveUrls(effectiveLoomUrl, v); }}
                     className="mt-1"
                   />
                   <p className="text-[10px] text-muted-foreground mt-1">Replaces the default tutorial in the customer story page.</p>
