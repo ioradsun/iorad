@@ -164,15 +164,14 @@ async function syncRecentCompanies(supabase: any) {
 // Upsert a HubSpot company into our companies table
 async function upsertCompany(supabase: any, hubspotCompany: any) {
   const props = hubspotCompany.properties || {};
-  const name = props.name || "";
-  if (!name.trim()) throw new Error("No company name");
-
   const domain = props.domain
     ? props.domain.toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "")
     : null;
+  const name = (props.name || "").trim() || domain || "";
+  if (!name) throw new Error("No company name or domain");
 
   const companyData: Record<string, any> = {
-    name: name.trim(),
+    name,
     domain,
     industry: props.industry || null,
     hq_country: props.country || null,
