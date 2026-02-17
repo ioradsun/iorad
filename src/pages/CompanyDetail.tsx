@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail, Plus, Brain, Sparkles, Copy, ChevronRight, Video, BookOpen, Eye, Building2, MapPin, Users, DollarSign, Globe } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -381,6 +382,7 @@ export default function CompanyDetail() {
   const [regenerating, setRegenerating] = useState(false);
   
   const [generatingCards, setGeneratingCards] = useState(false);
+  const [selectedContactId, setSelectedContactId] = useState<string>("");
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [newContact, setNewContact] = useState({ name: "", title: "", email: "", linkedin: "" });
   const [savingContact, setSavingContact] = useState(false);
@@ -446,7 +448,9 @@ export default function CompanyDetail() {
     if (!id) return;
     setGeneratingCards(true);
     try {
-      const { data, error } = await supabase.functions.invoke("generate-cards", { body: { company_id: id } });
+      const body: Record<string, string> = { company_id: id };
+      if (selectedContactId) body.contact_id = selectedContactId;
+      const { data, error } = await supabase.functions.invoke("generate-cards", { body });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       toast.success(`Cards generated — ${data?.cards_count || 0} cards`);
@@ -454,6 +458,27 @@ export default function CompanyDetail() {
     } catch (e: any) { toast.error(e.message || "Failed to generate cards"); }
     finally { setGeneratingCards(false); }
   };
+
+  // Selected contact for display
+  const selectedContact = contacts.find((c: any) => c.id === selectedContactId) || contacts[0] || null;
+
+  const contactSelector = contacts.length > 0 ? (
+    <Select value={selectedContactId || contacts[0]?.id || ""} onValueChange={setSelectedContactId}>
+      <SelectTrigger className="w-[220px] h-8 text-xs bg-background">
+        <SelectValue placeholder="Select contact" />
+      </SelectTrigger>
+      <SelectContent className="bg-background z-50">
+        {contacts.map((c: any) => (
+          <SelectItem key={c.id} value={c.id} className="text-xs">
+            <span className="font-medium">{c.name}</span>
+            {c.title && <span className="text-muted-foreground ml-1">· {c.title}</span>}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  ) : (
+    <span className="text-xs text-muted-foreground italic">No contacts</span>
+  );
 
 
   if (isLoading) {
@@ -983,8 +1008,11 @@ export default function CompanyDetail() {
 
         {/* ============ TAB 2: STRATEGY ============ */}
         <TabsContent value="strategy" className="space-y-6 mt-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Strategy & Cards</h3>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Strategy & Cards</h3>
+              {contactSelector}
+            </div>
             <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={generateCards} disabled={generatingCards}>
               {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
               {generatingCards ? "Generating…" : cards.length > 0 ? "Regenerate" : "Generate"}
@@ -1026,8 +1054,11 @@ export default function CompanyDetail() {
 
         {/* ============ TAB 3: OUTREACH ============ */}
         <TabsContent value="outreach" className="space-y-6 mt-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Outreach Assets</h3>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Outreach Assets</h3>
+              {contactSelector}
+            </div>
             <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={generateCards} disabled={generatingCards}>
               {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
               {generatingCards ? "Generating…" : (assets.email_sequence || assets.linkedin_sequence) ? "Regenerate" : "Generate"}
@@ -1068,8 +1099,11 @@ export default function CompanyDetail() {
 
         {/* ============ TAB 4: STORY ============ */}
         <TabsContent value="story" className="space-y-6 mt-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Story Configuration</h3>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Story Configuration</h3>
+              {contactSelector}
+            </div>
             <div className="flex items-center gap-2">
               {storyBaseUrl && (
                 <a href={storyBaseUrl} target="_blank" rel="noopener noreferrer">

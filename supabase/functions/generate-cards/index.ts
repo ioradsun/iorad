@@ -11,7 +11,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { company_id } = await req.json();
+    const { company_id, contact_id } = await req.json();
     if (!company_id) throw new Error("company_id is required");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -45,8 +45,10 @@ serve(async (req) => {
     // Determine model
     const model = aiConfig?.model || "google/gemini-2.5-flash";
 
-    // Build context for the prompt
-    const primaryContact = contacts[0] || null;
+    // Use specified contact or fall back to first
+    const primaryContact = contact_id
+      ? contacts.find((c: any) => c.id === contact_id) || contacts[0] || null
+      : contacts[0] || null;
     const context = {
       company_name: company.name,
       domain: company.domain,
