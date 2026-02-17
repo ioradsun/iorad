@@ -635,27 +635,101 @@ export default function CompanyDetail() {
                     {(() => {
                       const hp = (contact as any).hubspot_properties;
                       if (!hp || Object.keys(hp).length === 0) return null;
-                      const metrics = [
-                        { label: "Plan", value: hp.plan_name },
+
+                      // Tier 1: Core product usage
+                      const coreMetrics = [
+                        { label: "Plan", value: hp.plan_name, color: "bg-primary/10 text-primary border-primary/20" },
+                        { label: "Account", value: hp.account__type, color: "bg-primary/10 text-primary border-primary/20" },
+                        { label: "Category", value: hp.account_type, color: "bg-secondary text-foreground border-border/50" },
+                        { label: "Profile", value: hp.engagement_profile, color: "bg-accent/50 text-accent-foreground border-accent" },
+                      ].filter(m => m.value && m.value !== "--" && m.value !== "0");
+
+                      // Tier 2: Tutorial metrics
+                      const tutorialMetrics = [
                         { label: "Tutorials", value: hp.tutorials_created },
                         { label: "Valid", value: hp.tutorials_valid_owned },
                         { label: "Learned", value: hp.tutorials_learned },
                         { label: "Views", value: hp.tutorials_views },
-                        { label: "Libraries", value: hp.libraries_owned },
+                        { label: "Libraries", value: hp.help_centers_owned || hp.libraries_owned },
+                      ].filter(m => m.value !== null && m.value !== undefined && m.value !== "" && m.value !== "0" && m.value !== 0);
+
+                      // Tier 3: What they're documenting & where they embed
+                      const contextMetrics = [
+                        { label: "Documenting", value: hp.first_embed_tutorial_base_domain_name || hp.referral_signup_tutorial_base_domain },
+                        { label: "Embedded In", value: hp.first_embed_base_domain_name },
+                        { label: "Use Case", value: hp.creator_use_case?.replace(/_/g, " ") },
+                        { label: "LMS", value: hp.are_you_using_a_learning_management_system__lms__ },
+                      ].filter(m => m.value && m.value !== "--");
+
+                      // Tier 4: Integrations & connections
+                      const extensionStr = hp.extension_connections;
+                      const apiStr = hp.api_connections;
+                      const integrations = [extensionStr, apiStr].filter(Boolean);
+
+                      // Tier 5: Activity dates
+                      const dateMetrics = [
                         { label: "Last Active", value: hp.last_active_date ? new Date(hp.last_active_date).toLocaleDateString() : null },
                         { label: "Last Created", value: hp.last_tutorial_create_date ? new Date(hp.last_tutorial_create_date).toLocaleDateString() : null },
-                        { label: "Use Case", value: hp.creator_use_case },
-                        { label: "Category", value: hp.category },
-                      ].filter(m => m.value !== null && m.value !== undefined && m.value !== "" && m.value !== "--");
-                      if (metrics.length === 0) return null;
+                        { label: "First Created", value: hp.first_tutorial_create_date ? new Date(hp.first_tutorial_create_date).toLocaleDateString() : null },
+                      ].filter(m => m.value);
+
+                      const hasAny = coreMetrics.length > 0 || tutorialMetrics.length > 0 || contextMetrics.length > 0 || integrations.length > 0 || dateMetrics.length > 0;
+                      if (!hasAny) return null;
+
                       return (
-                        <div className="flex flex-wrap gap-1.5 ml-[52px]">
-                          {metrics.map(m => (
-                            <span key={m.label} className="text-[10px] px-1.5 py-0.5 rounded border border-border/50 bg-secondary/30 text-muted-foreground">
-                              <span className="font-mono uppercase tracking-wider">{m.label}:</span>{" "}
-                              <span className="text-foreground font-medium">{String(m.value)}</span>
-                            </span>
-                          ))}
+                        <div className="ml-[52px] space-y-1.5">
+                          {/* Core identity badges */}
+                          {coreMetrics.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                              {coreMetrics.map(m => (
+                                <span key={m.label} className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${m.color}`}>
+                                  {String(m.value)}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {/* Tutorial & usage numbers */}
+                          {tutorialMetrics.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                              {tutorialMetrics.map(m => (
+                                <span key={m.label} className="text-[10px] px-1.5 py-0.5 rounded border border-border/50 bg-secondary/30 text-muted-foreground">
+                                  <span className="font-mono uppercase tracking-wider">{m.label}:</span>{" "}
+                                  <span className="text-foreground font-medium">{String(m.value)}</span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {/* What they document & embed into */}
+                          {contextMetrics.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                              {contextMetrics.map(m => (
+                                <span key={m.label} className="text-[10px] px-1.5 py-0.5 rounded border border-primary/20 bg-primary/5 text-muted-foreground">
+                                  <span className="font-mono uppercase tracking-wider">{m.label}:</span>{" "}
+                                  <span className="text-primary font-medium">{String(m.value)}</span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {/* Integrations */}
+                          {integrations.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                              <span className="text-[10px] px-1.5 py-0.5 rounded border border-border/50 bg-secondary/20 text-muted-foreground">
+                                <span className="font-mono uppercase tracking-wider">Integrations:</span>{" "}
+                                <span className="text-foreground font-medium">{integrations.join(", ")}</span>
+                              </span>
+                            </div>
+                          )}
+                          {/* Activity dates */}
+                          {dateMetrics.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                              {dateMetrics.map(m => (
+                                <span key={m.label} className="text-[10px] px-1.5 py-0.5 rounded border border-border/30 bg-muted/30 text-muted-foreground">
+                                  <span className="font-mono uppercase tracking-wider">{m.label}:</span>{" "}
+                                  <span className="text-foreground">{m.value}</span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       );
                     })()}
