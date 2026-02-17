@@ -227,7 +227,12 @@ function AIConfigTab() {
   const [outreachPrompt, setOutreachPrompt] = useState("");
   const [storyPrompt, setStoryPrompt] = useState("");
   const [transcriptPrompt, setTranscriptPrompt] = useState("");
+  const [inboundStrategyPrompt, setInboundStrategyPrompt] = useState("");
+  const [inboundOutreachPrompt, setInboundOutreachPrompt] = useState("");
+  const [inboundStoryPrompt, setInboundStoryPrompt] = useState("");
+  const [inboundTranscriptPrompt, setInboundTranscriptPrompt] = useState("");
   const [model, setModel] = useState("");
+  const [promptMode, setPromptMode] = useState<"outbound" | "inbound">("outbound");
 
   useEffect(() => {
     if (data) {
@@ -238,6 +243,10 @@ function AIConfigTab() {
       setOutreachPrompt((data as any).outreach_prompt || "");
       setStoryPrompt((data as any).story_prompt || "");
       setTranscriptPrompt((data as any).transcript_prompt || "");
+      setInboundStrategyPrompt((data as any).inbound_strategy_prompt || "");
+      setInboundOutreachPrompt((data as any).inbound_outreach_prompt || "");
+      setInboundStoryPrompt((data as any).inbound_story_prompt || "");
+      setInboundTranscriptPrompt((data as any).inbound_transcript_prompt || "");
       setModel(data.model);
     }
   }, [data]);
@@ -252,6 +261,10 @@ function AIConfigTab() {
         outreach_prompt: outreachPrompt,
         story_prompt: storyPrompt,
         transcript_prompt: transcriptPrompt,
+        inbound_strategy_prompt: inboundStrategyPrompt,
+        inbound_outreach_prompt: inboundOutreachPrompt,
+        inbound_story_prompt: inboundStoryPrompt,
+        inbound_transcript_prompt: inboundTranscriptPrompt,
         model,
       } as any).eq("id", 1);
       if (error) throw error;
@@ -265,7 +278,7 @@ function AIConfigTab() {
 
   if (isLoading) return <Loader />;
 
-  const promptSections = [
+  const outboundPromptSections = [
     {
       key: "company",
       label: "Company Tab Prompt",
@@ -300,6 +313,37 @@ function AIConfigTab() {
       description: "Prompt for analyzing Fathom meeting transcripts — extracts strategic account intelligence for CS handoff.",
       value: transcriptPrompt,
       setter: setTranscriptPrompt,
+    },
+  ];
+
+  const inboundPromptSections = [
+    {
+      key: "inbound_strategy",
+      label: "Strategy Tab Prompt (Inbound)",
+      description: "Prompt for inbound leads — focus on qualification, discovery, and conversion strategy rather than cold outreach.",
+      value: inboundStrategyPrompt,
+      setter: setInboundStrategyPrompt,
+    },
+    {
+      key: "inbound_outreach",
+      label: "Outreach Tab Prompt (Inbound)",
+      description: "Prompt for inbound leads — nurture sequences, demo follow-ups, and onboarding-oriented messaging.",
+      value: inboundOutreachPrompt,
+      setter: setInboundOutreachPrompt,
+    },
+    {
+      key: "inbound_story",
+      label: "Custom Loom & iorad Prompt (Inbound)",
+      description: "Prompt for inbound leads — personalized welcome Loom scripts and getting-started iorad tutorials.",
+      value: inboundStoryPrompt,
+      setter: setInboundStoryPrompt,
+    },
+    {
+      key: "inbound_transcript",
+      label: "Transcript Analysis Prompt (Inbound)",
+      description: "Prompt for analyzing inbound demo/onboarding call transcripts — extract adoption signals and expansion opportunities.",
+      value: inboundTranscriptPrompt,
+      setter: setInboundTranscriptPrompt,
     },
   ];
 
@@ -338,9 +382,26 @@ function AIConfigTab() {
       </div>
 
       <div className="panel-header text-lg">Tab-Specific Prompts</div>
-      <p className="text-xs text-muted-foreground -mt-4">Each tab in the company detail page uses its own prompt. Edit them independently below.</p>
+      <p className="text-xs text-muted-foreground -mt-4">Each tab uses its own prompt. Switch between Outbound (cold outreach) and Inbound (warm leads from HubSpot) below.</p>
 
-      {promptSections.map(({ key, label, description, value, setter }) => (
+      <div className="flex gap-2">
+        <Button
+          variant={promptMode === "outbound" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setPromptMode("outbound")}
+        >
+          Outbound Prompts
+        </Button>
+        <Button
+          variant={promptMode === "inbound" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setPromptMode("inbound")}
+        >
+          Inbound Prompts
+        </Button>
+      </div>
+
+      {(promptMode === "outbound" ? outboundPromptSections : inboundPromptSections).map(({ key, label, description, value, setter }) => (
         <div key={key} className="panel space-y-4">
           <div className="panel-header">{label}</div>
           <p className="text-xs text-muted-foreground">{description}</p>

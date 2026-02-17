@@ -33,11 +33,20 @@ serve(async (req) => {
     // Fetch the transcript prompt from ai_config
     const { data: config } = await sb
       .from("ai_config")
-      .select("transcript_prompt, model")
+      .select("transcript_prompt, inbound_transcript_prompt, model")
       .eq("id", 1)
       .single();
 
-    const promptTemplate = config?.transcript_prompt || "Analyze this meeting transcript and extract key insights:";
+    // Determine if this is an inbound company
+    let isInbound = false;
+    if (meeting.company_id) {
+      const { data: comp } = await sb.from("companies").select("source_type").eq("id", meeting.company_id).single();
+      isInbound = comp?.source_type === "inbound";
+    }
+
+    const promptTemplate = isInbound && config?.inbound_transcript_prompt
+      ? config.inbound_transcript_prompt
+      : (config?.transcript_prompt || "Analyze this meeting transcript and extract key insights:");
     const model = config?.model || "google/gemini-3-flash-preview";
 
     const fullPrompt = `${promptTemplate}\n\n---\n\n${meeting.transcript}`;
