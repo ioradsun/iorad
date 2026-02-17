@@ -62,26 +62,22 @@ Deno.serve(async (req) => {
       snapshotJson?.executive_narrative ||
       "";
 
-    // Push to Clay
+    // Push to Clay webhook
     const clayPayload = {
-      records: [{
-        id: company.id,
-        cells: {
-          "Company Name": company.name,
-          "Domain": company.domain || "",
-          "Industry": company.industry || "",
-          "Partner": company.partner || "",
-          "Persona": company.persona || "",
-          "Score": snapshot?.score_total || company.last_score_total || 0,
-          "Snapshot Status": company.snapshot_status || "",
-          "Executive Framing": executiveFraming,
-          "Min Contacts": 5,
-          "Job Title Keywords": "enablement, learning, change management, L&D, education, Customer Education, Partner enablement, readiness, sales enablement, revenue enablement",
-        },
-      }],
+      "Company Name": company.name,
+      "Domain": company.domain || "",
+      "Industry": company.industry || "",
+      "Partner": company.partner || "",
+      "Persona": company.persona || "",
+      "Score": snapshot?.score_total || company.last_score_total || 0,
+      "Snapshot Status": company.snapshot_status || "",
+      "Executive Framing": executiveFraming,
+      "Min Contacts": 5,
+      "Job Title Keywords": "enablement, learning, change management, L&D, education, Customer Education, Partner enablement, readiness, sales enablement, revenue enablement",
     };
 
-    const clayResp = await fetch(`https://api.clay.com/v3/tables/${clayTableId}/records`, {
+    // CLAY_TABLE_ID is the full webhook URL (v1/inputs/webhook/...)
+    const clayResp = await fetch(clayTableId, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${clayApiKey}`,
