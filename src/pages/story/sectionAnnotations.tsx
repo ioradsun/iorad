@@ -23,9 +23,9 @@ const sectionConfigs: Record<string, SectionAnnotationConfig> = {
     sectionLabel: "What's Happening",
     jsonFields: ["whats_happening"],
     hasContent: (json) => (json.whats_happening || []).length > 0,
-    getMatchedSignals: (signals) => signals.slice(0, 5).map((s) => ({ type: s.type, title: s.title, url: s.url })),
+    getMatchedSignals: (signals) => (signals || []).slice(0, 5).map((s) => ({ type: s.type, title: s.title, url: s.url })),
     getReasoning: (json, signals) => {
-      if (signals.length === 0) return "No signals were found for this company. The AI had no external data to work with.";
+      if (!signals || signals.length === 0) return "No signals were found for this company. The AI had no external data to work with.";
       if ((json.whats_happening || []).length === 0) return "Signals were available but the AI didn't generate content for this section.";
       return undefined;
     },
