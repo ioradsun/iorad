@@ -20,18 +20,24 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const sb = createClient(supabaseUrl, supabaseKey);
 
-    // Optional: filter by specific company domain
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
-    const filterDomain = body.domain || null;
+    const filterDomain = body.domain;
+    const companyId = body.company_id;
     const limit = body.limit || 50;
 
-    // Fetch ALL meetings from Fathom (don't filter by domain - we'll match in code)
-    let fathomUrl = `${FATHOM_API}/meetings?limit=${limit}`;
-    if (filterDomain) {
-      fathomUrl += `&calendar_invitees_domains[]=${encodeURIComponent(filterDomain)}`;
-    }
+    if (!filterDomain) throw new Error("domain is required — sync is per-company");
 
+    // Domains to ignore when matching (your own org + personal email providers)
+    const ignoredDomains = new Set([
+      "iorad.com",
+      "gmail.com", "yahoo.com", "hotmail.com", "outlook.com",
+      "icloud.com", "aol.com", "protonmail.com",
+    ]);
+
+    // Fetch meetings from Fathom filtered to this company's domain
+    const fathomUrl = `${FATHOM_API}/meetings?limit=${limit}&calendar_invitees_domains[]=${encodeURIComponent(filterDomain)}`;
     console.log(`Fetching Fathom meetings: ${fathomUrl}`);
+
     const fathomResp = await fetch(fathomUrl, {
       headers: { "X-Api-Key": FATHOM_API_KEY },
     });
@@ -44,101 +50,44 @@ serve(async (req) => {
 
     const fathomData = await fathomResp.json();
     const meetings = fathomData.items || [];
-    console.log(`Fathom returned ${meetings.length} meetings`);
-
-    // Load all companies for domain matching
-    const { data: companies } = await sb.from("companies").select("id, name, domain");
-    const domainToCompany = new Map<string, { id: string; name: string }>();
-    for (const c of companies || []) {
-      if (c.domain) {
-        domainToCompany.set(c.domain.toLowerCase(), { id: c.id, name: c.name });
-      }
-    }
+    console.log(`Fathom returned ${meetings.length} meetings for domain ${filterDomain}`);
 
     let synced = 0;
-    let companiesCreated = 0;
-    const results: { meeting: string; company: string; action: string }[] = [];
+    const results: { meeting: string; action: string }[] = [];
 
     for (const meeting of meetings) {
-      // Fathom API returns recording_id or we can extract from url
-      const meetingId = meeting.recording_id || meeting.id || meeting.meeting_id || 
+      const meetingId = meeting.recording_id || meeting.id || meeting.meeting_id ||
         (meeting.url ? meeting.url.split("/").pop() : null);
-      if (!meetingId) { console.warn("Skipping meeting with no id:", JSON.stringify(meeting).slice(0, 200)); continue; }
+      if (!meetingId) { console.warn("Skipping meeting with no id"); continue; }
 
-      console.log(`Processing meeting: ${meetingId} - "${meeting.title || meeting.meeting_title}"`);
-
-      // Extract attendee domains from calendar invitees
+      // Extract attendee emails, filtering out iorad and personal domains
       const attendees = meeting.calendar_invitees || meeting.attendees || [];
-      const attendeeEmails: string[] = attendees
+      const allEmails: string[] = attendees
         .map((a: any) => a.email || a)
         .filter((e: string) => typeof e === "string" && e.includes("@"));
+      const externalEmails = allEmails.filter(
+        (e) => !ignoredDomains.has(e.split("@")[1]?.toLowerCase())
+      );
 
-      // Extract unique external domains (skip common personal email providers)
-      const personalDomains = new Set(["gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "icloud.com", "aol.com", "protonmail.com"]);
-      const externalDomains = new Set<string>();
-      for (const email of attendeeEmails) {
-        const domain = email.split("@")[1]?.toLowerCase();
-        if (domain && !personalDomains.has(domain)) {
-          externalDomains.add(domain);
-        }
-      }
-
-      // Try to match to a company
-      let companyId: string | null = null;
-      let companyName = "Unknown";
-
-      for (const domain of externalDomains) {
-        const match = domainToCompany.get(domain);
-        if (match) {
-          companyId = match.id;
-          companyName = match.name;
-          break;
-        }
-      }
-
-      // If no match, create a new company from the first external domain
-      if (!companyId && externalDomains.size > 0) {
-        const newDomain = [...externalDomains][0];
-        const newName = newDomain.split(".")[0].charAt(0).toUpperCase() + newDomain.split(".")[0].slice(1);
-
-        const { data: newCompany, error: createErr } = await sb
-          .from("companies")
-          .insert({ name: newName, domain: newDomain })
-          .select("id, name")
-          .single();
-
-        if (createErr) {
-          console.warn(`Failed to create company for ${newDomain}: ${createErr.message}`);
-        } else {
-          companyId = newCompany.id;
-          companyName = newCompany.name;
-          domainToCompany.set(newDomain, { id: newCompany.id, name: newCompany.name });
-          companiesCreated++;
-          console.log(`Created company: ${newName} (${newDomain})`);
-        }
-      }
-
-      // Build meeting summary and action items
       const summary = meeting.summary?.overview || meeting.summary?.text || meeting.summary || null;
       const actionItems = meeting.action_items || [];
       const meetingDate = meeting.created_at || meeting.start_time || null;
       const duration = meeting.duration_seconds || meeting.duration || null;
-      const fathomUrl = meeting.share_url || meeting.url || null;
+      const fathomShareUrl = meeting.share_url || meeting.url || null;
 
-      // Upsert meeting
       const { error: upsertErr } = await sb
         .from("meetings")
         .upsert(
           {
             fathom_meeting_id: String(meetingId),
-            company_id: companyId,
+            company_id: companyId || null,
             title: meeting.title || meeting.meeting_title || "Untitled Meeting",
             meeting_date: meetingDate,
             duration_seconds: duration,
             summary: typeof summary === "string" ? summary : JSON.stringify(summary),
             action_items: actionItems,
-            attendees: attendeeEmails,
-            fathom_url: fathomUrl,
+            attendees: externalEmails,
+            fathom_url: fathomShareUrl,
             synced_at: new Date().toISOString(),
           },
           { onConflict: "fathom_meeting_id" }
@@ -150,22 +99,13 @@ serve(async (req) => {
       }
 
       synced++;
-      results.push({
-        meeting: meeting.title || meetingId,
-        company: companyName,
-        action: companyId ? "linked" : "unlinked",
-      });
+      results.push({ meeting: meeting.title || String(meetingId), action: "synced" });
     }
 
-    console.log(`Synced ${synced} meetings, created ${companiesCreated} new companies`);
+    console.log(`Synced ${synced} meetings for ${filterDomain}`);
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        meetings_synced: synced,
-        companies_created: companiesCreated,
-        results,
-      }),
+      JSON.stringify({ success: true, meetings_synced: synced, results }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {

@@ -126,10 +126,13 @@ export default function CompanyDetail() {
   const PERSONAS = ["Learning & Development", "Sales Enablement", "Revenue Enablement", "Customer Education", "Partner Enablement"];
 
   const syncFathom = async () => {
+    if (!company?.domain) { toast.error("Company needs a domain to sync Fathom meetings"); return; }
     setSyncingFathom(true);
-    toast.info("Syncing meetings from Fathom…");
+    toast.info(`Syncing Fathom meetings for ${company.domain}…`);
     try {
-      const { data, error } = await supabase.functions.invoke("sync-fathom", { body: {} });
+      const { data, error } = await supabase.functions.invoke("sync-fathom", {
+        body: { domain: company.domain, company_id: id },
+      });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       toast.success(`Synced ${data.meetings_synced || 0} meetings`);
