@@ -23,6 +23,7 @@ export default function Dashboard() {
   const [minScore, setMinScore] = useState(0);
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [partnerFilter, setPartnerFilter] = useState<string>("all");
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
 
   const lastJob = jobs[0];
 
@@ -39,6 +40,7 @@ export default function Dashboard() {
     if (minScore > 0) list = list.filter(c => (c.last_score_total ?? 0) >= minScore);
     if (statusFilter.length > 0) list = list.filter(c => c.snapshot_status && statusFilter.includes(c.snapshot_status));
     if (partnerFilter !== "all") list = list.filter(c => c.partner === partnerFilter);
+    if (sourceFilter !== "all") list = list.filter(c => (c as any).source_type === sourceFilter);
 
     list.sort((a, b) => {
       let av: any, bv: any;
@@ -55,7 +57,7 @@ export default function Dashboard() {
       return 0;
     });
     return list;
-  }, [search, minScore, statusFilter, partnerFilter, sortKey, sortAsc, companiesWithSignals]);
+  }, [search, minScore, statusFilter, partnerFilter, sourceFilter, sortKey, sortAsc, companiesWithSignals]);
 
   const partners = useMemo(() => {
     const set = new Set(companies.map(c => c.partner).filter(Boolean) as string[]);
@@ -115,6 +117,16 @@ export default function Dashboard() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Search companies..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 bg-secondary border-border" />
         </div>
+        <Select value={sourceFilter} onValueChange={setSourceFilter}>
+          <SelectTrigger className="w-[160px] h-8 text-xs bg-secondary border-border">
+            <SelectValue placeholder="All Sources" />
+          </SelectTrigger>
+          <SelectContent className="bg-popover border-border z-50">
+            <SelectItem value="all">All Sources</SelectItem>
+            <SelectItem value="inbound">Inbound</SelectItem>
+            <SelectItem value="outbound">Outbound</SelectItem>
+          </SelectContent>
+        </Select>
         <Select value={partnerFilter} onValueChange={setPartnerFilter}>
           <SelectTrigger className="w-[180px] h-8 text-xs bg-secondary border-border">
             <SelectValue placeholder="All Partners" />

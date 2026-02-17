@@ -176,6 +176,7 @@ async function upsertCompany(supabase: any, hubspotCompany: any) {
     industry: props.industry || null,
     hq_country: props.country || null,
     headcount: props.numberofemployees ? parseInt(String(props.numberofemployees), 10) || null : null,
+    source_type: "inbound",
   };
 
   // Try to find existing by domain first
