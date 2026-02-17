@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail, Plus, Sparkles, Eye, Building2, MapPin, Users, DollarSign, Globe, Video, BookOpen, ChevronRight, Search, PhoneCall, Clock } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -392,8 +393,9 @@ export default function CompanyDetail() {
                 </Button>
               ))}
             </div>
-            <div className="space-y-3">
-              {contacts.length > 0 ? contacts.map((contact) => {
+            <ScrollArea className="max-h-[200px]">
+              <div className="space-y-3">
+              {contacts.length > 0 ? contacts.slice(0, 3).map((contact) => {
                 const firstName = contact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "");
                 const storyUrl = company.partner
                   ? `/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories/${firstName}`
@@ -432,7 +434,11 @@ export default function CompanyDetail() {
               ) : (
                 <p className="text-sm text-muted-foreground">No contacts yet. Add one manually or run enrichment.</p>
               )}
-            </div>
+              {contacts.length > 3 && (
+                <p className="text-xs text-muted-foreground text-center pt-1">+{contacts.length - 3} more — scroll to see all</p>
+              )}
+              </div>
+            </ScrollArea>
           </div>
 
           {/* Meetings (Fathom) */}
