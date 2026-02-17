@@ -165,6 +165,7 @@ export default function CompanyDetail() {
   const [syncingFathom, setSyncingFathom] = useState(false);
   const [fixingDomain, setFixingDomain] = useState(false);
   const [analyzingMeeting, setAnalyzingMeeting] = useState<string | null>(null);
+  const [contactSearch, setContactSearch] = useState("");
 
   const effectiveContactId = selectedContactId || contacts[0]?.id || "";
   const { data: companyCards, isLoading: cardsLoading } = useCompanyCards(id, effectiveContactId || undefined);
@@ -523,9 +524,23 @@ export default function CompanyDetail() {
                 </Button>
               ))}
             </div>
+            {contacts.length > 3 && (
+              <div className="px-4 pb-3">
+                <Input
+                  placeholder="Search contacts…"
+                  value={contactSearch}
+                  onChange={e => setContactSearch(e.target.value)}
+                  className="h-7 text-xs"
+                />
+              </div>
+            )}
             <ScrollArea className="h-[180px]">
               <div className="space-y-3 pr-3">
-              {contacts.length > 0 ? contacts.map((contact) => {
+              {contacts.length > 0 ? contacts.filter((c) => {
+                if (!contactSearch) return true;
+                const q = contactSearch.toLowerCase();
+                return (c.name?.toLowerCase().includes(q) || c.title?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q));
+              }).map((contact) => {
                 const firstName = contact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "");
                 const storyUrl = company.partner
                   ? `/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories/${firstName}`
