@@ -69,7 +69,8 @@ serve(async (req) => {
         (e) => !ignoredDomains.has(e.split("@")[1]?.toLowerCase())
       );
 
-      const summary = meeting.summary?.overview || meeting.summary?.text || meeting.summary || null;
+      const rawSummary = meeting.summary?.overview || meeting.summary?.text || meeting.summary || null;
+      const summary = (rawSummary && typeof rawSummary === "string" && rawSummary !== "null") ? rawSummary : null;
       const actionItems = meeting.action_items || [];
       const meetingDate = meeting.created_at || meeting.start_time || null;
       const duration = meeting.duration_seconds || meeting.duration || null;
@@ -86,8 +87,10 @@ serve(async (req) => {
             const txData = await txResp.json();
             // Transcript can be an array of segments or a string
             if (Array.isArray(txData)) {
-              transcript = txData.map((s: any) => `${s.speaker || "Speaker"}: ${s.text || s.content || ""}`).join("\n");
-            } else if (typeof txData === "string") {
+              transcript = txData.map((s: any) => {
+                const speaker = typeof s.speaker === "object" ? (s.speaker?.name || "Speaker") : (s.speaker || "Speaker");
+                return `${speaker}: ${s.text || s.content || ""}`;
+              }).join("\n");
               transcript = txData;
             } else if (txData?.transcript) {
               transcript = typeof txData.transcript === "string" ? txData.transcript : JSON.stringify(txData.transcript);
@@ -101,7 +104,10 @@ serve(async (req) => {
       }
       // If transcript is an array (from inline), flatten it
       if (Array.isArray(transcript)) {
-        transcript = transcript.map((s: any) => `${s.speaker || "Speaker"}: ${s.text || s.content || ""}`).join("\n");
+        transcript = transcript.map((s: any) => {
+          const speaker = typeof s.speaker === "object" ? (s.speaker?.name || "Speaker") : (s.speaker || "Speaker");
+          return `${speaker}: ${s.text || s.content || ""}`;
+        }).join("\n");
       }
 
       const { error: upsertErr } = await sb
