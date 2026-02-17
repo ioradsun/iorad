@@ -25,8 +25,8 @@ serve(async (req) => {
     const filterDomain = body.domain || null;
     const limit = body.limit || 50;
 
-    // Fetch meetings from Fathom
-    let fathomUrl = `${FATHOM_API}/meetings?limit=${limit}&include_summary=true&include_action_items=true`;
+    // Fetch ALL meetings from Fathom (don't filter by domain - we'll match in code)
+    let fathomUrl = `${FATHOM_API}/meetings?limit=${limit}`;
     if (filterDomain) {
       fathomUrl += `&calendar_invitees_domains[]=${encodeURIComponent(filterDomain)}`;
     }
@@ -60,8 +60,12 @@ serve(async (req) => {
     const results: { meeting: string; company: string; action: string }[] = [];
 
     for (const meeting of meetings) {
-      const meetingId = meeting.id || meeting.meeting_id;
-      if (!meetingId) continue;
+      // Fathom API returns recording_id or we can extract from url
+      const meetingId = meeting.recording_id || meeting.id || meeting.meeting_id || 
+        (meeting.url ? meeting.url.split("/").pop() : null);
+      if (!meetingId) { console.warn("Skipping meeting with no id:", JSON.stringify(meeting).slice(0, 200)); continue; }
+
+      console.log(`Processing meeting: ${meetingId} - "${meeting.title || meeting.meeting_title}"`);
 
       // Extract attendee domains from calendar invitees
       const attendees = meeting.calendar_invitees || meeting.attendees || [];
