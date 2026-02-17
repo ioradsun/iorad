@@ -1073,7 +1073,7 @@ export default function CompanyDetail() {
             <div className="flex items-center gap-2">
               {storyBaseUrl && (
                 <a href={storyBaseUrl} target="_blank" rel="noopener noreferrer">
-                  <Button size="sm" variant="ghost" className="gap-1.5 text-xs">
+                  <Button size="sm" className="gap-1.5 text-xs">
                     <Eye className="w-3.5 h-3.5" /> View Story
                   </Button>
                 </a>
@@ -1098,7 +1098,7 @@ export default function CompanyDetail() {
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <Video className="w-4 h-4 text-primary" />
                   Loom Video
-                  <Badge variant={effectiveLoomUrl ? "default" : "secondary"} className="text-[10px] ml-auto">
+                  <Badge variant="outline" className="text-[10px] ml-auto">
                     {effectiveLoomUrl ? "Ready" : "Not Set"}
                   </Badge>
                 </CardTitle>
@@ -1122,7 +1122,7 @@ export default function CompanyDetail() {
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <BookOpen className="w-4 h-4 text-primary" />
                   iorad Tutorial
-                  <Badge variant={effectiveIoradUrl ? "default" : "secondary"} className="text-[10px] ml-auto">
+                  <Badge variant="outline" className="text-[10px] ml-auto">
                     {effectiveIoradUrl ? "Ready" : "Not Set"}
                   </Badge>
                 </CardTitle>
