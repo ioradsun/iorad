@@ -46,7 +46,8 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        await upsertCompany(supabase, company);
+        const companyId = await upsertCompany(supabase, company);
+        await importContactsForCompany(supabase, objectId, companyId);
         imported++;
       } catch (err: any) {
         errors.push(`Event ${event.objectId || "unknown"}: ${err.message}`);
@@ -139,7 +140,9 @@ async function syncRecentCompanies(supabase: any) {
 
   for (const company of results) {
     try {
-      await upsertCompany(supabase, company);
+      const companyId = await upsertCompany(supabase, company);
+      // Fetch and save associated contacts
+      await importContactsForCompany(supabase, company.id, companyId);
       imported++;
     } catch (err: any) {
       errors.push(`${company.properties?.name || company.id}: ${err.message}`);
@@ -161,8 +164,8 @@ async function syncRecentCompanies(supabase: any) {
   );
 }
 
-// Upsert a HubSpot company into our companies table
-async function upsertCompany(supabase: any, hubspotCompany: any) {
+// Upsert a HubSpot company into our companies table, returns the company ID
+async function upsertCompany(supabase: any, hubspotCompany: any): Promise<string> {
   const props = hubspotCompany.properties || {};
   const domain = props.domain
     ? props.domain.toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "")
@@ -188,12 +191,90 @@ async function upsertCompany(supabase: any, hubspotCompany: any) {
       .maybeSingle();
 
     if (existing) {
-      // Update existing
       await supabase.from("companies").update(companyData).eq("id", existing.id);
-      return;
+      return existing.id;
     }
   }
 
   // Insert new company
-  await supabase.from("companies").insert(companyData);
+  const { data: inserted, error } = await supabase.from("companies").insert(companyData).select("id").single();
+  if (error) throw error;
+  return inserted.id;
+}
+
+// Fetch contacts associated with a HubSpot company and save them
+async function importContactsForCompany(supabase: any, hubspotCompanyId: string | number, companyId: string) {
+  const apiKey = Deno.env.get("HUBSPOT_API_KEY");
+  if (!apiKey) return;
+
+  try {
+    // Get associated contacts from HubSpot
+    const res = await fetch(
+      `https://api.hubapi.com/crm/v3/objects/companies/${hubspotCompanyId}/associations/contacts`,
+      { headers: { Authorization: `Bearer ${apiKey}` } }
+    );
+
+    if (!res.ok) {
+      const text = await res.text();
+      console.warn(`Failed to fetch contacts for company ${hubspotCompanyId}: ${text}`);
+      return;
+    }
+
+    const data = await res.json();
+    const contactIds = (data.results || []).map((r: any) => r.toObjectId || r.id).filter(Boolean);
+
+    if (contactIds.length === 0) return;
+
+    // Fetch contact details in batch (up to 10)
+    for (const contactId of contactIds.slice(0, 10)) {
+      try {
+        const contactRes = await fetch(
+          `https://api.hubapi.com/crm/v3/objects/contacts/${contactId}?properties=firstname,lastname,email,jobtitle,hs_linkedin_url`,
+          { headers: { Authorization: `Bearer ${apiKey}` } }
+        );
+
+        if (!contactRes.ok) continue;
+
+        const contact = await contactRes.json();
+        const cp = contact.properties || {};
+        const contactName = [cp.firstname, cp.lastname].filter(Boolean).join(" ").trim();
+        if (!contactName) continue;
+
+        // Check if contact already exists for this company by email
+        if (cp.email) {
+          const { data: existing } = await supabase
+            .from("contacts")
+            .select("id")
+            .eq("company_id", companyId)
+            .eq("email", cp.email)
+            .maybeSingle();
+
+          if (existing) {
+            // Update existing contact
+            await supabase.from("contacts").update({
+              name: contactName,
+              title: cp.jobtitle || null,
+              linkedin: cp.hs_linkedin_url || null,
+            }).eq("id", existing.id);
+            continue;
+          }
+        }
+
+        // Insert new contact
+        await supabase.from("contacts").insert({
+          company_id: companyId,
+          name: contactName,
+          email: cp.email || null,
+          title: cp.jobtitle || null,
+          linkedin: cp.hs_linkedin_url || null,
+          source: "hubspot",
+          confidence: "high",
+        });
+      } catch (err: any) {
+        console.warn(`Failed to import contact ${contactId}: ${err.message}`);
+      }
+    }
+  } catch (err: any) {
+    console.warn(`Contact import error for company ${companyId}: ${err.message}`);
+  }
 }
