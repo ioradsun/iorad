@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Plus, LayoutDashboard, History, BookOpen, LogOut, Shield } from "lucide-react";
+import { LayoutDashboard, BookOpen, LogOut, Shield } from "lucide-react";
 import ioradLogoDark from "@/assets/iorad-logo-new.png";
 import ioradLogoLight from "@/assets/iorad-logo-light.png";
 import { useAuth } from "@/hooks/useAuth";
@@ -16,8 +16,6 @@ import {
 
 const menuItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/upload", label: "Add Company", icon: Plus },
-  { to: "/jobs", label: "Jobs", icon: History },
   { to: "/stories", label: "Stories", icon: BookOpen },
 ];
 
