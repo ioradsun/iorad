@@ -252,10 +252,42 @@ export default function CompanyDetail() {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      toast.success(`Synced ${data.meetings_synced || 0} meetings`);
-      queryClient.invalidateQueries({ queryKey: ["meetings", id] });
+      const synced = data.meetings_synced || 0;
+      toast.success(`Synced ${synced} meetings`);
+      await queryClient.invalidateQueries({ queryKey: ["meetings", id] });
+
+      // Auto-analyze: get meetings with transcripts but no analysis yet
+      if (synced > 0) {
+        toast.info("Auto-analyzing transcripts…");
+        const { data: freshMeetings } = await supabase
+          .from("meetings")
+          .select("id, transcript, transcript_analysis")
+          .eq("company_id", id!)
+          .not("transcript", "is", null)
+          .is("transcript_analysis", null);
+
+        if (freshMeetings && freshMeetings.length > 0) {
+          for (const m of freshMeetings) {
+            setAnalyzingMeeting(m.id);
+            try {
+              const { data: aData, error: aErr } = await supabase.functions.invoke("analyze-transcript", {
+                body: { meeting_id: m.id },
+              });
+              if (aErr) throw aErr;
+              if (aData?.error) throw new Error(aData.error);
+            } catch (ae: any) {
+              console.error(`Analysis failed for meeting ${m.id}:`, ae);
+              toast.error(`Analysis failed for a meeting: ${ae.message}`);
+            }
+          }
+          setAnalyzingMeeting(null);
+          toast.success("Transcript analysis complete — check the Onboarding tab");
+          queryClient.invalidateQueries({ queryKey: ["meetings", id] });
+          setActiveTab("onboarding");
+        }
+      }
     } catch (e: any) { toast.error(e.message || "Fathom sync failed"); }
-    finally { setSyncingFathom(false); }
+    finally { setSyncingFathom(false); setAnalyzingMeeting(null); }
   };
 
   const analyzeTranscript = async (meetingId: string) => {
@@ -584,106 +616,33 @@ export default function CompanyDetail() {
           </div>
 
           {/* Meetings (Fathom) */}
-          <div className="panel">
-            <div className="panel-header flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <PhoneCall className="w-4 h-4 text-primary" />
-                <span>Meetings ({meetings.length})</span>
-              </div>
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs h-7" onClick={syncFathom} disabled={syncingFathom}>
-                {syncingFathom ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                Sync Fathom
-              </Button>
-            </div>
-            {meetings.length > 0 ? (
-              <div className="space-y-3">
-                {meetings.map((m: any) => (
-                  <div key={m.id} className="border rounded-lg p-3 space-y-2">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-medium">{m.title}</div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          {m.meeting_date && <span>{new Date(m.meeting_date).toLocaleDateString()}</span>}
-                          {m.duration_seconds && (
-                            <span className="flex items-center gap-0.5">
-                              <Clock className="w-3 h-3" />
-                              {Math.round(m.duration_seconds / 60)}m
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      {m.fathom_url && (
-                        <a href={m.fathom_url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary flex-shrink-0">
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </a>
-                      )}
-                    </div>
-                    {m.summary && (
-                      <p className="text-xs text-foreground/80 leading-relaxed line-clamp-3">{m.summary}</p>
-                    )}
-                    {Array.isArray(m.action_items) && m.action_items.length > 0 && (
-                      <div className="space-y-1">
-                        <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Action Items</div>
-                        {m.action_items.map((item: any, i: number) => (
-                          <div key={i} className="text-xs flex items-start gap-1.5">
-                            <CheckCircle2 className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
-                            <span>{typeof item === "string" ? item : item.text || item.description || JSON.stringify(item)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {Array.isArray(m.attendees) && m.attendees.length > 0 && (
-                      <div className="flex items-center gap-1 flex-wrap">
-                        {m.attendees.map((email: string, i: number) => (
-                          <span key={i} className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-muted-foreground">{email}</span>
-                        ))}
-                      </div>
-                     )}
-                    {m.transcript && (
-                      <div className="flex items-center gap-2 mt-1">
-                        <Collapsible className="flex-1">
-                          <CollapsibleTrigger className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground hover:text-primary flex items-center gap-1">
-                            <FileText className="w-3 h-3" />
-                            Full Transcript
-                          </CollapsibleTrigger>
-                          <CollapsibleContent>
-                            <ScrollArea className="h-[200px] mt-2 border rounded p-2">
-                              <pre className="text-xs whitespace-pre-wrap text-foreground/80 font-sans leading-relaxed">{m.transcript}</pre>
-                            </ScrollArea>
-                          </CollapsibleContent>
-                        </Collapsible>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="gap-1 text-[10px] h-6 px-2"
-                          onClick={() => analyzeTranscript(m.id)}
-                          disabled={analyzingMeeting === m.id}
-                        >
-                          {analyzingMeeting === m.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Brain className="w-3 h-3" />}
-                          {m.transcript_analysis ? "Re-analyze" : "Analyze"}
-                        </Button>
-                      </div>
-                    )}
-                    {m.transcript_analysis && (
-                      <Collapsible>
-                        <CollapsibleTrigger className="text-[10px] font-mono uppercase tracking-wider text-primary hover:text-primary/80 flex items-center gap-1 mt-1">
-                          <Brain className="w-3 h-3" />
-                          Strategic Analysis
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                          <ScrollArea className="h-[400px] mt-2 border border-primary/20 rounded p-3 bg-primary/5">
-                            <TranscriptAnalysisView analysis={m.transcript_analysis} />
-                          </ScrollArea>
-                        </CollapsibleContent>
-                      </Collapsible>
+          <Card className="bg-secondary/30">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <PhoneCall className="w-4 h-4 text-primary" />
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-foreground">
+                    {meetings.length} Meeting{meetings.length !== 1 ? "s" : ""} Synced
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {meetings.filter((m: any) => m.transcript_analysis).length} analyzed
+                    {(syncingFathom || analyzingMeeting) && (
+                      <span className="ml-2 inline-flex items-center gap-1">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        {syncingFathom ? "Syncing…" : "Analyzing…"}
+                      </span>
                     )}
                   </div>
-                ))}
+                </div>
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">No meetings synced yet. Click "Sync Fathom" to pull meeting data.</p>
-            )}
-          </div>
+              <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={syncFathom} disabled={syncingFathom || !!analyzingMeeting}>
+                {syncingFathom ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                Sync Fathom
+              </Button>
+            </CardContent>
+          </Card>
 
           {snap && latestSnapshot && (
             <div className="panel">
