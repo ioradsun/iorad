@@ -1,5 +1,8 @@
+import { useState } from "react";
 import SectionAnnotation from "./SectionAnnotation";
 import { useStoryDebug } from "./StoryDebugContext";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 /**
  * Pre-built annotation configs for each story section.
@@ -189,7 +192,74 @@ export function useSectionAnnotation(sectionKey: string) {
 
 function EmbedUrlOverride() {
   const debug = useStoryDebug();
-  if (!debug) return null;
+  const [localUrl, setLocalUrl] = useState(debug?.snapshotJson?.embed_url_override || "");
+  const [saving, setSaving] = useState(false);
+  if (!debug || !debug.snapshotId) return null;
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const { data: snap } = await supabase
+        .from("snapshots")
+        .select("snapshot_json")
+        .eq("id", debug.snapshotId!)
+        .single();
+
+      if (!snap) throw new Error("Snapshot not found");
+
+      const json = (snap.snapshot_json as Record<string, any>) || {};
+      if (localUrl.trim()) {
+        json.embed_url_override = localUrl.trim();
+      } else {
+        delete json.embed_url_override;
+      }
+
+      const { error } = await supabase
+        .from("snapshots")
+        .update({ snapshot_json: json as any })
+        .eq("id", debug.snapshotId!);
+
+      if (error) throw error;
+
+      toast.success(localUrl.trim() ? "Tutorial URL saved" : "Reset to default tutorial");
+      debug.refreshSnapshot?.();
+    } catch (err: any) {
+      toast.error("Failed to save: " + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleReset = async () => {
+    setLocalUrl("");
+    setSaving(true);
+    try {
+      const { data: snap } = await supabase
+        .from("snapshots")
+        .select("snapshot_json")
+        .eq("id", debug.snapshotId!)
+        .single();
+
+      if (!snap) throw new Error("Snapshot not found");
+
+      const json = (snap.snapshot_json as Record<string, any>) || {};
+      delete json.embed_url_override;
+
+      const { error } = await supabase
+        .from("snapshots")
+        .update({ snapshot_json: json as any })
+        .eq("id", debug.snapshotId!);
+
+      if (error) throw error;
+
+      toast.success("Reset to default tutorial");
+      debug.refreshSnapshot?.();
+    } catch (err: any) {
+      toast.error("Failed to reset: " + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-2 pt-2" style={{ borderTop: "1px solid var(--story-border)" }}>
@@ -197,13 +267,13 @@ function EmbedUrlOverride() {
         Custom Tutorial URL
       </p>
       <p className="text-[11px]" style={{ color: "var(--story-muted)" }}>
-        Paste an iorad tutorial URL to replace the default demo for this session.
+        Paste an iorad tutorial URL to replace the default demo.
       </p>
       <div className="flex gap-2">
         <input
           type="text"
-          value={debug.embedUrlOverride || ""}
-          onChange={(e) => debug.setEmbedUrlOverride(e.target.value || null)}
+          value={localUrl}
+          onChange={(e) => setLocalUrl(e.target.value)}
           placeholder="https://www.iorad.com/player/..."
           className="flex-1 px-2 py-1.5 rounded text-xs font-mono"
           style={{
@@ -212,9 +282,22 @@ function EmbedUrlOverride() {
             color: "var(--story-fg)",
           }}
         />
-        {debug.embedUrlOverride && (
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="px-2 py-1 rounded text-[11px] font-mono"
+          style={{
+            background: "var(--story-accent-dim)",
+            color: "var(--story-accent)",
+            border: "1px solid var(--story-accent-border)",
+          }}
+        >
+          {saving ? "..." : "Save"}
+        </button>
+        {debug.snapshotJson?.embed_url_override && (
           <button
-            onClick={() => debug.setEmbedUrlOverride(null)}
+            onClick={handleReset}
+            disabled={saving}
             className="px-2 py-1 rounded text-[11px] font-mono"
             style={{
               background: "rgba(239,68,68,0.1)",

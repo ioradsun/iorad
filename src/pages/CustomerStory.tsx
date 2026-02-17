@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -337,9 +336,11 @@ function StoryPageInner({
   rawSignals: any[];
 }) {
   const ctx = useStoryEdit();
-  const [embedUrlOverride, setEmbedUrlOverride] = useState<string | null>(null);
-
   const displayCustomer = ctx?.isEditing ? ctx.editedCustomer : customer;
+
+  const refreshSnapshot = () => {
+    queryClient.invalidateQueries({ queryKey: ["story"] });
+  };
 
   const handleSave = async () => {
     if (!ctx || !snapshotId) {
@@ -371,8 +372,7 @@ function StoryPageInner({
         snapshotJson: (snapshotMeta.snapshot_json as Record<string, any>) ?? {},
         signals: rawSignals,
         snapshotId: snapshotMeta?.id ?? null,
-        embedUrlOverride,
-        setEmbedUrlOverride,
+        refreshSnapshot,
       } : null
     }>
       <div className="min-h-screen" style={{ background: "var(--story-bg)", color: "var(--story-fg)" }}>
