@@ -12,7 +12,10 @@ interface ReinforcementPreview {
 export default function EmbedDemo({ reinforcementPreview }: { reinforcementPreview?: ReinforcementPreview }) {
   const ctx = useStoryEdit();
 
-  const iframeSrc = reinforcementPreview?.libraryUrl || "https://ior.ad/b973?iframeHash=trysteps-1";
+  // For library URLs, append oembed params; for fallback use hardcoded tutorial
+  const iframeSrc = reinforcementPreview?.libraryUrl
+    ? `${reinforcementPreview.libraryUrl}${reinforcementPreview.libraryUrl.includes('?') ? '&' : '?'}oembed=1`
+    : "https://ior.ad/b973?iframeHash=trysteps-1";
 
   const defaultLabel = "Try It Yourself";
   const defaultTitle = reinforcementPreview?.libraryUrl
@@ -44,11 +47,17 @@ export default function EmbedDemo({ reinforcementPreview }: { reinforcementPrevi
         ) : (
           <p className="max-w-2xl mb-8 leading-relaxed" style={{ color: "var(--story-muted)" }}>{desc}</p>
         )}
-        <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid var(--story-border)", background: "var(--story-surface)", aspectRatio: "16/9" }}>
+        <div className="rounded-2xl overflow-hidden" style={{ border: "2px solid #ebebeb", background: "var(--story-surface)", minWidth: "100%" }}>
           <iframe
             src={iframeSrc}
-            className="w-full h-full border-0"
-            allow="clipboard-read; clipboard-write"
+            width="100%"
+            height="500px"
+            style={{ width: "100%", height: "500px" }}
+            referrerPolicy="strict-origin-when-cross-origin"
+            frameBorder="0"
+            allowFullScreen
+            allow="camera; microphone; clipboard-write"
+            sandbox="allow-scripts allow-forms allow-same-origin allow-presentation allow-downloads allow-modals allow-popups allow-popups-to-escape-sandbox allow-top-navigation allow-top-navigation-by-user-activation"
             title="iorad interactive walkthrough"
           />
         </div>
