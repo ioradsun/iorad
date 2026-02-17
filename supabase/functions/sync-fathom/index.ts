@@ -34,8 +34,8 @@ serve(async (req) => {
       "icloud.com", "aol.com", "protonmail.com",
     ]);
 
-    // Fetch meetings from Fathom filtered to this company's domain
-    const fathomUrl = `${FATHOM_API}/meetings?limit=${limit}&calendar_invitees_domains[]=${encodeURIComponent(filterDomain)}`;
+    // Fetch meetings from Fathom filtered to this company's domain, with transcript + summary
+    const fathomUrl = `${FATHOM_API}/meetings?limit=${limit}&include_transcript=true&include_summary=true&include_action_items=true&calendar_invitees_domains[]=${encodeURIComponent(filterDomain)}`;
     console.log(`Fetching Fathom meetings: ${fathomUrl}`);
 
     const fathomResp = await fetch(fathomUrl, {
@@ -75,6 +75,35 @@ serve(async (req) => {
       const duration = meeting.duration_seconds || meeting.duration || null;
       const fathomShareUrl = meeting.share_url || meeting.url || null;
 
+      // Get transcript - inline from meetings endpoint or fetch separately
+      let transcript = meeting.transcript || null;
+      if (!transcript && meetingId) {
+        try {
+          const txResp = await fetch(`${FATHOM_API}/recordings/${meetingId}/transcript`, {
+            headers: { "X-Api-Key": FATHOM_API_KEY },
+          });
+          if (txResp.ok) {
+            const txData = await txResp.json();
+            // Transcript can be an array of segments or a string
+            if (Array.isArray(txData)) {
+              transcript = txData.map((s: any) => `${s.speaker || "Speaker"}: ${s.text || s.content || ""}`).join("\n");
+            } else if (typeof txData === "string") {
+              transcript = txData;
+            } else if (txData?.transcript) {
+              transcript = typeof txData.transcript === "string" ? txData.transcript : JSON.stringify(txData.transcript);
+            }
+          } else {
+            console.warn(`Transcript fetch failed for ${meetingId}: ${txResp.status}`);
+          }
+        } catch (txErr) {
+          console.warn(`Transcript fetch error for ${meetingId}:`, txErr);
+        }
+      }
+      // If transcript is an array (from inline), flatten it
+      if (Array.isArray(transcript)) {
+        transcript = transcript.map((s: any) => `${s.speaker || "Speaker"}: ${s.text || s.content || ""}`).join("\n");
+      }
+
       const { error: upsertErr } = await sb
         .from("meetings")
         .upsert(
@@ -88,6 +117,7 @@ serve(async (req) => {
             action_items: actionItems,
             attendees: externalEmails,
             fathom_url: fathomShareUrl,
+            transcript: typeof transcript === "string" ? transcript : null,
             synced_at: new Date().toISOString(),
           },
           { onConflict: "fathom_meeting_id" }
