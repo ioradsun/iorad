@@ -1,5 +1,4 @@
 import SectionAnnotation from "./SectionAnnotation";
-import LibraryPicker from "./LibraryPicker";
 import { useStoryDebug } from "./StoryDebugContext";
 
 /**
@@ -142,22 +141,16 @@ const sectionConfigs: Record<string, SectionAnnotationConfig> = {
     sectionKey: "embedDemo",
     sectionLabel: "Interactive Demo",
     jsonFields: ["reinforcement_preview"],
-    hasContent: (json) => !!json.reinforcement_preview?.library_url,
+    hasContent: () => true, // always has the hardcoded demo
     getDetections: (json) => {
       const preview = json.reinforcement_preview || {};
       return [
         {
           label: "Demo source",
-          value: preview.library_url ? "From matched library" : "Default iorad demo (no library matched)",
+          value: preview.library_url ? "From matched library" : "Default iorad demo",
           status: preview.library_url ? "found" as const : "inferred" as const,
         },
       ];
-    },
-    getReasoning: (json) => {
-      if (!json.reinforcement_preview?.library_url) {
-        return "No library was matched to this company's detected tools, so the default iorad demo is shown. Assign a library in the Reinforcement section to customize this.";
-      }
-      return undefined;
     },
   },
 };
@@ -186,15 +179,53 @@ export function useSectionAnnotation(sectionKey: string) {
         reasoning={reasoning}
         matchedSignals={matchedSignals}
       >
-        {sectionKey === "reinforcement" && debug.snapshotId && (
-          <LibraryPicker
-            detectedTool={json.reinforcement_preview?.detected_tool || null}
-            currentLibraryUrl={json.reinforcement_preview?.library_url || null}
-            snapshotId={debug.snapshotId}
-            onLibrarySelected={debug.onLibrarySelected}
-          />
+        {sectionKey === "embedDemo" && (
+          <EmbedUrlOverride />
         )}
       </SectionAnnotation>
     ),
   };
+}
+
+function EmbedUrlOverride() {
+  const debug = useStoryDebug();
+  if (!debug) return null;
+
+  return (
+    <div className="space-y-2 pt-2" style={{ borderTop: "1px solid var(--story-border)" }}>
+      <p className="font-mono uppercase text-[10px] tracking-wider" style={{ color: "var(--story-subtle)" }}>
+        Custom Tutorial URL
+      </p>
+      <p className="text-[11px]" style={{ color: "var(--story-muted)" }}>
+        Paste an iorad tutorial URL to replace the default demo for this session.
+      </p>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={debug.embedUrlOverride || ""}
+          onChange={(e) => debug.setEmbedUrlOverride(e.target.value || null)}
+          placeholder="https://www.iorad.com/player/..."
+          className="flex-1 px-2 py-1.5 rounded text-xs font-mono"
+          style={{
+            background: "var(--story-bg)",
+            border: "1px solid var(--story-border)",
+            color: "var(--story-fg)",
+          }}
+        />
+        {debug.embedUrlOverride && (
+          <button
+            onClick={() => debug.setEmbedUrlOverride(null)}
+            className="px-2 py-1 rounded text-[11px] font-mono"
+            style={{
+              background: "rgba(239,68,68,0.1)",
+              color: "#ef4444",
+              border: "1px solid rgba(239,68,68,0.2)",
+            }}
+          >
+            Reset
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }

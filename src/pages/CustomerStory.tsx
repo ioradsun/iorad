@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -337,19 +337,9 @@ function StoryPageInner({
   rawSignals: any[];
 }) {
   const ctx = useStoryEdit();
-  const [libraryOverride, setLibraryOverride] = useState<{ url: string; label: string } | null>(null);
+  const [embedUrlOverride, setEmbedUrlOverride] = useState<string | null>(null);
 
-  const handleLibrarySelected = useCallback((url: string, label: string) => {
-    setLibraryOverride({ url, label });
-  }, []);
-
-  const baseCustomer = ctx?.isEditing ? ctx.editedCustomer : customer;
-  const displayCustomer = {
-    ...baseCustomer,
-    reinforcementPreview: libraryOverride
-      ? { ...baseCustomer.reinforcementPreview, libraryUrl: libraryOverride.url }
-      : baseCustomer.reinforcementPreview,
-  };
+  const displayCustomer = ctx?.isEditing ? ctx.editedCustomer : customer;
 
   const handleSave = async () => {
     if (!ctx || !snapshotId) {
@@ -381,7 +371,8 @@ function StoryPageInner({
         snapshotJson: (snapshotMeta.snapshot_json as Record<string, any>) ?? {},
         signals: rawSignals,
         snapshotId: snapshotMeta?.id ?? null,
-        onLibrarySelected: handleLibrarySelected,
+        embedUrlOverride,
+        setEmbedUrlOverride,
       } : null
     }>
       <div className="min-h-screen" style={{ background: "var(--story-bg)", color: "var(--story-fg)" }}>
@@ -428,7 +419,7 @@ function StoryPageInner({
         )}
 
         {/* Interactive Demo */}
-        <EmbedDemo reinforcementPreview={displayCustomer.reinforcementPreview} />
+        <EmbedDemo />
 
         {/* 9. Similar Patterns */}
         {displayCustomer.caseStudies.length > 0 && (
