@@ -19,6 +19,10 @@ export type Database = {
           cards_prompt_template: string
           company_prompt: string
           id: number
+          inbound_outreach_prompt: string
+          inbound_story_prompt: string
+          inbound_strategy_prompt: string
+          inbound_transcript_prompt: string
           model: string
           outreach_prompt: string
           prompt_template: string
@@ -32,6 +36,10 @@ export type Database = {
           cards_prompt_template?: string
           company_prompt?: string
           id?: number
+          inbound_outreach_prompt?: string
+          inbound_story_prompt?: string
+          inbound_strategy_prompt?: string
+          inbound_transcript_prompt?: string
           model?: string
           outreach_prompt?: string
           prompt_template?: string
@@ -45,6 +53,10 @@ export type Database = {
           cards_prompt_template?: string
           company_prompt?: string
           id?: number
+          inbound_outreach_prompt?: string
+          inbound_story_prompt?: string
+          inbound_strategy_prompt?: string
+          inbound_transcript_prompt?: string
           model?: string
           outreach_prompt?: string
           prompt_template?: string

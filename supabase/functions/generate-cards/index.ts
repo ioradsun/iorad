@@ -92,16 +92,23 @@ ${JSON.stringify(context, null, 2)}
 
 Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
 
-    // Select the prompt for the requested tab
+    // Select the prompt for the requested tab, using inbound variants for inbound companies
+    const isInbound = company.source_type === "inbound";
     const promptMap: Record<string, string> = {
       company: aiConfig?.company_prompt || "",
-      strategy: aiConfig?.strategy_prompt || aiConfig?.cards_prompt_template || "",
-      outreach: aiConfig?.outreach_prompt || "",
-      story: aiConfig?.story_prompt || "",
+      strategy: isInbound
+        ? (aiConfig?.inbound_strategy_prompt || aiConfig?.strategy_prompt || aiConfig?.cards_prompt_template || "")
+        : (aiConfig?.strategy_prompt || aiConfig?.cards_prompt_template || ""),
+      outreach: isInbound
+        ? (aiConfig?.inbound_outreach_prompt || aiConfig?.outreach_prompt || "")
+        : (aiConfig?.outreach_prompt || ""),
+      story: isInbound
+        ? (aiConfig?.inbound_story_prompt || aiConfig?.story_prompt || "")
+        : (aiConfig?.story_prompt || ""),
     };
     const systemPrompt = promptMap[activeTab];
     if (!systemPrompt || !systemPrompt.trim()) {
-      throw new Error(`${activeTab} prompt is not configured. Go to Admin Settings → AI & Prompt to set it up.`);
+      throw new Error(`${activeTab}${isInbound ? " (inbound)" : ""} prompt is not configured. Go to Admin Settings → AI & Prompt to set it up.`);
     }
 
     console.log(`Generating cards for ${company.name} using ${model}`);
