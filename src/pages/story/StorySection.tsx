@@ -16,17 +16,20 @@ interface StorySectionProps {
   title: string;
   titleField?: string;
   children: React.ReactNode;
+  /** Optional annotation rendered above the section title */
+  annotation?: React.ReactNode;
 }
 
 export { fade };
 
-export default function StorySection({ icon: Icon, label, labelField, title, titleField, children }: StorySectionProps) {
+export default function StorySection({ icon: Icon, label, labelField, title, titleField, children, annotation }: StorySectionProps) {
   const ctx = useStoryEdit();
   const isEditing = ctx?.isEditing;
 
   return (
     <section className="max-w-5xl mx-auto px-6 py-16">
       <motion.div {...fade}>
+        {annotation && <div className="mb-1">{annotation}</div>}
         <div className="flex items-center gap-2 mb-3">
           <Icon className="w-4 h-4" style={{ color: "var(--story-accent)" }} />
           {isEditing && labelField ? (

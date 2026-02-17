@@ -5,6 +5,7 @@ import StorySection from "./StorySection";
 import type { StrategicPlay } from "@/data/customers";
 import { EditableText, EditableListItemWrapper } from "./EditableText";
 import { useStoryEdit } from "./EditContext";
+import { useSectionAnnotation } from "./sectionAnnotations";
 
 interface Props {
   plays: StrategicPlay[];
@@ -13,6 +14,7 @@ interface Props {
 export default function StrategicPlaysSection({ plays }: Props) {
   const ctx = useStoryEdit();
   const data = ctx?.isEditing ? ctx.editedCustomer.plays : plays;
+  const annotation = useSectionAnnotation("strategicPlays");
 
   return (
     <StorySection
@@ -21,6 +23,7 @@ export default function StrategicPlaysSection({ plays }: Props) {
       labelField="overrides.plays.label"
       title="Four plays to consider"
       titleField="overrides.plays.title"
+      annotation={annotation?.element}
     >
       <div className="space-y-6">
         {data.map((play, i) => (

@@ -2,6 +2,7 @@ import { AlertTriangle } from "lucide-react";
 import StorySection from "./StorySection";
 import { EditableText, EditableListItemWrapper } from "./EditableText";
 import { useStoryEdit } from "./EditContext";
+import { useSectionAnnotation } from "./sectionAnnotations";
 
 interface Props {
   items: string[];
@@ -10,6 +11,7 @@ interface Props {
 export default function RealCostSection({ items }: Props) {
   const ctx = useStoryEdit();
   const data = ctx?.isEditing ? ctx.editedCustomer.realCost : items;
+  const annotation = useSectionAnnotation("realCost");
 
   return (
     <StorySection
@@ -18,6 +20,7 @@ export default function RealCostSection({ items }: Props) {
       labelField="overrides.realcost.label"
       title="What this friction is costing the organization"
       titleField="overrides.realcost.title"
+      annotation={annotation?.element}
     >
       <div className="max-w-3xl">
         <ul className="space-y-3">
