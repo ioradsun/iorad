@@ -28,7 +28,11 @@ export default function FunctionalImplicationsSection({ text, contactName }: Pro
       annotation={annotation?.element}
     >
       <div className="max-w-3xl space-y-4">
-        {data.split("\n").filter(Boolean).map((paragraph, i) => (
+        {data
+          .split(/\n|(?=\d+[\.\)\]\s]\s)/)
+          .map(s => s.trim())
+          .filter(Boolean)
+          .map((paragraph, i) => (
           <EditableText
             key={i}
             value={paragraph}
