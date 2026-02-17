@@ -300,8 +300,8 @@ Deno.serve(async (req) => {
           score_total: result.score_total,
           score_breakdown: result.score_breakdown,
           snapshot_json: result.snapshot_json,
-          model_version: "gemini-2.5-flash",
-          prompt_version: "v2-iorad",
+          model_version: aiConfig.model,
+          prompt_version: aiConfig.prompt_template ? "db-template" : "v2-iorad-hardcoded",
         });
 
         await supabase.from("companies").update({
