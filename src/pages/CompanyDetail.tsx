@@ -493,6 +493,19 @@ export default function CompanyDetail() {
                           <span key={i} className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-muted-foreground">{email}</span>
                         ))}
                       </div>
+                     )}
+                    {m.transcript && (
+                      <Collapsible>
+                        <CollapsibleTrigger className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground hover:text-primary flex items-center gap-1 mt-1">
+                          <FileText className="w-3 h-3" />
+                          Full Transcript
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <ScrollArea className="h-[200px] mt-2 border rounded p-2">
+                            <pre className="text-xs whitespace-pre-wrap text-foreground/80 font-sans leading-relaxed">{m.transcript}</pre>
+                          </ScrollArea>
+                        </CollapsibleContent>
+                      </Collapsible>
                     )}
                   </div>
                 ))}
