@@ -168,10 +168,10 @@ export default function UploadPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="upload" className="space-y-6">
+      <Tabs defaultValue="manual" className="space-y-6">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="upload">CSV Upload</TabsTrigger>
           <TabsTrigger value="manual">Add Manually</TabsTrigger>
+          <TabsTrigger value="upload">CSV Upload</TabsTrigger>
           <TabsTrigger value="clay">Clay Import</TabsTrigger>
         </TabsList>
 
@@ -329,10 +329,6 @@ function ManualAddForm() {
     name: "",
     domain: "",
     partner: "",
-    industry: "",
-    hq_country: "",
-    persona: "",
-    headcount: "",
   });
   const [saving, setSaving] = useState(false);
 
@@ -352,13 +348,7 @@ function ManualAddForm() {
         name,
         domain,
         partner: form.partner || null,
-        industry: form.industry.trim() || null,
-        hq_country: form.hq_country.trim() || null,
-        persona: form.persona.trim() || null,
-        headcount: form.headcount ? parseInt(form.headcount, 10) || null : null,
         is_existing_customer: false,
-        partner_rep_email: null,
-        partner_rep_name: null,
       }]);
       toast.success(`Added ${name}`);
       navigate("/");
@@ -394,52 +384,12 @@ function ManualAddForm() {
             maxLength={255}
           />
         </div>
-        <div className="space-y-2">
+        <div className="space-y-2 col-span-2">
           <Label className="text-xs">Partner</Label>
           <Select value={form.partner} onValueChange={v => update("partner", v)}>
             <SelectTrigger className="bg-secondary"><SelectValue placeholder="Select partner" /></SelectTrigger>
-            <SelectContent>
-              {PARTNERS.map(p => <SelectItem key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label className="text-xs">Industry</Label>
-          <Input
-            value={form.industry}
-            onChange={e => update("industry", e.target.value)}
-            placeholder="SaaS, Healthcare…"
-            className="bg-secondary"
-            maxLength={100}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label className="text-xs">HQ Country</Label>
-          <Input
-            value={form.hq_country}
-            onChange={e => update("hq_country", e.target.value)}
-            placeholder="US"
-            className="bg-secondary"
-            maxLength={100}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label className="text-xs">Headcount</Label>
-          <Input
-            type="number"
-            value={form.headcount}
-            onChange={e => update("headcount", e.target.value)}
-            placeholder="500"
-            className="bg-secondary"
-            min={1}
-          />
-        </div>
-        <div className="space-y-2 col-span-2">
-          <Label className="text-xs">Persona</Label>
-          <Select value={form.persona} onValueChange={v => update("persona", v)}>
-            <SelectTrigger className="bg-secondary"><SelectValue placeholder="Select persona" /></SelectTrigger>
             <SelectContent className="bg-background z-50">
-              {PERSONAS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+              {PARTNERS.map(p => <SelectItem key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
