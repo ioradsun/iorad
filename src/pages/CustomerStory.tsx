@@ -80,8 +80,11 @@ function snapshotToCustomer(company: any, snap: any): Customer {
 
   // New fields
   const functionalImplications: string = json.functional_implications || "";
-  const accountabilityPressure: string[] = json.accountability_pressure || json.leaders_asked || [];
-  const realCost: string[] = json.real_cost || json.cost_unaddressed || [];
+  const toStringArray = (arr: any[]): string[] =>
+    arr.map((item: any) => (typeof item === "string" ? item : item?.prompt || item?.text || item?.title || JSON.stringify(item)));
+
+  const accountabilityPressure: string[] = toStringArray(json.accountability_pressure || json.leaders_asked || []);
+  const realCost: string[] = toStringArray(json.real_cost || json.cost_unaddressed || []);
   const reinforcementJourney: string = json.reinforcement_journey || "";
   const reinforcementPreview = json.reinforcement_preview ? {
     detectedTool: json.reinforcement_preview.detected_tool || "",
@@ -95,7 +98,7 @@ function snapshotToCustomer(company: any, snap: any): Customer {
   } : undefined;
 
   // Existing fields
-  const executionFriction: string[] = json.execution_friction || [];
+  const executionFriction: string[] = toStringArray(json.execution_friction || []);
   const blindSpot: string = json.blind_spot || "";
 
   const plays: StrategicPlay[] = (json.strategic_plays || []).map((p: any) => ({
