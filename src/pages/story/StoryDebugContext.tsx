@@ -15,8 +15,7 @@ export interface StoryDebugContextType {
   snapshotJson: Record<string, any>;
   signals: Signal[];
   snapshotId: string | null;
-  embedUrlOverride: string | null;
-  setEmbedUrlOverride: (url: string | null) => void;
+  refreshSnapshot?: () => void;
 }
 
 const StoryDebugContext = createContext<StoryDebugContextType | null>(null);

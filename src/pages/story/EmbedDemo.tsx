@@ -11,8 +11,9 @@ export default function EmbedDemo() {
   const annotation = useSectionAnnotation("embedDemo");
 
   const HARDCODED_TUTORIAL = "https://ior.ad/b973?iframeHash=trysteps-1";
-  const iframeSrc = debug?.embedUrlOverride
-    ? `${debug.embedUrlOverride}${debug.embedUrlOverride.includes('?') ? '&' : '?'}oembed=1`
+  const savedUrl = debug?.snapshotJson?.embed_url_override;
+  const iframeSrc = savedUrl
+    ? `${savedUrl}${savedUrl.includes('?') ? '&' : '?'}oembed=1`
     : HARDCODED_TUTORIAL;
 
   const defaultLabel = "Try It Yourself";
