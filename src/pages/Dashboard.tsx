@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useCompanies, useSignalCounts, useProcessingJobs } from "@/hooks/useSupabase";
 import ScoreCell from "@/components/ScoreCell";
 import { ArrowUpDown, Search, Loader2, Plus, ExternalLink } from "lucide-react";
@@ -14,7 +14,7 @@ export default function Dashboard() {
   const { data: companies = [], isLoading } = useCompanies();
   const { data: signalCounts = {} } = useSignalCounts();
   const { data: jobs = [] } = useProcessingJobs();
-
+  const navigate = useNavigate();
 
 
   const [sortKey, setSortKey] = useState<SortKey>("last_score_total");
@@ -163,13 +163,12 @@ export default function Dashboard() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: Math.min(i * 0.02, 0.5) }}
-                  className="border-b border-border/50 hover:bg-secondary/30 transition-colors"
+                  className="border-b border-border/50 hover:bg-secondary/30 transition-colors cursor-pointer"
+                  onClick={() => navigate(`/company/${company.id}`)}
                 >
                   <td className="px-4 py-3">
-                    <Link to={`/company/${company.id}`} className="group">
-                      <div className="font-medium text-foreground group-hover:text-primary transition-colors">{company.name}</div>
-                      <div className="text-xs text-muted-foreground">{company.domain || "—"}</div>
-                    </Link>
+                    <div className="font-medium text-foreground">{company.name}</div>
+                    <div className="text-xs text-muted-foreground">{company.domain || "—"}</div>
                   </td>
                   <td className="px-4 py-3"><ScoreCell score={company.last_score_total} /></td>
                   <td className="px-4 py-3 hidden md:table-cell text-xs text-muted-foreground">{company.industry?.replace(/_/g, " ").toLowerCase() || "—"}</td>
