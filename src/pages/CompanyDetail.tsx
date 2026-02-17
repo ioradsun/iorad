@@ -49,6 +49,7 @@ export default function CompanyDetail() {
   const [findingContacts, setFindingContacts] = useState(false);
   const [searchingPersona, setSearchingPersona] = useState<string | null>(null);
   const [syncingFathom, setSyncingFathom] = useState(false);
+  const [fixingDomain, setFixingDomain] = useState(false);
 
   const effectiveContactId = selectedContactId || contacts[0]?.id || "";
   const { data: companyCards, isLoading: cardsLoading } = useCompanyCards(id, effectiveContactId || undefined);
@@ -139,6 +140,27 @@ export default function CompanyDetail() {
       queryClient.invalidateQueries({ queryKey: ["meetings", id] });
     } catch (e: any) { toast.error(e.message || "Fathom sync failed"); }
     finally { setSyncingFathom(false); }
+  };
+
+  const fixDomain = async () => {
+    if (!id) return;
+    setFixingDomain(true);
+    toast.info("AI is checking the domain…");
+    try {
+      const { data, error } = await supabase.functions.invoke("fix-domain", {
+        body: { company_id: id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      const result = data.results?.[0];
+      if (result && result.old_domain !== result.new_domain) {
+        toast.success(`Domain fixed: ${result.old_domain} → ${result.new_domain}`);
+        queryClient.invalidateQueries({ queryKey: ["company", id] });
+      } else {
+        toast.info("Domain looks correct — no changes needed");
+      }
+    } catch (e: any) { toast.error(e.message || "Domain fix failed"); }
+    finally { setFixingDomain(false); }
   };
 
   const searchByPersona = async (persona: string) => {
@@ -304,7 +326,12 @@ export default function CompanyDetail() {
               <Card className="bg-secondary/30"><CardContent className="p-3 flex flex-col items-start gap-1.5">
                 <Globe className="w-4 h-4 text-primary" />
                 <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Website</span>
-                <a href={`https://${company.domain}`} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary hover:underline">{company.domain}</a>
+                <div className="flex items-center gap-1.5">
+                  <a href={`https://${company.domain}`} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary hover:underline">{company.domain}</a>
+                  <Button size="icon" variant="ghost" className="h-5 w-5" onClick={fixDomain} disabled={fixingDomain} title="AI fix domain">
+                    {fixingDomain ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3 text-muted-foreground" />}
+                  </Button>
+                </div>
               </CardContent></Card>
             )}
             {company.partner && (
