@@ -2,28 +2,22 @@ import { motion } from "framer-motion";
 import { fade } from "./StorySection";
 import { EditableText } from "./EditableText";
 import { useStoryEdit } from "./EditContext";
+import { useStoryDebug } from "./StoryDebugContext";
+import { useSectionAnnotation } from "./sectionAnnotations";
 
-interface ReinforcementPreview {
-  detectedTool: string;
-  libraryUrl: string | null;
-  description: string;
-}
-
-export default function EmbedDemo({ reinforcementPreview }: { reinforcementPreview?: ReinforcementPreview }) {
+export default function EmbedDemo() {
   const ctx = useStoryEdit();
+  const debug = useStoryDebug();
+  const annotation = useSectionAnnotation("embedDemo");
 
-  // For library URLs, append oembed params; for fallback use hardcoded tutorial
-  const iframeSrc = reinforcementPreview?.libraryUrl
-    ? `${reinforcementPreview.libraryUrl}${reinforcementPreview.libraryUrl.includes('?') ? '&' : '?'}oembed=1`
-    : "https://ior.ad/b973?iframeHash=trysteps-1";
+  const HARDCODED_TUTORIAL = "https://ior.ad/b973?iframeHash=trysteps-1";
+  const iframeSrc = debug?.embedUrlOverride
+    ? `${debug.embedUrlOverride}${debug.embedUrlOverride.includes('?') ? '&' : '?'}oembed=1`
+    : HARDCODED_TUTORIAL;
 
   const defaultLabel = "Try It Yourself";
-  const defaultTitle = reinforcementPreview?.libraryUrl
-    ? `See how ${reinforcementPreview.detectedTool || "iorad"} works`
-    : "This is what iorad feels like";
-  const defaultDesc = reinforcementPreview?.libraryUrl && reinforcementPreview.description
-    ? reinforcementPreview.description
-    : "Instead of reading documentation or watching a video, your team follows the steps right inside the application. No context switching. No guessing.";
+  const defaultTitle = "This is what iorad feels like";
+  const defaultDesc = "Instead of reading documentation or watching a video, your team follows the steps right inside the application. No context switching. No guessing.";
 
   const label = ctx?.editedCustomer?.overrides?.["embed.label"] || defaultLabel;
   const title = ctx?.editedCustomer?.overrides?.["embed.title"] || defaultTitle;
@@ -32,6 +26,7 @@ export default function EmbedDemo({ reinforcementPreview }: { reinforcementPrevi
   return (
     <section className="mx-auto px-6 py-16" style={{ maxWidth: "1108px" }}>
       <motion.div {...fade}>
+        {annotation?.element}
         {ctx?.isEditing ? (
           <EditableText value={label} field="overrides.embed.label" as="p" className="text-xs font-mono uppercase tracking-[0.2em] mb-3" style={{ color: "var(--story-accent)" }} />
         ) : (
