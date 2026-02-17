@@ -1,119 +1,40 @@
 
 
-# Rework: From Research Report to ABM Conversion Microsite
+# Wire Library URL into the Embed Demo Section
 
-## What Changes
+## What's happening now
+- The `EmbedDemo` component has a hardcoded iframe URL: `https://ior.ad/b973?iframeHash=trysteps-1`
+- The snapshot JSON already contains `reinforcement_preview` with `library_url` and `detected_tool`, parsed into `customer.reinforcementPreview`
+- But this data is never passed to `EmbedDemo` -- the component doesn't receive any props
 
-The current story pages are structured as internal intelligence reports (signals, meta-patterns, operational friction, competitive insulation, quantified impact with math). The new structure is a customer-facing persuasion asset that feels insightful and helpful without being invasive.
+## Plan
 
-## New Section Structure
-
-The microsite will have these sections (replacing the current ones):
-
-| Current Section | New Section | Purpose |
-|---|---|---|
-| StoryHero (signals-focused) | **StoryHero** (value-focused) | Personalized greeting, consultative tone |
-| CompellingEventsSection | **WhatsHappeningSection** | "What's Happening at {Company}" - 1-3 initiatives, soft language |
-| MetaPatternSection | **ExecutionFrictionSection** | "Where Execution Friction Usually Emerges" - educational, pattern-based |
-| PartnerCeilingSection | **OpportunityAreasSection** | "Opportunity Areas for {Company}" - 2-4 use cases mapped to signals |
-| EmbeddedLeverageSection | **HowIoradHelpsSection** | "How iorad Could Support These Initiatives" - outcome-focused, no feature dumping |
-| EmbedDemo | **EmbedDemo** (keep) | Interactive walkthrough demo |
-| ImpactSection (math/calculations) | **ConversationStartersSection** | 3 tailored discussion prompts |
-| NarrativeSection | **REMOVED** | No longer needed |
-| StoryCTA | **StoryCTA** (updated copy) | Softer, consultative CTA |
-| (none) | **InternalSignalSummary** | Hidden section for sales team only (shown to authenticated users) |
-
-## Changes Required
-
-### 1. Data Model (`src/data/customers.ts`)
-
-Replace the current `Customer` interface with a new one aligned to the ABM structure:
-
+### 1. Pass `reinforcementPreview` to `EmbedDemo`
+In `CustomerStory.tsx`, update the `<EmbedDemo />` call to pass the customer's `reinforcementPreview` data:
 ```
-Customer {
-  id, name, contactName, partner, persona
-  whatsHappening: { title, detail }[]        // 1-3 initiatives
-  executionFriction: string[]                 // educational friction patterns
-  opportunityAreas: { title, detail }[]       // 2-4 mapped use cases
-  howIoradHelps: { title, detail }[]          // outcome-focused support points
-  conversationStarters: string[]              // 3 tailored prompts
-  internalSignals: {                          // internal only
-    signalTypes: string[]
-    confidenceLevel: "High" | "Medium" | "Low"
-    urgency: "Emerging" | "Active" | "High Momentum"
-    primaryPersona: string
-  }
-}
+<EmbedDemo reinforcementPreview={displayCustomer.reinforcementPreview} />
 ```
 
-### 2. AI Prompt (`supabase/functions/run-signals/prompt.ts`)
+### 2. Update `EmbedDemo` to use `libraryUrl` for the iframe
+In `EmbedDemo.tsx`:
+- Accept a `reinforcementPreview` prop (optional)
+- If `reinforcementPreview.libraryUrl` exists, use it as the iframe `src`
+- If not, fall back to the current hardcoded iorad tutorial URL (`https://ior.ad/b973?iframeHash=trysteps-1`)
+- Optionally show the `detected_tool` name and `description` from the preview data in the section text (replacing or supplementing the defaults)
 
-Replace the entire prompt with the new mega prompt. The JSON output schema changes to match:
+### 3. Update default text when a library is detected
+When a library URL is present, the description text can be pulled from `reinforcementPreview.description` instead of the hardcoded default, giving a more tailored message about the specific tool detected.
 
-```json
-{
-  "score_total": 0-100,
-  "whats_happening": [{ "title": "...", "detail": "..." }],
-  "execution_friction": ["pattern1", "pattern2"],
-  "opportunity_areas": [{ "title": "...", "detail": "..." }],
-  "how_iorad_helps": [{ "title": "...", "detail": "..." }],
-  "conversation_starters": ["prompt1", "prompt2", "prompt3"],
-  "internal_signals": {
-    "signal_types": [...],
-    "confidence_level": "High|Medium|Low",
-    "urgency": "Emerging|Active|High Momentum",
-    "primary_persona": "..."
-  }
-}
-```
+---
 
-### 3. Snapshot-to-Customer Mapping (`src/pages/CustomerStory.tsx`)
+### Technical Details
 
-Update `snapshotToCustomer()` to map the new JSON fields. Add backward compatibility so existing snapshots still render (graceful fallbacks for old field names).
+**File: `src/pages/CustomerStory.tsx`**
+- Line ~418: Change `<EmbedDemo />` to `<EmbedDemo reinforcementPreview={displayCustomer.reinforcementPreview} />`
 
-### 4. Story Page Components (all in `src/pages/story/`)
-
-**Replace/rewrite:**
-- `CompellingEventsSection.tsx` becomes `WhatsHappeningSection.tsx` - soft initiative summaries
-- `MetaPatternSection.tsx` becomes `ExecutionFrictionSection.tsx` - educational patterns, no accusations
-- `PartnerCeilingSection.tsx` becomes `OpportunityAreasSection.tsx` - high-level use cases
-- `EmbeddedLeverageSection.tsx` becomes `HowIoradHelpsSection.tsx` - outcomes, not features
-- `ImpactSection.tsx` becomes `ConversationStartersSection.tsx` - 3 smart discussion prompts
-- `NarrativeSection.tsx` - deleted (no longer part of the structure)
-
-**Update:**
-- `StoryHero.tsx` - softer headline, consultative tone, remove "unlock more value" framing
-- `StoryCTA.tsx` - softer CTA language, conversation-oriented
-- `EmbedDemo.tsx` - keep as-is
-
-**New:**
-- `InternalSignalSummary.tsx` - discreet section at bottom, only visible to authenticated/internal users
-
-### 5. StoryPage Layout (`CustomerStory.tsx`)
-
-Update the `StoryPage` component to render the new section order and conditionally show the internal signal summary only to authenticated users.
-
-### 6. Edge Function (`supabase/functions/run-signals/index.ts`)
-
-Minor update to `scoreSignals` - no structural changes needed since the AI output schema change is handled entirely in `prompt.ts`. The snapshot_json will naturally contain the new fields.
-
-### 7. Hardcoded Example Data
-
-Update the Intermedia example in `customers.ts` to match the new interface so the legacy route still works.
-
-## Tone Guidelines (enforced in prompt + components)
-
-- Use "It appears {Company} is investing in..." not "You are hiring 7 instructional designers"
-- Use "When organizations invest in X, Y often follows" not "You are struggling with..."
-- No scraping references, no exact counts, no LinkedIn mentions
-- Strategic, consultative, executive-level, no hype
-
-## What Stays the Same
-
-- Routing structure (/:partner/:customer/stories/:contactName)
-- Theme system (admin-controlled dark/light)
-- EmbedDemo component
-- CSS variables and animation system
-- Contact name personalization
-- Database tables (snapshots, companies) - just new JSON shape inside snapshot_json
+**File: `src/pages/story/EmbedDemo.tsx`**
+- Add prop interface: `{ reinforcementPreview?: ReinforcementPreview }`
+- Compute iframe URL: `reinforcementPreview?.libraryUrl || "https://ior.ad/b973?iframeHash=trysteps-1"`
+- Use `reinforcementPreview?.description` as default description text when available
+- Keep overrides logic intact (overrides still take priority)
 
