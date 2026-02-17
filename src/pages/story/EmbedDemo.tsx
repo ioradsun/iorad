@@ -30,7 +30,7 @@ export default function EmbedDemo({ reinforcementPreview }: { reinforcementPrevi
   const desc = ctx?.editedCustomer?.overrides?.["embed.desc"] || defaultDesc;
 
   return (
-    <section className="mx-auto px-6 py-16" style={{ maxWidth: "1050px" }}>
+    <section className="mx-auto px-6 py-16" style={{ maxWidth: "1098px" }}>
       <motion.div {...fade}>
         {ctx?.isEditing ? (
           <EditableText value={label} field="overrides.embed.label" as="p" className="text-xs font-mono uppercase tracking-[0.2em] mb-3" style={{ color: "var(--story-accent)" }} />
