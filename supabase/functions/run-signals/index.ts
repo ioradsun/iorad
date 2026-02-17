@@ -327,8 +327,10 @@ Deno.serve(async (req) => {
               "Job Title Keywords": "enablement, learning, change management, L&D, education, Customer Education, Partner enablement, readiness, sales enablement, revenue enablement",
             };
 
-            // CLAY_TABLE_ID is the full webhook URL (v1/inputs/webhook/...)
-            const clayResp = await fetch(clayTableId, {
+            const clayUrl = clayTableId.startsWith("http")
+              ? clayTableId
+              : `https://app.clay.com/api/v1/inputs/webhook/${clayTableId}`;
+            const clayResp = await fetch(clayUrl, {
               method: "POST",
               headers: {
                 "Authorization": `Bearer ${clayApiKey}`,
