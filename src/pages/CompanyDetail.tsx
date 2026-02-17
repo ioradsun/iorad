@@ -645,14 +645,22 @@ export default function CompanyDetail() {
                       ].filter(m => m.value && m.value !== "--" && m.value !== "0");
 
                       // Tier 2: Tutorial metrics + session analytics
+                      const sessions = parseInt(hp.hs_analytics_num_visits, 10) || 0;
+                      const firstVisit = hp.hs_analytics_first_visit_timestamp ? new Date(hp.hs_analytics_first_visit_timestamp).getTime() : 0;
+                      const lastVisit = hp.hs_analytics_last_visit_timestamp ? new Date(hp.hs_analytics_last_visit_timestamp).getTime() : 0;
+                      const totalMinutes = firstVisit && lastVisit && lastVisit > firstVisit ? Math.round((lastVisit - firstVisit) / 60000) : 0;
+                      const avgMinPerSession = sessions > 0 && totalMinutes > 0 ? Math.round(totalMinutes / sessions) : 0;
+                      const formatDuration = (mins: number) => mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
+
                       const tutorialMetrics = [
                         { label: "Tutorials", value: hp.tutorials_created },
                         { label: "Valid", value: hp.tutorials_valid_owned },
                         { label: "Learned", value: hp.tutorials_learned },
                         { label: "Views", value: hp.tutorials_views },
                         { label: "Libraries", value: hp.help_centers_owned || hp.libraries_owned },
-                        { label: "Sessions", value: hp.hs_analytics_num_visits },
-                        { label: "Avg Pages/Session", value: hp.hs_analytics_average_page_views },
+                        { label: "Sessions", value: sessions > 0 ? String(sessions) : null },
+                        { label: "Avg Time/Session", value: avgMinPerSession > 0 ? formatDuration(avgMinPerSession) : null },
+                        { label: "Total Time", value: totalMinutes > 0 ? formatDuration(totalMinutes) : null },
                         { label: "Page Views", value: hp.hs_analytics_num_page_views },
                       ].filter(m => m.value !== null && m.value !== undefined && m.value !== "" && m.value !== "0" && m.value !== 0);
 
