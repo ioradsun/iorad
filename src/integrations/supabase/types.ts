@@ -328,6 +328,62 @@ export type Database = {
         }
         Relationships: []
       }
+      meetings: {
+        Row: {
+          action_items: Json | null
+          attendees: Json | null
+          company_id: string | null
+          created_at: string
+          duration_seconds: number | null
+          fathom_meeting_id: string
+          fathom_url: string | null
+          id: string
+          meeting_date: string | null
+          summary: string | null
+          synced_at: string
+          title: string
+          transcript: string | null
+        }
+        Insert: {
+          action_items?: Json | null
+          attendees?: Json | null
+          company_id?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          fathom_meeting_id: string
+          fathom_url?: string | null
+          id?: string
+          meeting_date?: string | null
+          summary?: string | null
+          synced_at?: string
+          title: string
+          transcript?: string | null
+        }
+        Update: {
+          action_items?: Json | null
+          attendees?: Json | null
+          company_id?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          fathom_meeting_id?: string
+          fathom_url?: string | null
+          id?: string
+          meeting_date?: string | null
+          summary?: string | null
+          synced_at?: string
+          title?: string
+          transcript?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meetings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       partner_config: {
         Row: {
           color: string

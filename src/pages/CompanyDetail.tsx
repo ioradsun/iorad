@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
-import { useCompany, useSignals, useSnapshots, useContacts, useCompanyCards, useUpdateCompany } from "@/hooks/useSupabase";
+import { useCompany, useSignals, useSnapshots, useContacts, useCompanyCards, useUpdateCompany, useMeetings } from "@/hooks/useSupabase";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import ScoreCell from "@/components/ScoreCell";
@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail, Plus, Sparkles, Eye, Building2, MapPin, Users, DollarSign, Globe, Video, BookOpen, ChevronRight, Search } from "lucide-react";
+import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail, Plus, Sparkles, Eye, Building2, MapPin, Users, DollarSign, Globe, Video, BookOpen, ChevronRight, Search, PhoneCall, Clock } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,6 +32,7 @@ export default function CompanyDetail() {
   const { data: signals = [] } = useSignals(id);
   const { data: snapshots = [] } = useSnapshots(id);
   const { data: contacts = [] } = useContacts(id);
+  const { data: meetings = [] } = useMeetings(id);
   // companyCards hook moved below state declarations
   const updateCompany = useUpdateCompany();
   const queryClient = useQueryClient();
@@ -47,6 +48,7 @@ export default function CompanyDetail() {
   const [ioradUrl, setIoradUrl] = useState<string | null>(null);
   const [findingContacts, setFindingContacts] = useState(false);
   const [searchingPersona, setSearchingPersona] = useState<string | null>(null);
+  const [syncingFathom, setSyncingFathom] = useState(false);
 
   const effectiveContactId = selectedContactId || contacts[0]?.id || "";
   const { data: companyCards, isLoading: cardsLoading } = useCompanyCards(id, effectiveContactId || undefined);
@@ -122,6 +124,20 @@ export default function CompanyDetail() {
   };
 
   const PERSONAS = ["Learning & Development", "Sales Enablement", "Revenue Enablement", "Customer Education", "Partner Enablement"];
+
+  const syncFathom = async () => {
+    if (!company?.domain) { toast.error("Company needs a domain to sync Fathom meetings"); return; }
+    setSyncingFathom(true);
+    toast.info("Syncing meetings from Fathom…");
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-fathom", { body: { domain: company.domain } });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success(`Synced ${data.meetings_synced || 0} meetings`);
+      queryClient.invalidateQueries({ queryKey: ["meetings", id] });
+    } catch (e: any) { toast.error(e.message || "Fathom sync failed"); }
+    finally { setSyncingFathom(false); }
+  };
 
   const searchByPersona = async (persona: string) => {
     if (!id) return;
@@ -390,7 +406,70 @@ export default function CompanyDetail() {
             </div>
           </div>
 
-          {/* iorad Expansion Analysis */}
+          {/* Meetings (Fathom) */}
+          <div className="panel">
+            <div className="panel-header flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <PhoneCall className="w-4 h-4 text-primary" />
+                <span>Meetings ({meetings.length})</span>
+              </div>
+              <Button size="sm" variant="outline" className="gap-1.5 text-xs h-7" onClick={syncFathom} disabled={syncingFathom}>
+                {syncingFathom ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                Sync Fathom
+              </Button>
+            </div>
+            {meetings.length > 0 ? (
+              <div className="space-y-3">
+                {meetings.map((m: any) => (
+                  <div key={m.id} className="border rounded-lg p-3 space-y-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-medium">{m.title}</div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          {m.meeting_date && <span>{new Date(m.meeting_date).toLocaleDateString()}</span>}
+                          {m.duration_seconds && (
+                            <span className="flex items-center gap-0.5">
+                              <Clock className="w-3 h-3" />
+                              {Math.round(m.duration_seconds / 60)}m
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {m.fathom_url && (
+                        <a href={m.fathom_url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary flex-shrink-0">
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                    </div>
+                    {m.summary && (
+                      <p className="text-xs text-foreground/80 leading-relaxed line-clamp-3">{m.summary}</p>
+                    )}
+                    {Array.isArray(m.action_items) && m.action_items.length > 0 && (
+                      <div className="space-y-1">
+                        <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Action Items</div>
+                        {m.action_items.map((item: any, i: number) => (
+                          <div key={i} className="text-xs flex items-start gap-1.5">
+                            <CheckCircle2 className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
+                            <span>{typeof item === "string" ? item : item.text || item.description || JSON.stringify(item)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {Array.isArray(m.attendees) && m.attendees.length > 0 && (
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {m.attendees.map((email: string, i: number) => (
+                          <span key={i} className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-muted-foreground">{email}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No meetings synced yet. Click "Sync Fathom" to pull meeting data.</p>
+            )}
+          </div>
+
           {snap && latestSnapshot && (
             <div className="panel">
               <div className="panel-header flex items-center justify-between">
