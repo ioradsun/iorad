@@ -1,11 +1,8 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useCompanies, useSignalCounts, useProcessingJobs } from "@/hooks/useSupabase";
-import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 import ScoreCell from "@/components/ScoreCell";
-import { ArrowUpDown, Search, Loader2, RefreshCw, Plus } from "lucide-react";
+import { ArrowUpDown, Search, Loader2, Plus, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -17,8 +14,8 @@ export default function Dashboard() {
   const { data: companies = [], isLoading } = useCompanies();
   const { data: signalCounts = {} } = useSignalCounts();
   const { data: jobs = [] } = useProcessingJobs();
-  const queryClient = useQueryClient();
-  const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
+
+
 
   const [sortKey, setSortKey] = useState<SortKey>("last_score_total");
   const [sortAsc, setSortAsc] = useState(false);
@@ -80,29 +77,8 @@ export default function Dashboard() {
     </button>
   );
 
-  const regenerateCompany = async (companyId: string) => {
-    setRegeneratingId(companyId);
-    try {
-      const { data, error } = await supabase.functions.invoke("run-signals", {
-        body: { company_id: companyId, mode: "full" },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
 
-      // Find contacts (best-effort)
-      try {
-        await supabase.functions.invoke("find-contacts", { body: { company_id: companyId } });
-      } catch {}
 
-      toast.success(`Done — ${data?.company || "company"}`);
-      queryClient.invalidateQueries({ queryKey: ["companies"] });
-      queryClient.invalidateQueries({ queryKey: ["signalCounts"] });
-    } catch (e: any) {
-      toast.error(e.message || "Regeneration failed");
-    } finally {
-      setRegeneratingId(null);
-    }
-  };
 
   if (isLoading) {
     return (
@@ -207,22 +183,14 @@ export default function Dashboard() {
                     {company.last_processed_at ? new Date(company.last_processed_at).toLocaleDateString() : "—"}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5 text-xs h-7"
-                        disabled={regeneratingId === company.id}
-                        onClick={(e) => { e.stopPropagation(); regenerateCompany(company.id); }}
-                      >
-                        {regeneratingId === company.id ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <RefreshCw className="w-3 h-3" />
-                        )}
-                        {company.snapshot_status === "Generated" ? "Regenerate" : "Generate"}
-                      </Button>
-                    </div>
+                    {company.snapshot_status === "Generated" && (
+                      <Link to={`/company/${company.id}`}>
+                        <Button variant="outline" size="sm" className="gap-1.5 text-xs h-7">
+                          <ExternalLink className="w-3 h-3" />
+                          View Story
+                        </Button>
+                      </Link>
+                    )}
                   </td>
                 </motion.tr>
               ))}
