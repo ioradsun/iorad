@@ -26,6 +26,7 @@ import type { ScoreBreakdown, SnapshotJSON, DashboardCard, EmailTouch, LinkedInS
 import { DashboardCardUI } from "./company/DashboardCardUI";
 import { EmailSequenceUI, LinkedInSequenceUI } from "./company/OutreachSequences";
 import { StoryAssetsUI } from "./company/StoryAssetsUI";
+import OnboardingTab from "./company/OnboardingTab";
 
 function TranscriptAnalysisView({ analysis }: { analysis: any }) {
   if (!analysis) return null;
@@ -404,6 +405,7 @@ export default function CompanyDetail() {
           <TabsTrigger value="strategy">Strategy</TabsTrigger>
           <TabsTrigger value="outreach">Outreach</TabsTrigger>
           <TabsTrigger value="story">Story</TabsTrigger>
+          <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
         </TabsList>
 
         {/* ============ TAB 1: COMPANY ============ */}
@@ -1181,6 +1183,15 @@ export default function CompanyDetail() {
               )}
             </div>
           )}
+        </TabsContent>
+
+        {/* ============ TAB 5: ONBOARDING ============ */}
+        <TabsContent value="onboarding">
+          <OnboardingTab
+            meetings={meetings}
+            analyzingMeeting={analyzingMeeting}
+            onAnalyze={analyzeTranscript}
+          />
         </TabsContent>
       </Tabs>
     </div>
