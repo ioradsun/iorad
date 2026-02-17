@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail, Plus, ChevronDown, Search, Brain, Sparkles, Copy, ChevronRight, Video, BookOpen, Save, Eye } from "lucide-react";
+import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail, Plus, ChevronDown, Search, Brain, Sparkles, Copy, ChevronRight, Video, BookOpen, Save, Eye, Building2, MapPin, Users, DollarSign, Globe } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -475,6 +475,14 @@ export default function CompanyDetail() {
 
   const cards = (companyCards?.cards_json as unknown as DashboardCard[] | null) || [];
   const assets = parseJson<{ email_sequence?: Record<string, EmailTouch>; linkedin_sequence?: LinkedInStep[]; story_assets?: StoryAssets }>(companyCards?.assets_json as Json) || {};
+  const accountData = parseJson<{
+    name?: string; about?: { text?: string; status?: string };
+    industry?: { value?: string; status?: string };
+    employees?: { value?: string; status?: string };
+    hq?: { value?: string; status?: string };
+    revenue_range?: { value?: string; status?: string };
+    products_services?: { name: string; status?: string }[];
+  }>(companyCards?.account_json as Json);
 
   const loomEmbedUrl = toLoomEmbedUrl(effectiveLoomUrl);
   const ioradEmbedUrl = toIoradEmbedUrl(effectiveIoradUrl);
@@ -537,6 +545,59 @@ export default function CompanyDetail() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+          {/* Company Profile Card */}
+          <Card>
+            <CardContent className="pt-5 pb-4">
+              <div className="flex flex-col gap-3">
+                {/* About line */}
+                {(accountData?.about?.text || company.domain) && (
+                  <p className="text-sm text-foreground/80 leading-relaxed line-clamp-2">
+                    {accountData?.about?.text || `${company.name} — ${company.domain}`}
+                  </p>
+                )}
+                {/* Metadata pills row */}
+                <div className="flex flex-wrap gap-x-4 gap-y-2">
+                  {(accountData?.industry?.value || company.industry) && (
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Building2 className="w-3.5 h-3.5 text-primary" />
+                      <span className="text-foreground/90">{accountData?.industry?.value || company.industry?.replace(/_/g, " ").toLowerCase()}</span>
+                    </div>
+                  )}
+                  {(accountData?.employees?.value || company.headcount) && (
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Users className="w-3.5 h-3.5 text-primary" />
+                      <span className="text-foreground/90">{accountData?.employees?.value || `${company.headcount}+`} employees</span>
+                    </div>
+                  )}
+                  {(accountData?.hq?.value || company.hq_country) && (
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <MapPin className="w-3.5 h-3.5 text-primary" />
+                      <span className="text-foreground/90">{accountData?.hq?.value || company.hq_country}</span>
+                    </div>
+                  )}
+                  {accountData?.revenue_range?.value && accountData.revenue_range.value !== "Unknown" && (
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <DollarSign className="w-3.5 h-3.5 text-primary" />
+                      <span className="text-foreground/90">{accountData.revenue_range.value}</span>
+                    </div>
+                  )}
+                  {company.domain && (
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Globe className="w-3.5 h-3.5 text-primary" />
+                      <a href={`https://${company.domain}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{company.domain}</a>
+                    </div>
+                  )}
+                  {company.partner && (
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Briefcase className="w-3.5 h-3.5 text-primary" />
+                      <span className="text-foreground/90">Partner: {company.partner}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Contacts */}
           <div className="panel">
             <div className="panel-header flex items-center justify-between">
@@ -601,18 +662,6 @@ export default function CompanyDetail() {
               )}
             </div>
           </div>
-
-          {/* Company metadata */}
-          {(company.partner || company.industry || company.hq_country || company.persona) && (
-            <div className="flex flex-wrap gap-2">
-              {company.partner && <span className="text-xs bg-secondary px-2 py-0.5 rounded">Partner: {company.partner}</span>}
-              {company.partner_rep_name && <span className="text-xs bg-secondary px-2 py-0.5 rounded">Rep: {company.partner_rep_name}</span>}
-              {company.industry && <span className="text-xs bg-secondary px-2 py-0.5 rounded">{company.industry.replace(/_/g, " ").toLowerCase()}</span>}
-              {company.hq_country && <span className="text-xs bg-secondary px-2 py-0.5 rounded">{company.hq_country}</span>}
-              {company.persona && <span className="text-xs bg-secondary px-2 py-0.5 rounded">{company.persona}</span>}
-              {company.headcount && <span className="text-xs bg-secondary px-2 py-0.5 rounded">{company.headcount}+ employees</span>}
-            </div>
-          )}
 
           <div className="glow-line" />
 
