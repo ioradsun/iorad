@@ -165,17 +165,20 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
     };
     if (contact_id) upsertRow.contact_id = contact_id;
 
-    // Delete existing then insert (unique index uses COALESCE so standard upsert won't work)
-    const delQuery = sb
-      .from("company_cards")
-      .delete()
-      .eq("company_id", company_id);
+    // Delete existing then insert
     if (contact_id) {
-      delQuery.eq("contact_id", contact_id);
+      await sb
+        .from("company_cards")
+        .delete()
+        .eq("company_id", company_id)
+        .eq("contact_id", contact_id);
     } else {
-      delQuery.is("contact_id", null);
+      await sb
+        .from("company_cards")
+        .delete()
+        .eq("company_id", company_id)
+        .is("contact_id", null);
     }
-    await delQuery;
 
     const { error: upsertErr } = await sb
       .from("company_cards")
