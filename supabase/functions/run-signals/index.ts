@@ -7,6 +7,15 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Partner → Persona mapping for auto contact enrichment
+const PARTNER_PERSONA_MAP: Record<string, string> = {
+  docebo: "Learning & Development",
+  "360learning": "Learning & Development",
+  seismic: "Sales Enablement",
+  gainsight: "Customer Education",
+  workramp: "Learning & Development",
+};
+
 interface CompanyRow {
   id: string;
   name: string;
@@ -348,6 +357,32 @@ Deno.serve(async (req) => {
             }
           } catch (clayErr: any) {
             console.error(`Clay push error for ${company.name}: ${clayErr.message}`);
+          }
+        }
+
+        // Auto-enrich contacts based on partner→persona mapping
+        const partnerKey = (company.partner || "").toLowerCase();
+        const autoPersona = PARTNER_PERSONA_MAP[partnerKey];
+        if (autoPersona) {
+          try {
+            console.log(`Auto-enriching contacts for ${company.name} (${partnerKey} → ${autoPersona})`);
+            const fnUrl = `${supabaseUrl}/functions/v1/find-contacts`;
+            const contactResp = await fetch(fnUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${serviceRoleKey}`,
+              },
+              body: JSON.stringify({ company_id: company.id, persona: autoPersona }),
+            });
+            if (contactResp.ok) {
+              const contactResult = await contactResp.json();
+              console.log(`Auto-enriched ${contactResult.contacts_found || 0} contacts for ${company.name}`);
+            } else {
+              console.warn(`Contact enrichment failed for ${company.name}: ${contactResp.status}`);
+            }
+          } catch (contactErr: any) {
+            console.warn(`Contact enrichment error for ${company.name}: ${contactErr.message}`);
           }
         }
       } else {
