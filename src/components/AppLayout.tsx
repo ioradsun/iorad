@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { LayoutDashboard, BookOpen, LogOut, Shield } from "lucide-react";
+import { LayoutDashboard, LogOut, Shield } from "lucide-react";
 import ioradLogoDark from "@/assets/iorad-logo-new.png";
 import ioradLogoLight from "@/assets/iorad-logo-light.png";
 import { useAuth } from "@/hooks/useAuth";
@@ -16,7 +16,6 @@ import {
 
 const menuItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/stories", label: "Stories", icon: BookOpen },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
