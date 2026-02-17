@@ -284,10 +284,10 @@ export default function CustomerStory() {
   customer.contactName = formattedContactName;
   const pm = getPartnerMeta(partner || "", dbData.partnerConfig);
 
-  return <StoryPage customer={customer} pm={pm} snapshotId={dbData.snapshot.id} snapshotMeta={dbData.snapshot} companyId={dbData.company.id} />;
+  return <StoryPage customer={customer} pm={pm} snapshotId={dbData.snapshot.id} snapshotMeta={dbData.snapshot} companyId={dbData.company.id} loomUrl={dbData.company.loom_url} ioradUrl={dbData.company.iorad_url} />;
 }
 
-function StoryPage({ customer, pm, snapshotId, snapshotMeta, companyId }: { customer: Customer; pm: PartnerMeta; snapshotId?: string; snapshotMeta?: any; companyId?: string }) {
+function StoryPage({ customer, pm, snapshotId, snapshotMeta, companyId, loomUrl, ioradUrl }: { customer: Customer; pm: PartnerMeta; snapshotId?: string; snapshotMeta?: any; companyId?: string; loomUrl?: string | null; ioradUrl?: string | null }) {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const showInternal = user && searchParams.get("internal") === "true";
@@ -311,7 +311,7 @@ function StoryPage({ customer, pm, snapshotId, snapshotMeta, companyId }: { cust
 
   return (
     <StoryEditProvider customer={customer}>
-      <StoryPageInner customer={customer} pm={pm} snapshotId={snapshotId} showInternal={!!showInternal} isIoradUser={!!isIoradUser} queryClient={queryClient} snapshotMeta={snapshotMeta} rawSignals={rawSignals || []} />
+      <StoryPageInner customer={customer} pm={pm} snapshotId={snapshotId} showInternal={!!showInternal} isIoradUser={!!isIoradUser} queryClient={queryClient} snapshotMeta={snapshotMeta} rawSignals={rawSignals || []} loomUrl={loomUrl} ioradUrl={ioradUrl} />
     </StoryEditProvider>
   );
 }
@@ -325,6 +325,8 @@ function StoryPageInner({
   queryClient,
   snapshotMeta,
   rawSignals,
+  loomUrl,
+  ioradUrl,
 }: {
   customer: Customer;
   pm: PartnerMeta;
@@ -334,6 +336,8 @@ function StoryPageInner({
   queryClient: any;
   snapshotMeta?: any;
   rawSignals: any[];
+  loomUrl?: string | null;
+  ioradUrl?: string | null;
 }) {
   const ctx = useStoryEdit();
   const displayCustomer = ctx?.isEditing ? ctx.editedCustomer : customer;
@@ -378,6 +382,28 @@ function StoryPageInner({
       <div className="min-h-screen" style={{ background: "var(--story-bg)", color: "var(--story-fg)" }}>
         <StoryHero customer={displayCustomer} pm={pm} />
 
+        {/* Loom Video Embed (from Story config) */}
+        {loomUrl && (() => {
+          const match = loomUrl.match(/loom\.com\/(?:share|embed)\/([a-zA-Z0-9]+)/);
+          const embedUrl = match ? `https://www.loom.com/embed/${match[1]}` : null;
+          return embedUrl ? (
+            <section className="max-w-5xl mx-auto px-6 py-12">
+              <div className="rounded-2xl overflow-hidden" style={{ background: "var(--story-surface)" }}>
+                <iframe
+                  src={embedUrl}
+                  width="100%"
+                  height="450"
+                  frameBorder="0"
+                  allowFullScreen
+                  allow="autoplay; fullscreen"
+                  title="Loom video"
+                  style={{ width: "100%", display: "block" }}
+                />
+              </div>
+            </section>
+          ) : null;
+        })()}
+
         {/* 1. What We're Seeing */}
         {displayCustomer.whatsHappening.length > 0 && (
           <WhatsHappeningSection companyName={displayCustomer.name} items={displayCustomer.whatsHappening} />
@@ -419,7 +445,7 @@ function StoryPageInner({
         )}
 
         {/* Interactive Demo */}
-        <EmbedDemo />
+        <EmbedDemo ioradUrl={ioradUrl} />
 
         {/* 9. Similar Patterns */}
         {displayCustomer.caseStudies.length > 0 && (

@@ -5,13 +5,14 @@ import { useStoryEdit } from "./EditContext";
 import { useStoryDebug } from "./StoryDebugContext";
 import { useSectionAnnotation } from "./sectionAnnotations";
 
-export default function EmbedDemo() {
+export default function EmbedDemo({ ioradUrl }: { ioradUrl?: string | null }) {
   const ctx = useStoryEdit();
   const debug = useStoryDebug();
   const annotation = useSectionAnnotation("embedDemo");
 
   const HARDCODED_TUTORIAL = "https://ior.ad/b973?iframeHash=trysteps-1";
-  const savedUrl = debug?.snapshotJson?.embed_url_override;
+  const propUrl = ioradUrl || null;
+  const savedUrl = propUrl || debug?.snapshotJson?.embed_url_override;
   const iframeSrc = savedUrl
     ? `${savedUrl}${savedUrl.includes('?') ? '&' : '?'}oembed=1`
     : HARDCODED_TUTORIAL;
