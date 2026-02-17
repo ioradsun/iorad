@@ -166,6 +166,7 @@ export default function CompanyDetail() {
   const [fixingDomain, setFixingDomain] = useState(false);
   const [analyzingMeeting, setAnalyzingMeeting] = useState<string | null>(null);
   const [contactSearch, setContactSearch] = useState("");
+  const [extractingProfiles, setExtractingProfiles] = useState(false);
 
   const effectiveContactId = selectedContactId || contacts[0]?.id || "";
   const { data: companyCards, isLoading: cardsLoading } = useCompanyCards(id, effectiveContactId || undefined);
@@ -347,6 +348,20 @@ export default function CompanyDetail() {
     } finally {
       setSearchingPersona(null);
     }
+  };
+
+  const extractProfiles = async () => {
+    if (!id) return;
+    setExtractingProfiles(true);
+    toast.info("Extracting AI product usage profiles…");
+    try {
+      const { data, error } = await supabase.functions.invoke("extract-contact-profile", { body: { company_id: id } });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success(`Extracted ${data?.profiles_extracted || 0} profiles`);
+      queryClient.invalidateQueries({ queryKey: ["contacts", id] });
+    } catch (e: any) { toast.error(e.message || "Profile extraction failed"); }
+    finally { setExtractingProfiles(false); }
   };
 
   const generateCards = async () => {
@@ -553,6 +568,12 @@ export default function CompanyDetail() {
                 )}
               </div>
               <div className="flex items-center gap-1">
+              {contacts.some((c: any) => c.hubspot_properties && Object.keys(c.hubspot_properties).length > 0) && (
+                <Button size="sm" variant="ghost" className="gap-1 text-xs h-7" onClick={extractProfiles} disabled={extractingProfiles}>
+                  {extractingProfiles ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Brain className="w-3.5 h-3.5" />}
+                  {extractingProfiles ? "Extracting…" : "Extract Profiles"}
+                </Button>
+              )}
               <Dialog open={addContactOpen} onOpenChange={setAddContactOpen}>
                 <DialogTrigger asChild>
                   <Button size="sm" variant="ghost" className="gap-1 text-xs h-7"><Plus className="w-3.5 h-3.5" /> Add</Button>

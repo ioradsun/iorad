@@ -282,12 +282,14 @@ export type Database = {
         Row: {
           company_id: string
           confidence: string | null
+          contact_profile: Json | null
           created_at: string
           email: string | null
           hubspot_properties: Json | null
           id: string
           linkedin: string | null
           name: string
+          profile_extracted_at: string | null
           reasoning: string | null
           source: string | null
           title: string | null
@@ -296,12 +298,14 @@ export type Database = {
         Insert: {
           company_id: string
           confidence?: string | null
+          contact_profile?: Json | null
           created_at?: string
           email?: string | null
           hubspot_properties?: Json | null
           id?: string
           linkedin?: string | null
           name: string
+          profile_extracted_at?: string | null
           reasoning?: string | null
           source?: string | null
           title?: string | null
@@ -310,12 +314,14 @@ export type Database = {
         Update: {
           company_id?: string
           confidence?: string | null
+          contact_profile?: Json | null
           created_at?: string
           email?: string | null
           hubspot_properties?: Json | null
           id?: string
           linkedin?: string | null
           name?: string
+          profile_extracted_at?: string | null
           reasoning?: string | null
           source?: string | null
           title?: string | null
