@@ -393,9 +393,9 @@ export default function CompanyDetail() {
                 </Button>
               ))}
             </div>
-            <ScrollArea className="max-h-[200px]">
-              <div className="space-y-3">
-              {contacts.length > 0 ? contacts.slice(0, 3).map((contact) => {
+            <ScrollArea className="h-[180px]">
+              <div className="space-y-3 pr-3">
+              {contacts.length > 0 ? contacts.map((contact) => {
                 const firstName = contact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "");
                 const storyUrl = company.partner
                   ? `/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories/${firstName}`
@@ -433,9 +433,6 @@ export default function CompanyDetail() {
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">No contacts yet. Add one manually or run enrichment.</p>
-              )}
-              {contacts.length > 3 && (
-                <p className="text-xs text-muted-foreground text-center pt-1">+{contacts.length - 3} more — scroll to see all</p>
               )}
               </div>
             </ScrollArea>
