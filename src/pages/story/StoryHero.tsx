@@ -59,8 +59,9 @@ export default function StoryHero({ customer, pm }: StoryHeroProps) {
   const customerLogoUrl = customer.domain ? `https://www.google.com/s2/favicons?domain=${customer.domain}&sz=128` : undefined;
   const partnerLogoUrl = partnerLogoMap[pm.key] || (pm.domain ? `https://www.google.com/s2/favicons?domain=${pm.domain}&sz=128` : undefined);
 
-  const defaultSubtitle = `Based on public signals, here's a grounded look at where ${customer.name} is heading — and where reinforcement gaps typically show up at this stage.`;
-  const subtitle = customer.overrides?.["hero.subtitle"] || defaultSubtitle;
+  const subtitle = customer.overrides?.["hero.subtitle"]
+    || customer.openingHook?.openingParagraph
+    || `An operating brief exploring where reinforcement gaps typically show up at ${customer.name}'s current stage.`;
 
   return (
     <section className="relative overflow-hidden">

@@ -60,6 +60,7 @@ export interface Customer {
   caseStudies: CaseStudy[];
   whyNow: string;
   cta?: string;
+  openingHook?: { subjectLine: string; openingParagraph: string };
   conversationStarters: string[];
   internalSignals: InternalSignals;
   /** Free-form text overrides keyed by path */

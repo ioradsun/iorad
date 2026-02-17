@@ -89,6 +89,10 @@ function snapshotToCustomer(company: any, snap: any): Customer {
     description: json.reinforcement_preview.description || "",
   } : undefined;
   const cta: string = json.cta || "";
+  const openingHook = json.opening_hook ? {
+    subjectLine: json.opening_hook.subject_line || "",
+    openingParagraph: json.opening_hook.opening_paragraph || "",
+  } : undefined;
 
   // Existing fields
   const executionFriction: string[] = json.execution_friction || [];
@@ -174,6 +178,7 @@ function snapshotToCustomer(company: any, snap: any): Customer {
     caseStudies,
     whyNow,
     cta,
+    openingHook,
     conversationStarters,
     internalSignals,
     overrides: json.text_overrides || {},
