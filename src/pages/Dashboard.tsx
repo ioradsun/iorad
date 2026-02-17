@@ -147,7 +147,7 @@ export default function Dashboard() {
             <thead>
               <tr className="border-b bg-secondary/50">
                 <th className="text-left px-4 py-3"><SortHeader label="Company" field="name" /></th>
-                <th className="text-left px-4 py-3"><SortHeader label="Score" field="last_score_total" /></th>
+                
                 <th className="text-left px-4 py-3 hidden md:table-cell"><span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Partner</span></th>
                 <th className="text-left px-4 py-3 hidden lg:table-cell"><span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Partner Rep</span></th>
                 
@@ -169,7 +169,7 @@ export default function Dashboard() {
                     <div className="font-medium text-foreground">{company.name}</div>
                     <div className="text-xs text-muted-foreground">{company.domain || "—"}</div>
                   </td>
-                  <td className="px-4 py-3"><ScoreCell score={company.last_score_total} /></td>
+                  
                   <td className="px-4 py-3 hidden md:table-cell text-xs text-muted-foreground">{company.partner || "—"}</td>
                   <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground">
                     {company.partner_rep_name || "—"}
@@ -182,7 +182,7 @@ export default function Dashboard() {
                   <td className="px-4 py-3">
                     {company.snapshot_status === "Generated" && (
                       <Link to={`/company/${company.id}`}>
-                        <Button variant="outline" size="sm" className="gap-1.5 text-xs h-7">
+                        <Button variant="outline" size="sm" className="gap-1.5 text-xs h-7 border-pink text-pink hover:bg-pink/10">
                           <ExternalLink className="w-3 h-3" />
                           View Story
                         </Button>
@@ -193,7 +193,7 @@ export default function Dashboard() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
+                  <td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">
                     {companies.length === 0 ? "No companies yet. Upload a CSV to get started." : "No companies match your filters."}
                   </td>
                 </tr>
