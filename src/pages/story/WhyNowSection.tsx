@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { fade } from "./StorySection";
 import { EditableText } from "./EditableText";
 import { useStoryEdit } from "./EditContext";
+import { useSectionAnnotation } from "./sectionAnnotations";
 
 interface Props {
   text: string;
@@ -13,9 +14,11 @@ export default function WhyNowSection({ text }: Props) {
   const val = ctx?.isEditing ? ctx.editedCustomer.whyNow : text;
   const defaultLabel = "Why This Matters Now";
   const label = ctx?.editedCustomer.overrides?.["whynow.label"] || defaultLabel;
+  const annotation = useSectionAnnotation("whyNow");
 
   return (
     <section className="max-w-5xl mx-auto px-6 py-12">
+      {annotation && <div className="mb-1">{annotation.element}</div>}
       <motion.div
         {...fade}
         className="rounded-xl p-6"

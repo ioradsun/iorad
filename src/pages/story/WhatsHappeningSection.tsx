@@ -5,6 +5,7 @@ import StorySection from "./StorySection";
 import type { InitiativeItem } from "@/data/customers";
 import { EditableText, EditableListItemWrapper } from "./EditableText";
 import { useStoryEdit } from "./EditContext";
+import { useSectionAnnotation } from "./sectionAnnotations";
 
 interface Props {
   companyName: string;
@@ -14,6 +15,7 @@ interface Props {
 export default function WhatsHappeningSection({ companyName, items }: Props) {
   const ctx = useStoryEdit();
   const data = ctx?.isEditing ? ctx.editedCustomer.whatsHappening : items;
+  const annotation = useSectionAnnotation("whatsHappening");
 
   return (
     <StorySection
@@ -22,6 +24,7 @@ export default function WhatsHappeningSection({ companyName, items }: Props) {
       labelField="overrides.whatsHappening.label"
       title={`What's happening at ${companyName}`}
       titleField="overrides.whatsHappening.title"
+      annotation={annotation?.element}
     >
       <div className="space-y-5 max-w-3xl">
         {data.map((item, i) => (

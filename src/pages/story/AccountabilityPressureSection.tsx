@@ -4,6 +4,7 @@ import { fade } from "./StorySection";
 import StorySection from "./StorySection";
 import { EditableText, EditableListItemWrapper } from "./EditableText";
 import { useStoryEdit } from "./EditContext";
+import { useSectionAnnotation } from "./sectionAnnotations";
 
 interface Props {
   items: string[];
@@ -12,6 +13,7 @@ interface Props {
 export default function AccountabilityPressureSection({ items }: Props) {
   const ctx = useStoryEdit();
   const data = ctx?.isEditing ? ctx.editedCustomer.accountabilityPressure : items;
+  const annotation = useSectionAnnotation("accountabilityPressure");
 
   return (
     <StorySection
@@ -20,6 +22,7 @@ export default function AccountabilityPressureSection({ items }: Props) {
       labelField="overrides.accountability.label"
       title="The questions that are already being asked"
       titleField="overrides.accountability.title"
+      annotation={annotation?.element}
     >
       <div className="space-y-3 max-w-3xl">
         {data.map((item, i) => (

@@ -5,6 +5,7 @@ import StorySection from "./StorySection";
 import type { CaseStudy } from "@/data/customers";
 import { EditableText, EditableListItemWrapper } from "./EditableText";
 import { useStoryEdit } from "./EditContext";
+import { useSectionAnnotation } from "./sectionAnnotations";
 
 interface Props {
   studies: CaseStudy[];
@@ -13,6 +14,7 @@ interface Props {
 export default function CaseStudiesSection({ studies }: Props) {
   const ctx = useStoryEdit();
   const data = ctx?.isEditing ? ctx.editedCustomer.caseStudies : studies;
+  const annotation = useSectionAnnotation("caseStudies");
 
   return (
     <StorySection
@@ -21,6 +23,7 @@ export default function CaseStudiesSection({ studies }: Props) {
       labelField="overrides.cases.label"
       title="Patterns we've seen elsewhere"
       titleField="overrides.cases.title"
+      annotation={annotation?.element}
     >
       <div className="space-y-5">
         {data.map((study, i) => (

@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { fade } from "./StorySection";
 import { EditableText } from "./EditableText";
 import { useStoryEdit } from "./EditContext";
+import { useSectionAnnotation } from "./sectionAnnotations";
 
 interface Props {
   text: string;
@@ -13,9 +14,11 @@ export default function BlindSpotSection({ text }: Props) {
   const val = ctx?.isEditing ? ctx.editedCustomer.blindSpot : text;
   const defaultLabel = "A Common Blind Spot";
   const label = ctx?.editedCustomer.overrides?.["blindspot.label"] || defaultLabel;
+  const annotation = useSectionAnnotation("blindSpot");
 
   return (
     <section className="max-w-5xl mx-auto px-6 py-16">
+      {annotation && <div className="mb-1">{annotation.element}</div>}
       <motion.div
         {...fade}
         className="rounded-2xl p-8 md:p-10"

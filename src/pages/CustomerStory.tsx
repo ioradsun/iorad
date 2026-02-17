@@ -23,6 +23,7 @@ import WhyNowSection from "./story/WhyNowSection";
 import StoryCTA from "./story/StoryCTA";
 import InternalSignalSummary from "./story/InternalSignalSummary";
 import DebugPanel from "./story/DebugPanel";
+import { StoryDebugProvider } from "./story/StoryDebugContext";
 import { StoryEditProvider, useStoryEdit } from "./story/EditContext";
 import EditToolbar from "./story/EditToolbar";
 
@@ -300,9 +301,18 @@ function StoryPage({ customer, pm, snapshotId, snapshotMeta, companyId }: { cust
     },
   });
 
+  const debugContext = isIoradUser && snapshotMeta ? {
+    isIoradUser: true,
+    snapshotJson: (snapshotMeta.snapshot_json as Record<string, any>) ?? {},
+    signals: rawSignals,
+    snapshotId: snapshotMeta.id ?? null,
+  } : null;
+
   return (
     <StoryEditProvider customer={customer}>
-      <StoryPageInner customer={customer} pm={pm} snapshotId={snapshotId} showInternal={!!showInternal} isIoradUser={!!isIoradUser} queryClient={queryClient} snapshotMeta={snapshotMeta} rawSignals={rawSignals || []} />
+      <StoryDebugProvider value={debugContext}>
+        <StoryPageInner customer={customer} pm={pm} snapshotId={snapshotId} showInternal={!!showInternal} isIoradUser={!!isIoradUser} queryClient={queryClient} snapshotMeta={snapshotMeta} rawSignals={rawSignals || []} />
+      </StoryDebugProvider>
     </StoryEditProvider>
   );
 }

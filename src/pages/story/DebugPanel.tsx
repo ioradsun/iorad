@@ -59,7 +59,7 @@ export default function DebugPanel({
   const [showRawJson, setShowRawJson] = useState(false);
 
   return (
-    <div className="fixed bottom-4 right-4 z-[100] max-w-lg" style={{ fontFamily: "monospace" }}>
+    <div className="fixed bottom-4 left-4 z-[100] max-w-lg" style={{ fontFamily: "monospace" }}>
       {!open ? (
         <button
           onClick={() => setOpen(true)}

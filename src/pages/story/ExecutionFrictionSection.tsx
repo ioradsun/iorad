@@ -4,6 +4,7 @@ import { fade } from "./StorySection";
 import StorySection from "./StorySection";
 import { EditableText, EditableListItemWrapper } from "./EditableText";
 import { useStoryEdit } from "./EditContext";
+import { useSectionAnnotation } from "./sectionAnnotations";
 
 interface Props {
   items: string[];
@@ -12,6 +13,7 @@ interface Props {
 export default function ExecutionFrictionSection({ items }: Props) {
   const ctx = useStoryEdit();
   const data = ctx?.isEditing ? ctx.editedCustomer.executionFriction : items;
+  const annotation = useSectionAnnotation("executionFriction");
 
   return (
     <StorySection
@@ -20,6 +22,7 @@ export default function ExecutionFrictionSection({ items }: Props) {
       labelField="overrides.friction.label"
       title="When companies are at this stage, here's what usually happens"
       titleField="overrides.friction.title"
+      annotation={annotation?.element}
     >
       <div className="space-y-4 max-w-3xl">
         {data.map((item, i) => (

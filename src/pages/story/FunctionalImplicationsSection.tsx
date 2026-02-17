@@ -2,6 +2,7 @@ import { Target } from "lucide-react";
 import StorySection from "./StorySection";
 import { EditableText } from "./EditableText";
 import { useStoryEdit } from "./EditContext";
+import { useSectionAnnotation } from "./sectionAnnotations";
 
 interface Props {
   text: string;
@@ -11,6 +12,7 @@ interface Props {
 export default function FunctionalImplicationsSection({ text, contactName }: Props) {
   const ctx = useStoryEdit();
   const data = ctx?.isEditing ? ctx.editedCustomer.functionalImplications : text;
+  const annotation = useSectionAnnotation("functionalImplications");
 
   const title = contactName
     ? `What this likely means for ${contactName}'s function`
@@ -23,6 +25,7 @@ export default function FunctionalImplicationsSection({ text, contactName }: Pro
       labelField="overrides.implications.label"
       title={title}
       titleField="overrides.implications.title"
+      annotation={annotation?.element}
     >
       <div className="max-w-3xl space-y-4">
         {data.split("\n").filter(Boolean).map((paragraph, i) => (
