@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.sync-fathom]
 verify_jwt = false
+
+[functions.fix-domain]
+verify_jwt = false
