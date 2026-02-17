@@ -212,23 +212,25 @@ export default function CompanyDetail() {
       if (data?.error) throw new Error(data.error);
       toast.success(`Signals complete — ${data?.signals_found ?? 0} found for ${data?.company || "company"}`);
 
-      // Step 2: Find contacts via Apollo
-      toast.info("Step 2/2 — Finding contacts via Apollo…");
-      setFindingContacts(true);
-      try {
-        const { data: contactData, error: contactErr } = await supabase.functions.invoke("find-contacts", { body: { company_id: id } });
-        if (contactErr) throw contactErr;
-        if (contactData?.error) throw new Error(contactData.error);
-        if (contactData?.contacts_found > 0) {
-          toast.success(`Found ${contactData.contacts_found} contacts via Apollo`);
-        } else {
-          toast.warning("No contacts found — check company domain is correct");
+      // Step 2: Find contacts via Apollo (skip for inbound companies — contacts come from HubSpot)
+      if (companyAny?.source_type !== "inbound") {
+        toast.info("Step 2/2 — Finding contacts via Apollo…");
+        setFindingContacts(true);
+        try {
+          const { data: contactData, error: contactErr } = await supabase.functions.invoke("find-contacts", { body: { company_id: id } });
+          if (contactErr) throw contactErr;
+          if (contactData?.error) throw new Error(contactData.error);
+          if (contactData?.contacts_found > 0) {
+            toast.success(`Found ${contactData.contacts_found} contacts via Apollo`);
+          } else {
+            toast.warning("No contacts found — check company domain is correct");
+          }
+        } catch (ce: any) {
+          console.error("Contact enrichment failed:", ce);
+          toast.error("Contact enrichment failed: " + (ce.message || "Unknown error"));
+        } finally {
+          setFindingContacts(false);
         }
-      } catch (ce: any) {
-        console.error("Contact enrichment failed:", ce);
-        toast.error("Contact enrichment failed: " + (ce.message || "Unknown error"));
-      } finally {
-        setFindingContacts(false);
       }
 
       queryClient.invalidateQueries({ queryKey: ["company", id] });
@@ -539,7 +541,8 @@ export default function CompanyDetail() {
               </Dialog>
               </div>
             </div>
-            {/* Persona Search */}
+            {/* Persona Search — only for outbound companies */}
+            {companyAny?.source_type !== "inbound" && (
             <div className="flex items-center gap-2 flex-wrap px-4 pb-3">
               <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Search by persona:</span>
               {PERSONAS.map((p) => (
@@ -556,6 +559,7 @@ export default function CompanyDetail() {
                 </Button>
               ))}
             </div>
+            )}
             {contacts.length > 3 && (
               <div className="px-4 pb-3">
                 <Input
