@@ -415,7 +415,7 @@ function StoryPageInner({
       )}
 
       {/* Interactive Demo */}
-      <EmbedDemo />
+      <EmbedDemo reinforcementPreview={displayCustomer.reinforcementPreview} />
 
       {/* 9. Similar Patterns */}
       {displayCustomer.caseStudies.length > 0 && (

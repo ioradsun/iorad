@@ -3,12 +3,24 @@ import { fade } from "./StorySection";
 import { EditableText } from "./EditableText";
 import { useStoryEdit } from "./EditContext";
 
-export default function EmbedDemo() {
+interface ReinforcementPreview {
+  detectedTool: string;
+  libraryUrl: string | null;
+  description: string;
+}
+
+export default function EmbedDemo({ reinforcementPreview }: { reinforcementPreview?: ReinforcementPreview }) {
   const ctx = useStoryEdit();
 
+  const iframeSrc = reinforcementPreview?.libraryUrl || "https://ior.ad/b973?iframeHash=trysteps-1";
+
   const defaultLabel = "Try It Yourself";
-  const defaultTitle = "This is what iorad feels like";
-  const defaultDesc = "Instead of reading documentation or watching a video, your team follows the steps right inside the application. No context switching. No guessing.";
+  const defaultTitle = reinforcementPreview?.libraryUrl
+    ? `See how ${reinforcementPreview.detectedTool || "iorad"} works`
+    : "This is what iorad feels like";
+  const defaultDesc = reinforcementPreview?.libraryUrl && reinforcementPreview.description
+    ? reinforcementPreview.description
+    : "Instead of reading documentation or watching a video, your team follows the steps right inside the application. No context switching. No guessing.";
 
   const label = ctx?.editedCustomer?.overrides?.["embed.label"] || defaultLabel;
   const title = ctx?.editedCustomer?.overrides?.["embed.title"] || defaultTitle;
@@ -34,7 +46,7 @@ export default function EmbedDemo() {
         )}
         <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid var(--story-border)", background: "var(--story-surface)", aspectRatio: "16/9" }}>
           <iframe
-            src="https://ior.ad/b973?iframeHash=trysteps-1"
+            src={iframeSrc}
             className="w-full h-full border-0"
             allow="clipboard-read; clipboard-write"
             title="iorad interactive walkthrough"
