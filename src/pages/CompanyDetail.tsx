@@ -32,7 +32,7 @@ export default function CompanyDetail() {
   const { data: signals = [] } = useSignals(id);
   const { data: snapshots = [] } = useSnapshots(id);
   const { data: contacts = [] } = useContacts(id);
-  const { data: companyCards, isLoading: cardsLoading } = useCompanyCards(id);
+  // companyCards hook moved below state declarations
   const updateCompany = useUpdateCompany();
   const queryClient = useQueryClient();
   const [regenerating, setRegenerating] = useState(false);
@@ -47,6 +47,9 @@ export default function CompanyDetail() {
   const [ioradUrl, setIoradUrl] = useState<string | null>(null);
   const [findingContacts, setFindingContacts] = useState(false);
   const [searchingPersona, setSearchingPersona] = useState<string | null>(null);
+
+  const effectiveContactId = selectedContactId || contacts[0]?.id || "";
+  const { data: companyCards, isLoading: cardsLoading } = useCompanyCards(id, effectiveContactId || undefined);
 
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosaveUrls = useCallback((loom: string, iorad: string) => {
@@ -146,12 +149,13 @@ export default function CompanyDetail() {
     setGeneratingCards(true);
     try {
       const body: Record<string, string> = { company_id: id, tab: activeTab };
-      if (selectedContactId) body.contact_id = selectedContactId;
+      const cId = effectiveContactId;
+      if (cId) body.contact_id = cId;
       const { data, error } = await supabase.functions.invoke("generate-cards", { body });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       toast.success(`Cards generated — ${data?.cards_count || 0} cards`);
-      queryClient.invalidateQueries({ queryKey: ["company_cards", id] });
+      queryClient.invalidateQueries({ queryKey: ["company_cards", id, cId || "default"] });
     } catch (e: any) { toast.error(e.message || "Failed to generate cards"); }
     finally { setGeneratingCards(false); }
   };
