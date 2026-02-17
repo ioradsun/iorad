@@ -45,7 +45,7 @@ export default function CompanyDetail() {
   const [extraOpen, setExtraOpen] = useState(true);
   const [loomUrl, setLoomUrl] = useState<string | null>(null);
   const [ioradUrl, setIoradUrl] = useState<string | null>(null);
-  const [pushingToClay, setPushingToClay] = useState(false);
+  const [findingContacts, setFindingContacts] = useState(false);
 
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosaveUrls = useCallback((loom: string, iorad: string) => {
@@ -83,10 +83,28 @@ export default function CompanyDetail() {
     setRegenerating(true);
     const modeLabels: Record<string, string> = { full: "Full refresh", signals_only: "Signal search", score_only: "Story regeneration" };
     try {
+      // Run signals first
       const { data, error } = await supabase.functions.invoke("run-signals", { body: { company_id: id, mode } });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       toast.success(`${modeLabels[mode] || mode} complete — ${data?.company || "company"}`);
+
+      // Then find contacts via Apollo
+      setFindingContacts(true);
+      try {
+        const { data: contactData, error: contactErr } = await supabase.functions.invoke("find-contacts", { body: { company_id: id } });
+        if (contactErr) throw contactErr;
+        if (contactData?.error) throw new Error(contactData.error);
+        if (contactData?.contacts_found > 0) {
+          toast.success(`Found ${contactData.contacts_found} contacts via Apollo`);
+        }
+      } catch (ce: any) {
+        console.error("Contact enrichment failed:", ce);
+        toast.error("Contact enrichment failed: " + (ce.message || "Unknown error"));
+      } finally {
+        setFindingContacts(false);
+      }
+
       queryClient.invalidateQueries({ queryKey: ["company", id] });
       queryClient.invalidateQueries({ queryKey: ["signals", id] });
       queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
@@ -96,18 +114,6 @@ export default function CompanyDetail() {
     finally { setRegenerating(false); }
   };
 
-  const pushToClay = async () => {
-    if (!id) return;
-    setPushingToClay(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("push-to-clay", { body: { company_id: id } });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      toast.success(`Pushed ${data?.company || "company"} to Clay for enrichment`);
-      queryClient.invalidateQueries({ queryKey: ["company", id] });
-    } catch (e: any) { toast.error(e.message || "Failed to push to Clay"); }
-    finally { setPushingToClay(false); }
-  };
 
   const generateCards = async () => {
     if (!id) return;
@@ -267,22 +273,14 @@ export default function CompanyDetail() {
             <div className="panel-header flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <span>Contacts ({contacts.length || (companyAny?.buyer_name ? 1 : 0)})</span>
-                {companyAny?.clay_pushed_at && (
+                {findingContacts && (
                   <span className="text-[10px] text-muted-foreground font-normal flex items-center gap-1">
-                    <Search className="w-3 h-3" />
-                    Clay enriched {new Date(companyAny.clay_pushed_at).toLocaleDateString()}
-                    {(() => {
-                      const clayContacts = contacts.filter((c: any) => c.source === "clay");
-                      return clayContacts.length > 0 ? ` · ${clayContacts.length} found` : "";
-                    })()}
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Finding contacts via Apollo…
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-1">
-                <Button size="sm" variant="ghost" className="gap-1 text-xs h-7" onClick={pushToClay} disabled={pushingToClay}>
-                  {pushingToClay ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
-                  {pushingToClay ? "Pushing…" : "Enrich via Clay"}
-                </Button>
               <Dialog open={addContactOpen} onOpenChange={setAddContactOpen}>
                 <DialogTrigger asChild>
                   <Button size="sm" variant="ghost" className="gap-1 text-xs h-7"><Plus className="w-3.5 h-3.5" /> Add</Button>
