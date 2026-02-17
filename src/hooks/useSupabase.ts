@@ -230,6 +230,24 @@ export function useCompanyCards(companyId: string | undefined) {
   });
 }
 
+// ---- Update Company ----
+export function useUpdateCompany() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Record<string, unknown> }) => {
+      const { error } = await supabase
+        .from("companies")
+        .update(updates)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ["company", variables.id] });
+      qc.invalidateQueries({ queryKey: ["companies"] });
+    },
+  });
+}
+
 // ---- Signal counts for dashboard (aggregated) ----
 export function useSignalCounts() {
   return useQuery({
