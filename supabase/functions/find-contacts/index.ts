@@ -50,38 +50,83 @@ Deno.serve(async (req) => {
 
     console.log(`Apollo search for: ${company.name} (domain: ${company.domain})`);
 
-    // Step 1: People API Search — find people by domain + title keywords (no credits used)
-    const searchBody: Record<string, unknown> = {
-      person_titles: TITLE_KEYWORDS,
-      per_page: 10,
-      page: 1,
-    };
+    // Helper: run Apollo People Search with given params
+    async function apolloSearch(params: Record<string, unknown>, useTitles = true) {
+      const searchParams: Record<string, unknown> = { per_page: 10, page: 1, ...params };
+      if (useTitles) searchParams.person_titles = TITLE_KEYWORDS;
+      const resp = await fetch(`${APOLLO_BASE}/mixed_people/api_search`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Api-Key": apolloKey! },
+        body: JSON.stringify(searchParams),
+      });
+      if (!resp.ok) {
+        const errText = await resp.text();
+        console.error(`Apollo search error: ${resp.status} ${errText}`);
+        throw new Error(`Apollo People Search error: ${resp.status}`);
+      }
+      const result = await resp.json();
+      return result.people || [];
+    }
+
+    // Try domain first, then company name, then broader org search
+    let people: any[] = [];
 
     if (company.domain) {
-      searchBody.q_organization_domains_list = [company.domain];
-    } else {
-      searchBody.q_organization_name = company.name;
+      people = await apolloSearch({ q_organization_domains_list: [company.domain] });
+      console.log(`Apollo domain search (${company.domain}): ${people.length} results`);
     }
 
-    const searchResp = await fetch(`${APOLLO_BASE}/mixed_people/api_search`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Api-Key": apolloKey,
-      },
-      body: JSON.stringify(searchBody),
-    });
-
-    if (!searchResp.ok) {
-      const errText = await searchResp.text();
-      console.error(`Apollo search error: ${searchResp.status} ${errText}`);
-      throw new Error(`Apollo People Search error: ${searchResp.status}`);
+    if (people.length === 0) {
+      // Fallback: search by company name
+      console.log(`Falling back to company name search: ${company.name}`);
+      people = await apolloSearch({ q_organization_name: company.name });
+      console.log(`Apollo name search (${company.name}): ${people.length} results`);
     }
 
-    const searchResult = await searchResp.json();
-    const people = searchResult.people || [];
+    if (people.length === 0 && company.domain) {
+      // Last resort: try without www/subdomain variations
+      const baseDomain = company.domain.replace(/^www\./, "");
+      const altDomains = [baseDomain];
+      // Try common variations like companyname.com from the company name
+      const nameDomain = company.name.toLowerCase().replace(/[^a-z0-9]/g, "") + ".com";
+      if (nameDomain !== baseDomain) altDomains.push(nameDomain);
+      
+      console.log(`Last resort: trying alternative domains: ${altDomains.join(", ")}`);
+      people = await apolloSearch({ q_organization_domains_list: altDomains });
+      console.log(`Apollo alt-domain search: ${people.length} results`);
 
-    console.log(`Apollo found ${people.length} people for ${company.name}`);
+      // If we found a better domain, update it on the company record
+      if (people.length > 0 && people[0]?.organization?.primary_domain) {
+        const correctDomain = people[0].organization.primary_domain;
+        if (correctDomain !== company.domain) {
+          console.log(`Updating company domain: ${company.domain} → ${correctDomain}`);
+          await supabase.from("companies").update({ domain: correctDomain }).eq("id", company.id);
+        }
+      }
+    }
+
+    // Final fallback: search without title filters (broader — any senior person)
+    if (people.length === 0) {
+      console.log(`Broadening search: dropping title filters for ${company.name}`);
+      const broadParams: Record<string, unknown> = company.domain
+        ? { q_organization_domains_list: [company.domain] }
+        : { q_organization_name: company.name };
+      // Filter to senior people only
+      broadParams.person_seniorities = ["vp", "director", "c_suite", "owner", "partner"];
+      people = await apolloSearch(broadParams, false);
+      console.log(`Apollo broad search (no titles): ${people.length} results`);
+
+      // Auto-correct domain if found
+      if (people.length > 0 && people[0]?.organization?.primary_domain) {
+        const correctDomain = people[0].organization.primary_domain;
+        if (correctDomain !== company.domain) {
+          console.log(`Updating company domain: ${company.domain} → ${correctDomain}`);
+          await supabase.from("companies").update({ domain: correctDomain }).eq("id", company.id);
+        }
+      }
+    }
+
+    console.log(`Apollo total found: ${people.length} people for ${company.name}`);
 
     if (people.length === 0) {
       return new Response(
