@@ -46,6 +46,7 @@ export default function CompanyDetail() {
   const [loomUrl, setLoomUrl] = useState<string | null>(null);
   const [ioradUrl, setIoradUrl] = useState<string | null>(null);
   const [findingContacts, setFindingContacts] = useState(false);
+  const [searchingPersona, setSearchingPersona] = useState<string | null>(null);
 
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosaveUrls = useCallback((loom: string, iorad: string) => {
@@ -117,6 +118,28 @@ export default function CompanyDetail() {
     finally { setRegenerating(false); }
   };
 
+  const PERSONAS = ["Learning & Development", "Sales Enablement", "Revenue Enablement", "Customer Education", "Partner Enablement"];
+
+  const searchByPersona = async (persona: string) => {
+    if (!id) return;
+    setSearchingPersona(persona);
+    toast.info(`Searching Apollo for "${persona}" contacts…`);
+    try {
+      const { data, error } = await supabase.functions.invoke("find-contacts", { body: { company_id: id, persona } });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (data?.contacts_found > 0) {
+        toast.success(`Found ${data.contacts_found} "${persona}" contacts`);
+      } else {
+        toast.warning(`No "${persona}" contacts found at this company`);
+      }
+      queryClient.invalidateQueries({ queryKey: ["contacts", id] });
+    } catch (e: any) {
+      toast.error(e.message || "Persona search failed");
+    } finally {
+      setSearchingPersona(null);
+    }
+  };
 
   const generateCards = async () => {
     if (!id) return;
@@ -302,6 +325,23 @@ export default function CompanyDetail() {
                 </DialogContent>
               </Dialog>
               </div>
+            </div>
+            {/* Persona Search */}
+            <div className="flex items-center gap-2 flex-wrap px-4 pb-3">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Search by persona:</span>
+              {PERSONAS.map((p) => (
+                <Button
+                  key={p}
+                  size="sm"
+                  variant="outline"
+                  className="text-[11px] h-6 px-2 gap-1"
+                  disabled={!!searchingPersona || findingContacts}
+                  onClick={() => searchByPersona(p)}
+                >
+                  {searchingPersona === p ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
+                  {p}
+                </Button>
+              ))}
             </div>
             <div className="space-y-3">
               {contacts.length > 0 ? contacts.map((contact) => {
