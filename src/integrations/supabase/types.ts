@@ -17,25 +17,37 @@ export type Database = {
       ai_config: {
         Row: {
           cards_prompt_template: string
+          company_prompt: string
           id: number
           model: string
+          outreach_prompt: string
           prompt_template: string
+          story_prompt: string
+          strategy_prompt: string
           system_prompt: string
           updated_at: string
         }
         Insert: {
           cards_prompt_template?: string
+          company_prompt?: string
           id?: number
           model?: string
+          outreach_prompt?: string
           prompt_template?: string
+          story_prompt?: string
+          strategy_prompt?: string
           system_prompt?: string
           updated_at?: string
         }
         Update: {
           cards_prompt_template?: string
+          company_prompt?: string
           id?: number
           model?: string
+          outreach_prompt?: string
           prompt_template?: string
+          story_prompt?: string
+          strategy_prompt?: string
           system_prompt?: string
           updated_at?: string
         }

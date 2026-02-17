@@ -38,6 +38,7 @@ export default function CompanyDetail() {
   const [regenerating, setRegenerating] = useState(false);
   const [generatingCards, setGeneratingCards] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState<string>("");
+  const [activeTab, setActiveTab] = useState("company");
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [newContact, setNewContact] = useState({ name: "", title: "", email: "", linkedin: "" });
   const [savingContact, setSavingContact] = useState(false);
@@ -98,7 +99,7 @@ export default function CompanyDetail() {
     if (!id) return;
     setGeneratingCards(true);
     try {
-      const body: Record<string, string> = { company_id: id };
+      const body: Record<string, string> = { company_id: id, tab: activeTab };
       if (selectedContactId) body.contact_id = selectedContactId;
       const { data, error } = await supabase.functions.invoke("generate-cards", { body });
       if (error) throw error;
@@ -178,7 +179,7 @@ export default function CompanyDetail() {
         </div>
       </div>
 
-      <Tabs defaultValue="company" className="w-full">
+      <Tabs defaultValue="company" className="w-full" onValueChange={setActiveTab}>
         <TabsList className="w-full justify-start">
           <TabsTrigger value="company">Company</TabsTrigger>
           <TabsTrigger value="strategy">Strategy</TabsTrigger>

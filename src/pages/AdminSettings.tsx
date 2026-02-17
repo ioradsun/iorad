@@ -100,21 +100,35 @@ function AIConfigTab() {
   const queryClient = useQueryClient();
   const [prompt, setPrompt] = useState("");
   const [promptTemplate, setPromptTemplate] = useState("");
-  const [cardsPromptTemplate, setCardsPromptTemplate] = useState("");
+  const [companyPrompt, setCompanyPrompt] = useState("");
+  const [strategyPrompt, setStrategyPrompt] = useState("");
+  const [outreachPrompt, setOutreachPrompt] = useState("");
+  const [storyPrompt, setStoryPrompt] = useState("");
   const [model, setModel] = useState("");
 
   useEffect(() => {
     if (data) {
       setPrompt(data.system_prompt);
       setPromptTemplate((data as any).prompt_template || "");
-      setCardsPromptTemplate((data as any).cards_prompt_template || "");
+      setCompanyPrompt((data as any).company_prompt || "");
+      setStrategyPrompt((data as any).strategy_prompt || "");
+      setOutreachPrompt((data as any).outreach_prompt || "");
+      setStoryPrompt((data as any).story_prompt || "");
       setModel(data.model);
     }
   }, [data]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("ai_config").update({ system_prompt: prompt, prompt_template: promptTemplate, cards_prompt_template: cardsPromptTemplate, model } as any).eq("id", 1);
+      const { error } = await supabase.from("ai_config").update({
+        system_prompt: prompt,
+        prompt_template: promptTemplate,
+        company_prompt: companyPrompt,
+        strategy_prompt: strategyPrompt,
+        outreach_prompt: outreachPrompt,
+        story_prompt: storyPrompt,
+        model,
+      } as any).eq("id", 1);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -125,6 +139,37 @@ function AIConfigTab() {
   });
 
   if (isLoading) return <Loader />;
+
+  const promptSections = [
+    {
+      key: "company",
+      label: "Company Tab Prompt",
+      description: "Prompt for generating the Company overview tab content (account summary, key facts).",
+      value: companyPrompt,
+      setter: setCompanyPrompt,
+    },
+    {
+      key: "strategy",
+      label: "Strategy Tab Prompt",
+      description: "Prompt for generating Strategy tab content (dashboard cards, plays, leverage points).",
+      value: strategyPrompt,
+      setter: setStrategyPrompt,
+    },
+    {
+      key: "outreach",
+      label: "Outreach Tab Prompt",
+      description: "Prompt for generating Outreach tab content (email sequences, LinkedIn messages).",
+      value: outreachPrompt,
+      setter: setOutreachPrompt,
+    },
+    {
+      key: "story",
+      label: "Story Tab Prompt",
+      description: "Prompt for generating Story tab content (narrative assets, story configuration).",
+      value: storyPrompt,
+      setter: setStoryPrompt,
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -140,8 +185,8 @@ function AIConfigTab() {
         </Select>
       </div>
       <div className="panel space-y-4">
-        <div className="panel-header">System Prompt</div>
-        <p className="text-xs text-muted-foreground">High-level system instruction prepended to every snapshot generation.</p>
+        <div className="panel-header">System Prompt (Global)</div>
+        <p className="text-xs text-muted-foreground">High-level system instruction prepended to every generation.</p>
         <Textarea
           value={prompt}
           onChange={e => setPrompt(e.target.value)}
@@ -149,28 +194,33 @@ function AIConfigTab() {
         />
       </div>
       <div className="panel space-y-4">
-        <div className="panel-header">Prompt Template & JSON Schema</div>
+        <div className="panel-header">Story Mega Prompt Template</div>
         <p className="text-xs text-muted-foreground">
-          Full prompt template with JSON schema. Use placeholders: <code className="text-primary">{"{{company_name}}"}</code>, <code className="text-primary">{"{{industry}}"}</code>, <code className="text-primary">{"{{partner_platform}}"}</code>, <code className="text-primary">{"{{compelling_events}}"}</code>, <code className="text-primary">{"{{signals}}"}</code>
+          Full prompt template with JSON schema for story microsites. Placeholders: <code className="text-primary">{"{{company_name}}"}</code>, <code className="text-primary">{"{{signals}}"}</code>, etc.
         </p>
         <Textarea
           value={promptTemplate}
           onChange={e => setPromptTemplate(e.target.value)}
-          className="bg-secondary font-mono text-xs min-h-[400px]"
+          className="bg-secondary font-mono text-xs min-h-[300px]"
         />
       </div>
-      <div className="panel space-y-4">
-        <div className="panel-header">Cards Prompt Template (CRM Dashboard)</div>
-        <p className="text-xs text-muted-foreground">
-          Master prompt for the "Generate Cards" feature. Produces dashboard cards + email/LinkedIn outreach sequences. Leave empty to use the built-in default.
-        </p>
-        <Textarea
-          value={cardsPromptTemplate}
-          onChange={e => setCardsPromptTemplate(e.target.value)}
-          className="bg-secondary font-mono text-xs min-h-[400px]"
-          placeholder="Leave empty to use default cards prompt…"
-        />
-      </div>
+
+      <div className="panel-header text-lg">Tab-Specific Prompts</div>
+      <p className="text-xs text-muted-foreground -mt-4">Each tab in the company detail page uses its own prompt. Edit them independently below.</p>
+
+      {promptSections.map(({ key, label, description, value, setter }) => (
+        <div key={key} className="panel space-y-4">
+          <div className="panel-header">{label}</div>
+          <p className="text-xs text-muted-foreground">{description}</p>
+          <Textarea
+            value={value}
+            onChange={e => setter(e.target.value)}
+            className="bg-secondary font-mono text-xs min-h-[300px]"
+            placeholder={`Enter the ${label.toLowerCase()} here…`}
+          />
+        </div>
+      ))}
+
       <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="w-full gap-2">
         {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
         Save AI Config

@@ -11,7 +11,8 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { company_id, contact_id } = await req.json();
+    const { company_id, contact_id, tab } = await req.json();
+    const activeTab = tab || "strategy"; // default to strategy for backward compat
     if (!company_id) throw new Error("company_id is required");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -84,18 +85,23 @@ serve(async (req) => {
         : null,
     };
 
-    // Build the user prompt
-    const userPrompt = `Generate the full CRM dashboard cards and outreach sequences for this account.
+    const userPrompt = `Generate content for the "${activeTab}" tab of the CRM dashboard for this account.
 
 ACCOUNT CONTEXT:
 ${JSON.stringify(context, null, 2)}
 
 Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
 
-    // Get the system prompt from DB (required)
-    const systemPrompt = aiConfig?.cards_prompt_template;
+    // Select the prompt for the requested tab
+    const promptMap: Record<string, string> = {
+      company: aiConfig?.company_prompt || "",
+      strategy: aiConfig?.strategy_prompt || aiConfig?.cards_prompt_template || "",
+      outreach: aiConfig?.outreach_prompt || "",
+      story: aiConfig?.story_prompt || "",
+    };
+    const systemPrompt = promptMap[activeTab];
     if (!systemPrompt || !systemPrompt.trim()) {
-      throw new Error("Cards prompt template is not configured. Go to Admin Settings → AI & Prompt to set it up.");
+      throw new Error(`${activeTab} prompt is not configured. Go to Admin Settings → AI & Prompt to set it up.`);
     }
 
     console.log(`Generating cards for ${company.name} using ${model}`);
