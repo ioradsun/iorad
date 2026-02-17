@@ -503,8 +503,6 @@ export default function CompanyDetail() {
             <h1 className="text-2xl font-bold tracking-tight">{company.name}</h1>
             <p className="text-sm text-muted-foreground font-mono">{company.domain || "no domain"}</p>
           </div>
-          <ScoreCell score={company.last_score_total} size="lg" />
-          <StatusBadge status={company.snapshot_status} />
         </div>
       </div>
 
