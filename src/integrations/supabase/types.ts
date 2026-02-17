@@ -133,6 +133,7 @@ export type Database = {
           domain: string | null
           headcount: number | null
           hq_country: string | null
+          hubspot_properties: Json | null
           id: string
           industry: string | null
           iorad_url: string | null
@@ -159,6 +160,7 @@ export type Database = {
           domain?: string | null
           headcount?: number | null
           hq_country?: string | null
+          hubspot_properties?: Json | null
           id?: string
           industry?: string | null
           iorad_url?: string | null
@@ -185,6 +187,7 @@ export type Database = {
           domain?: string | null
           headcount?: number | null
           hq_country?: string | null
+          hubspot_properties?: Json | null
           id?: string
           industry?: string | null
           iorad_url?: string | null
@@ -281,6 +284,7 @@ export type Database = {
           confidence: string | null
           created_at: string
           email: string | null
+          hubspot_properties: Json | null
           id: string
           linkedin: string | null
           name: string
@@ -294,6 +298,7 @@ export type Database = {
           confidence?: string | null
           created_at?: string
           email?: string | null
+          hubspot_properties?: Json | null
           id?: string
           linkedin?: string | null
           name: string
@@ -307,6 +312,7 @@ export type Database = {
           confidence?: string | null
           created_at?: string
           email?: string | null
+          hubspot_properties?: Json | null
           id?: string
           linkedin?: string | null
           name?: string

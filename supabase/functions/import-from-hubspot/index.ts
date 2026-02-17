@@ -70,14 +70,17 @@ Deno.serve(async (req) => {
   }
 });
 
-// Fetch a single company from HubSpot by ID
+// Fetch a single company from HubSpot by ID — pull ALL properties
 async function fetchHubSpotCompany(objectId: string | number) {
   const apiKey = Deno.env.get("HUBSPOT_API_KEY");
   if (!apiKey) throw new Error("HUBSPOT_API_KEY not configured");
 
-  const properties = "name,domain,industry,country,numberofemployees,hubspot_owner_id";
+  // First get all available company properties to request them all
+  const allProps = await getAllCompanyPropertyNames(apiKey);
+  const propsParam = allProps.length > 0 ? allProps.join(",") : "name,domain,industry,country,numberofemployees,hubspot_owner_id";
+
   const res = await fetch(
-    `https://api.hubapi.com/crm/v3/objects/companies/${objectId}?properties=${properties}`,
+    `https://api.hubapi.com/crm/v3/objects/companies/${objectId}?properties=${encodeURIComponent(propsParam)}`,
     { headers: { Authorization: `Bearer ${apiKey}` } }
   );
 
@@ -90,12 +93,43 @@ async function fetchHubSpotCompany(objectId: string | number) {
   return data;
 }
 
+// Cache for property names (per invocation)
+let _companyPropNamesCache: string[] | null = null;
+let _contactPropNamesCache: string[] | null = null;
+
+async function getAllCompanyPropertyNames(apiKey: string): Promise<string[]> {
+  if (_companyPropNamesCache) return _companyPropNamesCache;
+  try {
+    const res = await fetch("https://api.hubapi.com/crm/v3/properties/companies", {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!res.ok) { await res.text(); return []; }
+    const data = await res.json();
+    _companyPropNamesCache = (data.results || []).map((p: any) => p.name);
+    return _companyPropNamesCache!;
+  } catch { return []; }
+}
+
+async function getAllContactPropertyNames(apiKey: string): Promise<string[]> {
+  if (_contactPropNamesCache) return _contactPropNamesCache;
+  try {
+    const res = await fetch("https://api.hubapi.com/crm/v3/properties/contacts", {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!res.ok) { await res.text(); return []; }
+    const data = await res.json();
+    _contactPropNamesCache = (data.results || []).map((p: any) => p.name);
+    return _contactPropNamesCache!;
+  } catch { return []; }
+}
+
 // Pull recently created companies from HubSpot (manual sync)
 async function syncRecentCompanies(supabase: any) {
   const apiKey = Deno.env.get("HUBSPOT_API_KEY");
   if (!apiKey) throw new Error("HUBSPOT_API_KEY not configured");
 
-  const properties = "name,domain,industry,country,numberofemployees";
+  const allProps = await getAllCompanyPropertyNames(apiKey);
+  const properties = allProps.length > 0 ? allProps.join(",") : "name,domain,industry,country,numberofemployees";
   
   // Fetch companies created in the last 7 days
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -180,6 +214,7 @@ async function upsertCompany(supabase: any, hubspotCompany: any): Promise<string
     hq_country: props.country || null,
     headcount: props.numberofemployees ? parseInt(String(props.numberofemployees), 10) || null : null,
     source_type: "inbound",
+    hubspot_properties: props,
   };
 
   // Try to find existing by domain first
@@ -228,8 +263,11 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
     // Fetch contact details in batch (up to 10)
     for (const contactId of contactIds.slice(0, 10)) {
       try {
+        // Fetch ALL properties for each contact
+        const allContactProps = await getAllContactPropertyNames(apiKey);
+        const propsParam = allContactProps.length > 0 ? allContactProps.join(",") : "firstname,lastname,email,jobtitle,hs_linkedin_url";
         const contactRes = await fetch(
-          `https://api.hubapi.com/crm/v3/objects/contacts/${contactId}?properties=firstname,lastname,email,jobtitle,hs_linkedin_url`,
+          `https://api.hubapi.com/crm/v3/objects/contacts/${contactId}?properties=${encodeURIComponent(propsParam)}`,
           { headers: { Authorization: `Bearer ${apiKey}` } }
         );
 
@@ -257,6 +295,7 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
               name: contactName,
               title: cp.jobtitle || null,
               linkedin: cp.hs_linkedin_url || null,
+              hubspot_properties: cp,
             }).eq("id", existing.id);
             savedContactId = existing.id;
           }
@@ -272,6 +311,7 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
             linkedin: cp.hs_linkedin_url || null,
             source: "hubspot",
             confidence: "high",
+            hubspot_properties: cp,
           }).select("id").single();
           savedContactId = inserted?.id || null;
         }

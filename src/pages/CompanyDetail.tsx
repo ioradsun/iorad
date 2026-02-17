@@ -509,6 +509,37 @@ export default function CompanyDetail() {
             )}
           </div>
 
+          {/* HubSpot Product Properties */}
+          {companyAny?.hubspot_properties && Object.keys(companyAny.hubspot_properties).length > 0 && (
+            <Collapsible>
+              <CollapsibleTrigger className="flex items-center gap-2 w-full text-left">
+                <ChevronRight className="w-4 h-4 text-muted-foreground transition-transform data-[state=open]:rotate-90" />
+                <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">iorad Product Data (HubSpot)</span>
+                <Badge variant="outline" className="text-[9px] h-4 ml-auto">
+                  {Object.entries(companyAny.hubspot_properties).filter(([_, v]) => v !== null && v !== "" && v !== undefined).length} properties
+                </Badge>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {Object.entries(companyAny.hubspot_properties as Record<string, any>)
+                    .filter(([_, v]) => v !== null && v !== "" && v !== undefined)
+                    .filter(([k]) => !["name", "domain", "industry", "country", "numberofemployees", "hs_object_id", "createdate", "hs_lastmodifieddate", "hs_pipeline"].includes(k))
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([key, value]) => (
+                      <div key={key} className="px-3 py-2 rounded-lg border border-border/50 bg-secondary/20">
+                        <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground truncate" title={key}>
+                          {key.replace(/_/g, " ").replace(/^hs /, "")}
+                        </div>
+                        <div className="text-sm font-medium text-foreground mt-0.5 truncate" title={String(value)}>
+                          {String(value).length > 80 ? String(value).slice(0, 80) + "…" : String(value)}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
           {/* Contacts */}
           <div className="panel">
             <div className="panel-header flex items-center justify-between">
