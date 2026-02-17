@@ -1,10 +1,9 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useCompany, useSignals, useSnapshots, useContacts, useCompanyCards, useUpdateCompany } from "@/hooks/useSupabase";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import ScoreCell from "@/components/ScoreCell";
-import StatusBadge from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail, Plus, Brain, Sparkles, Copy, ChevronRight, Video, BookOpen, Eye, Building2, MapPin, Users, DollarSign, Globe } from "lucide-react";
+import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail, Plus, Sparkles, Eye, Building2, MapPin, Users, DollarSign, Globe, Video, BookOpen, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,355 +19,12 @@ import { motion } from "framer-motion";
 import { Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 
-// --- Types ---
-
-interface ScoreBreakdown {
-  relevance?: number; urgency?: number; buyer_signal?: number;
-  hiring?: number; news?: number; expansion?: number;
-  rules_fired?: string[]; evidence_urls?: string[];
-}
-
-interface SnapshotJSON {
-  trigger_summary?: string; why_now?: string | string[];
-  likely_initiative?: string; suggested_persona_targets?: string[];
-  confidence_level?: string; confidence_reason?: string;
-  missing_data_questions?: string[];
-  evidence?: { snippet?: string; detail?: string; signal_type?: string; source_url?: string; url?: string; source_type?: string; date?: string | null }[];
-  signal_deconstruction?: { observable_facts?: string[]; company_stage?: string; workflow_stress_indicators?: string[] };
-  operational_friction?: { cause?: string; effect?: string; bottleneck?: string }[];
-  partner_platform_ceiling?: { platform_strengths?: string[]; execution_gaps?: string[]; key_insight?: string };
-  embedded_leverage?: { situation?: string; constraint?: string; intervention?: string; transformation?: string };
-  quantified_impact?: { metric?: string; assumptions?: string; calculation?: string; result?: string }[];
-  executive_narrative?: string;
-  outbound_positioning?: { executive_framing?: string; efficiency_framing?: string; risk_framing?: string };
-  competitive_insulation?: string[];
-}
-
-interface CardField { label: string; value: string; status?: string }
-interface CardAction { label: string; value: string }
-interface Strategy { title: string; pitch: string; why_now: string; proof: string; what_to_validate: string[]; sources: string[] }
-interface DashboardCard { id: string; title: string; priority: string; fields?: CardField[]; actions?: CardAction[]; strategies?: Strategy[] }
-interface EmailTouch { subject_lines: string[]; body: string }
-interface LinkedInStep { step: number; timing: string; message: string }
-interface StoryAssets {
-  active_strategy?: string;
-  primary_asset?: {
-    type: string; title: string; purpose: string; covers: string[];
-    when_to_send: string; intro_message: string; loom_script: string;
-  };
-  supporting_asset?: {
-    type: string; title: string; environment: string; what_it_guides: string[];
-    business_outcome: string; when_to_send: string; intro_message: string; embed_context: string;
-  };
-}
-
-function toArray(val: unknown): string[] {
-  if (Array.isArray(val)) return val.map(String);
-  if (typeof val === "string" && val) return [val];
-  return [];
-}
-
-function parseJson<T>(val: Json | null | undefined): T | null {
-  if (!val) return null;
-  if (typeof val === "object") return val as unknown as T;
-  try { return JSON.parse(String(val)); } catch { return null; }
-}
-
-// --- Truth Status Badge ---
-const statusColors: Record<string, string> = {
-  Provided: "bg-primary/10 text-primary border-primary/20",
-  "Source-backed": "bg-info/10 text-info border-info/20",
-  Inference: "bg-warning/10 text-warning border-warning/20",
-  Hypothesis: "bg-accent/50 text-accent-foreground border-accent",
-  Unknown: "bg-muted text-muted-foreground border-border",
-};
-
-function TruthBadge({ status }: { status?: string }) {
-  if (!status) return null;
-  const cls = statusColors[status] || statusColors.Unknown;
-  return <span className={`text-[10px] px-1.5 py-0.5 rounded border ${cls}`}>{status}</span>;
-}
-
-function copyToClipboard(text: string) {
-  navigator.clipboard.writeText(text);
-  toast.success("Copied to clipboard");
-}
-
-// --- Loom embed helper ---
-function toLoomEmbedUrl(url: string): string | null {
-  if (!url) return null;
-  const match = url.match(/loom\.com\/(?:share|embed)\/([a-zA-Z0-9]+)/);
-  if (match) return `https://www.loom.com/embed/${match[1]}`;
-  return null;
-}
-
-// --- iorad embed helper ---
-function toIoradEmbedUrl(url: string): string | null {
-  if (!url) return null;
-  const base = url.split("?")[0];
-  return `${base}${url.includes("?") ? "&" : "?"}oembed=1`;
-}
-
-// --- Dashboard Card Component ---
-function DashboardCardUI({ card }: { card: DashboardCard }) {
-  if (card.id === "ai_strategy" && card.strategies?.length) {
-    return (
-      <Card className="col-span-1 lg:col-span-2">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <Brain className="w-4 h-4 text-primary" />
-            {card.title}
-            <Badge variant="outline" className="text-[10px] ml-auto">{card.priority}</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {card.strategies.map((s, i) => (
-            <div key={i} className="border rounded-lg p-3 space-y-2">
-              <div className="font-medium text-sm">{s.title}</div>
-              <p className="text-xs text-muted-foreground leading-relaxed">{s.pitch}</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                <div><span className="font-mono text-muted-foreground">Why now:</span> <span className="text-foreground/80">{s.why_now}</span></div>
-                <div><span className="font-mono text-muted-foreground">Proof:</span> <span className="text-foreground/80">{s.proof}</span></div>
-              </div>
-              {s.what_to_validate?.length > 0 && (
-                <div className="text-xs">
-                  <span className="font-mono text-muted-foreground">Validate:</span>
-                  <ul className="mt-1 space-y-0.5">{s.what_to_validate.map((q, j) => <li key={j} className="text-foreground/70 flex gap-1"><span className="text-primary">•</span>{q}</li>)}</ul>
-                </div>
-              )}
-              {s.sources?.length > 0 && (
-                <div className="flex flex-wrap gap-1 pt-1">
-                  {s.sources.map((url, j) => (
-                    <a key={j} href={url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
-                      <ExternalLink className="w-3 h-3" /> Source
-                    </a>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-medium flex items-center gap-2">
-          {card.title}
-          <Badge variant="outline" className="text-[10px] ml-auto">{card.priority}</Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {card.fields?.length ? (
-          <div className="space-y-2">
-            {card.fields.map((f, i) => (
-              <div key={i} className="flex items-start justify-between gap-2 text-xs">
-                <div className="flex-1">
-                  <span className="font-mono text-muted-foreground">{f.label}:</span>{" "}
-                  <span className="text-foreground/90">{f.value}</span>
-                </div>
-                <TruthBadge status={f.status} />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">No data</p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-// --- Email Sequence ---
-function EmailSequenceUI({ emails }: { emails: Record<string, EmailTouch> }) {
-  const entries = Object.entries(emails).sort();
-  if (entries.length === 0) return null;
-  return (
-    <Accordion type="multiple" className="space-y-1">
-      {entries.map(([key, email]) => (
-        <AccordionItem key={key} value={key} className="border rounded-lg px-4">
-          <AccordionTrigger className="text-sm font-medium">
-            <div className="flex items-center gap-2">
-              <Mail className="w-4 h-4 text-primary" />
-              {key.replace("_", " ").replace(/\b\w/g, c => c.toUpperCase())}
-            </div>
-          </AccordionTrigger>
-          <AccordionContent>
-            <div className="space-y-3">
-              {email.subject_lines?.length > 0 && (
-                <div>
-                  <div className="text-[10px] font-mono text-muted-foreground mb-1">Subject Lines</div>
-                  {email.subject_lines.map((s, i) => (
-                    <div key={i} className="text-xs text-foreground/90 flex items-center gap-2">
-                      <span>• {s}</span>
-                      <button onClick={() => copyToClipboard(s)} className="text-muted-foreground hover:text-primary"><Copy className="w-3 h-3" /></button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div>
-                <div className="text-[10px] font-mono text-muted-foreground mb-1">Body</div>
-                <div className="text-xs text-foreground/80 whitespace-pre-wrap leading-relaxed bg-secondary/30 rounded p-3">{email.body}</div>
-              </div>
-              <Button size="sm" variant="ghost" className="gap-1 text-xs h-7" onClick={() => copyToClipboard(`Subject: ${email.subject_lines?.[0] || ""}\n\n${email.body}`)}>
-                <Copy className="w-3 h-3" /> Copy Full Email
-              </Button>
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-      ))}
-    </Accordion>
-  );
-}
-
-// --- LinkedIn Sequence ---
-function LinkedInSequenceUI({ steps }: { steps: LinkedInStep[] }) {
-  if (!steps?.length) return null;
-  return (
-    <Accordion type="multiple" className="space-y-1">
-      {steps.map((step) => (
-        <AccordionItem key={step.step} value={`li-${step.step}`} className="border rounded-lg px-4">
-          <AccordionTrigger className="text-sm font-medium">
-            <div className="flex items-center gap-2">
-              <Linkedin className="w-4 h-4 text-primary" />
-              Step {step.step} — {step.timing}
-            </div>
-          </AccordionTrigger>
-          <AccordionContent>
-            <div className="text-xs text-foreground/80 whitespace-pre-wrap leading-relaxed bg-secondary/30 rounded p-3">{step.message}</div>
-            <Button size="sm" variant="ghost" className="gap-1 text-xs h-7 mt-2" onClick={() => copyToClipboard(step.message)}>
-              <Copy className="w-3 h-3" /> Copy
-            </Button>
-          </AccordionContent>
-        </AccordionItem>
-      ))}
-    </Accordion>
-  );
-}
-
-// --- Story Assets (AI-generated config) ---
-function StoryAssetsUI({ storyAssets }: { storyAssets: StoryAssets }) {
-  const loom = storyAssets.primary_asset;
-  const iorad = storyAssets.supporting_asset;
-  const loomReady = !!(loom?.title && loom?.loom_script);
-  const ioradReady = !!(iorad?.title && iorad?.what_it_guides?.length);
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-primary" /> AI-Generated Story Config
-        </h3>
-        {storyAssets.active_strategy && (
-          <Badge variant="outline" className="text-xs">Strategy: {storyAssets.active_strategy}</Badge>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Loom — Narrative Layer */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Video className="w-4 h-4 text-primary" />
-              Loom Script
-              <span className="text-[10px] text-muted-foreground">(Narrative Layer)</span>
-              <Badge variant={loomReady ? "default" : "secondary"} className="text-[10px] ml-auto">
-                {loomReady ? "Ready" : "Not Ready"}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {loom?.title && (
-              <div className="text-xs"><span className="font-mono text-muted-foreground">Title:</span> <span className="text-foreground/90">{loom.title}</span></div>
-            )}
-            {loom?.purpose && (
-              <div className="text-xs"><span className="font-mono text-muted-foreground">Purpose:</span> <span className="text-foreground/90">{loom.purpose}</span></div>
-            )}
-            {loom?.covers?.length > 0 && (
-              <div className="text-xs">
-                <span className="font-mono text-muted-foreground">Covers:</span>
-                <ul className="mt-1 space-y-0.5">{loom.covers.map((c, i) => <li key={i} className="text-foreground/80 flex gap-1"><span className="text-primary">•</span>{c}</li>)}</ul>
-              </div>
-            )}
-            {loom?.when_to_send && (
-              <div className="text-xs"><span className="font-mono text-muted-foreground">When to send:</span> <span className="text-foreground/90">{loom.when_to_send}</span></div>
-            )}
-            {loom?.intro_message && (
-              <div className="space-y-1">
-                <div className="text-[10px] font-mono text-muted-foreground">Intro Message</div>
-                <div className="text-xs text-foreground/80 bg-secondary/30 rounded p-2">{loom.intro_message}</div>
-                <Button size="sm" variant="ghost" className="gap-1 text-xs h-7" onClick={() => copyToClipboard(loom.intro_message)}>
-                  <Copy className="w-3 h-3" /> Copy Intro
-                </Button>
-              </div>
-            )}
-            {loom?.loom_script && (
-              <div className="space-y-1 border-t border-border/50 pt-3">
-                <div className="text-[10px] font-mono text-muted-foreground">Loom Script</div>
-                <div className="text-xs text-foreground/80 whitespace-pre-wrap leading-relaxed bg-secondary/30 rounded p-3 max-h-64 overflow-y-auto">{loom.loom_script}</div>
-                <Button size="sm" variant="ghost" className="gap-1 text-xs h-7" onClick={() => copyToClipboard(loom.loom_script)}>
-                  <Copy className="w-3 h-3" /> Copy Script
-                </Button>
-              </div>
-            )}
-            {!loom?.title && <p className="text-xs text-muted-foreground">No Loom data generated yet.</p>}
-          </CardContent>
-        </Card>
-
-        {/* iorad Tutorial — Mechanism Layer */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-primary" />
-              iorad Tutorial
-              <span className="text-[10px] text-muted-foreground">(Mechanism Layer)</span>
-              <Badge variant={ioradReady ? "default" : "secondary"} className="text-[10px] ml-auto">
-                {ioradReady ? "Ready" : "Not Ready"}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {iorad?.title && (
-              <div className="text-xs"><span className="font-mono text-muted-foreground">Title:</span> <span className="text-foreground/90">{iorad.title}</span></div>
-            )}
-            {iorad?.environment && (
-              <div className="text-xs"><span className="font-mono text-muted-foreground">Environment:</span> <span className="text-foreground/90">{iorad.environment}</span></div>
-            )}
-            {iorad?.what_it_guides?.length > 0 && (
-              <div className="text-xs">
-                <span className="font-mono text-muted-foreground">What it guides:</span>
-                <ul className="mt-1 space-y-0.5">{iorad.what_it_guides.map((g, i) => <li key={i} className="text-foreground/80 flex gap-1"><span className="text-primary">•</span>{g}</li>)}</ul>
-              </div>
-            )}
-            {iorad?.business_outcome && (
-              <div className="text-xs"><span className="font-mono text-muted-foreground">Business outcome:</span> <span className="text-foreground/90">{iorad.business_outcome}</span></div>
-            )}
-            {iorad?.when_to_send && (
-              <div className="text-xs"><span className="font-mono text-muted-foreground">When to send:</span> <span className="text-foreground/90">{iorad.when_to_send}</span></div>
-            )}
-            {iorad?.intro_message && (
-              <div className="space-y-1">
-                <div className="text-[10px] font-mono text-muted-foreground">Intro Message</div>
-                <div className="text-xs text-foreground/80 bg-secondary/30 rounded p-2">{iorad.intro_message}</div>
-                <Button size="sm" variant="ghost" className="gap-1 text-xs h-7" onClick={() => copyToClipboard(iorad.intro_message)}>
-                  <Copy className="w-3 h-3" /> Copy Intro
-                </Button>
-              </div>
-            )}
-            {iorad?.embed_context && (
-              <div className="text-xs"><span className="font-mono text-muted-foreground">Embed context:</span> <span className="text-foreground/90">{iorad.embed_context}</span></div>
-            )}
-            {!iorad?.title && <p className="text-xs text-muted-foreground">No tutorial data generated yet.</p>}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-// === MAIN COMPONENT ===
+// Sub-components
+import { parseJson, toArray, toLoomEmbedUrl, toIoradEmbedUrl } from "./company/types";
+import type { ScoreBreakdown, SnapshotJSON, DashboardCard, EmailTouch, LinkedInStep, StoryAssets } from "./company/types";
+import { DashboardCardUI } from "./company/DashboardCardUI";
+import { EmailSequenceUI, LinkedInSequenceUI } from "./company/OutreachSequences";
+import { StoryAssetsUI } from "./company/StoryAssetsUI";
 
 export default function CompanyDetail() {
   const { id } = useParams<{ id: string }>();
@@ -380,7 +36,6 @@ export default function CompanyDetail() {
   const updateCompany = useUpdateCompany();
   const queryClient = useQueryClient();
   const [regenerating, setRegenerating] = useState(false);
-  
   const [generatingCards, setGeneratingCards] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState<string>("");
   const [addContactOpen, setAddContactOpen] = useState(false);
@@ -390,20 +45,15 @@ export default function CompanyDetail() {
   const [loomUrl, setLoomUrl] = useState<string | null>(null);
   const [ioradUrl, setIoradUrl] = useState<string | null>(null);
 
-  // Autosave URL debounce
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosaveUrls = useCallback((loom: string, iorad: string) => {
     if (!id) return;
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     autosaveTimer.current = setTimeout(() => {
-      updateCompany.mutate({
-        id,
-        updates: { loom_url: loom || null, iorad_url: iorad || null },
-      });
+      updateCompany.mutate({ id, updates: { loom_url: loom || null, iorad_url: iorad || null } });
     }, 800);
   }, [id, updateCompany]);
 
-  // Sync local state with company data
   const companyAny = company as any;
   const effectiveLoomUrl = loomUrl ?? companyAny?.loom_url ?? "";
   const effectiveIoradUrl = ioradUrl ?? companyAny?.iorad_url ?? "";
@@ -459,7 +109,6 @@ export default function CompanyDetail() {
     finally { setGeneratingCards(false); }
   };
 
-  // Selected contact for display
   const selectedContact = contacts.find((c: any) => c.id === selectedContactId) || contacts[0] || null;
 
   const contactSelector = contacts.length > 0 ? (
@@ -479,7 +128,6 @@ export default function CompanyDetail() {
   ) : (
     <span className="text-xs text-muted-foreground italic">No contacts</span>
   );
-
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
@@ -512,7 +160,6 @@ export default function CompanyDetail() {
   const loomEmbedUrl = toLoomEmbedUrl(effectiveLoomUrl);
   const ioradEmbedUrl = toIoradEmbedUrl(effectiveIoradUrl);
 
-  // Build story URL for link
   const firstContact = contacts[0] || (companyAny?.buyer_name ? { name: companyAny.buyer_name } : null);
   const storyBaseUrl = firstContact && company.partner
     ? `/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories/${firstContact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "")}`
@@ -531,7 +178,6 @@ export default function CompanyDetail() {
         </div>
       </div>
 
-      {/* ============ TABS ============ */}
       <Tabs defaultValue="company" className="w-full">
         <TabsList className="w-full justify-start">
           <TabsTrigger value="company">Company</TabsTrigger>
@@ -549,7 +195,8 @@ export default function CompanyDetail() {
               {regenerating ? "Generating…" : signals.length > 0 ? "Regenerate" : "Generate"}
             </Button>
           </div>
-          {/* Company Profile — scannable card grid */}
+
+          {/* Company Profile */}
           {(accountData?.about?.text || company.domain) && (
             <p className="text-sm text-foreground/80 leading-relaxed line-clamp-2">
               {accountData?.about?.text || `${company.name} — ${company.domain}`}
@@ -557,65 +204,53 @@ export default function CompanyDetail() {
           )}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {(accountData?.industry?.value || company.industry) && (
-              <Card className="bg-secondary/30">
-                <CardContent className="p-3 flex flex-col items-start gap-1.5">
-                  <Building2 className="w-4 h-4 text-primary" />
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Industry</span>
-                  <span className="text-sm font-medium text-foreground leading-tight">{accountData?.industry?.value || company.industry?.replace(/_/g, " ").toLowerCase()}</span>
-                </CardContent>
-              </Card>
+              <Card className="bg-secondary/30"><CardContent className="p-3 flex flex-col items-start gap-1.5">
+                <Building2 className="w-4 h-4 text-primary" />
+                <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Industry</span>
+                <span className="text-sm font-medium text-foreground leading-tight">{accountData?.industry?.value || company.industry?.replace(/_/g, " ").toLowerCase()}</span>
+              </CardContent></Card>
             )}
             {(accountData?.employees?.value || company.headcount) && (
-              <Card className="bg-secondary/30">
-                <CardContent className="p-3 flex flex-col items-start gap-1.5">
-                  <Users className="w-4 h-4 text-primary" />
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Employees</span>
-                  <span className="text-sm font-medium text-foreground">{accountData?.employees?.value || `${company.headcount}+`}</span>
-                </CardContent>
-              </Card>
+              <Card className="bg-secondary/30"><CardContent className="p-3 flex flex-col items-start gap-1.5">
+                <Users className="w-4 h-4 text-primary" />
+                <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Employees</span>
+                <span className="text-sm font-medium text-foreground">{accountData?.employees?.value || `${company.headcount}+`}</span>
+              </CardContent></Card>
             )}
             {(accountData?.hq?.value || company.hq_country) && (
-              <Card className="bg-secondary/30">
-                <CardContent className="p-3 flex flex-col items-start gap-1.5">
-                  <MapPin className="w-4 h-4 text-primary" />
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Headquarters</span>
-                  <span className="text-sm font-medium text-foreground leading-tight">{accountData?.hq?.value || company.hq_country}</span>
-                </CardContent>
-              </Card>
+              <Card className="bg-secondary/30"><CardContent className="p-3 flex flex-col items-start gap-1.5">
+                <MapPin className="w-4 h-4 text-primary" />
+                <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Headquarters</span>
+                <span className="text-sm font-medium text-foreground leading-tight">{accountData?.hq?.value || company.hq_country}</span>
+              </CardContent></Card>
             )}
             {accountData?.revenue_range?.value && accountData.revenue_range.value !== "Unknown" && (
-              <Card className="bg-secondary/30">
-                <CardContent className="p-3 flex flex-col items-start gap-1.5">
-                  <DollarSign className="w-4 h-4 text-primary" />
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Revenue</span>
-                  <span className="text-sm font-medium text-foreground">{accountData.revenue_range.value}</span>
-                </CardContent>
-              </Card>
+              <Card className="bg-secondary/30"><CardContent className="p-3 flex flex-col items-start gap-1.5">
+                <DollarSign className="w-4 h-4 text-primary" />
+                <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Revenue</span>
+                <span className="text-sm font-medium text-foreground">{accountData.revenue_range.value}</span>
+              </CardContent></Card>
             )}
             {company.domain && (
-              <Card className="bg-secondary/30">
-                <CardContent className="p-3 flex flex-col items-start gap-1.5">
-                  <Globe className="w-4 h-4 text-primary" />
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Website</span>
-                  <a href={`https://${company.domain}`} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary hover:underline">{company.domain}</a>
-                </CardContent>
-              </Card>
+              <Card className="bg-secondary/30"><CardContent className="p-3 flex flex-col items-start gap-1.5">
+                <Globe className="w-4 h-4 text-primary" />
+                <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Website</span>
+                <a href={`https://${company.domain}`} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary hover:underline">{company.domain}</a>
+              </CardContent></Card>
             )}
             {company.partner && (
-              <Card className="bg-secondary/30">
-                <CardContent className="p-3 flex flex-col items-start gap-1.5">
-                  <Briefcase className="w-4 h-4 text-primary" />
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Partner</span>
-                  <span className="text-sm font-medium text-foreground">{company.partner}</span>
-                </CardContent>
-              </Card>
+              <Card className="bg-secondary/30"><CardContent className="p-3 flex flex-col items-start gap-1.5">
+                <Briefcase className="w-4 h-4 text-primary" />
+                <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Partner</span>
+                <span className="text-sm font-medium text-foreground">{company.partner}</span>
+              </CardContent></Card>
             )}
           </div>
 
           {/* Contacts */}
           <div className="panel">
             <div className="panel-header flex items-center justify-between">
-              <span>Contacts ({contacts.length || ((companyAny)?.buyer_name ? 1 : 0)})</span>
+              <span>Contacts ({contacts.length || (companyAny?.buyer_name ? 1 : 0)})</span>
               <Dialog open={addContactOpen} onOpenChange={setAddContactOpen}>
                 <DialogTrigger asChild>
                   <Button size="sm" variant="ghost" className="gap-1 text-xs h-7"><Plus className="w-3.5 h-3.5" /> Add</Button>
@@ -659,7 +294,7 @@ export default function CompanyDetail() {
                     </div>
                   </div>
                 );
-              }) : (companyAny)?.buyer_name ? (
+              }) : companyAny?.buyer_name ? (
                 <div className="flex items-center gap-4 p-2 rounded-md hover:bg-secondary/30 transition-colors">
                   <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center"><UserSearch className="w-4 h-4 text-primary" /></div>
                   <div className="flex-1 min-w-0 space-y-0.5">
@@ -679,22 +314,22 @@ export default function CompanyDetail() {
 
           <div className="glow-line" />
 
-          {/* Extra — Score, Signals, Analysis, History (open by default in Company tab) */}
+          {/* Score + Signals + Analysis (collapsible) */}
           <Collapsible open={extraOpen} onOpenChange={setExtraOpen}>
             <CollapsibleTrigger asChild>
-              <Button variant="ghost" className="w-full justify-between text-sm font-medium h-10">
-                <span className="flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-primary" />
-                  Score, Signals, Analysis & History
-                </span>
+              <Button variant="ghost" className="w-full justify-between text-xs font-mono uppercase tracking-wider text-muted-foreground hover:text-foreground">
+                Score · Signals · Analysis
                 <ChevronRight className={`w-4 h-4 transition-transform ${extraOpen ? "rotate-90" : ""}`} />
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="space-y-6 pt-4">
-              {/* Score + Signals row */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="panel lg:col-span-1">
-                  <div className="panel-header">Score Breakdown</div>
+                {/* Score */}
+                <div className="panel">
+                  <div className="panel-header flex items-center justify-between">
+                    <span>Score</span>
+                    <ScoreCell score={company.last_score_total} />
+                  </div>
                   {bd ? (
                     <div className="space-y-4">
                       {[
@@ -727,6 +362,7 @@ export default function CompanyDetail() {
                   )}
                 </div>
 
+                {/* Signals */}
                 <div className="panel lg:col-span-2">
                   <div className="panel-header">Signals ({signals.length})</div>
                   {signals.length === 0 ? (
@@ -1027,12 +663,8 @@ export default function CompanyDetail() {
           ) : cards.length > 0 ? (
             <>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {cards.map((card, i) => (
-                  <DashboardCardUI key={card.id || i} card={card} />
-                ))}
+                {cards.map((card, i) => <DashboardCardUI key={card.id || i} card={card} />)}
               </div>
-
-              {/* AI-Generated Story Config */}
               {assets.story_assets && (assets.story_assets.primary_asset || assets.story_assets.supporting_asset) && (
                 <>
                   <div className="glow-line" />
@@ -1112,13 +744,7 @@ export default function CompanyDetail() {
                   </Button>
                 </a>
               )}
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5 text-xs"
-                onClick={generateCards}
-                disabled={generatingCards}
-              >
+              <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={generateCards} disabled={generatingCards}>
                 {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                 {generatingCards ? "Generating…" : (assets.story_assets ? "Regenerate" : "Generate")}
               </Button>
@@ -1130,11 +756,8 @@ export default function CompanyDetail() {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Video className="w-4 h-4 text-primary" />
-                  Loom Video
-                  <Badge variant="outline" className="text-[10px] ml-auto">
-                    {effectiveLoomUrl ? "Ready" : "Not Set"}
-                  </Badge>
+                  <Video className="w-4 h-4 text-primary" /> Loom Video
+                  <Badge variant="outline" className="text-[10px] ml-auto">{effectiveLoomUrl ? "Ready" : "Not Set"}</Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -1154,11 +777,8 @@ export default function CompanyDetail() {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <BookOpen className="w-4 h-4 text-primary" />
-                  iorad Tutorial
-                  <Badge variant="outline" className="text-[10px] ml-auto">
-                    {effectiveIoradUrl ? "Ready" : "Not Set"}
-                  </Badge>
+                  <BookOpen className="w-4 h-4 text-primary" /> iorad Tutorial
+                  <Badge variant="outline" className="text-[10px] ml-auto">{effectiveIoradUrl ? "Ready" : "Not Set"}</Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -1186,15 +806,7 @@ export default function CompanyDetail() {
                 <div className="space-y-2">
                   <h4 className="text-sm font-medium flex items-center gap-2"><Video className="w-4 h-4 text-primary" /> Loom Video</h4>
                   <div className="rounded-xl overflow-hidden border">
-                    <iframe
-                      src={loomEmbedUrl}
-                      width="100%"
-                      height="400"
-                      frameBorder="0"
-                      allowFullScreen
-                      allow="autoplay; fullscreen"
-                      title="Loom video preview"
-                    />
+                    <iframe src={loomEmbedUrl} width="100%" height="400" frameBorder="0" allowFullScreen allow="autoplay; fullscreen" title="Loom video preview" />
                   </div>
                 </div>
               )}
@@ -1204,11 +816,7 @@ export default function CompanyDetail() {
                   <h4 className="text-sm font-medium flex items-center gap-2"><BookOpen className="w-4 h-4 text-primary" /> iorad Tutorial</h4>
                   <div className="rounded-xl overflow-hidden border">
                     <iframe
-                      src={ioradEmbedUrl}
-                      width="100%"
-                      height="500"
-                      frameBorder="0"
-                      allowFullScreen
+                      src={ioradEmbedUrl} width="100%" height="500" frameBorder="0" allowFullScreen
                       allow="camera; microphone; clipboard-write"
                       sandbox="allow-scripts allow-forms allow-same-origin allow-presentation allow-downloads allow-modals allow-popups allow-popups-to-escape-sandbox allow-top-navigation allow-top-navigation-by-user-activation"
                       title="iorad tutorial preview"
