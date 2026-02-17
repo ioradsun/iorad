@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail, Plus, Sparkles, Eye, Building2, MapPin, Users, DollarSign, Globe, Video, BookOpen, ChevronRight } from "lucide-react";
+import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail, Plus, Sparkles, Eye, Building2, MapPin, Users, DollarSign, Globe, Video, BookOpen, ChevronRight, Search } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,6 +45,7 @@ export default function CompanyDetail() {
   const [extraOpen, setExtraOpen] = useState(true);
   const [loomUrl, setLoomUrl] = useState<string | null>(null);
   const [ioradUrl, setIoradUrl] = useState<string | null>(null);
+  const [pushingToClay, setPushingToClay] = useState(false);
 
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosaveUrls = useCallback((loom: string, iorad: string) => {
@@ -93,6 +94,19 @@ export default function CompanyDetail() {
       queryClient.invalidateQueries({ queryKey: ["companies"] });
     } catch (e: any) { toast.error(e.message || "Operation failed"); }
     finally { setRegenerating(false); }
+  };
+
+  const pushToClay = async () => {
+    if (!id) return;
+    setPushingToClay(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("push-to-clay", { body: { company_id: id } });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success(`Pushed ${data?.company || "company"} to Clay for enrichment`);
+      queryClient.invalidateQueries({ queryKey: ["company", id] });
+    } catch (e: any) { toast.error(e.message || "Failed to push to Clay"); }
+    finally { setPushingToClay(false); }
   };
 
   const generateCards = async () => {
@@ -251,7 +265,24 @@ export default function CompanyDetail() {
           {/* Contacts */}
           <div className="panel">
             <div className="panel-header flex items-center justify-between">
-              <span>Contacts ({contacts.length || (companyAny?.buyer_name ? 1 : 0)})</span>
+              <div className="flex items-center gap-3">
+                <span>Contacts ({contacts.length || (companyAny?.buyer_name ? 1 : 0)})</span>
+                {companyAny?.clay_pushed_at && (
+                  <span className="text-[10px] text-muted-foreground font-normal flex items-center gap-1">
+                    <Search className="w-3 h-3" />
+                    Clay enriched {new Date(companyAny.clay_pushed_at).toLocaleDateString()}
+                    {(() => {
+                      const clayContacts = contacts.filter((c: any) => c.source === "clay");
+                      return clayContacts.length > 0 ? ` · ${clayContacts.length} found` : "";
+                    })()}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1">
+                <Button size="sm" variant="ghost" className="gap-1 text-xs h-7" onClick={pushToClay} disabled={pushingToClay}>
+                  {pushingToClay ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+                  {pushingToClay ? "Pushing…" : "Enrich via Clay"}
+                </Button>
               <Dialog open={addContactOpen} onOpenChange={setAddContactOpen}>
                 <DialogTrigger asChild>
                   <Button size="sm" variant="ghost" className="gap-1 text-xs h-7"><Plus className="w-3.5 h-3.5" /> Add</Button>
@@ -269,6 +300,7 @@ export default function CompanyDetail() {
                   </div>
                 </DialogContent>
               </Dialog>
+              </div>
             </div>
             <div className="space-y-3">
               {contacts.length > 0 ? contacts.map((contact) => {

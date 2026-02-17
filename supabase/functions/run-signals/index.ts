@@ -346,6 +346,7 @@ Deno.serve(async (req) => {
               console.error(`Clay push failed for ${company.name}: ${clayResp.status} ${errText}`);
             } else {
               console.log(`Pushed ${company.name} to Clay table`);
+              await supabase.from("companies").update({ clay_pushed_at: new Date().toISOString() }).eq("id", company.id);
             }
           } catch (clayErr: any) {
             console.error(`Clay push error for ${company.name}: ${clayErr.message}`);
