@@ -272,3 +272,19 @@ export function useSignalCounts() {
   });
 }
 
+// ---- Meetings ----
+export function useMeetings(companyId: string | undefined) {
+  return useQuery({
+    queryKey: ["meetings", companyId],
+    enabled: !!companyId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("meetings")
+        .select("*")
+        .eq("company_id", companyId!)
+        .order("meeting_date", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+}
