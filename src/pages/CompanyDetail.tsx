@@ -545,58 +545,68 @@ export default function CompanyDetail() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          {/* Company Profile Card */}
-          <Card>
-            <CardContent className="pt-5 pb-4">
-              <div className="flex flex-col gap-3">
-                {/* About line */}
-                {(accountData?.about?.text || company.domain) && (
-                  <p className="text-sm text-foreground/80 leading-relaxed line-clamp-2">
-                    {accountData?.about?.text || `${company.name} — ${company.domain}`}
-                  </p>
-                )}
-                {/* Metadata pills row */}
-                <div className="flex flex-wrap gap-x-4 gap-y-2">
-                  {(accountData?.industry?.value || company.industry) && (
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Building2 className="w-3.5 h-3.5 text-primary" />
-                      <span className="text-foreground/90">{accountData?.industry?.value || company.industry?.replace(/_/g, " ").toLowerCase()}</span>
-                    </div>
-                  )}
-                  {(accountData?.employees?.value || company.headcount) && (
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Users className="w-3.5 h-3.5 text-primary" />
-                      <span className="text-foreground/90">{accountData?.employees?.value || `${company.headcount}+`} employees</span>
-                    </div>
-                  )}
-                  {(accountData?.hq?.value || company.hq_country) && (
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <MapPin className="w-3.5 h-3.5 text-primary" />
-                      <span className="text-foreground/90">{accountData?.hq?.value || company.hq_country}</span>
-                    </div>
-                  )}
-                  {accountData?.revenue_range?.value && accountData.revenue_range.value !== "Unknown" && (
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <DollarSign className="w-3.5 h-3.5 text-primary" />
-                      <span className="text-foreground/90">{accountData.revenue_range.value}</span>
-                    </div>
-                  )}
-                  {company.domain && (
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Globe className="w-3.5 h-3.5 text-primary" />
-                      <a href={`https://${company.domain}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{company.domain}</a>
-                    </div>
-                  )}
-                  {company.partner && (
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Briefcase className="w-3.5 h-3.5 text-primary" />
-                      <span className="text-foreground/90">Partner: {company.partner}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Company Profile — scannable card grid */}
+          {(accountData?.about?.text || company.domain) && (
+            <p className="text-sm text-foreground/80 leading-relaxed line-clamp-2">
+              {accountData?.about?.text || `${company.name} — ${company.domain}`}
+            </p>
+          )}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {(accountData?.industry?.value || company.industry) && (
+              <Card className="bg-secondary/30">
+                <CardContent className="p-3 flex flex-col items-start gap-1.5">
+                  <Building2 className="w-4 h-4 text-primary" />
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Industry</span>
+                  <span className="text-sm font-medium text-foreground leading-tight">{accountData?.industry?.value || company.industry?.replace(/_/g, " ").toLowerCase()}</span>
+                </CardContent>
+              </Card>
+            )}
+            {(accountData?.employees?.value || company.headcount) && (
+              <Card className="bg-secondary/30">
+                <CardContent className="p-3 flex flex-col items-start gap-1.5">
+                  <Users className="w-4 h-4 text-primary" />
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Employees</span>
+                  <span className="text-sm font-medium text-foreground">{accountData?.employees?.value || `${company.headcount}+`}</span>
+                </CardContent>
+              </Card>
+            )}
+            {(accountData?.hq?.value || company.hq_country) && (
+              <Card className="bg-secondary/30">
+                <CardContent className="p-3 flex flex-col items-start gap-1.5">
+                  <MapPin className="w-4 h-4 text-primary" />
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Headquarters</span>
+                  <span className="text-sm font-medium text-foreground leading-tight">{accountData?.hq?.value || company.hq_country}</span>
+                </CardContent>
+              </Card>
+            )}
+            {accountData?.revenue_range?.value && accountData.revenue_range.value !== "Unknown" && (
+              <Card className="bg-secondary/30">
+                <CardContent className="p-3 flex flex-col items-start gap-1.5">
+                  <DollarSign className="w-4 h-4 text-primary" />
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Revenue</span>
+                  <span className="text-sm font-medium text-foreground">{accountData.revenue_range.value}</span>
+                </CardContent>
+              </Card>
+            )}
+            {company.domain && (
+              <Card className="bg-secondary/30">
+                <CardContent className="p-3 flex flex-col items-start gap-1.5">
+                  <Globe className="w-4 h-4 text-primary" />
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Website</span>
+                  <a href={`https://${company.domain}`} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary hover:underline">{company.domain}</a>
+                </CardContent>
+              </Card>
+            )}
+            {company.partner && (
+              <Card className="bg-secondary/30">
+                <CardContent className="p-3 flex flex-col items-start gap-1.5">
+                  <Briefcase className="w-4 h-4 text-primary" />
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Partner</span>
+                  <span className="text-sm font-medium text-foreground">{company.partner}</span>
+                </CardContent>
+              </Card>
+            )}
+          </div>
 
           {/* Contacts */}
           <div className="panel">
