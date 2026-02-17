@@ -11,8 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail, Plus, ChevronDown, Search, Brain, Sparkles, Copy, ChevronRight, Video, BookOpen, Save, Eye, Building2, MapPin, Users, DollarSign, Globe } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail, Plus, Brain, Sparkles, Copy, ChevronRight, Video, BookOpen, Save, Eye, Building2, MapPin, Users, DollarSign, Globe } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -380,7 +379,7 @@ export default function CompanyDetail() {
   const updateCompany = useUpdateCompany();
   const queryClient = useQueryClient();
   const [regenerating, setRegenerating] = useState(false);
-  const [runMode, setRunMode] = useState<string | null>(null);
+  
   const [generatingCards, setGeneratingCards] = useState(false);
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [newContact, setNewContact] = useState({ name: "", title: "", email: "", linkedin: "" });
@@ -415,7 +414,7 @@ export default function CompanyDetail() {
 
   const regenerate = async (mode: string = "full") => {
     if (!id) return;
-    setRegenerating(true); setRunMode(mode);
+    setRegenerating(true);
     const modeLabels: Record<string, string> = { full: "Full refresh", signals_only: "Signal search", score_only: "Story regeneration" };
     try {
       const { data, error } = await supabase.functions.invoke("run-signals", { body: { company_id: id, mode } });
@@ -428,7 +427,7 @@ export default function CompanyDetail() {
       queryClient.invalidateQueries({ queryKey: ["contacts", id] });
       queryClient.invalidateQueries({ queryKey: ["companies"] });
     } catch (e: any) { toast.error(e.message || "Operation failed"); }
-    finally { setRegenerating(false); setRunMode(null); }
+    finally { setRegenerating(false); }
   };
 
   const generateCards = async () => {
@@ -521,29 +520,10 @@ export default function CompanyDetail() {
         <TabsContent value="company" className="space-y-6 mt-6">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Company Intel</h3>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="outline" className="gap-1.5 text-xs" disabled={regenerating}>
-                  {regenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                  {runMode === "signals_only" ? "Searching signals…" : runMode === "score_only" ? "Regenerating story…" : regenerating ? "Running…" : "Run Signals"}
-                  <ChevronDown className="w-3 h-3 ml-1" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => regenerate("full")} className="gap-2 text-xs">
-                  <RefreshCw className="w-3.5 h-3.5" /> Full Refresh
-                  <span className="text-muted-foreground ml-auto">signals + story</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => regenerate("signals_only")} className="gap-2 text-xs">
-                  <Search className="w-3.5 h-3.5" /> Signals Only
-                  <span className="text-muted-foreground ml-auto">no AI call</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => regenerate("score_only")} className="gap-2 text-xs">
-                  <Brain className="w-3.5 h-3.5" /> Regenerate Story
-                  <span className="text-muted-foreground ml-auto">uses existing signals</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => regenerate("full")} disabled={regenerating}>
+              {regenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              {regenerating ? "Generating…" : signals.length > 0 ? "Regenerate" : "Generate"}
+            </Button>
           </div>
           {/* Company Profile — scannable card grid */}
           {(accountData?.about?.text || company.domain) && (
@@ -1008,7 +988,7 @@ export default function CompanyDetail() {
             <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Strategy & Cards</h3>
             <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={generateCards} disabled={generatingCards}>
               {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-              {generatingCards ? "Generating…" : "Generate Cards"}
+              {generatingCards ? "Generating…" : cards.length > 0 ? "Regenerate" : "Generate"}
             </Button>
           </div>
 
@@ -1051,7 +1031,7 @@ export default function CompanyDetail() {
             <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Outreach Assets</h3>
             <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={generateCards} disabled={generatingCards}>
               {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-              {generatingCards ? "Generating…" : "Generate Cards"}
+              {generatingCards ? "Generating…" : (assets.email_sequence || assets.linkedin_sequence) ? "Regenerate" : "Generate"}
             </Button>
           </div>
 
