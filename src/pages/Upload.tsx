@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import Papa from "papaparse";
 import { CSVRow, ValidationError } from "@/types";
 import { useInsertCompanies } from "@/hooks/useSupabase";
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload as UploadIcon, FileText, AlertTriangle, CheckCircle2, X, Building2, Globe, Users, Plus, Copy, ExternalLink } from "lucide-react";
+import { Upload as UploadIcon, FileText, AlertTriangle, CheckCircle2, X, Building2, Globe, Users, Plus, Copy, ExternalLink, ArrowLeft } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
@@ -161,11 +161,16 @@ export default function UploadPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Add Companies</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Upload a CSV, manually add, or import from Clay.
-        </p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors"><ArrowLeft className="w-5 h-5" /></Link>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Add Companies</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Upload a CSV, manually add, or import from Clay.
+            </p>
+          </div>
+        </div>
       </div>
 
       <Tabs defaultValue="manual" className="space-y-6">
