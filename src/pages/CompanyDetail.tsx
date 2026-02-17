@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { useCompany, useSignals, useSnapshots, useContacts, useCompanyCards } from "@/hooks/useSupabase";
+import { useCompany, useSignals, useSnapshots, useContacts, useCompanyCards, useUpdateCompany } from "@/hooks/useSupabase";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import ScoreCell from "@/components/ScoreCell";
@@ -8,9 +8,10 @@ import StatusBadge from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail, Plus, ChevronDown, Search, Brain, Sparkles, Copy, ChevronRight, Video, BookOpen } from "lucide-react";
+import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail, Plus, ChevronDown, Search, Brain, Sparkles, Copy, ChevronRight, Video, BookOpen, Save, Eye } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -93,9 +94,23 @@ function copyToClipboard(text: string) {
   toast.success("Copied to clipboard");
 }
 
+// --- Loom embed helper ---
+function toLoomEmbedUrl(url: string): string | null {
+  if (!url) return null;
+  const match = url.match(/loom\.com\/(?:share|embed)\/([a-zA-Z0-9]+)/);
+  if (match) return `https://www.loom.com/embed/${match[1]}`;
+  return null;
+}
+
+// --- iorad embed helper ---
+function toIoradEmbedUrl(url: string): string | null {
+  if (!url) return null;
+  const base = url.split("?")[0];
+  return `${base}${url.includes("?") ? "&" : "?"}oembed=1`;
+}
+
 // --- Dashboard Card Component ---
 function DashboardCardUI({ card }: { card: DashboardCard }) {
-  // Special treatment for AI Strategy
   if (card.id === "ai_strategy" && card.strategies?.length) {
     return (
       <Card className="col-span-1 lg:col-span-2">
@@ -233,7 +248,7 @@ function LinkedInSequenceUI({ steps }: { steps: LinkedInStep[] }) {
   );
 }
 
-// --- Story Assets ---
+// --- Story Assets (AI-generated config) ---
 function StoryAssetsUI({ storyAssets }: { storyAssets: StoryAssets }) {
   const loom = storyAssets.primary_asset;
   const iorad = storyAssets.supporting_asset;
@@ -244,7 +259,7 @@ function StoryAssetsUI({ storyAssets }: { storyAssets: StoryAssets }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-primary" /> Story Assets
+          <Sparkles className="w-4 h-4 text-primary" /> AI-Generated Story Config
         </h3>
         {storyAssets.active_strategy && (
           <Badge variant="outline" className="text-xs">Strategy: {storyAssets.active_strategy}</Badge>
@@ -362,6 +377,7 @@ export default function CompanyDetail() {
   const { data: snapshots = [] } = useSnapshots(id);
   const { data: contacts = [] } = useContacts(id);
   const { data: companyCards, isLoading: cardsLoading } = useCompanyCards(id);
+  const updateCompany = useUpdateCompany();
   const queryClient = useQueryClient();
   const [regenerating, setRegenerating] = useState(false);
   const [runMode, setRunMode] = useState<string | null>(null);
@@ -369,7 +385,15 @@ export default function CompanyDetail() {
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [newContact, setNewContact] = useState({ name: "", title: "", email: "", linkedin: "" });
   const [savingContact, setSavingContact] = useState(false);
-  const [extraOpen, setExtraOpen] = useState(false);
+  const [extraOpen, setExtraOpen] = useState(true);
+  const [loomUrl, setLoomUrl] = useState<string | null>(null);
+  const [ioradUrl, setIoradUrl] = useState<string | null>(null);
+  const [storyUrlsDirty, setStoryUrlsDirty] = useState(false);
+
+  // Sync local state with company data
+  const companyAny = company as any;
+  const effectiveLoomUrl = loomUrl ?? companyAny?.loom_url ?? "";
+  const effectiveIoradUrl = ioradUrl ?? companyAny?.iorad_url ?? "";
 
   const handleAddContact = async () => {
     if (!id || !newContact.name.trim()) return;
@@ -420,6 +444,18 @@ export default function CompanyDetail() {
     finally { setGeneratingCards(false); }
   };
 
+  const saveStoryUrls = async () => {
+    if (!id) return;
+    try {
+      await updateCompany.mutateAsync({
+        id,
+        updates: { loom_url: effectiveLoomUrl || null, iorad_url: effectiveIoradUrl || null },
+      });
+      toast.success("Story URLs saved");
+      setStoryUrlsDirty(false);
+    } catch (e: any) { toast.error(e.message || "Failed to save"); }
+  };
+
   if (isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
   }
@@ -437,9 +473,17 @@ export default function CompanyDetail() {
   const bd = latestSnapshot ? parseJson<ScoreBreakdown>(latestSnapshot.score_breakdown) : null;
   const snap = latestSnapshot ? parseJson<SnapshotJSON>(latestSnapshot.snapshot_json) : null;
 
-  // Parse cards data
   const cards = (companyCards?.cards_json as unknown as DashboardCard[] | null) || [];
   const assets = parseJson<{ email_sequence?: Record<string, EmailTouch>; linkedin_sequence?: LinkedInStep[]; story_assets?: StoryAssets }>(companyCards?.assets_json as Json) || {};
+
+  const loomEmbedUrl = toLoomEmbedUrl(effectiveLoomUrl);
+  const ioradEmbedUrl = toIoradEmbedUrl(effectiveIoradUrl);
+
+  // Build story URL for link
+  const firstContact = contacts[0] || (companyAny?.buyer_name ? { name: companyAny.buyer_name } : null);
+  const storyBaseUrl = firstContact && company.partner
+    ? `/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories/${firstContact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "")}`
+    : null;
 
   return (
     <div className="space-y-6">
@@ -478,506 +522,630 @@ export default function CompanyDetail() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={generateCards} disabled={generatingCards}>
-            {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-            {generatingCards ? "Generating…" : "Generate Cards"}
-          </Button>
         </div>
       </div>
 
-      {/* Contacts */}
-      {(contacts.length > 0 || (company as any).buyer_name) ? (
-        <div className="panel">
-          <div className="panel-header flex items-center justify-between">
-            <span>Contacts ({contacts.length || 1})</span>
-            <Dialog open={addContactOpen} onOpenChange={setAddContactOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" variant="ghost" className="gap-1 text-xs h-7"><Plus className="w-3.5 h-3.5" /> Add</Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader><DialogTitle>Add Contact</DialogTitle></DialogHeader>
-                <div className="space-y-3">
-                  <div><Label>Name *</Label><Input value={newContact.name} onChange={e => setNewContact(p => ({ ...p, name: e.target.value }))} placeholder="Jane Smith" /></div>
-                  <div><Label>Title</Label><Input value={newContact.title} onChange={e => setNewContact(p => ({ ...p, title: e.target.value }))} placeholder="VP of Learning" /></div>
-                  <div><Label>Email</Label><Input type="email" value={newContact.email} onChange={e => setNewContact(p => ({ ...p, email: e.target.value }))} placeholder="jane@company.com" /></div>
-                  <div><Label>LinkedIn</Label><Input value={newContact.linkedin} onChange={e => setNewContact(p => ({ ...p, linkedin: e.target.value }))} placeholder="https://linkedin.com/in/..." /></div>
-                  <Button onClick={handleAddContact} disabled={!newContact.name.trim() || savingContact} className="w-full">
-                    {savingContact ? <Loader2 className="w-4 h-4 animate-spin" /> : "Add Contact"}
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-          <div className="space-y-3">
-            {contacts.length > 0 ? contacts.map((contact) => {
-              const firstName = contact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "");
-              const storyUrl = company.partner
-                ? `/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories/${firstName}`
-                : null;
-              return (
-                <div key={contact.id} className="flex items-center gap-4 p-2 rounded-md hover:bg-secondary/30 transition-colors">
-                  <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <UserSearch className="w-4 h-4 text-primary" />
+      {/* ============ TABS ============ */}
+      <Tabs defaultValue="company" className="w-full">
+        <TabsList className="w-full justify-start">
+          <TabsTrigger value="company">Company</TabsTrigger>
+          <TabsTrigger value="strategy">Strategy</TabsTrigger>
+          <TabsTrigger value="outreach">Outreach</TabsTrigger>
+          <TabsTrigger value="story">Story</TabsTrigger>
+        </TabsList>
+
+        {/* ============ TAB 1: COMPANY ============ */}
+        <TabsContent value="company" className="space-y-6 mt-6">
+          {/* Contacts */}
+          <div className="panel">
+            <div className="panel-header flex items-center justify-between">
+              <span>Contacts ({contacts.length || ((companyAny)?.buyer_name ? 1 : 0)})</span>
+              <Dialog open={addContactOpen} onOpenChange={setAddContactOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" variant="ghost" className="gap-1 text-xs h-7"><Plus className="w-3.5 h-3.5" /> Add</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader><DialogTitle>Add Contact</DialogTitle></DialogHeader>
+                  <div className="space-y-3">
+                    <div><Label>Name *</Label><Input value={newContact.name} onChange={e => setNewContact(p => ({ ...p, name: e.target.value }))} placeholder="Jane Smith" /></div>
+                    <div><Label>Title</Label><Input value={newContact.title} onChange={e => setNewContact(p => ({ ...p, title: e.target.value }))} placeholder="VP of Learning" /></div>
+                    <div><Label>Email</Label><Input type="email" value={newContact.email} onChange={e => setNewContact(p => ({ ...p, email: e.target.value }))} placeholder="jane@company.com" /></div>
+                    <div><Label>LinkedIn</Label><Input value={newContact.linkedin} onChange={e => setNewContact(p => ({ ...p, linkedin: e.target.value }))} placeholder="https://linkedin.com/in/..." /></div>
+                    <Button onClick={handleAddContact} disabled={!newContact.name.trim() || savingContact} className="w-full">
+                      {savingContact ? <Loader2 className="w-4 h-4 animate-spin" /> : "Add Contact"}
+                    </Button>
                   </div>
-                  <div className="flex-1 min-w-0 space-y-0.5">
-                    <div className="text-sm font-medium truncate">{contact.name}</div>
-                    {contact.title && <div className="text-xs text-muted-foreground truncate">{contact.title}</div>}
-                    {contact.source && <span className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-muted-foreground">{contact.source}</span>}
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {storyUrl && snap && (
-                      <a href={storyUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" title="View personalized story"><ExternalLink className="w-4 h-4" /></a>
-                    )}
-                    {contact.email && <a href={`mailto:${contact.email}`} className="text-muted-foreground hover:text-primary" title={contact.email}><Mail className="w-4 h-4" /></a>}
-                    {contact.linkedin && <a href={contact.linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary"><Linkedin className="w-4 h-4" /></a>}
-                  </div>
-                </div>
-              );
-            }) : (
-              (() => {
-                const legacyFirstName = ((company as any).buyer_name || "").split(" ")[0].toLowerCase().replace(/[^a-z]/g, "");
-                const legacyStoryUrl = company.partner && legacyFirstName ? `/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories/${legacyFirstName}` : null;
+                </DialogContent>
+              </Dialog>
+            </div>
+            <div className="space-y-3">
+              {contacts.length > 0 ? contacts.map((contact) => {
+                const firstName = contact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "");
+                const storyUrl = company.partner
+                  ? `/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories/${firstName}`
+                  : null;
                 return (
-                  <div className="flex items-center gap-4 p-2 rounded-md hover:bg-secondary/30 transition-colors">
-                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center"><UserSearch className="w-4 h-4 text-primary" /></div>
+                  <div key={contact.id} className="flex items-center gap-4 p-2 rounded-md hover:bg-secondary/30 transition-colors">
+                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <UserSearch className="w-4 h-4 text-primary" />
+                    </div>
                     <div className="flex-1 min-w-0 space-y-0.5">
-                      <div className="text-sm font-medium">{(company as any).buyer_name}</div>
-                      {(company as any).buyer_title && <div className="text-xs text-muted-foreground">{(company as any).buyer_title}</div>}
+                      <div className="text-sm font-medium truncate">{contact.name}</div>
+                      {contact.title && <div className="text-xs text-muted-foreground truncate">{contact.title}</div>}
+                      {contact.source && <span className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-muted-foreground">{contact.source}</span>}
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      {legacyStoryUrl && snap && <a href={legacyStoryUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" title="View personalized story"><ExternalLink className="w-4 h-4" /></a>}
-                      {(company as any).buyer_email && <a href={`mailto:${(company as any).buyer_email}`} className="text-muted-foreground hover:text-primary"><Mail className="w-4 h-4" /></a>}
-                      {(company as any).buyer_linkedin && <a href={(company as any).buyer_linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary"><Linkedin className="w-4 h-4" /></a>}
+                      {storyUrl && snap && (
+                        <a href={storyUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" title="View personalized story"><ExternalLink className="w-4 h-4" /></a>
+                      )}
+                      {contact.email && <a href={`mailto:${contact.email}`} className="text-muted-foreground hover:text-primary" title={contact.email}><Mail className="w-4 h-4" /></a>}
+                      {contact.linkedin && <a href={contact.linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary"><Linkedin className="w-4 h-4" /></a>}
                     </div>
                   </div>
                 );
-              })()
-            )}
-          </div>
-        </div>
-      ) : (
-        <div className="panel">
-          <div className="panel-header flex items-center justify-between">
-            <span>Contacts (0)</span>
-            <Dialog open={addContactOpen} onOpenChange={setAddContactOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" variant="ghost" className="gap-1 text-xs h-7"><Plus className="w-3.5 h-3.5" /> Add</Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader><DialogTitle>Add Contact</DialogTitle></DialogHeader>
-                <div className="space-y-3">
-                  <div><Label>Name *</Label><Input value={newContact.name} onChange={e => setNewContact(p => ({ ...p, name: e.target.value }))} placeholder="Jane Smith" /></div>
-                  <div><Label>Title</Label><Input value={newContact.title} onChange={e => setNewContact(p => ({ ...p, title: e.target.value }))} placeholder="VP of Learning" /></div>
-                  <div><Label>Email</Label><Input type="email" value={newContact.email} onChange={e => setNewContact(p => ({ ...p, email: e.target.value }))} placeholder="jane@company.com" /></div>
-                  <div><Label>LinkedIn</Label><Input value={newContact.linkedin} onChange={e => setNewContact(p => ({ ...p, linkedin: e.target.value }))} placeholder="https://linkedin.com/in/..." /></div>
-                  <Button onClick={handleAddContact} disabled={!newContact.name.trim() || savingContact} className="w-full">
-                    {savingContact ? <Loader2 className="w-4 h-4 animate-spin" /> : "Add Contact"}
-                  </Button>
+              }) : (companyAny)?.buyer_name ? (
+                <div className="flex items-center gap-4 p-2 rounded-md hover:bg-secondary/30 transition-colors">
+                  <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center"><UserSearch className="w-4 h-4 text-primary" /></div>
+                  <div className="flex-1 min-w-0 space-y-0.5">
+                    <div className="text-sm font-medium">{companyAny.buyer_name}</div>
+                    {companyAny.buyer_title && <div className="text-xs text-muted-foreground">{companyAny.buyer_title}</div>}
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {companyAny.buyer_email && <a href={`mailto:${companyAny.buyer_email}`} className="text-muted-foreground hover:text-primary"><Mail className="w-4 h-4" /></a>}
+                    {companyAny.buyer_linkedin && <a href={companyAny.buyer_linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary"><Linkedin className="w-4 h-4" /></a>}
+                  </div>
                 </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-          <p className="text-sm text-muted-foreground">No contacts yet. Add one manually or run enrichment.</p>
-        </div>
-      )}
-
-      {/* Company metadata */}
-      {(company.partner || company.industry || company.hq_country || company.persona) && (
-        <div className="flex flex-wrap gap-2">
-          {company.partner && <span className="text-xs bg-secondary px-2 py-0.5 rounded">Partner: {company.partner}</span>}
-          {company.partner_rep_name && <span className="text-xs bg-secondary px-2 py-0.5 rounded">Rep: {company.partner_rep_name}</span>}
-          {company.industry && <span className="text-xs bg-secondary px-2 py-0.5 rounded">{company.industry.replace(/_/g, " ").toLowerCase()}</span>}
-          {company.hq_country && <span className="text-xs bg-secondary px-2 py-0.5 rounded">{company.hq_country}</span>}
-          {company.persona && <span className="text-xs bg-secondary px-2 py-0.5 rounded">{company.persona}</span>}
-          {company.headcount && <span className="text-xs bg-secondary px-2 py-0.5 rounded">{company.headcount}+ employees</span>}
-        </div>
-      )}
-
-      <div className="glow-line" />
-
-      {/* ============ DASHBOARD CARDS ============ */}
-      {cardsLoading ? (
-        <div className="flex items-center justify-center py-10">
-          <Loader2 className="w-5 h-5 animate-spin text-primary" />
-          <span className="ml-2 text-sm text-muted-foreground">Loading cards…</span>
-        </div>
-      ) : cards.length > 0 ? (
-        <>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {cards.map((card, i) => (
-              <DashboardCardUI key={card.id || i} card={card} />
-            ))}
+              ) : (
+                <p className="text-sm text-muted-foreground">No contacts yet. Add one manually or run enrichment.</p>
+              )}
+            </div>
           </div>
 
-          {/* ============ STORY ASSETS ============ */}
-          {assets.story_assets && (assets.story_assets.primary_asset || assets.story_assets.supporting_asset) && (
-            <>
-              <div className="glow-line" />
-              <StoryAssetsUI storyAssets={assets.story_assets} />
-            </>
+          {/* Company metadata */}
+          {(company.partner || company.industry || company.hq_country || company.persona) && (
+            <div className="flex flex-wrap gap-2">
+              {company.partner && <span className="text-xs bg-secondary px-2 py-0.5 rounded">Partner: {company.partner}</span>}
+              {company.partner_rep_name && <span className="text-xs bg-secondary px-2 py-0.5 rounded">Rep: {company.partner_rep_name}</span>}
+              {company.industry && <span className="text-xs bg-secondary px-2 py-0.5 rounded">{company.industry.replace(/_/g, " ").toLowerCase()}</span>}
+              {company.hq_country && <span className="text-xs bg-secondary px-2 py-0.5 rounded">{company.hq_country}</span>}
+              {company.persona && <span className="text-xs bg-secondary px-2 py-0.5 rounded">{company.persona}</span>}
+              {company.headcount && <span className="text-xs bg-secondary px-2 py-0.5 rounded">{company.headcount}+ employees</span>}
+            </div>
           )}
 
-          {/* ============ OUTREACH ASSETS ============ */}
-          {(assets.email_sequence || assets.linkedin_sequence) && (
-            <>
-              <div className="glow-line" />
-              <div className="space-y-4">
-                <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <Mail className="w-4 h-4 text-primary" /> Outreach Assets
-                </h3>
-                {assets.email_sequence && (
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium">Email Sequence</h4>
-                    <EmailSequenceUI emails={assets.email_sequence} />
-                  </div>
-                )}
-                {assets.linkedin_sequence && (
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium">LinkedIn Sequence</h4>
-                    <LinkedInSequenceUI steps={assets.linkedin_sequence} />
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </>
-      ) : (
-        <div className="panel text-center py-8">
-          <Sparkles className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground mb-3">No dashboard cards generated yet.</p>
-          <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={generateCards} disabled={generatingCards}>
-            {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-            Generate Cards
-          </Button>
-        </div>
-      )}
+          <div className="glow-line" />
 
-      {/* ============ EXTRA (collapsible) ============ */}
-      <div className="glow-line" />
-      <Collapsible open={extraOpen} onOpenChange={setExtraOpen}>
-        <CollapsibleTrigger asChild>
-          <Button variant="ghost" className="w-full justify-between text-sm font-medium h-10">
-            <span className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-primary" />
-              Extra — Score, Signals, Analysis, History
-            </span>
-            <ChevronRight className={`w-4 h-4 transition-transform ${extraOpen ? "rotate-90" : ""}`} />
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-6 pt-4">
-          {/* Score + Signals row */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="panel lg:col-span-1">
-              <div className="panel-header">Score Breakdown</div>
-              {bd ? (
-                <div className="space-y-4">
-                  {[
-                    { label: "Hiring", value: bd.relevance || bd.hiring || 0, max: 30 },
-                    { label: "News", value: bd.urgency || bd.news || 0, max: 40 },
-                    { label: "Expansion", value: bd.buyer_signal || bd.expansion || 0, max: 30 },
-                  ].map(({ label, value, max }) => (
-                    <div key={label}>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="text-muted-foreground">{label}</span>
-                        <span className="font-mono font-bold text-foreground">{value}/{max}</span>
-                      </div>
-                      <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-                        <motion.div initial={{ width: 0 }} animate={{ width: `${(value / max) * 100}%` }} transition={{ duration: 0.8, ease: "easeOut" }} className="h-full bg-primary rounded-full" />
-                      </div>
+          {/* Extra — Score, Signals, Analysis, History (open by default in Company tab) */}
+          <Collapsible open={extraOpen} onOpenChange={setExtraOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" className="w-full justify-between text-sm font-medium h-10">
+                <span className="flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-primary" />
+                  Score, Signals, Analysis & History
+                </span>
+                <ChevronRight className={`w-4 h-4 transition-transform ${extraOpen ? "rotate-90" : ""}`} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-6 pt-4">
+              {/* Score + Signals row */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="panel lg:col-span-1">
+                  <div className="panel-header">Score Breakdown</div>
+                  {bd ? (
+                    <div className="space-y-4">
+                      {[
+                        { label: "Hiring", value: bd.relevance || bd.hiring || 0, max: 30 },
+                        { label: "News", value: bd.urgency || bd.news || 0, max: 40 },
+                        { label: "Expansion", value: bd.buyer_signal || bd.expansion || 0, max: 30 },
+                      ].map(({ label, value, max }) => (
+                        <div key={label}>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span className="text-muted-foreground">{label}</span>
+                            <span className="font-mono font-bold text-foreground">{value}/{max}</span>
+                          </div>
+                          <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                            <motion.div initial={{ width: 0 }} animate={{ width: `${(value / max) * 100}%` }} transition={{ duration: 0.8, ease: "easeOut" }} className="h-full bg-primary rounded-full" />
+                          </div>
+                        </div>
+                      ))}
+                      {snap?.confidence_level && (
+                        <div className="flex items-start gap-3 bg-secondary/50 rounded p-3 mt-2">
+                          <AlertCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                          <div>
+                            <div className="text-xs font-mono font-bold text-primary">{snap.confidence_level} Confidence</div>
+                            {snap.confidence_reason && <p className="text-xs text-muted-foreground mt-0.5">{snap.confidence_reason}</p>}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  ))}
-                  {snap?.confidence_level && (
-                    <div className="flex items-start gap-3 bg-secondary/50 rounded p-3 mt-2">
-                      <AlertCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                      <div>
-                        <div className="text-xs font-mono font-bold text-primary">{snap.confidence_level} Confidence</div>
-                        {snap.confidence_reason && <p className="text-xs text-muted-foreground mt-0.5">{snap.confidence_reason}</p>}
-                      </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No score computed yet.</p>
+                  )}
+                </div>
+
+                <div className="panel lg:col-span-2">
+                  <div className="panel-header">Signals ({signals.length})</div>
+                  {signals.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No signals discovered yet.</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {signals.map(signal => {
+                        const snippets = (Array.isArray(signal.evidence_snippets) ? signal.evidence_snippets : []) as string[];
+                        return (
+                          <div key={signal.id} className="border rounded-md p-3 space-y-2">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-2">
+                                {signal.type === "job" ? <Briefcase className="w-4 h-4 text-info flex-shrink-0" /> : <Newspaper className="w-4 h-4 text-warning flex-shrink-0" />}
+                                <div>
+                                  <div className="text-sm font-medium">{signal.title}</div>
+                                  <div className="text-xs text-muted-foreground">{signal.date || "No date"} · {signal.type}</div>
+                                </div>
+                              </div>
+                              <a href={signal.url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary flex-shrink-0"><ExternalLink className="w-3.5 h-3.5" /></a>
+                            </div>
+                            {signal.raw_excerpt && <p className="text-xs text-muted-foreground leading-relaxed">{signal.raw_excerpt}</p>}
+                            {snippets.length > 0 && (
+                              <div className="space-y-1 pt-1 border-t border-border/50">
+                                <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Evidence Snippets</div>
+                                {snippets.map((snippet, i) => (
+                                  <div key={i} className="text-xs text-accent-foreground bg-accent/20 rounded px-2 py-1.5 border-l-2 border-primary/40">"{snippet}"</div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No score computed yet.</p>
-              )}
-            </div>
+              </div>
 
-            <div className="panel lg:col-span-2">
-              <div className="panel-header">Signals ({signals.length})</div>
-              {signals.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No signals discovered yet.</p>
-              ) : (
-                <div className="space-y-4">
-                  {signals.map(signal => {
-                    const snippets = (Array.isArray(signal.evidence_snippets) ? signal.evidence_snippets : []) as string[];
-                    return (
-                      <div key={signal.id} className="border rounded-md p-3 space-y-2">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-center gap-2">
-                            {signal.type === "job" ? <Briefcase className="w-4 h-4 text-info flex-shrink-0" /> : <Newspaper className="w-4 h-4 text-warning flex-shrink-0" />}
-                            <div>
-                              <div className="text-sm font-medium">{signal.title}</div>
-                              <div className="text-xs text-muted-foreground">{signal.date || "No date"} · {signal.type}</div>
-                            </div>
+              {/* Enterprise Analysis Accordion */}
+              {snap && latestSnapshot && (
+                <div className="panel">
+                  <div className="panel-header flex items-center justify-between">
+                    <span>iorad Expansion Analysis</span>
+                    <span className="text-[10px] text-muted-foreground normal-case tracking-normal">
+                      {latestSnapshot.model_version} · {latestSnapshot.prompt_version} · {new Date(latestSnapshot.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+
+                  {snap.why_now && toArray(snap.why_now).length > 0 && (
+                    <div className="mb-4 bg-primary/5 border border-primary/20 rounded-lg p-4">
+                      <div className="text-xs font-mono uppercase tracking-wider text-primary mb-2">Why Now</div>
+                      {toArray(snap.why_now).map((item, i) => <p key={i} className="text-sm text-foreground/90 leading-relaxed">{item}</p>)}
+                    </div>
+                  )}
+
+                  <Accordion type="multiple" defaultValue={["executive-narrative"]} className="space-y-2">
+                    {snap.signal_deconstruction && (
+                      <AccordionItem value="signal-deconstruction" className="border rounded-lg px-4">
+                        <AccordionTrigger className="text-sm font-medium">
+                          <div className="flex items-center gap-2"><Target className="w-4 h-4 text-primary" /> Signal Deconstruction</div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <div className="space-y-4">
+                            {snap.signal_deconstruction.company_stage && (
+                              <div>
+                                <div className="text-xs font-mono text-muted-foreground mb-1">Company Stage</div>
+                                <span className="text-sm bg-primary/10 text-primary px-2 py-0.5 rounded">{snap.signal_deconstruction.company_stage}</span>
+                              </div>
+                            )}
+                            {snap.signal_deconstruction.observable_facts?.length ? (
+                              <div>
+                                <div className="text-xs font-mono text-muted-foreground mb-2">Observable Facts</div>
+                                <ul className="space-y-1">{snap.signal_deconstruction.observable_facts.map((f, i) => <li key={i} className="text-sm flex items-start gap-2"><span className="text-primary">•</span>{f}</li>)}</ul>
+                              </div>
+                            ) : null}
+                            {snap.signal_deconstruction.workflow_stress_indicators?.length ? (
+                              <div>
+                                <div className="text-xs font-mono text-muted-foreground mb-2">Workflow Stress Indicators</div>
+                                <ul className="space-y-1">{snap.signal_deconstruction.workflow_stress_indicators.map((w, i) => <li key={i} className="text-sm flex items-start gap-2"><AlertCircle className="w-3.5 h-3.5 text-destructive mt-0.5 flex-shrink-0" />{w}</li>)}</ul>
+                              </div>
+                            ) : null}
                           </div>
-                          <a href={signal.url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary flex-shrink-0"><ExternalLink className="w-3.5 h-3.5" /></a>
-                        </div>
-                        {signal.raw_excerpt && <p className="text-xs text-muted-foreground leading-relaxed">{signal.raw_excerpt}</p>}
-                        {snippets.length > 0 && (
-                          <div className="space-y-1 pt-1 border-t border-border/50">
-                            <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Evidence Snippets</div>
-                            {snippets.map((snippet, i) => (
-                              <div key={i} className="text-xs text-accent-foreground bg-accent/20 rounded px-2 py-1.5 border-l-2 border-primary/40">"{snippet}"</div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    )}
+
+                    {snap.operational_friction?.length ? (
+                      <AccordionItem value="operational-friction" className="border rounded-lg px-4">
+                        <AccordionTrigger className="text-sm font-medium">
+                          <div className="flex items-center gap-2"><Zap className="w-4 h-4 text-primary" /> Operational Friction</div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <div className="space-y-3">
+                            {snap.operational_friction.map((f, i) => (
+                              <div key={i} className="bg-secondary/50 rounded-lg p-3 space-y-1">
+                                <div className="text-sm"><span className="font-medium text-foreground">Cause:</span> <span className="text-foreground/80">{f.cause}</span></div>
+                                <div className="text-sm"><span className="font-medium text-foreground">→ Effect:</span> <span className="text-foreground/80">{f.effect}</span></div>
+                                <div className="text-sm"><span className="font-medium text-foreground">→ Bottleneck:</span> <span className="text-foreground/80">{f.bottleneck}</span></div>
+                              </div>
                             ))}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                        </AccordionContent>
+                      </AccordionItem>
+                    ) : null}
+
+                    {snap.partner_platform_ceiling && (
+                      <AccordionItem value="partner-ceiling" className="border rounded-lg px-4">
+                        <AccordionTrigger className="text-sm font-medium">
+                          <div className="flex items-center gap-2"><TrendingUp className="w-4 h-4 text-primary" /> Partner Platform Ceiling</div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <div className="space-y-4">
+                            {snap.partner_platform_ceiling.platform_strengths?.length ? (
+                              <div>
+                                <div className="text-xs font-mono text-muted-foreground mb-2">Platform Strengths</div>
+                                <div className="flex flex-wrap gap-1.5">{snap.partner_platform_ceiling.platform_strengths.map((s, i) => <span key={i} className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">{s}</span>)}</div>
+                              </div>
+                            ) : null}
+                            {snap.partner_platform_ceiling.execution_gaps?.length ? (
+                              <div>
+                                <div className="text-xs font-mono text-muted-foreground mb-2">Execution Gaps</div>
+                                <ul className="space-y-1">{snap.partner_platform_ceiling.execution_gaps.map((g, i) => <li key={i} className="text-sm flex items-start gap-2"><span className="text-destructive">✕</span>{g}</li>)}</ul>
+                              </div>
+                            ) : null}
+                            {snap.partner_platform_ceiling.key_insight && (
+                              <div className="bg-primary/5 border border-primary/20 rounded p-3 text-sm italic text-foreground/90">{snap.partner_platform_ceiling.key_insight}</div>
+                            )}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    )}
+
+                    {snap.embedded_leverage && (
+                      <AccordionItem value="embedded-leverage" className="border rounded-lg px-4">
+                        <AccordionTrigger className="text-sm font-medium">
+                          <div className="flex items-center gap-2"><Zap className="w-4 h-4 text-primary" /> Embedded iorad Leverage</div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {(["situation", "constraint", "intervention", "transformation"] as const).map(key => {
+                              const val = snap.embedded_leverage?.[key];
+                              if (!val) return null;
+                              const labels: Record<string, string> = { situation: "Situation", constraint: "Constraint", intervention: "Intervention", transformation: "Transformation" };
+                              return (
+                                <div key={key} className="bg-secondary/50 rounded-lg p-3">
+                                  <div className="text-xs font-mono text-muted-foreground mb-1">{labels[key]}</div>
+                                  <p className="text-sm text-foreground/90">{val}</p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    )}
+
+                    {snap.quantified_impact?.length ? (
+                      <AccordionItem value="quantified-impact" className="border rounded-lg px-4">
+                        <AccordionTrigger className="text-sm font-medium">
+                          <div className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" /> Quantified Impact</div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <div className="space-y-3">
+                            {snap.quantified_impact.map((q, i) => (
+                              <div key={i} className="border rounded-lg p-3 space-y-2">
+                                <div className="font-medium text-sm text-foreground">{q.metric}</div>
+                                <div className="text-xs text-muted-foreground"><span className="font-mono">Assumptions:</span> {q.assumptions}</div>
+                                <div className="text-xs font-mono bg-secondary/50 rounded p-2 text-foreground/80">{q.calculation}</div>
+                                <div className="text-sm font-bold text-primary">{q.result}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    ) : null}
+
+                    {snap.executive_narrative && (
+                      <AccordionItem value="executive-narrative" className="border rounded-lg px-4">
+                        <AccordionTrigger className="text-sm font-medium">
+                          <div className="flex items-center gap-2"><FileText className="w-4 h-4 text-primary" /> Executive Narrative</div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <div className="prose prose-sm dark:prose-invert max-w-none">
+                            {(Array.isArray(snap.executive_narrative)
+                              ? snap.executive_narrative
+                              : typeof snap.executive_narrative === 'string' ? snap.executive_narrative.split("\n\n") : []
+                            ).map((p: string, i: number) => (
+                              <p key={i} className="text-sm text-foreground/90 leading-relaxed mb-3">{p}</p>
+                            ))}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    )}
+
+                    {snap.outbound_positioning && (
+                      <AccordionItem value="outbound-positioning" className="border rounded-lg px-4">
+                        <AccordionTrigger className="text-sm font-medium">
+                          <div className="flex items-center gap-2"><MessageSquareQuote className="w-4 h-4 text-primary" /> Outbound Positioning</div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <div className="space-y-3">
+                            {snap.outbound_positioning.executive_framing && (
+                              <div className="border-l-2 border-primary/40 pl-3">
+                                <div className="text-xs font-mono text-muted-foreground mb-1">Executive Framing</div>
+                                <p className="text-sm text-foreground/90 italic">"{snap.outbound_positioning.executive_framing}"</p>
+                              </div>
+                            )}
+                            {snap.outbound_positioning.efficiency_framing && (
+                              <div className="border-l-2 border-primary/40 pl-3">
+                                <div className="text-xs font-mono text-muted-foreground mb-1">Efficiency / Revenue</div>
+                                <p className="text-sm text-foreground/90 italic">"{snap.outbound_positioning.efficiency_framing}"</p>
+                              </div>
+                            )}
+                            {snap.outbound_positioning.risk_framing && (
+                              <div className="border-l-2 border-primary/40 pl-3">
+                                <div className="text-xs font-mono text-muted-foreground mb-1">Risk Mitigation</div>
+                                <p className="text-sm text-foreground/90 italic">"{snap.outbound_positioning.risk_framing}"</p>
+                              </div>
+                            )}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    )}
+
+                    {snap.competitive_insulation?.length ? (
+                      <AccordionItem value="competitive-insulation" className="border rounded-lg px-4">
+                        <AccordionTrigger className="text-sm font-medium">
+                          <div className="flex items-center gap-2"><Shield className="w-4 h-4 text-primary" /> Competitive Insulation</div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <ul className="space-y-1.5">{snap.competitive_insulation.map((r, i) => <li key={i} className="text-sm flex items-start gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />{r}</li>)}</ul>
+                        </AccordionContent>
+                      </AccordionItem>
+                    ) : null}
+
+                    {snap.evidence?.length ? (
+                      <AccordionItem value="evidence" className="border rounded-lg px-4">
+                        <AccordionTrigger className="text-sm font-medium">
+                          <div className="flex items-center gap-2"><ExternalLink className="w-4 h-4 text-primary" /> Cited Evidence ({snap.evidence.length})</div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <div className="space-y-2">
+                            {snap.evidence.map((ev, i) => (
+                              <div key={i} className="text-xs border-l-2 border-primary/40 pl-3 py-1">
+                                <p className="text-foreground/80 italic">"{ev.snippet || ev.detail || ""}"</p>
+                                <a href={ev.source_url || ev.url || "#"} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1 mt-0.5">
+                                  <ExternalLink className="w-3 h-3" /> {ev.source_type || ev.signal_type || "source"} · {ev.date || "no date"}
+                                </a>
+                              </div>
+                            ))}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    ) : null}
+                  </Accordion>
                 </div>
               )}
-            </div>
+
+              {/* Snapshot History */}
+              <div className="panel">
+                <div className="panel-header">Snapshot History</div>
+                {snapshots.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No snapshots generated yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {snapshots.map(s => (
+                      <div key={s.id} className="flex items-center justify-between text-sm border rounded px-3 py-2">
+                        <div className="flex items-center gap-3">
+                          <ScoreCell score={s.score_total} />
+                          <span className="font-mono text-xs text-muted-foreground">{s.model_version}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">{new Date(s.created_at).toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        </TabsContent>
+
+        {/* ============ TAB 2: STRATEGY ============ */}
+        <TabsContent value="strategy" className="space-y-6 mt-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Strategy & Cards</h3>
+            <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={generateCards} disabled={generatingCards}>
+              {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+              {generatingCards ? "Generating…" : "Generate Cards"}
+            </Button>
           </div>
 
-          {/* Enterprise Analysis Accordion */}
-          {snap && latestSnapshot && (
-            <div className="panel">
-              <div className="panel-header flex items-center justify-between">
-                <span>iorad Expansion Analysis</span>
-                <span className="text-[10px] text-muted-foreground normal-case tracking-normal">
-                  {latestSnapshot.model_version} · {latestSnapshot.prompt_version} · {new Date(latestSnapshot.created_at).toLocaleDateString()}
-                </span>
-              </div>
-
-              {snap.why_now && toArray(snap.why_now).length > 0 && (
-                <div className="mb-4 bg-primary/5 border border-primary/20 rounded-lg p-4">
-                  <div className="text-xs font-mono uppercase tracking-wider text-primary mb-2">Why Now</div>
-                  {toArray(snap.why_now).map((item, i) => <p key={i} className="text-sm text-foreground/90 leading-relaxed">{item}</p>)}
-                </div>
-              )}
-
-              <Accordion type="multiple" defaultValue={["executive-narrative"]} className="space-y-2">
-                {snap.signal_deconstruction && (
-                  <AccordionItem value="signal-deconstruction" className="border rounded-lg px-4">
-                    <AccordionTrigger className="text-sm font-medium">
-                      <div className="flex items-center gap-2"><Target className="w-4 h-4 text-primary" /> Signal Deconstruction</div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-4">
-                        {snap.signal_deconstruction.company_stage && (
-                          <div>
-                            <div className="text-xs font-mono text-muted-foreground mb-1">Company Stage</div>
-                            <span className="text-sm bg-primary/10 text-primary px-2 py-0.5 rounded">{snap.signal_deconstruction.company_stage}</span>
-                          </div>
-                        )}
-                        {snap.signal_deconstruction.observable_facts?.length ? (
-                          <div>
-                            <div className="text-xs font-mono text-muted-foreground mb-2">Observable Facts</div>
-                            <ul className="space-y-1">{snap.signal_deconstruction.observable_facts.map((f, i) => <li key={i} className="text-sm flex items-start gap-2"><span className="text-primary">•</span>{f}</li>)}</ul>
-                          </div>
-                        ) : null}
-                        {snap.signal_deconstruction.workflow_stress_indicators?.length ? (
-                          <div>
-                            <div className="text-xs font-mono text-muted-foreground mb-2">Workflow Stress Indicators</div>
-                            <ul className="space-y-1">{snap.signal_deconstruction.workflow_stress_indicators.map((w, i) => <li key={i} className="text-sm flex items-start gap-2"><AlertCircle className="w-3.5 h-3.5 text-destructive mt-0.5 flex-shrink-0" />{w}</li>)}</ul>
-                          </div>
-                        ) : null}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                )}
-
-                {snap.operational_friction?.length ? (
-                  <AccordionItem value="operational-friction" className="border rounded-lg px-4">
-                    <AccordionTrigger className="text-sm font-medium">
-                      <div className="flex items-center gap-2"><Zap className="w-4 h-4 text-primary" /> Operational Friction</div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-3">
-                        {snap.operational_friction.map((f, i) => (
-                          <div key={i} className="bg-secondary/50 rounded-lg p-3 space-y-1">
-                            <div className="text-sm"><span className="font-medium text-foreground">Cause:</span> <span className="text-foreground/80">{f.cause}</span></div>
-                            <div className="text-sm"><span className="font-medium text-foreground">→ Effect:</span> <span className="text-foreground/80">{f.effect}</span></div>
-                            <div className="text-sm"><span className="font-medium text-foreground">→ Bottleneck:</span> <span className="text-foreground/80">{f.bottleneck}</span></div>
-                          </div>
-                        ))}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                ) : null}
-
-                {snap.partner_platform_ceiling && (
-                  <AccordionItem value="partner-ceiling" className="border rounded-lg px-4">
-                    <AccordionTrigger className="text-sm font-medium">
-                      <div className="flex items-center gap-2"><TrendingUp className="w-4 h-4 text-primary" /> Partner Platform Ceiling</div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-4">
-                        {snap.partner_platform_ceiling.platform_strengths?.length ? (
-                          <div>
-                            <div className="text-xs font-mono text-muted-foreground mb-2">Platform Strengths</div>
-                            <div className="flex flex-wrap gap-1.5">{snap.partner_platform_ceiling.platform_strengths.map((s, i) => <span key={i} className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">{s}</span>)}</div>
-                          </div>
-                        ) : null}
-                        {snap.partner_platform_ceiling.execution_gaps?.length ? (
-                          <div>
-                            <div className="text-xs font-mono text-muted-foreground mb-2">Execution Gaps</div>
-                            <ul className="space-y-1">{snap.partner_platform_ceiling.execution_gaps.map((g, i) => <li key={i} className="text-sm flex items-start gap-2"><span className="text-destructive">✕</span>{g}</li>)}</ul>
-                          </div>
-                        ) : null}
-                        {snap.partner_platform_ceiling.key_insight && (
-                          <div className="bg-primary/5 border border-primary/20 rounded p-3 text-sm italic text-foreground/90">{snap.partner_platform_ceiling.key_insight}</div>
-                        )}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                )}
-
-                {snap.embedded_leverage && (
-                  <AccordionItem value="embedded-leverage" className="border rounded-lg px-4">
-                    <AccordionTrigger className="text-sm font-medium">
-                      <div className="flex items-center gap-2"><Zap className="w-4 h-4 text-primary" /> Embedded iorad Leverage</div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {(["situation", "constraint", "intervention", "transformation"] as const).map(key => {
-                          const val = snap.embedded_leverage?.[key];
-                          if (!val) return null;
-                          const labels: Record<string, string> = { situation: "Situation", constraint: "Constraint", intervention: "Intervention", transformation: "Transformation" };
-                          return (
-                            <div key={key} className="bg-secondary/50 rounded-lg p-3">
-                              <div className="text-xs font-mono text-muted-foreground mb-1">{labels[key]}</div>
-                              <p className="text-sm text-foreground/90">{val}</p>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                )}
-
-                {snap.quantified_impact?.length ? (
-                  <AccordionItem value="quantified-impact" className="border rounded-lg px-4">
-                    <AccordionTrigger className="text-sm font-medium">
-                      <div className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" /> Quantified Impact</div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-3">
-                        {snap.quantified_impact.map((q, i) => (
-                          <div key={i} className="border rounded-lg p-3 space-y-2">
-                            <div className="font-medium text-sm text-foreground">{q.metric}</div>
-                            <div className="text-xs text-muted-foreground"><span className="font-mono">Assumptions:</span> {q.assumptions}</div>
-                            <div className="text-xs font-mono bg-secondary/50 rounded p-2 text-foreground/80">{q.calculation}</div>
-                            <div className="text-sm font-bold text-primary">{q.result}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                ) : null}
-
-                {snap.executive_narrative && (
-                  <AccordionItem value="executive-narrative" className="border rounded-lg px-4">
-                    <AccordionTrigger className="text-sm font-medium">
-                      <div className="flex items-center gap-2"><FileText className="w-4 h-4 text-primary" /> Executive Narrative</div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="prose prose-sm dark:prose-invert max-w-none">
-                        {(Array.isArray(snap.executive_narrative)
-                          ? snap.executive_narrative
-                          : typeof snap.executive_narrative === 'string' ? snap.executive_narrative.split("\n\n") : []
-                        ).map((p: string, i: number) => (
-                          <p key={i} className="text-sm text-foreground/90 leading-relaxed mb-3">{p}</p>
-                        ))}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                )}
-
-                {snap.outbound_positioning && (
-                  <AccordionItem value="outbound-positioning" className="border rounded-lg px-4">
-                    <AccordionTrigger className="text-sm font-medium">
-                      <div className="flex items-center gap-2"><MessageSquareQuote className="w-4 h-4 text-primary" /> Outbound Positioning</div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-3">
-                        {snap.outbound_positioning.executive_framing && (
-                          <div className="border-l-2 border-primary/40 pl-3">
-                            <div className="text-xs font-mono text-muted-foreground mb-1">Executive Framing</div>
-                            <p className="text-sm text-foreground/90 italic">"{snap.outbound_positioning.executive_framing}"</p>
-                          </div>
-                        )}
-                        {snap.outbound_positioning.efficiency_framing && (
-                          <div className="border-l-2 border-primary/40 pl-3">
-                            <div className="text-xs font-mono text-muted-foreground mb-1">Efficiency / Revenue</div>
-                            <p className="text-sm text-foreground/90 italic">"{snap.outbound_positioning.efficiency_framing}"</p>
-                          </div>
-                        )}
-                        {snap.outbound_positioning.risk_framing && (
-                          <div className="border-l-2 border-primary/40 pl-3">
-                            <div className="text-xs font-mono text-muted-foreground mb-1">Risk Mitigation</div>
-                            <p className="text-sm text-foreground/90 italic">"{snap.outbound_positioning.risk_framing}"</p>
-                          </div>
-                        )}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                )}
-
-                {snap.competitive_insulation?.length ? (
-                  <AccordionItem value="competitive-insulation" className="border rounded-lg px-4">
-                    <AccordionTrigger className="text-sm font-medium">
-                      <div className="flex items-center gap-2"><Shield className="w-4 h-4 text-primary" /> Competitive Insulation</div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <ul className="space-y-1.5">{snap.competitive_insulation.map((r, i) => <li key={i} className="text-sm flex items-start gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />{r}</li>)}</ul>
-                    </AccordionContent>
-                  </AccordionItem>
-                ) : null}
-
-                {snap.evidence?.length ? (
-                  <AccordionItem value="evidence" className="border rounded-lg px-4">
-                    <AccordionTrigger className="text-sm font-medium">
-                      <div className="flex items-center gap-2"><ExternalLink className="w-4 h-4 text-primary" /> Cited Evidence ({snap.evidence.length})</div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-2">
-                        {snap.evidence.map((ev, i) => (
-                          <div key={i} className="text-xs border-l-2 border-primary/40 pl-3 py-1">
-                            <p className="text-foreground/80 italic">"{ev.snippet || ev.detail || ""}"</p>
-                            <a href={ev.source_url || ev.url || "#"} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1 mt-0.5">
-                              <ExternalLink className="w-3 h-3" /> {ev.source_type || ev.signal_type || "source"} · {ev.date || "no date"}
-                            </a>
-                          </div>
-                        ))}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                ) : null}
-              </Accordion>
+          {cardsLoading ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+              <span className="ml-2 text-sm text-muted-foreground">Loading cards…</span>
             </div>
-          )}
-
-          {/* Snapshot History */}
-          <div className="panel">
-            <div className="panel-header">Snapshot History</div>
-            {snapshots.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No snapshots generated yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {snapshots.map(s => (
-                  <div key={s.id} className="flex items-center justify-between text-sm border rounded px-3 py-2">
-                    <div className="flex items-center gap-3">
-                      <ScoreCell score={s.score_total} />
-                      <span className="font-mono text-xs text-muted-foreground">{s.model_version}</span>
-                    </div>
-                    <span className="text-xs text-muted-foreground">{new Date(s.created_at).toLocaleString()}</span>
-                  </div>
+          ) : cards.length > 0 ? (
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {cards.map((card, i) => (
+                  <DashboardCardUI key={card.id || i} card={card} />
                 ))}
               </div>
-            )}
+
+              {/* AI-Generated Story Config */}
+              {assets.story_assets && (assets.story_assets.primary_asset || assets.story_assets.supporting_asset) && (
+                <>
+                  <div className="glow-line" />
+                  <StoryAssetsUI storyAssets={assets.story_assets} />
+                </>
+              )}
+            </>
+          ) : (
+            <div className="panel text-center py-8">
+              <Sparkles className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground mb-3">No dashboard cards generated yet.</p>
+              <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={generateCards} disabled={generatingCards}>
+                {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                Generate Cards
+              </Button>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ============ TAB 3: OUTREACH ============ */}
+        <TabsContent value="outreach" className="space-y-6 mt-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Outreach Assets</h3>
+            <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={generateCards} disabled={generatingCards}>
+              {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+              {generatingCards ? "Generating…" : "Generate Cards"}
+            </Button>
           </div>
-        </CollapsibleContent>
-      </Collapsible>
+
+          {cardsLoading ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+              <span className="ml-2 text-sm text-muted-foreground">Loading…</span>
+            </div>
+          ) : (assets.email_sequence || assets.linkedin_sequence) ? (
+            <div className="space-y-6">
+              {assets.email_sequence && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium flex items-center gap-2"><Mail className="w-4 h-4 text-primary" /> Email Sequence</h4>
+                  <EmailSequenceUI emails={assets.email_sequence} />
+                </div>
+              )}
+              {assets.linkedin_sequence && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium flex items-center gap-2"><Linkedin className="w-4 h-4 text-primary" /> LinkedIn Sequence</h4>
+                  <LinkedInSequenceUI steps={assets.linkedin_sequence} />
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="panel text-center py-8">
+              <Mail className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground mb-3">No outreach assets generated yet.</p>
+              <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={generateCards} disabled={generatingCards}>
+                {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                Generate Cards
+              </Button>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ============ TAB 4: STORY ============ */}
+        <TabsContent value="story" className="space-y-6 mt-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Story Configuration</h3>
+            <div className="flex items-center gap-2">
+              {storyBaseUrl && (
+                <a href={storyBaseUrl} target="_blank" rel="noopener noreferrer">
+                  <Button size="sm" variant="ghost" className="gap-1.5 text-xs">
+                    <Eye className="w-3.5 h-3.5" /> View Story
+                  </Button>
+                </a>
+              )}
+              <Button
+                size="sm"
+                className="gap-1.5 text-xs"
+                onClick={saveStoryUrls}
+                disabled={!storyUrlsDirty || updateCompany.isPending}
+              >
+                {updateCompany.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                Save
+              </Button>
+            </div>
+          </div>
+
+          {/* URL Inputs */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Video className="w-4 h-4 text-primary" />
+                  Loom Video
+                  <Badge variant={effectiveLoomUrl ? "default" : "secondary"} className="text-[10px] ml-auto">
+                    {effectiveLoomUrl ? "Ready" : "Not Set"}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <Label className="text-xs">Loom Share URL</Label>
+                  <Input
+                    placeholder="https://www.loom.com/share/abc123..."
+                    value={effectiveLoomUrl}
+                    onChange={(e) => { setLoomUrl(e.target.value); setStoryUrlsDirty(true); }}
+                    className="mt-1"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">Paste your Loom share link. It will embed automatically at the top of the story page.</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-primary" />
+                  iorad Tutorial
+                  <Badge variant={effectiveIoradUrl ? "default" : "secondary"} className="text-[10px] ml-auto">
+                    {effectiveIoradUrl ? "Ready" : "Not Set"}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <Label className="text-xs">iorad Tutorial URL</Label>
+                  <Input
+                    placeholder="https://ior.ad/..."
+                    value={effectiveIoradUrl}
+                    onChange={(e) => { setIoradUrl(e.target.value); setStoryUrlsDirty(true); }}
+                    className="mt-1"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">Replaces the default tutorial in the customer story page.</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Embedded Previews */}
+          {(loomEmbedUrl || ioradEmbedUrl) && (
+            <div className="space-y-4">
+              <div className="glow-line" />
+              <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Preview</h3>
+
+              {loomEmbedUrl && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium flex items-center gap-2"><Video className="w-4 h-4 text-primary" /> Loom Video</h4>
+                  <div className="rounded-xl overflow-hidden border">
+                    <iframe
+                      src={loomEmbedUrl}
+                      width="100%"
+                      height="400"
+                      frameBorder="0"
+                      allowFullScreen
+                      allow="autoplay; fullscreen"
+                      title="Loom video preview"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {ioradEmbedUrl && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium flex items-center gap-2"><BookOpen className="w-4 h-4 text-primary" /> iorad Tutorial</h4>
+                  <div className="rounded-xl overflow-hidden border">
+                    <iframe
+                      src={ioradEmbedUrl}
+                      width="100%"
+                      height="500"
+                      frameBorder="0"
+                      allowFullScreen
+                      allow="camera; microphone; clipboard-write"
+                      sandbox="allow-scripts allow-forms allow-same-origin allow-presentation allow-downloads allow-modals allow-popups allow-popups-to-escape-sandbox allow-top-navigation allow-top-navigation-by-user-activation"
+                      title="iorad tutorial preview"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

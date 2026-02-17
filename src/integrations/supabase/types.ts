@@ -107,9 +107,11 @@ export type Database = {
           hq_country: string | null
           id: string
           industry: string | null
+          iorad_url: string | null
           is_existing_customer: boolean
           last_processed_at: string | null
           last_score_total: number | null
+          loom_url: string | null
           name: string
           partner: string | null
           partner_rep_email: string | null
@@ -129,9 +131,11 @@ export type Database = {
           hq_country?: string | null
           id?: string
           industry?: string | null
+          iorad_url?: string | null
           is_existing_customer?: boolean
           last_processed_at?: string | null
           last_score_total?: number | null
+          loom_url?: string | null
           name: string
           partner?: string | null
           partner_rep_email?: string | null
@@ -151,9 +155,11 @@ export type Database = {
           hq_country?: string | null
           id?: string
           industry?: string | null
+          iorad_url?: string | null
           is_existing_customer?: boolean
           last_processed_at?: string | null
           last_score_total?: number | null
+          loom_url?: string | null
           name?: string
           partner?: string | null
           partner_rep_email?: string | null

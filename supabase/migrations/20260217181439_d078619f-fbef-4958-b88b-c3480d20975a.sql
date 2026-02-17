@@ -1,0 +1,1 @@
+ALTER TABLE public.companies ADD COLUMN loom_url text, ADD COLUMN iorad_url text;
