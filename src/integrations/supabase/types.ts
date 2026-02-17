@@ -25,6 +25,7 @@ export type Database = {
           story_prompt: string
           strategy_prompt: string
           system_prompt: string
+          transcript_prompt: string
           updated_at: string
         }
         Insert: {
@@ -37,6 +38,7 @@ export type Database = {
           story_prompt?: string
           strategy_prompt?: string
           system_prompt?: string
+          transcript_prompt?: string
           updated_at?: string
         }
         Update: {
@@ -49,6 +51,7 @@ export type Database = {
           story_prompt?: string
           strategy_prompt?: string
           system_prompt?: string
+          transcript_prompt?: string
           updated_at?: string
         }
         Relationships: []
@@ -343,6 +346,7 @@ export type Database = {
           synced_at: string
           title: string
           transcript: string | null
+          transcript_analysis: Json | null
         }
         Insert: {
           action_items?: Json | null
@@ -358,6 +362,7 @@ export type Database = {
           synced_at?: string
           title: string
           transcript?: string | null
+          transcript_analysis?: Json | null
         }
         Update: {
           action_items?: Json | null
@@ -373,6 +378,7 @@ export type Database = {
           synced_at?: string
           title?: string
           transcript?: string | null
+          transcript_analysis?: Json | null
         }
         Relationships: [
           {
