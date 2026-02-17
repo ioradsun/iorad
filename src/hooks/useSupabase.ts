@@ -212,15 +212,21 @@ export function useRunSignals() {
 }
 
 // ---- Company Cards ----
-export function useCompanyCards(companyId: string | undefined) {
+export function useCompanyCards(companyId: string | undefined, contactId?: string) {
   return useQuery({
-    queryKey: ["company_cards", companyId],
+    queryKey: ["company_cards", companyId, contactId || "default"],
     enabled: !!companyId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("company_cards")
         .select("*")
-        .eq("company_id", companyId!)
+        .eq("company_id", companyId!);
+      if (contactId) {
+        query = query.eq("contact_id", contactId);
+      } else {
+        query = query.is("contact_id", null);
+      }
+      const { data, error } = await query
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();

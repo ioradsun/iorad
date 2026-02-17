@@ -191,6 +191,7 @@ export type Database = {
           assets_json: Json
           cards_json: Json
           company_id: string
+          contact_id: string | null
           created_at: string
           id: string
           model_version: string | null
@@ -200,6 +201,7 @@ export type Database = {
           assets_json?: Json
           cards_json?: Json
           company_id: string
+          contact_id?: string | null
           created_at?: string
           id?: string
           model_version?: string | null
@@ -209,6 +211,7 @@ export type Database = {
           assets_json?: Json
           cards_json?: Json
           company_id?: string
+          contact_id?: string | null
           created_at?: string
           id?: string
           model_version?: string | null
@@ -219,6 +222,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_cards_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
         ]

@@ -155,19 +155,31 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
     const assets_json = parsed.assets || {};
     const account_json = parsed.account || {};
 
-    // Upsert into company_cards
+    // Upsert into company_cards (per-contact)
+    const upsertRow: Record<string, unknown> = {
+      company_id,
+      cards_json,
+      assets_json,
+      account_json,
+      model_version: model,
+    };
+    if (contact_id) upsertRow.contact_id = contact_id;
+
+    // Delete existing then insert (unique index uses COALESCE so standard upsert won't work)
+    const delQuery = sb
+      .from("company_cards")
+      .delete()
+      .eq("company_id", company_id);
+    if (contact_id) {
+      delQuery.eq("contact_id", contact_id);
+    } else {
+      delQuery.is("contact_id", null);
+    }
+    await delQuery;
+
     const { error: upsertErr } = await sb
       .from("company_cards")
-      .upsert(
-        {
-          company_id,
-          cards_json,
-          assets_json,
-          account_json,
-          model_version: model,
-        },
-        { onConflict: "company_id" }
-      );
+      .insert(upsertRow);
 
     if (upsertErr) {
       console.error("Upsert error:", upsertErr);
