@@ -1,11 +1,11 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { useCompanies, useSignalCounts, useProcessingJobs, useRunSignals } from "@/hooks/useSupabase";
+import { useCompanies, useSignalCounts, useProcessingJobs } from "@/hooks/useSupabase";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import ScoreCell from "@/components/ScoreCell";
-import { ArrowUpDown, Play, Search, SlidersHorizontal, Loader2, RefreshCw, Plus } from "lucide-react";
+import { ArrowUpDown, Search, Loader2, RefreshCw, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -17,9 +17,7 @@ export default function Dashboard() {
   const { data: companies = [], isLoading } = useCompanies();
   const { data: signalCounts = {} } = useSignalCounts();
   const { data: jobs = [] } = useProcessingJobs();
-  const runSignals = useRunSignals();
   const queryClient = useQueryClient();
-  const [runProgress, setRunProgress] = useState<string | null>(null);
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
 
   const [sortKey, setSortKey] = useState<SortKey>("last_score_total");
@@ -119,7 +117,7 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Signal Dashboard</h1>
+          <h1 className="text-2xl font-bold tracking-tight">iorad Scout Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {companies.length} companies tracked · Last run{" "}
             {lastJob ? new Date(lastJob.started_at).toLocaleDateString() : "never"}
@@ -127,39 +125,10 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center gap-3">
           <Link to="/upload">
-            <Button variant="outline" className="gap-2">
+            <Button className="gap-2 bg-pink text-pink-foreground hover:bg-pink/90">
               <Plus className="w-4 h-4" /> Add Company
             </Button>
           </Link>
-          {runProgress && (
-            <span className="text-xs text-muted-foreground font-mono">{runProgress}</span>
-          )}
-          <Button
-            className="gap-2"
-            disabled={runSignals.isPending}
-            onClick={() => {
-              setRunProgress("Starting…");
-              const progressCb = (processed: number, total: number, name: string) => {
-                setRunProgress(`${processed}/${total} — ${name}`);
-              };
-              runSignals.mutate(progressCb, {
-                onSuccess: (data) => {
-                  setRunProgress(null);
-                  toast.success(`Job complete: ${data?.total_processed ?? 0} companies processed`);
-                },
-                onError: (err: any) => {
-                  setRunProgress(null);
-                  toast.error(`Run failed: ${err.message}`);
-                },
-              });
-            }}
-          >
-            {runSignals.isPending ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Running…</>
-            ) : (
-              <><Play className="w-4 h-4" /> Run Now</>
-            )}
-          </Button>
         </div>
       </div>
 

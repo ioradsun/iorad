@@ -64,6 +64,10 @@ export default {
           DEFAULT: "hsl(var(--info))",
           foreground: "hsl(var(--info-foreground))",
         },
+        pink: {
+          DEFAULT: "hsl(var(--pink))",
+          foreground: "hsl(var(--pink-foreground))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
