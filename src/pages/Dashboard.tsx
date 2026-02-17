@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { motion } from "framer-motion";
 
-type SortKey = "name" | "last_score_total" | "signals_count" | "updated_at";
+type SortKey = "name" | "last_score_total" | "signals_count" | "updated_at" | "created_at";
 
 export default function Dashboard() {
   const { data: companies = [], isLoading } = useCompanies();
@@ -17,7 +17,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
 
-  const [sortKey, setSortKey] = useState<SortKey>("last_score_total");
+  const [sortKey, setSortKey] = useState<SortKey>("created_at");
   const [sortAsc, setSortAsc] = useState(false);
   const [search, setSearch] = useState("");
   const [minScore, setMinScore] = useState(0);
@@ -49,7 +49,7 @@ export default function Dashboard() {
         case "last_score_total": av = a.last_score_total ?? -1; bv = b.last_score_total ?? -1; break;
         case "signals_count": av = a.signals_count; bv = b.signals_count; break;
         case "updated_at": av = a.updated_at; bv = b.updated_at; break;
-        case "updated_at": av = a.updated_at; bv = b.updated_at; break;
+        case "created_at": av = a.created_at; bv = b.created_at; break;
         default: av = 0; bv = 0;
       }
       if (av < bv) return sortAsc ? -1 : 1;
@@ -146,11 +146,10 @@ export default function Dashboard() {
             <thead>
               <tr className="border-b bg-secondary/50">
                 <th className="text-left px-4 py-3"><SortHeader label="Company" field="name" /></th>
-                
+                <th className="text-left px-4 py-3 hidden md:table-cell"><span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Source</span></th>
                 <th className="text-left px-4 py-3 hidden md:table-cell"><span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Partner</span></th>
                 <th className="text-left px-4 py-3 hidden lg:table-cell"><span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Partner Rep</span></th>
-                
-                <th className="text-left px-4 py-3 hidden lg:table-cell"><SortHeader label="Updated" field="updated_at" /></th>
+                <th className="text-left px-4 py-3 hidden lg:table-cell"><SortHeader label="Date Added" field="created_at" /></th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
@@ -168,15 +167,22 @@ export default function Dashboard() {
                     <div className="font-medium text-foreground">{company.name}</div>
                     <div className="text-xs text-muted-foreground">{company.domain || "—"}</div>
                   </td>
-                  
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    <span className={`text-[11px] font-mono font-medium uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                      (company as any).source_type === "inbound"
+                        ? "border-emerald-500/40 text-emerald-400 bg-emerald-500/10"
+                        : "border-blue-500/40 text-blue-400 bg-blue-500/10"
+                    }`}>
+                      {(company as any).source_type || "outbound"}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 hidden md:table-cell text-xs text-muted-foreground">{company.partner || "—"}</td>
                   <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground">
                     {company.partner_rep_name || "—"}
                     {company.partner_rep_email && <div className="text-[10px] text-muted-foreground/60">{company.partner_rep_email}</div>}
                   </td>
-                  
                   <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground">
-                    {company.last_processed_at ? new Date(company.last_processed_at).toLocaleDateString() : "—"}
+                    {new Date(company.created_at).toLocaleDateString()}
                   </td>
                   <td className="px-4 py-3">
                     {company.snapshot_status === "Generated" && (
@@ -192,7 +198,7 @@ export default function Dashboard() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">
+                  <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
                     {companies.length === 0 ? "No companies yet. Upload a CSV to get started." : "No companies match your filters."}
                   </td>
                 </tr>
