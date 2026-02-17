@@ -307,7 +307,29 @@ Output must be VALID JSON ONLY. No markdown. No commentary. No extra keys outsid
       {"step": 3, "timing": "Day 7", "message": ""},
       {"step": 4, "timing": "Day 10", "message": ""},
       {"step": 5, "timing": "Day 14", "message": ""}
-    ]
+    ],
+    "story_assets": {
+      "active_strategy": "",
+      "primary_asset": {
+        "type": "loom",
+        "title": "",
+        "purpose": "",
+        "covers": [],
+        "when_to_send": "",
+        "intro_message": "",
+        "loom_script": ""
+      },
+      "supporting_asset": {
+        "type": "iorad_tutorial",
+        "title": "",
+        "environment": "",
+        "what_it_guides": [],
+        "business_outcome": "",
+        "when_to_send": "",
+        "intro_message": "",
+        "embed_context": ""
+      }
+    }
   }
 }
 
@@ -318,7 +340,41 @@ Output must be VALID JSON ONLY. No markdown. No commentary. No extra keys outsid
 - LinkedIn messages must respect character limits (connection note under 300 chars, follow-ups under 500 chars, close under 350 chars).
 - No emojis, no dashes, no "just following up", no product pitch.
 
-4) FINAL VALIDATION
-Before output: JSON is valid. All required cards exist. No phone outreach. No fabricated facts. Each outreach touch introduces one new insight.
+4) STORY ASSETS RULES
+
+The Story Assets section creates a multi-asset narrative bundle: Loom (narrative layer) + iorad tutorial (mechanism layer).
+Both assets must align to ONE chosen strategy from the AI Strategy card. Set "active_strategy" to that strategy title.
+
+4.1 PRIMARY ASSET — LOOM (Narrative Layer)
+Purpose: Visualize friction and frame the operational risk.
+The loom_script must follow this mandatory structure:
+- Opening hook (contextual insight, not product)
+- Operational friction walkthrough
+- What breaks if this continues
+- What "controlled execution" looks like
+- Soft invitation
+Tone: Operator explaining pattern. No demo voice. No feature listing. No product pitch.
+The "covers" array should list 3-5 specific topics the Loom covers.
+"when_to_send": timing relative to outreach (e.g., "After initial reply", "With email_2").
+"intro_message": short copy reps can paste when sharing the Loom.
+
+4.2 SUPPORTING ASSET — IORAD TUTORIAL (Mechanism Layer)
+Position this as: "Here's how execution gets controlled."
+"environment": where the guidance lives (e.g., Workday, Seismic, CRM, internal admin console, demo environment).
+"what_it_guides": bullet list of specific in-system actions (must be concrete, e.g., "Selecting correct DISA compliance configuration", "Preventing incorrect partner tagging").
+"business_outcome": clear operational result (e.g., "Reduced configuration errors", "Shorter ramp time", "Standardized partner execution").
+"when_to_send": timing (e.g., "After Loom", "During pilot discussion", "After discovery call").
+"intro_message": short copy reps can paste. Example: "Here's a quick interactive walkthrough showing what this would look like inside [environment]. It's not a slide deck — it's the actual step-by-step guidance reps would see."
+"embed_context": where this tutorial would be embedded (e.g., "Inside Seismic content", "Embedded in Workday UI", "Shared in partner portal").
+
+4.3 CRITICAL RULES FOR STORY ASSETS
+- Loom must NOT pitch product.
+- iorad tutorial must NOT sound like marketing.
+- Both assets must align to ONE chosen strategy.
+- No feature dumping.
+- Keep everything execution-focused.
+
+5) FINAL VALIDATION
+Before output: JSON is valid. All required cards exist. No phone outreach. No fabricated facts. Each outreach touch introduces one new insight. Story assets align to one strategy.
 
 Return JSON only.`;

@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail, Plus, ChevronDown, Search, Brain, Sparkles, Copy, ChevronRight } from "lucide-react";
+import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail, Plus, ChevronDown, Search, Brain, Sparkles, Copy, ChevronRight, Video, BookOpen } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -49,6 +49,17 @@ interface Strategy { title: string; pitch: string; why_now: string; proof: strin
 interface DashboardCard { id: string; title: string; priority: string; fields?: CardField[]; actions?: CardAction[]; strategies?: Strategy[] }
 interface EmailTouch { subject_lines: string[]; body: string }
 interface LinkedInStep { step: number; timing: string; message: string }
+interface StoryAssets {
+  active_strategy?: string;
+  primary_asset?: {
+    type: string; title: string; purpose: string; covers: string[];
+    when_to_send: string; intro_message: string; loom_script: string;
+  };
+  supporting_asset?: {
+    type: string; title: string; environment: string; what_it_guides: string[];
+    business_outcome: string; when_to_send: string; intro_message: string; embed_context: string;
+  };
+}
 
 function toArray(val: unknown): string[] {
   if (Array.isArray(val)) return val.map(String);
@@ -222,6 +233,126 @@ function LinkedInSequenceUI({ steps }: { steps: LinkedInStep[] }) {
   );
 }
 
+// --- Story Assets ---
+function StoryAssetsUI({ storyAssets }: { storyAssets: StoryAssets }) {
+  const loom = storyAssets.primary_asset;
+  const iorad = storyAssets.supporting_asset;
+  const loomReady = !!(loom?.title && loom?.loom_script);
+  const ioradReady = !!(iorad?.title && iorad?.what_it_guides?.length);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-primary" /> Story Assets
+        </h3>
+        {storyAssets.active_strategy && (
+          <Badge variant="outline" className="text-xs">Strategy: {storyAssets.active_strategy}</Badge>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Loom — Narrative Layer */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Video className="w-4 h-4 text-primary" />
+              Loom Script
+              <span className="text-[10px] text-muted-foreground">(Narrative Layer)</span>
+              <Badge variant={loomReady ? "default" : "secondary"} className="text-[10px] ml-auto">
+                {loomReady ? "Ready" : "Not Ready"}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {loom?.title && (
+              <div className="text-xs"><span className="font-mono text-muted-foreground">Title:</span> <span className="text-foreground/90">{loom.title}</span></div>
+            )}
+            {loom?.purpose && (
+              <div className="text-xs"><span className="font-mono text-muted-foreground">Purpose:</span> <span className="text-foreground/90">{loom.purpose}</span></div>
+            )}
+            {loom?.covers?.length > 0 && (
+              <div className="text-xs">
+                <span className="font-mono text-muted-foreground">Covers:</span>
+                <ul className="mt-1 space-y-0.5">{loom.covers.map((c, i) => <li key={i} className="text-foreground/80 flex gap-1"><span className="text-primary">•</span>{c}</li>)}</ul>
+              </div>
+            )}
+            {loom?.when_to_send && (
+              <div className="text-xs"><span className="font-mono text-muted-foreground">When to send:</span> <span className="text-foreground/90">{loom.when_to_send}</span></div>
+            )}
+            {loom?.intro_message && (
+              <div className="space-y-1">
+                <div className="text-[10px] font-mono text-muted-foreground">Intro Message</div>
+                <div className="text-xs text-foreground/80 bg-secondary/30 rounded p-2">{loom.intro_message}</div>
+                <Button size="sm" variant="ghost" className="gap-1 text-xs h-7" onClick={() => copyToClipboard(loom.intro_message)}>
+                  <Copy className="w-3 h-3" /> Copy Intro
+                </Button>
+              </div>
+            )}
+            {loom?.loom_script && (
+              <div className="space-y-1 border-t border-border/50 pt-3">
+                <div className="text-[10px] font-mono text-muted-foreground">Loom Script</div>
+                <div className="text-xs text-foreground/80 whitespace-pre-wrap leading-relaxed bg-secondary/30 rounded p-3 max-h-64 overflow-y-auto">{loom.loom_script}</div>
+                <Button size="sm" variant="ghost" className="gap-1 text-xs h-7" onClick={() => copyToClipboard(loom.loom_script)}>
+                  <Copy className="w-3 h-3" /> Copy Script
+                </Button>
+              </div>
+            )}
+            {!loom?.title && <p className="text-xs text-muted-foreground">No Loom data generated yet.</p>}
+          </CardContent>
+        </Card>
+
+        {/* iorad Tutorial — Mechanism Layer */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-primary" />
+              iorad Tutorial
+              <span className="text-[10px] text-muted-foreground">(Mechanism Layer)</span>
+              <Badge variant={ioradReady ? "default" : "secondary"} className="text-[10px] ml-auto">
+                {ioradReady ? "Ready" : "Not Ready"}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {iorad?.title && (
+              <div className="text-xs"><span className="font-mono text-muted-foreground">Title:</span> <span className="text-foreground/90">{iorad.title}</span></div>
+            )}
+            {iorad?.environment && (
+              <div className="text-xs"><span className="font-mono text-muted-foreground">Environment:</span> <span className="text-foreground/90">{iorad.environment}</span></div>
+            )}
+            {iorad?.what_it_guides?.length > 0 && (
+              <div className="text-xs">
+                <span className="font-mono text-muted-foreground">What it guides:</span>
+                <ul className="mt-1 space-y-0.5">{iorad.what_it_guides.map((g, i) => <li key={i} className="text-foreground/80 flex gap-1"><span className="text-primary">•</span>{g}</li>)}</ul>
+              </div>
+            )}
+            {iorad?.business_outcome && (
+              <div className="text-xs"><span className="font-mono text-muted-foreground">Business outcome:</span> <span className="text-foreground/90">{iorad.business_outcome}</span></div>
+            )}
+            {iorad?.when_to_send && (
+              <div className="text-xs"><span className="font-mono text-muted-foreground">When to send:</span> <span className="text-foreground/90">{iorad.when_to_send}</span></div>
+            )}
+            {iorad?.intro_message && (
+              <div className="space-y-1">
+                <div className="text-[10px] font-mono text-muted-foreground">Intro Message</div>
+                <div className="text-xs text-foreground/80 bg-secondary/30 rounded p-2">{iorad.intro_message}</div>
+                <Button size="sm" variant="ghost" className="gap-1 text-xs h-7" onClick={() => copyToClipboard(iorad.intro_message)}>
+                  <Copy className="w-3 h-3" /> Copy Intro
+                </Button>
+              </div>
+            )}
+            {iorad?.embed_context && (
+              <div className="text-xs"><span className="font-mono text-muted-foreground">Embed context:</span> <span className="text-foreground/90">{iorad.embed_context}</span></div>
+            )}
+            {!iorad?.title && <p className="text-xs text-muted-foreground">No tutorial data generated yet.</p>}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 // === MAIN COMPONENT ===
 
 export default function CompanyDetail() {
@@ -308,7 +439,7 @@ export default function CompanyDetail() {
 
   // Parse cards data
   const cards = (companyCards?.cards_json as unknown as DashboardCard[] | null) || [];
-  const assets = parseJson<{ email_sequence?: Record<string, EmailTouch>; linkedin_sequence?: LinkedInStep[] }>(companyCards?.assets_json as Json) || {};
+  const assets = parseJson<{ email_sequence?: Record<string, EmailTouch>; linkedin_sequence?: LinkedInStep[]; story_assets?: StoryAssets }>(companyCards?.assets_json as Json) || {};
 
   return (
     <div className="space-y-6">
@@ -477,6 +608,14 @@ export default function CompanyDetail() {
               <DashboardCardUI key={card.id || i} card={card} />
             ))}
           </div>
+
+          {/* ============ STORY ASSETS ============ */}
+          {assets.story_assets && (assets.story_assets.primary_asset || assets.story_assets.supporting_asset) && (
+            <>
+              <div className="glow-line" />
+              <StoryAssetsUI storyAssets={assets.story_assets} />
+            </>
+          )}
 
           {/* ============ OUTREACH ASSETS ============ */}
           {(assets.email_sequence || assets.linkedin_sequence) && (
