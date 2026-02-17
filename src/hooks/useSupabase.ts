@@ -288,3 +288,21 @@ export function useMeetings(companyId: string | undefined) {
     },
   });
 }
+
+// ---- Customer Activity ----
+export function useCustomerActivity(companyId: string | undefined) {
+  return useQuery({
+    queryKey: ["customer_activity", companyId],
+    enabled: !!companyId,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("customer_activity")
+        .select("*")
+        .eq("company_id", companyId!)
+        .order("occurred_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data || [];
+    },
+  });
+}

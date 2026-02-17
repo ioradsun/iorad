@@ -240,6 +240,8 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
         const contactName = [cp.firstname, cp.lastname].filter(Boolean).join(" ").trim();
         if (!contactName) continue;
 
+        let savedContactId: string | null = null;
+
         // Check if contact already exists for this company by email
         if (cp.email) {
           const { data: existing } = await supabase
@@ -256,25 +258,155 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
               title: cp.jobtitle || null,
               linkedin: cp.hs_linkedin_url || null,
             }).eq("id", existing.id);
-            continue;
+            savedContactId = existing.id;
           }
         }
 
-        // Insert new contact
-        await supabase.from("contacts").insert({
-          company_id: companyId,
-          name: contactName,
-          email: cp.email || null,
-          title: cp.jobtitle || null,
-          linkedin: cp.hs_linkedin_url || null,
-          source: "hubspot",
-          confidence: "high",
-        });
+        if (!savedContactId) {
+          // Insert new contact
+          const { data: inserted } = await supabase.from("contacts").insert({
+            company_id: companyId,
+            name: contactName,
+            email: cp.email || null,
+            title: cp.jobtitle || null,
+            linkedin: cp.hs_linkedin_url || null,
+            source: "hubspot",
+            confidence: "high",
+          }).select("id").single();
+          savedContactId = inserted?.id || null;
+        }
+
+        // Pull engagement timeline for this contact
+        await importContactActivity(supabase, contactId, companyId, savedContactId, apiKey);
       } catch (err: any) {
         console.warn(`Failed to import contact ${contactId}: ${err.message}`);
       }
     }
   } catch (err: any) {
     console.warn(`Contact import error for company ${companyId}: ${err.message}`);
+  }
+}
+
+// Fetch engagement/activity timeline for a HubSpot contact
+async function importContactActivity(
+  supabase: any,
+  hubspotContactId: string | number,
+  companyId: string,
+  contactId: string | null,
+  apiKey: string
+) {
+  try {
+    // Fetch engagements associated with this contact (last 50)
+    const engRes = await fetch(
+      `https://api.hubapi.com/engagements/v1/engagements/associated/CONTACT/${hubspotContactId}/paged?limit=50`,
+      { headers: { Authorization: `Bearer ${apiKey}` } }
+    );
+
+    if (!engRes.ok) {
+      // Try the v3 timeline API as fallback
+      const text = await engRes.text();
+      console.warn(`Engagements API failed for contact ${hubspotContactId}: ${text}`);
+
+      // Fallback: try web analytics events (page views)
+      await importWebAnalyticsEvents(supabase, hubspotContactId, companyId, contactId, apiKey);
+      return;
+    }
+
+    const engData = await engRes.json();
+    const engagements = engData.results || [];
+
+    for (const eng of engagements) {
+      const e = eng.engagement || {};
+      const meta = eng.metadata || {};
+      const eventId = `eng_${e.id}`;
+
+      const typeMap: Record<string, string> = {
+        EMAIL: "EMAIL",
+        MEETING: "MEETING",
+        CALL: "CALL",
+        TASK: "TASK",
+        NOTE: "NOTE",
+        INCOMING_EMAIL: "EMAIL_RECEIVED",
+      };
+
+      const activityType = typeMap[e.type] || e.type || "UNKNOWN";
+      const title = meta.subject || meta.title || meta.body?.substring(0, 100) || `${activityType} engagement`;
+      const occurredAt = e.timestamp ? new Date(e.timestamp).toISOString() : new Date().toISOString();
+
+      // Upsert by hubspot_event_id
+      const { error } = await supabase.from("customer_activity").upsert(
+        {
+          company_id: companyId,
+          contact_id: contactId,
+          activity_type: activityType,
+          title,
+          occurred_at: occurredAt,
+          metadata: { source: "hubspot_engagement", engagement_type: e.type, ...meta },
+          hubspot_event_id: eventId,
+        },
+        { onConflict: "hubspot_event_id" }
+      );
+
+      if (error) console.warn(`Failed to save engagement ${eventId}: ${error.message}`);
+    }
+
+    // Also try web analytics
+    await importWebAnalyticsEvents(supabase, hubspotContactId, companyId, contactId, apiKey);
+  } catch (err: any) {
+    console.warn(`Activity import error for contact ${hubspotContactId}: ${err.message}`);
+  }
+}
+
+// Fetch web analytics events (page views, form submissions) for a contact
+async function importWebAnalyticsEvents(
+  supabase: any,
+  hubspotContactId: string | number,
+  companyId: string,
+  contactId: string | null,
+  apiKey: string
+) {
+  try {
+    // Get contact's recent page views via the contacts API timeline
+    const timelineRes = await fetch(
+      `https://api.hubapi.com/contacts/v1/contact/vid/${hubspotContactId}/profile?propertyMode=value_and_history&formSubmissionMode=all&showListMemberships=false`,
+      { headers: { Authorization: `Bearer ${apiKey}` } }
+    );
+
+    if (!timelineRes.ok) return;
+
+    const profile = await timelineRes.json();
+
+    // Extract form submissions
+    const formSubs = profile["form-submissions"] || [];
+    for (const fs of formSubs.slice(0, 20)) {
+      const eventId = `form_${fs.timestamp || Date.now()}_${hubspotContactId}`;
+      const title = fs.title || fs["form-id"] || "Form Submission";
+      const url = fs["page-url"] || null;
+
+      await supabase.from("customer_activity").upsert(
+        {
+          company_id: companyId,
+          contact_id: contactId,
+          activity_type: "FORM_SUBMISSION",
+          title: `Form: ${title}`,
+          url,
+          occurred_at: fs.timestamp ? new Date(fs.timestamp).toISOString() : new Date().toISOString(),
+          metadata: { source: "hubspot_form", form_id: fs["form-id"], page_title: fs.title },
+          hubspot_event_id: eventId,
+        },
+        { onConflict: "hubspot_event_id" }
+      );
+    }
+
+    // Extract identity profiles for signup source info
+    const identities = profile["identity-profiles"] || [];
+    for (const ip of identities) {
+      for (const ident of (ip.identities || [])) {
+        if (ident.type === "LEAD_STATUS" || ident.type === "EMAIL") continue;
+        // Could log first-touch source etc.
+      }
+    }
+  } catch (err: any) {
+    console.warn(`Web analytics import error for contact ${hubspotContactId}: ${err.message}`);
   }
 }
