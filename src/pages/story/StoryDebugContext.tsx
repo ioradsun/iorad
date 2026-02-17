@@ -15,6 +15,7 @@ export interface StoryDebugContextType {
   snapshotJson: Record<string, any>;
   signals: Signal[];
   snapshotId: string | null;
+  onLibrarySelected?: (url: string, label: string) => void;
 }
 
 const StoryDebugContext = createContext<StoryDebugContextType | null>(null);
