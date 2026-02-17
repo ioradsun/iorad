@@ -21,6 +21,15 @@ const TITLE_KEYWORDS = [
   "change management",
 ];
 
+// Persona-specific title keywords for targeted searches
+const PERSONA_TITLES: Record<string, string[]> = {
+  "Learning & Development": ["learning", "L&D", "training", "instructional design", "talent development", "organizational development", "learning experience"],
+  "Sales Enablement": ["sales enablement", "revenue enablement", "sales readiness", "sales training", "sales operations", "go-to-market"],
+  "Revenue Enablement": ["revenue enablement", "revenue operations", "RevOps", "sales enablement", "go-to-market enablement", "GTM"],
+  "Customer Education": ["customer education", "customer training", "customer success", "customer enablement", "customer onboarding", "academy"],
+  "Partner Enablement": ["partner enablement", "channel enablement", "partner training", "partner success", "channel sales", "alliances"],
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -34,7 +43,7 @@ Deno.serve(async (req) => {
 
     if (!apolloKey) throw new Error("APOLLO_API_KEY not configured");
 
-    const { company_id } = await req.json();
+    const { company_id, persona } = await req.json();
     if (!company_id) throw new Error("company_id is required");
 
     const { data: company, error: compErr } = await supabase
@@ -48,12 +57,15 @@ Deno.serve(async (req) => {
 
     const partnerPlatform = company.partner || "unknown";
 
-    console.log(`Apollo search for: ${company.name} (domain: ${company.domain})`);
+    // Use persona-specific titles if provided, otherwise default keywords
+    const searchPersona = persona || company.persona;
+    const titleKeywords = (searchPersona && PERSONA_TITLES[searchPersona]) || TITLE_KEYWORDS;
+    console.log(`Apollo search for: ${company.name} (domain: ${company.domain}, persona: ${searchPersona || "default"})`);
 
     // Helper: run Apollo People Search with given params
     async function apolloSearch(params: Record<string, unknown>, useTitles = true) {
       const searchParams: Record<string, unknown> = { per_page: 10, page: 1, ...params };
-      if (useTitles) searchParams.person_titles = TITLE_KEYWORDS;
+      if (useTitles) searchParams.person_titles = titleKeywords;
       const resp = await fetch(`${APOLLO_BASE}/mixed_people/api_search`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Api-Key": apolloKey! },
