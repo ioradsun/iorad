@@ -61,6 +61,20 @@ serve(async (req) => {
       contact_name: primaryContact?.name || company.buyer_name || null,
       contact_role: primaryContact?.title || company.buyer_title || null,
       contacts: contacts.map((c: any) => {
+        // Use AI-extracted profile (Pass 1) if available, otherwise fall back to raw properties
+        const profile = c.contact_profile;
+        if (profile) {
+          return {
+            name: c.name,
+            title: c.title,
+            email: c.email,
+            linkedin: c.linkedin,
+            source: c.source,
+            confidence: c.confidence,
+            product_usage_profile: profile,
+          };
+        }
+        // Fallback: raw HubSpot properties (for contacts not yet profiled)
         const hp = c.hubspot_properties || {};
         return {
           name: c.name,
@@ -69,25 +83,14 @@ serve(async (req) => {
           linkedin: c.linkedin,
           source: c.source,
           confidence: c.confidence,
-          // Product usage data from HubSpot
           plan_name: hp.plan_name || null,
           account_type: hp.account__type || null,
           category: hp.account_type || null,
-          engagement_profile: hp.engagement_profile || null,
-          creator_use_case: hp.creator_use_case || null,
           tutorials_created: hp.tutorials_created || null,
-          tutorials_valid_owned: hp.tutorials_valid_owned || null,
-          tutorials_learned: hp.tutorials_learned || null,
           tutorials_views: hp.tutorials_views || null,
-          libraries_owned: hp.help_centers_owned || null,
-          documenting_product: hp.first_embed_tutorial_base_domain_name || hp.referral_signup_tutorial_base_domain || null,
+          documenting_product: hp.first_embed_tutorial_base_domain_name || null,
           embedded_in: hp.first_embed_base_domain_name || null,
-          extension_connections: hp.extension_connections || null,
-          api_connections: hp.api_connections || null,
-          lms: hp.are_you_using_a_learning_management_system__lms__ || null,
           last_active_date: hp.last_active_date || null,
-          last_tutorial_create_date: hp.last_tutorial_create_date || null,
-          first_tutorial_create_date: hp.first_tutorial_create_date || null,
         };
       }),
       signals: signals.map((s: any) => ({

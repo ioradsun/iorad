@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.import-from-hubspot]
 verify_jwt = false
+
+[functions.extract-contact-profile]
+verify_jwt = false
