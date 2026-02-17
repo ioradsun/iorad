@@ -164,8 +164,8 @@ function AIConfigTab() {
     },
     {
       key: "story",
-      label: "Story Tab Prompt",
-      description: "Prompt for generating Story tab content (narrative assets, story configuration).",
+      label: "Story with Custom Loom & iorad Prompt",
+      description: "Prompt for generating Story tab content — produces bespoke Loom scripts and iorad tutorial assets.",
       value: storyPrompt,
       setter: setStoryPrompt,
     },
