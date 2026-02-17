@@ -644,13 +644,16 @@ export default function CompanyDetail() {
                         { label: "Profile", value: hp.engagement_profile, color: "bg-accent/50 text-accent-foreground border-accent" },
                       ].filter(m => m.value && m.value !== "--" && m.value !== "0");
 
-                      // Tier 2: Tutorial metrics
+                      // Tier 2: Tutorial metrics + session analytics
                       const tutorialMetrics = [
                         { label: "Tutorials", value: hp.tutorials_created },
                         { label: "Valid", value: hp.tutorials_valid_owned },
                         { label: "Learned", value: hp.tutorials_learned },
                         { label: "Views", value: hp.tutorials_views },
                         { label: "Libraries", value: hp.help_centers_owned || hp.libraries_owned },
+                        { label: "Sessions", value: hp.hs_analytics_num_visits },
+                        { label: "Avg Pages/Session", value: hp.hs_analytics_average_page_views },
+                        { label: "Page Views", value: hp.hs_analytics_num_page_views },
                       ].filter(m => m.value !== null && m.value !== undefined && m.value !== "" && m.value !== "0" && m.value !== 0);
 
                       // Tier 3: What they're documenting & where they embed
