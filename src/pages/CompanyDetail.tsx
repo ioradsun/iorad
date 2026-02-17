@@ -498,31 +498,6 @@ export default function CompanyDetail() {
           <ScoreCell score={company.last_score_total} size="lg" />
           <StatusBadge status={company.snapshot_status} />
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" className="gap-1.5 text-xs" disabled={regenerating}>
-                {regenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                {runMode === "signals_only" ? "Searching signals…" : runMode === "score_only" ? "Regenerating story…" : regenerating ? "Running…" : "Run"}
-                <ChevronDown className="w-3 h-3 ml-1" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => regenerate("full")} className="gap-2 text-xs">
-                <RefreshCw className="w-3.5 h-3.5" /> Full Refresh
-                <span className="text-muted-foreground ml-auto">signals + story</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => regenerate("signals_only")} className="gap-2 text-xs">
-                <Search className="w-3.5 h-3.5" /> Signals Only
-                <span className="text-muted-foreground ml-auto">no AI call</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => regenerate("score_only")} className="gap-2 text-xs">
-                <Brain className="w-3.5 h-3.5" /> Regenerate Story
-                <span className="text-muted-foreground ml-auto">uses existing signals</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
       </div>
 
       {/* ============ TABS ============ */}
@@ -536,6 +511,32 @@ export default function CompanyDetail() {
 
         {/* ============ TAB 1: COMPANY ============ */}
         <TabsContent value="company" className="space-y-6 mt-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Company Intel</h3>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline" className="gap-1.5 text-xs" disabled={regenerating}>
+                  {regenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                  {runMode === "signals_only" ? "Searching signals…" : runMode === "score_only" ? "Regenerating story…" : regenerating ? "Running…" : "Run Signals"}
+                  <ChevronDown className="w-3 h-3 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => regenerate("full")} className="gap-2 text-xs">
+                  <RefreshCw className="w-3.5 h-3.5" /> Full Refresh
+                  <span className="text-muted-foreground ml-auto">signals + story</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => regenerate("signals_only")} className="gap-2 text-xs">
+                  <Search className="w-3.5 h-3.5" /> Signals Only
+                  <span className="text-muted-foreground ml-auto">no AI call</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => regenerate("score_only")} className="gap-2 text-xs">
+                  <Brain className="w-3.5 h-3.5" /> Regenerate Story
+                  <span className="text-muted-foreground ml-auto">uses existing signals</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           {/* Contacts */}
           <div className="panel">
             <div className="panel-header flex items-center justify-between">
