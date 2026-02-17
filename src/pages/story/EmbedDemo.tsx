@@ -44,7 +44,7 @@ export default function EmbedDemo({ ioradUrl }: { ioradUrl?: string | null }) {
         ) : (
           <p className="max-w-2xl mb-8 leading-relaxed" style={{ color: "var(--story-muted)" }}>{desc}</p>
         )}
-        <div className="rounded-2xl overflow-hidden" style={{ background: "var(--story-surface)", minWidth: "100%" }}>
+        <div className="rounded-2xl overflow-hidden border border-border" style={{ background: "var(--story-surface)", minWidth: "100%" }}>
           <iframe
             src={iframeSrc}
             width="100%"
