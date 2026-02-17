@@ -1,0 +1,1 @@
+ALTER TABLE public.companies ADD COLUMN source_type text NOT NULL DEFAULT 'outbound';

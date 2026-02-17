@@ -134,6 +134,7 @@ export type Database = {
           partner_rep_name: string | null
           persona: string | null
           snapshot_status: string | null
+          source_type: string
           updated_at: string
         }
         Insert: {
@@ -159,6 +160,7 @@ export type Database = {
           partner_rep_name?: string | null
           persona?: string | null
           snapshot_status?: string | null
+          source_type?: string
           updated_at?: string
         }
         Update: {
@@ -184,6 +186,7 @@ export type Database = {
           partner_rep_name?: string | null
           persona?: string | null
           snapshot_status?: string | null
+          source_type?: string
           updated_at?: string
         }
         Relationships: []
