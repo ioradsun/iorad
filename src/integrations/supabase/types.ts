@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       ai_config: {
         Row: {
+          cards_prompt_template: string
           id: number
           model: string
           prompt_template: string
@@ -23,6 +24,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cards_prompt_template?: string
           id?: number
           model?: string
           prompt_template?: string
@@ -30,6 +32,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cards_prompt_template?: string
           id?: number
           model?: string
           prompt_template?: string
@@ -160,6 +163,44 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      company_cards: {
+        Row: {
+          account_json: Json
+          assets_json: Json
+          cards_json: Json
+          company_id: string
+          created_at: string
+          id: string
+          model_version: string | null
+        }
+        Insert: {
+          account_json?: Json
+          assets_json?: Json
+          cards_json?: Json
+          company_id: string
+          created_at?: string
+          id?: string
+          model_version?: string | null
+        }
+        Update: {
+          account_json?: Json
+          assets_json?: Json
+          cards_json?: Json
+          company_id?: string
+          created_at?: string
+          id?: string
+          model_version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_cards_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       compelling_events: {
         Row: {

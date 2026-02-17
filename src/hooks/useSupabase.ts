@@ -211,6 +211,25 @@ export function useRunSignals() {
   });
 }
 
+// ---- Company Cards ----
+export function useCompanyCards(companyId: string | undefined) {
+  return useQuery({
+    queryKey: ["company_cards", companyId],
+    enabled: !!companyId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("company_cards")
+        .select("*")
+        .eq("company_id", companyId!)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 // ---- Signal counts for dashboard (aggregated) ----
 export function useSignalCounts() {
   return useQuery({
