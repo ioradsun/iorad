@@ -191,6 +191,7 @@ export function useSectionAnnotation(sectionKey: string) {
             detectedTool={json.reinforcement_preview?.detected_tool || null}
             currentLibraryUrl={json.reinforcement_preview?.library_url || null}
             snapshotId={debug.snapshotId}
+            onLibrarySelected={debug.onLibrarySelected}
           />
         )}
       </SectionAnnotation>

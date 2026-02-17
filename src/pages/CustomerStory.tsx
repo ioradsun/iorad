@@ -1,3 +1,4 @@
+import { useState, useCallback } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -309,18 +310,9 @@ function StoryPage({ customer, pm, snapshotId, snapshotMeta, companyId }: { cust
     },
   });
 
-  const debugContext = isIoradUser && snapshotMeta ? {
-    isIoradUser: true,
-    snapshotJson: (snapshotMeta.snapshot_json as Record<string, any>) ?? {},
-    signals: rawSignals,
-    snapshotId: snapshotMeta.id ?? null,
-  } : null;
-
   return (
     <StoryEditProvider customer={customer}>
-      <StoryDebugProvider value={debugContext}>
-        <StoryPageInner customer={customer} pm={pm} snapshotId={snapshotId} showInternal={!!showInternal} isIoradUser={!!isIoradUser} queryClient={queryClient} snapshotMeta={snapshotMeta} rawSignals={rawSignals || []} />
-      </StoryDebugProvider>
+      <StoryPageInner customer={customer} pm={pm} snapshotId={snapshotId} showInternal={!!showInternal} isIoradUser={!!isIoradUser} queryClient={queryClient} snapshotMeta={snapshotMeta} rawSignals={rawSignals || []} />
     </StoryEditProvider>
   );
 }
@@ -345,7 +337,19 @@ function StoryPageInner({
   rawSignals: any[];
 }) {
   const ctx = useStoryEdit();
-  const displayCustomer = ctx?.isEditing ? ctx.editedCustomer : customer;
+  const [libraryOverride, setLibraryOverride] = useState<{ url: string; label: string } | null>(null);
+
+  const handleLibrarySelected = useCallback((url: string, label: string) => {
+    setLibraryOverride({ url, label });
+  }, []);
+
+  const baseCustomer = ctx?.isEditing ? ctx.editedCustomer : customer;
+  const displayCustomer = {
+    ...baseCustomer,
+    reinforcementPreview: libraryOverride
+      ? { ...baseCustomer.reinforcementPreview, libraryUrl: libraryOverride.url }
+      : baseCustomer.reinforcementPreview,
+  };
 
   const handleSave = async () => {
     if (!ctx || !snapshotId) {
@@ -371,93 +375,103 @@ function StoryPageInner({
   };
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--story-bg)", color: "var(--story-fg)" }}>
-      <StoryHero customer={displayCustomer} pm={pm} />
+    <StoryDebugProvider value={
+      isIoradUser && snapshotMeta ? {
+        isIoradUser: true,
+        snapshotJson: (snapshotMeta.snapshot_json as Record<string, any>) ?? {},
+        signals: rawSignals,
+        snapshotId: snapshotMeta?.id ?? null,
+        onLibrarySelected: handleLibrarySelected,
+      } : null
+    }>
+      <div className="min-h-screen" style={{ background: "var(--story-bg)", color: "var(--story-fg)" }}>
+        <StoryHero customer={displayCustomer} pm={pm} />
 
-      {/* 1. What We're Seeing */}
-      {displayCustomer.whatsHappening.length > 0 && (
-        <WhatsHappeningSection companyName={displayCustomer.name} items={displayCustomer.whatsHappening} />
-      )}
+        {/* 1. What We're Seeing */}
+        {displayCustomer.whatsHappening.length > 0 && (
+          <WhatsHappeningSection companyName={displayCustomer.name} items={displayCustomer.whatsHappening} />
+        )}
 
-      {/* 2. What This Likely Means */}
-      {displayCustomer.functionalImplications && (
-        <FunctionalImplicationsSection text={displayCustomer.functionalImplications} contactName={displayCustomer.contactName} />
-      )}
+        {/* 2. What This Likely Means */}
+        {displayCustomer.functionalImplications && (
+          <FunctionalImplicationsSection text={displayCustomer.functionalImplications} contactName={displayCustomer.contactName} />
+        )}
 
-      {/* 3. Where Adoption Friction Shows Up */}
-      {displayCustomer.executionFriction.length > 0 && (
-        <ExecutionFrictionSection items={displayCustomer.executionFriction} />
-      )}
+        {/* 3. Where Adoption Friction Shows Up */}
+        {displayCustomer.executionFriction.length > 0 && (
+          <ExecutionFrictionSection items={displayCustomer.executionFriction} />
+        )}
 
-      {/* 4. The Accountability Pressure */}
-      {displayCustomer.accountabilityPressure.length > 0 && (
-        <AccountabilityPressureSection items={displayCustomer.accountabilityPressure} />
-      )}
+        {/* 4. The Accountability Pressure */}
+        {displayCustomer.accountabilityPressure.length > 0 && (
+          <AccountabilityPressureSection items={displayCustomer.accountabilityPressure} />
+        )}
 
-      {/* 5. The Real Cost */}
-      {displayCustomer.realCost.length > 0 && (
-        <RealCostSection items={displayCustomer.realCost} />
-      )}
+        {/* 5. The Real Cost */}
+        {displayCustomer.realCost.length > 0 && (
+          <RealCostSection items={displayCustomer.realCost} />
+        )}
 
-      {/* 6. The Common Blind Spot */}
-      {displayCustomer.blindSpot && (
-        <BlindSpotSection text={displayCustomer.blindSpot} />
-      )}
+        {/* 6. The Common Blind Spot */}
+        {displayCustomer.blindSpot && (
+          <BlindSpotSection text={displayCustomer.blindSpot} />
+        )}
 
-      {/* 7. Four Strategic Plays */}
-      {displayCustomer.plays.length > 0 && (
-        <StrategicPlaysSection plays={displayCustomer.plays} />
-      )}
+        {/* 7. Four Strategic Plays */}
+        {displayCustomer.plays.length > 0 && (
+          <StrategicPlaysSection plays={displayCustomer.plays} />
+        )}
 
-      {/* 8. What Reinforcement Could Feel Like */}
-      {displayCustomer.reinforcementJourney && (
-        <ReinforcementJourneySection text={displayCustomer.reinforcementJourney} />
-      )}
+        {/* 8. What Reinforcement Could Feel Like */}
+        {displayCustomer.reinforcementJourney && (
+          <ReinforcementJourneySection text={displayCustomer.reinforcementJourney} />
+        )}
 
-      {/* Interactive Demo */}
-      <EmbedDemo reinforcementPreview={displayCustomer.reinforcementPreview} />
+        {/* Interactive Demo */}
+        <EmbedDemo reinforcementPreview={displayCustomer.reinforcementPreview} />
 
-      {/* 9. Similar Patterns */}
-      {displayCustomer.caseStudies.length > 0 && (
-        <CaseStudiesSection studies={displayCustomer.caseStudies} />
-      )}
+        {/* 9. Similar Patterns */}
+        {displayCustomer.caseStudies.length > 0 && (
+          <CaseStudiesSection studies={displayCustomer.caseStudies} />
+        )}
 
-      {/* 10. Why This Matters Now */}
-      {displayCustomer.whyNow && (
-        <WhyNowSection text={displayCustomer.whyNow} />
-      )}
+        {/* 10. Why This Matters Now */}
+        {displayCustomer.whyNow && (
+          <WhyNowSection text={displayCustomer.whyNow} />
+        )}
 
-      {/* 11. Continue the Conversation */}
-      <StoryCTA customer={displayCustomer} pm={pm} />
+        {/* 11. Continue the Conversation */}
+        <StoryCTA customer={displayCustomer} pm={pm} />
 
-      {/* 12. Internal Signal Context (hidden) */}
-      {showInternal && displayCustomer.internalSignals.signalTypes.length > 0 && (
-        <InternalSignalSummary signals={displayCustomer.internalSignals} conversationStarters={displayCustomer.conversationStarters} />
-      )}
+        {/* 12. Internal Signal Context (hidden) */}
+        {showInternal && displayCustomer.internalSignals.signalTypes.length > 0 && (
+          <InternalSignalSummary signals={displayCustomer.internalSignals} conversationStarters={displayCustomer.conversationStarters} />
+        )}
 
-      <footer className="py-8 text-center text-xs" style={{ borderTop: "1px solid var(--story-border)", color: "var(--story-subtle)" }}>
-        <p>© {new Date().getFullYear()} iorad · Prepared for {displayCustomer.name}.</p>
-      </footer>
+        <footer className="py-8 text-center text-xs" style={{ borderTop: "1px solid var(--story-border)", color: "var(--story-subtle)" }}>
+          <p>© {new Date().getFullYear()} iorad · Prepared for {displayCustomer.name}.</p>
+        </footer>
 
-      {isIoradUser && snapshotId && (
-        <>
-          <EditToolbar onSave={handleSave} />
-          {snapshotMeta && (
-            <DebugPanel
-              companyId={customer.id}
-              companyName={customer.name}
-              scoreTotal={snapshotMeta.score_total ?? 0}
-              scoreBreakdown={(snapshotMeta.score_breakdown as Record<string, number>) ?? {}}
-              modelVersion={snapshotMeta.model_version}
-              promptVersion={snapshotMeta.prompt_version}
-              snapshotCreatedAt={snapshotMeta.created_at}
-              snapshotJson={(snapshotMeta.snapshot_json as Record<string, any>) ?? {}}
-              signals={rawSignals}
-            />
-          )}
-        </>
-      )}
-    </div>
+        {isIoradUser && snapshotId && (
+          <>
+            <EditToolbar onSave={handleSave} />
+            {snapshotMeta && (
+              <DebugPanel
+                companyId={customer.id}
+                companyName={customer.name}
+                scoreTotal={snapshotMeta.score_total ?? 0}
+                scoreBreakdown={(snapshotMeta.score_breakdown as Record<string, number>) ?? {}}
+                modelVersion={snapshotMeta.model_version}
+                promptVersion={snapshotMeta.prompt_version}
+                snapshotCreatedAt={snapshotMeta.created_at}
+                snapshotJson={(snapshotMeta.snapshot_json as Record<string, any>) ?? {}}
+                signals={rawSignals}
+              />
+            )}
+          </>
+        )}
+      </div>
+    </StoryDebugProvider>
   );
 }
 
