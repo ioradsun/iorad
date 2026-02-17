@@ -226,6 +226,7 @@ function AIConfigTab() {
   const [strategyPrompt, setStrategyPrompt] = useState("");
   const [outreachPrompt, setOutreachPrompt] = useState("");
   const [storyPrompt, setStoryPrompt] = useState("");
+  const [transcriptPrompt, setTranscriptPrompt] = useState("");
   const [model, setModel] = useState("");
 
   useEffect(() => {
@@ -236,6 +237,7 @@ function AIConfigTab() {
       setStrategyPrompt((data as any).strategy_prompt || "");
       setOutreachPrompt((data as any).outreach_prompt || "");
       setStoryPrompt((data as any).story_prompt || "");
+      setTranscriptPrompt((data as any).transcript_prompt || "");
       setModel(data.model);
     }
   }, [data]);
@@ -249,6 +251,7 @@ function AIConfigTab() {
         strategy_prompt: strategyPrompt,
         outreach_prompt: outreachPrompt,
         story_prompt: storyPrompt,
+        transcript_prompt: transcriptPrompt,
         model,
       } as any).eq("id", 1);
       if (error) throw error;
@@ -290,6 +293,13 @@ function AIConfigTab() {
       description: "Prompt for generating Story tab content — produces bespoke Loom scripts and iorad tutorial assets.",
       value: storyPrompt,
       setter: setStoryPrompt,
+    },
+    {
+      key: "transcript",
+      label: "Transcript Analysis Prompt",
+      description: "Prompt for analyzing Fathom meeting transcripts — extracts strategic account intelligence for CS handoff.",
+      value: transcriptPrompt,
+      setter: setTranscriptPrompt,
     },
   ];
 
