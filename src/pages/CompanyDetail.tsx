@@ -652,6 +652,101 @@ export default function CompanyDetail() {
                         {contact.linkedin && <a href={contact.linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary"><Linkedin className="w-4 h-4" /></a>}
                       </div>
                     </div>
+                    {/* AI-Extracted Profile (Pass 1) */}
+                    {(() => {
+                      const profile = (contact as any).contact_profile;
+                      if (!profile) return null;
+                      return (
+                        <Collapsible className="ml-[52px]">
+                          <CollapsibleTrigger className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-primary hover:text-primary/80 transition-colors py-1">
+                            <Brain className="w-3 h-3" />
+                            <span>AI Profile — {profile.engagement_tier?.replace(/_/g, " ")} · {profile.adoption_stage?.replace(/_/g, " ")}</span>
+                            <ChevronRight className="w-3 h-3 transition-transform [[data-state=open]>&]:rotate-90" />
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="space-y-2 pt-1 pb-2">
+                            {profile.primary_use_case && (
+                              <div className="text-xs text-foreground/80">
+                                <span className="text-muted-foreground font-medium">Use Case:</span> {profile.primary_use_case}
+                              </div>
+                            )}
+                            {profile.account_narrative && (
+                              <div className="text-xs text-foreground/70 italic leading-relaxed">{profile.account_narrative}</div>
+                            )}
+                            {profile.key_metrics && (
+                              <div className="flex flex-wrap gap-1.5">
+                                {profile.key_metrics.plan && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded border border-primary/20 bg-primary/10 text-primary font-medium">{profile.key_metrics.plan}</span>
+                                )}
+                                {profile.key_metrics.tutorials_created > 0 && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded border border-border/50 bg-secondary/30 text-muted-foreground">
+                                    Created: <span className="text-foreground font-medium">{profile.key_metrics.tutorials_created}</span>
+                                  </span>
+                                )}
+                                {profile.key_metrics.tutorials_viewed > 0 && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded border border-border/50 bg-secondary/30 text-muted-foreground">
+                                    Views: <span className="text-foreground font-medium">{profile.key_metrics.tutorials_viewed}</span>
+                                  </span>
+                                )}
+                                {profile.key_metrics.days_since_last_active != null && (
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded border ${profile.key_metrics.days_since_last_active > 30 ? "border-destructive/30 bg-destructive/10 text-destructive" : "border-border/50 bg-secondary/30 text-muted-foreground"}`}>
+                                    Last Active: <span className="font-medium">{profile.key_metrics.days_since_last_active}d ago</span>
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            {profile.tools_documented?.length > 0 && (
+                              <div className="text-xs text-muted-foreground">
+                                <span className="font-medium">Documenting:</span> {profile.tools_documented.join(", ")}
+                              </div>
+                            )}
+                            {profile.deployment_channels?.length > 0 && (
+                              <div className="text-xs text-muted-foreground">
+                                <span className="font-medium">Deployed to:</span> {profile.deployment_channels.join(", ")}
+                              </div>
+                            )}
+                            {profile.expansion_signals?.length > 0 && (
+                              <div className="space-y-0.5">
+                                <div className="text-[10px] font-mono uppercase tracking-wider text-primary">Expansion Signals</div>
+                                <ul className="space-y-0.5">
+                                  {profile.expansion_signals.map((s: string, i: number) => (
+                                    <li key={i} className="text-xs text-foreground/80 flex items-start gap-1.5">
+                                      <TrendingUp className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
+                                      <span>{s}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {profile.risk_signals?.length > 0 && (
+                              <div className="space-y-0.5">
+                                <div className="text-[10px] font-mono uppercase tracking-wider text-destructive">Risk Signals</div>
+                                <ul className="space-y-0.5">
+                                  {profile.risk_signals.map((s: string, i: number) => (
+                                    <li key={i} className="text-xs text-foreground/80 flex items-start gap-1.5">
+                                      <AlertCircle className="w-3 h-3 text-destructive mt-0.5 flex-shrink-0" />
+                                      <span>{s}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {profile.recommended_angles?.length > 0 && (
+                              <div className="space-y-0.5">
+                                <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Outreach Angles</div>
+                                <ul className="space-y-0.5">
+                                  {profile.recommended_angles.map((a: string, i: number) => (
+                                    <li key={i} className="text-xs text-foreground/80 flex items-start gap-1.5">
+                                      <Target className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
+                                      <span>{a}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </CollapsibleContent>
+                        </Collapsible>
+                      );
+                    })()}
                     {/* Product usage metrics from HubSpot contact properties */}
                     {(() => {
                       const hp = (contact as any).hubspot_properties;
