@@ -314,6 +314,14 @@ export default function UploadPage() {
 
 const PARTNERS = ["seismic", "workramp", "360learning", "docebo", "gainsight"];
 
+const PERSONAS = [
+  "Learning & Development",
+  "Sales Enablement",
+  "Revenue Enablement",
+  "Customer Education",
+  "Partner Enablement",
+];
+
 function ManualAddForm() {
   const navigate = useNavigate();
   const insertCompanies = useInsertCompanies();
@@ -428,13 +436,12 @@ function ManualAddForm() {
         </div>
         <div className="space-y-2 col-span-2">
           <Label className="text-xs">Persona</Label>
-          <Input
-            value={form.persona}
-            onChange={e => update("persona", e.target.value)}
-            placeholder="VP of Enablement"
-            className="bg-secondary"
-            maxLength={200}
-          />
+          <Select value={form.persona} onValueChange={v => update("persona", v)}>
+            <SelectTrigger className="bg-secondary"><SelectValue placeholder="Select persona" /></SelectTrigger>
+            <SelectContent className="bg-background z-50">
+              {PERSONAS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
       </div>
       <Button type="submit" disabled={saving || !form.name.trim()} className="w-full gap-2">
