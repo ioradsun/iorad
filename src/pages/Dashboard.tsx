@@ -108,19 +108,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {[
-          { label: "Total Companies", value: companies.length },
-          { label: "Snapshots Generated", value: companies.filter(c => c.snapshot_status === "Generated").length },
-          { label: "Not Started", value: companies.filter(c => !c.snapshot_status || c.snapshot_status === "Low Signal").length },
-        ].map(({ label, value }) => (
-          <motion.div key={label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="panel">
-            <div className="panel-header">{label}</div>
-            <div className="text-2xl font-display font-bold text-foreground">{value}</div>
-          </motion.div>
-        ))}
-      </div>
-
       <div className="glow-line" />
 
       <div className="flex flex-wrap items-center gap-3">
