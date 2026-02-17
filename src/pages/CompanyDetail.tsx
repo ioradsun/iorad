@@ -345,6 +345,225 @@ export default function CompanyDetail() {
             </div>
           </div>
 
+          {/* iorad Expansion Analysis */}
+          {snap && latestSnapshot && (
+            <div className="panel">
+              <div className="panel-header flex items-center justify-between">
+                <span>iorad Expansion Analysis</span>
+                <span className="text-[10px] text-muted-foreground normal-case tracking-normal">
+                  {latestSnapshot.model_version} · {latestSnapshot.prompt_version} · {new Date(latestSnapshot.created_at).toLocaleDateString()}
+                </span>
+              </div>
+
+              {snap.why_now && toArray(snap.why_now).length > 0 && (
+                <div className="mb-4 bg-primary/5 border border-primary/20 rounded-lg p-4">
+                  <div className="text-xs font-mono uppercase tracking-wider text-primary mb-2">Why Now</div>
+                  {toArray(snap.why_now).map((item, i) => <p key={i} className="text-sm text-foreground/90 leading-relaxed">{item}</p>)}
+                </div>
+              )}
+
+              <Accordion type="multiple" defaultValue={["executive-narrative"]} className="space-y-2">
+                {snap.signal_deconstruction && (
+                  <AccordionItem value="signal-deconstruction" className="border rounded-lg px-4">
+                    <AccordionTrigger className="text-sm font-medium">
+                      <div className="flex items-center gap-2"><Target className="w-4 h-4 text-primary" /> Signal Deconstruction</div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-4">
+                        {snap.signal_deconstruction.company_stage && (
+                          <div>
+                            <div className="text-xs font-mono text-muted-foreground mb-1">Company Stage</div>
+                            <span className="text-sm bg-primary/10 text-primary px-2 py-0.5 rounded">{snap.signal_deconstruction.company_stage}</span>
+                          </div>
+                        )}
+                        {snap.signal_deconstruction.observable_facts?.length ? (
+                          <div>
+                            <div className="text-xs font-mono text-muted-foreground mb-2">Observable Facts</div>
+                            <ul className="space-y-1">{snap.signal_deconstruction.observable_facts.map((f, i) => <li key={i} className="text-sm flex items-start gap-2"><span className="text-primary">•</span>{f}</li>)}</ul>
+                          </div>
+                        ) : null}
+                        {snap.signal_deconstruction.workflow_stress_indicators?.length ? (
+                          <div>
+                            <div className="text-xs font-mono text-muted-foreground mb-2">Workflow Stress Indicators</div>
+                            <ul className="space-y-1">{snap.signal_deconstruction.workflow_stress_indicators.map((w, i) => <li key={i} className="text-sm flex items-start gap-2"><AlertCircle className="w-3.5 h-3.5 text-destructive mt-0.5 flex-shrink-0" />{w}</li>)}</ul>
+                          </div>
+                        ) : null}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                )}
+
+                {snap.operational_friction?.length ? (
+                  <AccordionItem value="operational-friction" className="border rounded-lg px-4">
+                    <AccordionTrigger className="text-sm font-medium">
+                      <div className="flex items-center gap-2"><Zap className="w-4 h-4 text-primary" /> Operational Friction</div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-3">
+                        {snap.operational_friction.map((f, i) => (
+                          <div key={i} className="bg-secondary/50 rounded-lg p-3 space-y-1">
+                            <div className="text-sm"><span className="font-medium text-foreground">Cause:</span> <span className="text-foreground/80">{f.cause}</span></div>
+                            <div className="text-sm"><span className="font-medium text-foreground">→ Effect:</span> <span className="text-foreground/80">{f.effect}</span></div>
+                            <div className="text-sm"><span className="font-medium text-foreground">→ Bottleneck:</span> <span className="text-foreground/80">{f.bottleneck}</span></div>
+                          </div>
+                        ))}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                ) : null}
+
+                {snap.partner_platform_ceiling && (
+                  <AccordionItem value="partner-ceiling" className="border rounded-lg px-4">
+                    <AccordionTrigger className="text-sm font-medium">
+                      <div className="flex items-center gap-2"><TrendingUp className="w-4 h-4 text-primary" /> Partner Platform Ceiling</div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-4">
+                        {snap.partner_platform_ceiling.platform_strengths?.length ? (
+                          <div>
+                            <div className="text-xs font-mono text-muted-foreground mb-2">Platform Strengths</div>
+                            <div className="flex flex-wrap gap-1.5">{snap.partner_platform_ceiling.platform_strengths.map((s, i) => <span key={i} className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">{s}</span>)}</div>
+                          </div>
+                        ) : null}
+                        {snap.partner_platform_ceiling.execution_gaps?.length ? (
+                          <div>
+                            <div className="text-xs font-mono text-muted-foreground mb-2">Execution Gaps</div>
+                            <ul className="space-y-1">{snap.partner_platform_ceiling.execution_gaps.map((g, i) => <li key={i} className="text-sm flex items-start gap-2"><span className="text-destructive">✕</span>{g}</li>)}</ul>
+                          </div>
+                        ) : null}
+                        {snap.partner_platform_ceiling.key_insight && (
+                          <div className="bg-primary/5 border border-primary/20 rounded p-3 text-sm italic text-foreground/90">{snap.partner_platform_ceiling.key_insight}</div>
+                        )}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                )}
+
+                {snap.embedded_leverage && (
+                  <AccordionItem value="embedded-leverage" className="border rounded-lg px-4">
+                    <AccordionTrigger className="text-sm font-medium">
+                      <div className="flex items-center gap-2"><Zap className="w-4 h-4 text-primary" /> Embedded iorad Leverage</div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {(["situation", "constraint", "intervention", "transformation"] as const).map(key => {
+                          const val = snap.embedded_leverage?.[key];
+                          if (!val) return null;
+                          const labels: Record<string, string> = { situation: "Situation", constraint: "Constraint", intervention: "Intervention", transformation: "Transformation" };
+                          return (
+                            <div key={key} className="bg-secondary/50 rounded-lg p-3">
+                              <div className="text-xs font-mono text-muted-foreground mb-1">{labels[key]}</div>
+                              <p className="text-sm text-foreground/90">{val}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                )}
+
+                {snap.quantified_impact?.length ? (
+                  <AccordionItem value="quantified-impact" className="border rounded-lg px-4">
+                    <AccordionTrigger className="text-sm font-medium">
+                      <div className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" /> Quantified Impact</div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-3">
+                        {snap.quantified_impact.map((q, i) => (
+                          <div key={i} className="border rounded-lg p-3 space-y-2">
+                            <div className="font-medium text-sm text-foreground">{q.metric}</div>
+                            <div className="text-xs text-muted-foreground"><span className="font-mono">Assumptions:</span> {q.assumptions}</div>
+                            <div className="text-xs font-mono bg-secondary/50 rounded p-2 text-foreground/80">{q.calculation}</div>
+                            <div className="text-sm font-bold text-primary">{q.result}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                ) : null}
+
+                {snap.executive_narrative && (
+                  <AccordionItem value="executive-narrative" className="border rounded-lg px-4">
+                    <AccordionTrigger className="text-sm font-medium">
+                      <div className="flex items-center gap-2"><FileText className="w-4 h-4 text-primary" /> Executive Narrative</div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                        {(Array.isArray(snap.executive_narrative)
+                          ? snap.executive_narrative
+                          : typeof snap.executive_narrative === 'string' ? snap.executive_narrative.split("\n\n") : []
+                        ).map((p: string, i: number) => (
+                          <p key={i} className="text-sm text-foreground/90 leading-relaxed mb-3">{p}</p>
+                        ))}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                )}
+
+                {snap.outbound_positioning && (
+                  <AccordionItem value="outbound-positioning" className="border rounded-lg px-4">
+                    <AccordionTrigger className="text-sm font-medium">
+                      <div className="flex items-center gap-2"><MessageSquareQuote className="w-4 h-4 text-primary" /> Outbound Positioning</div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-3">
+                        {snap.outbound_positioning.executive_framing && (
+                          <div className="border-l-2 border-primary/40 pl-3">
+                            <div className="text-xs font-mono text-muted-foreground mb-1">Executive Framing</div>
+                            <p className="text-sm text-foreground/90 italic">"{snap.outbound_positioning.executive_framing}"</p>
+                          </div>
+                        )}
+                        {snap.outbound_positioning.efficiency_framing && (
+                          <div className="border-l-2 border-primary/40 pl-3">
+                            <div className="text-xs font-mono text-muted-foreground mb-1">Efficiency / Revenue</div>
+                            <p className="text-sm text-foreground/90 italic">"{snap.outbound_positioning.efficiency_framing}"</p>
+                          </div>
+                        )}
+                        {snap.outbound_positioning.risk_framing && (
+                          <div className="border-l-2 border-primary/40 pl-3">
+                            <div className="text-xs font-mono text-muted-foreground mb-1">Risk Mitigation</div>
+                            <p className="text-sm text-foreground/90 italic">"{snap.outbound_positioning.risk_framing}"</p>
+                          </div>
+                        )}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                )}
+
+                {snap.competitive_insulation?.length ? (
+                  <AccordionItem value="competitive-insulation" className="border rounded-lg px-4">
+                    <AccordionTrigger className="text-sm font-medium">
+                      <div className="flex items-center gap-2"><Shield className="w-4 h-4 text-primary" /> Competitive Insulation</div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <ul className="space-y-1.5">{snap.competitive_insulation.map((r, i) => <li key={i} className="text-sm flex items-start gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />{r}</li>)}</ul>
+                    </AccordionContent>
+                  </AccordionItem>
+                ) : null}
+
+                {snap.evidence?.length ? (
+                  <AccordionItem value="evidence" className="border rounded-lg px-4">
+                    <AccordionTrigger className="text-sm font-medium">
+                      <div className="flex items-center gap-2"><ExternalLink className="w-4 h-4 text-primary" /> Cited Evidence ({snap.evidence.length})</div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-2">
+                        {snap.evidence.map((ev, i) => (
+                          <div key={i} className="text-xs border-l-2 border-primary/40 pl-3 py-1">
+                            <p className="text-foreground/80 italic">"{ev.snippet || ev.detail || ""}"</p>
+                            <a href={ev.source_url || ev.url || "#"} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1 mt-0.5">
+                              <ExternalLink className="w-3 h-3" /> {ev.source_type || ev.signal_type || "source"} · {ev.date || "no date"}
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                ) : null}
+              </Accordion>
+            </div>
+          )}
+
           <div className="glow-line" />
 
           {/* Score + Signals + Analysis (collapsible) */}
@@ -432,225 +651,6 @@ export default function CompanyDetail() {
                   )}
                 </div>
               </div>
-
-              {/* Enterprise Analysis Accordion */}
-              {snap && latestSnapshot && (
-                <div className="panel">
-                  <div className="panel-header flex items-center justify-between">
-                    <span>iorad Expansion Analysis</span>
-                    <span className="text-[10px] text-muted-foreground normal-case tracking-normal">
-                      {latestSnapshot.model_version} · {latestSnapshot.prompt_version} · {new Date(latestSnapshot.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-
-                  {snap.why_now && toArray(snap.why_now).length > 0 && (
-                    <div className="mb-4 bg-primary/5 border border-primary/20 rounded-lg p-4">
-                      <div className="text-xs font-mono uppercase tracking-wider text-primary mb-2">Why Now</div>
-                      {toArray(snap.why_now).map((item, i) => <p key={i} className="text-sm text-foreground/90 leading-relaxed">{item}</p>)}
-                    </div>
-                  )}
-
-                  <Accordion type="multiple" defaultValue={["executive-narrative"]} className="space-y-2">
-                    {snap.signal_deconstruction && (
-                      <AccordionItem value="signal-deconstruction" className="border rounded-lg px-4">
-                        <AccordionTrigger className="text-sm font-medium">
-                          <div className="flex items-center gap-2"><Target className="w-4 h-4 text-primary" /> Signal Deconstruction</div>
-                        </AccordionTrigger>
-                        <AccordionContent>
-                          <div className="space-y-4">
-                            {snap.signal_deconstruction.company_stage && (
-                              <div>
-                                <div className="text-xs font-mono text-muted-foreground mb-1">Company Stage</div>
-                                <span className="text-sm bg-primary/10 text-primary px-2 py-0.5 rounded">{snap.signal_deconstruction.company_stage}</span>
-                              </div>
-                            )}
-                            {snap.signal_deconstruction.observable_facts?.length ? (
-                              <div>
-                                <div className="text-xs font-mono text-muted-foreground mb-2">Observable Facts</div>
-                                <ul className="space-y-1">{snap.signal_deconstruction.observable_facts.map((f, i) => <li key={i} className="text-sm flex items-start gap-2"><span className="text-primary">•</span>{f}</li>)}</ul>
-                              </div>
-                            ) : null}
-                            {snap.signal_deconstruction.workflow_stress_indicators?.length ? (
-                              <div>
-                                <div className="text-xs font-mono text-muted-foreground mb-2">Workflow Stress Indicators</div>
-                                <ul className="space-y-1">{snap.signal_deconstruction.workflow_stress_indicators.map((w, i) => <li key={i} className="text-sm flex items-start gap-2"><AlertCircle className="w-3.5 h-3.5 text-destructive mt-0.5 flex-shrink-0" />{w}</li>)}</ul>
-                              </div>
-                            ) : null}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    )}
-
-                    {snap.operational_friction?.length ? (
-                      <AccordionItem value="operational-friction" className="border rounded-lg px-4">
-                        <AccordionTrigger className="text-sm font-medium">
-                          <div className="flex items-center gap-2"><Zap className="w-4 h-4 text-primary" /> Operational Friction</div>
-                        </AccordionTrigger>
-                        <AccordionContent>
-                          <div className="space-y-3">
-                            {snap.operational_friction.map((f, i) => (
-                              <div key={i} className="bg-secondary/50 rounded-lg p-3 space-y-1">
-                                <div className="text-sm"><span className="font-medium text-foreground">Cause:</span> <span className="text-foreground/80">{f.cause}</span></div>
-                                <div className="text-sm"><span className="font-medium text-foreground">→ Effect:</span> <span className="text-foreground/80">{f.effect}</span></div>
-                                <div className="text-sm"><span className="font-medium text-foreground">→ Bottleneck:</span> <span className="text-foreground/80">{f.bottleneck}</span></div>
-                              </div>
-                            ))}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    ) : null}
-
-                    {snap.partner_platform_ceiling && (
-                      <AccordionItem value="partner-ceiling" className="border rounded-lg px-4">
-                        <AccordionTrigger className="text-sm font-medium">
-                          <div className="flex items-center gap-2"><TrendingUp className="w-4 h-4 text-primary" /> Partner Platform Ceiling</div>
-                        </AccordionTrigger>
-                        <AccordionContent>
-                          <div className="space-y-4">
-                            {snap.partner_platform_ceiling.platform_strengths?.length ? (
-                              <div>
-                                <div className="text-xs font-mono text-muted-foreground mb-2">Platform Strengths</div>
-                                <div className="flex flex-wrap gap-1.5">{snap.partner_platform_ceiling.platform_strengths.map((s, i) => <span key={i} className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">{s}</span>)}</div>
-                              </div>
-                            ) : null}
-                            {snap.partner_platform_ceiling.execution_gaps?.length ? (
-                              <div>
-                                <div className="text-xs font-mono text-muted-foreground mb-2">Execution Gaps</div>
-                                <ul className="space-y-1">{snap.partner_platform_ceiling.execution_gaps.map((g, i) => <li key={i} className="text-sm flex items-start gap-2"><span className="text-destructive">✕</span>{g}</li>)}</ul>
-                              </div>
-                            ) : null}
-                            {snap.partner_platform_ceiling.key_insight && (
-                              <div className="bg-primary/5 border border-primary/20 rounded p-3 text-sm italic text-foreground/90">{snap.partner_platform_ceiling.key_insight}</div>
-                            )}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    )}
-
-                    {snap.embedded_leverage && (
-                      <AccordionItem value="embedded-leverage" className="border rounded-lg px-4">
-                        <AccordionTrigger className="text-sm font-medium">
-                          <div className="flex items-center gap-2"><Zap className="w-4 h-4 text-primary" /> Embedded iorad Leverage</div>
-                        </AccordionTrigger>
-                        <AccordionContent>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {(["situation", "constraint", "intervention", "transformation"] as const).map(key => {
-                              const val = snap.embedded_leverage?.[key];
-                              if (!val) return null;
-                              const labels: Record<string, string> = { situation: "Situation", constraint: "Constraint", intervention: "Intervention", transformation: "Transformation" };
-                              return (
-                                <div key={key} className="bg-secondary/50 rounded-lg p-3">
-                                  <div className="text-xs font-mono text-muted-foreground mb-1">{labels[key]}</div>
-                                  <p className="text-sm text-foreground/90">{val}</p>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    )}
-
-                    {snap.quantified_impact?.length ? (
-                      <AccordionItem value="quantified-impact" className="border rounded-lg px-4">
-                        <AccordionTrigger className="text-sm font-medium">
-                          <div className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" /> Quantified Impact</div>
-                        </AccordionTrigger>
-                        <AccordionContent>
-                          <div className="space-y-3">
-                            {snap.quantified_impact.map((q, i) => (
-                              <div key={i} className="border rounded-lg p-3 space-y-2">
-                                <div className="font-medium text-sm text-foreground">{q.metric}</div>
-                                <div className="text-xs text-muted-foreground"><span className="font-mono">Assumptions:</span> {q.assumptions}</div>
-                                <div className="text-xs font-mono bg-secondary/50 rounded p-2 text-foreground/80">{q.calculation}</div>
-                                <div className="text-sm font-bold text-primary">{q.result}</div>
-                              </div>
-                            ))}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    ) : null}
-
-                    {snap.executive_narrative && (
-                      <AccordionItem value="executive-narrative" className="border rounded-lg px-4">
-                        <AccordionTrigger className="text-sm font-medium">
-                          <div className="flex items-center gap-2"><FileText className="w-4 h-4 text-primary" /> Executive Narrative</div>
-                        </AccordionTrigger>
-                        <AccordionContent>
-                          <div className="prose prose-sm dark:prose-invert max-w-none">
-                            {(Array.isArray(snap.executive_narrative)
-                              ? snap.executive_narrative
-                              : typeof snap.executive_narrative === 'string' ? snap.executive_narrative.split("\n\n") : []
-                            ).map((p: string, i: number) => (
-                              <p key={i} className="text-sm text-foreground/90 leading-relaxed mb-3">{p}</p>
-                            ))}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    )}
-
-                    {snap.outbound_positioning && (
-                      <AccordionItem value="outbound-positioning" className="border rounded-lg px-4">
-                        <AccordionTrigger className="text-sm font-medium">
-                          <div className="flex items-center gap-2"><MessageSquareQuote className="w-4 h-4 text-primary" /> Outbound Positioning</div>
-                        </AccordionTrigger>
-                        <AccordionContent>
-                          <div className="space-y-3">
-                            {snap.outbound_positioning.executive_framing && (
-                              <div className="border-l-2 border-primary/40 pl-3">
-                                <div className="text-xs font-mono text-muted-foreground mb-1">Executive Framing</div>
-                                <p className="text-sm text-foreground/90 italic">"{snap.outbound_positioning.executive_framing}"</p>
-                              </div>
-                            )}
-                            {snap.outbound_positioning.efficiency_framing && (
-                              <div className="border-l-2 border-primary/40 pl-3">
-                                <div className="text-xs font-mono text-muted-foreground mb-1">Efficiency / Revenue</div>
-                                <p className="text-sm text-foreground/90 italic">"{snap.outbound_positioning.efficiency_framing}"</p>
-                              </div>
-                            )}
-                            {snap.outbound_positioning.risk_framing && (
-                              <div className="border-l-2 border-primary/40 pl-3">
-                                <div className="text-xs font-mono text-muted-foreground mb-1">Risk Mitigation</div>
-                                <p className="text-sm text-foreground/90 italic">"{snap.outbound_positioning.risk_framing}"</p>
-                              </div>
-                            )}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    )}
-
-                    {snap.competitive_insulation?.length ? (
-                      <AccordionItem value="competitive-insulation" className="border rounded-lg px-4">
-                        <AccordionTrigger className="text-sm font-medium">
-                          <div className="flex items-center gap-2"><Shield className="w-4 h-4 text-primary" /> Competitive Insulation</div>
-                        </AccordionTrigger>
-                        <AccordionContent>
-                          <ul className="space-y-1.5">{snap.competitive_insulation.map((r, i) => <li key={i} className="text-sm flex items-start gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />{r}</li>)}</ul>
-                        </AccordionContent>
-                      </AccordionItem>
-                    ) : null}
-
-                    {snap.evidence?.length ? (
-                      <AccordionItem value="evidence" className="border rounded-lg px-4">
-                        <AccordionTrigger className="text-sm font-medium">
-                          <div className="flex items-center gap-2"><ExternalLink className="w-4 h-4 text-primary" /> Cited Evidence ({snap.evidence.length})</div>
-                        </AccordionTrigger>
-                        <AccordionContent>
-                          <div className="space-y-2">
-                            {snap.evidence.map((ev, i) => (
-                              <div key={i} className="text-xs border-l-2 border-primary/40 pl-3 py-1">
-                                <p className="text-foreground/80 italic">"{ev.snippet || ev.detail || ""}"</p>
-                                <a href={ev.source_url || ev.url || "#"} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1 mt-0.5">
-                                  <ExternalLink className="w-3 h-3" /> {ev.source_type || ev.signal_type || "source"} · {ev.date || "no date"}
-                                </a>
-                              </div>
-                            ))}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    ) : null}
-                  </Accordion>
-                </div>
-              )}
 
               {/* Snapshot History */}
               <div className="panel">
