@@ -25,7 +25,7 @@ export default function EmbedDemo() {
   const desc = ctx?.editedCustomer?.overrides?.["embed.desc"] || defaultDesc;
 
   return (
-    <section className="mx-auto px-6 py-16" style={{ maxWidth: "1108px" }}>
+    <section className="max-w-5xl mx-auto px-6 py-16">
       <motion.div {...fade}>
         {annotation?.element}
         {ctx?.isEditing ? (
