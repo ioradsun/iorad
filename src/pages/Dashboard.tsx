@@ -150,7 +150,7 @@ export default function Dashboard() {
                 <th className="text-left px-4 py-3"><SortHeader label="Score" field="last_score_total" /></th>
                 <th className="text-left px-4 py-3 hidden md:table-cell"><span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Partner</span></th>
                 <th className="text-left px-4 py-3 hidden lg:table-cell"><span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Partner Rep</span></th>
-                <th className="text-left px-4 py-3 hidden sm:table-cell"><SortHeader label="Signals" field="signals_count" /></th>
+                
                 <th className="text-left px-4 py-3 hidden lg:table-cell"><SortHeader label="Updated" field="updated_at" /></th>
                 <th className="px-4 py-3"></th>
               </tr>
@@ -175,7 +175,7 @@ export default function Dashboard() {
                     {company.partner_rep_name || "—"}
                     {company.partner_rep_email && <div className="text-[10px] text-muted-foreground/60">{company.partner_rep_email}</div>}
                   </td>
-                  <td className="px-4 py-3 hidden sm:table-cell data-cell text-muted-foreground">{company.signals_count}</td>
+                  
                   <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground">
                     {company.last_processed_at ? new Date(company.last_processed_at).toLocaleDateString() : "—"}
                   </td>
@@ -193,7 +193,7 @@ export default function Dashboard() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
+                  <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
                     {companies.length === 0 ? "No companies yet. Upload a CSV to get started." : "No companies match your filters."}
                   </td>
                 </tr>
