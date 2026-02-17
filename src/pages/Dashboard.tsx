@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Building2, ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { useCompanies, useSignalCounts, useProcessingJobs } from "@/hooks/useSupabase";
 import ScoreCell from "@/components/ScoreCell";
 import { ArrowUpDown, Search, Loader2, Plus, ExternalLink } from "lucide-react";
@@ -64,6 +65,20 @@ export default function Dashboard() {
     return Array.from(set).sort();
   }, [companies]);
 
+  const stats = useMemo(() => {
+    const now = Date.now();
+    const oneDayAgo = now - 24 * 60 * 60 * 1000;
+    let newInbound = 0;
+    let newOutbound = 0;
+    for (const c of companies) {
+      if (new Date(c.created_at).getTime() >= oneDayAgo) {
+        if ((c as any).source_type === "inbound") newInbound++;
+        else newOutbound++;
+      }
+    }
+    return { total: companies.length, newInbound, newOutbound };
+  }, [companies]);
+
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
     else { setSortKey(key); setSortAsc(false); }
@@ -107,6 +122,30 @@ export default function Dashboard() {
               <Plus className="w-4 h-4" /> Add Company
             </Button>
           </Link>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div className="panel flex items-center gap-3 px-4 py-3">
+          <div className="rounded-lg bg-primary/10 p-2"><Building2 className="w-5 h-5 text-primary" /></div>
+          <div>
+            <div className="text-2xl font-bold tracking-tight">{stats.total}</div>
+            <div className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">Total Records</div>
+          </div>
+        </div>
+        <div className="panel flex items-center gap-3 px-4 py-3">
+          <div className="rounded-lg bg-emerald-500/10 p-2"><ArrowDownRight className="w-5 h-5 text-emerald-400" /></div>
+          <div>
+            <div className="text-2xl font-bold tracking-tight">{stats.newInbound}</div>
+            <div className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">New Inbound <span className="normal-case text-muted-foreground/60">(24h)</span></div>
+          </div>
+        </div>
+        <div className="panel flex items-center gap-3 px-4 py-3">
+          <div className="rounded-lg bg-blue-500/10 p-2"><ArrowUpRight className="w-5 h-5 text-blue-400" /></div>
+          <div>
+            <div className="text-2xl font-bold tracking-tight">{stats.newOutbound}</div>
+            <div className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">New Outbound <span className="normal-case text-muted-foreground/60">(24h)</span></div>
+          </div>
         </div>
       </div>
 
