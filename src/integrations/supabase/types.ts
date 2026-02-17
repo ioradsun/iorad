@@ -113,6 +113,7 @@ export type Database = {
           buyer_linkedin: string | null
           buyer_name: string | null
           buyer_title: string | null
+          clay_pushed_at: string | null
           created_at: string
           domain: string | null
           headcount: number | null
@@ -137,6 +138,7 @@ export type Database = {
           buyer_linkedin?: string | null
           buyer_name?: string | null
           buyer_title?: string | null
+          clay_pushed_at?: string | null
           created_at?: string
           domain?: string | null
           headcount?: number | null
@@ -161,6 +163,7 @@ export type Database = {
           buyer_linkedin?: string | null
           buyer_name?: string | null
           buyer_title?: string | null
+          clay_pushed_at?: string | null
           created_at?: string
           domain?: string | null
           headcount?: number | null

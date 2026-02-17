@@ -1,0 +1,1 @@
+ALTER TABLE public.companies ADD COLUMN clay_pushed_at timestamp with time zone DEFAULT NULL;
