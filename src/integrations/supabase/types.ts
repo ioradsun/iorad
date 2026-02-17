@@ -325,6 +325,60 @@ export type Database = {
           },
         ]
       }
+      customer_activity: {
+        Row: {
+          activity_type: string
+          company_id: string
+          contact_id: string | null
+          created_at: string
+          hubspot_event_id: string | null
+          id: string
+          metadata: Json
+          occurred_at: string
+          title: string
+          url: string | null
+        }
+        Insert: {
+          activity_type: string
+          company_id: string
+          contact_id?: string | null
+          created_at?: string
+          hubspot_event_id?: string | null
+          id?: string
+          metadata?: Json
+          occurred_at?: string
+          title?: string
+          url?: string | null
+        }
+        Update: {
+          activity_type?: string
+          company_id?: string
+          contact_id?: string | null
+          created_at?: string
+          hubspot_event_id?: string | null
+          id?: string
+          metadata?: Json
+          occurred_at?: string
+          title?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_activity_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_activity_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       iorad_libraries: {
         Row: {
           created_at: string

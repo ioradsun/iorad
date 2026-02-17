@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
-import { useCompany, useSignals, useSnapshots, useContacts, useCompanyCards, useUpdateCompany, useMeetings } from "@/hooks/useSupabase";
+import { useCompany, useSignals, useSnapshots, useContacts, useCompanyCards, useUpdateCompany, useMeetings, useCustomerActivity } from "@/hooks/useSupabase";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import ScoreCell from "@/components/ScoreCell";
@@ -147,7 +147,7 @@ export default function CompanyDetail() {
   const { data: snapshots = [] } = useSnapshots(id);
   const { data: contacts = [] } = useContacts(id);
   const { data: meetings = [] } = useMeetings(id);
-  // companyCards hook moved below state declarations
+  const { data: activityEvents = [] } = useCustomerActivity(id);
   const updateCompany = useUpdateCompany();
   const queryClient = useQueryClient();
   const [regenerating, setRegenerating] = useState(false);
@@ -975,6 +975,53 @@ export default function CompanyDetail() {
               </div>
             </CollapsibleContent>
           </Collapsible>
+
+          {/* Intent Activity Timeline */}
+          {activityEvents.length > 0 && (
+            <div className="panel space-y-3">
+              <div className="panel-header flex items-center gap-2">
+                <Zap className="w-4 h-4 text-primary" />
+                <span>Intent Activity ({activityEvents.length})</span>
+              </div>
+              <p className="text-xs text-muted-foreground">Actions captured from HubSpot — page views, form submissions, emails, and meetings.</p>
+              <div className="space-y-1 max-h-[400px] overflow-y-auto">
+                {activityEvents.map((evt: any) => {
+                  const typeIcons: Record<string, string> = {
+                    FORM_SUBMISSION: "📝", EMAIL: "📧", EMAIL_RECEIVED: "📩",
+                    MEETING: "📅", CALL: "📞", PAGE_VIEW: "👁️",
+                    NOTE: "📒", TASK: "✅",
+                  };
+                  const icon = typeIcons[evt.activity_type] || "⚡";
+                  return (
+                    <div key={evt.id} className="flex items-start gap-3 px-3 py-2 rounded-lg border border-border/50 bg-secondary/20 hover:bg-secondary/40 transition-colors">
+                      <span className="text-base mt-0.5">{icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-foreground truncate">{evt.title}</div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className={`text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded border ${
+                            evt.activity_type === "FORM_SUBMISSION"
+                              ? "border-emerald-500/40 text-emerald-400 bg-emerald-500/10"
+                              : evt.activity_type?.includes("EMAIL")
+                              ? "border-blue-500/40 text-blue-400 bg-blue-500/10"
+                              : "border-border text-muted-foreground bg-muted/50"
+                          }`}>{evt.activity_type?.replace(/_/g, " ")}</span>
+                          {evt.url && (
+                            <a href={evt.url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-primary hover:underline truncate max-w-[200px]">
+                              {evt.url}
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                        {new Date(evt.occurred_at).toLocaleDateString()}{" "}
+                        {new Date(evt.occurred_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </TabsContent>
 
         {/* ============ TAB 2: STRATEGY ============ */}
