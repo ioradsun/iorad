@@ -81,15 +81,16 @@ export default function CompanyDetail() {
   const regenerate = async (mode: string = "full") => {
     if (!id) return;
     setRegenerating(true);
-    const modeLabels: Record<string, string> = { full: "Full refresh", signals_only: "Signal search", score_only: "Story regeneration" };
     try {
-      // Run signals first
+      // Step 1: Run signals
+      toast.info("Step 1/2 — Running signal search…");
       const { data, error } = await supabase.functions.invoke("run-signals", { body: { company_id: id, mode } });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      toast.success(`${modeLabels[mode] || mode} complete — ${data?.company || "company"}`);
+      toast.success(`Signals complete — ${data?.signals_found ?? 0} found for ${data?.company || "company"}`);
 
-      // Then find contacts via Apollo
+      // Step 2: Find contacts via Apollo
+      toast.info("Step 2/2 — Finding contacts via Apollo…");
       setFindingContacts(true);
       try {
         const { data: contactData, error: contactErr } = await supabase.functions.invoke("find-contacts", { body: { company_id: id } });
@@ -97,6 +98,8 @@ export default function CompanyDetail() {
         if (contactData?.error) throw new Error(contactData.error);
         if (contactData?.contacts_found > 0) {
           toast.success(`Found ${contactData.contacts_found} contacts via Apollo`);
+        } else {
+          toast.warning("No contacts found — check company domain is correct");
         }
       } catch (ce: any) {
         console.error("Contact enrichment failed:", ce);
