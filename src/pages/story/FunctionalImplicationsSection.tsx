@@ -29,7 +29,7 @@ export default function FunctionalImplicationsSection({ text, contactName }: Pro
     >
       <div className="max-w-3xl space-y-4">
         {data
-          .split(/\n|(?=\d+[\.\)\]\s]\s)/)
+          .split(/\n|(?=[1-9]\uFE0F?\u20E3)|(?=\d+[\.\)\]]\s)/)
           .map(s => s.trim())
           .filter(Boolean)
           .map((paragraph, i) => (
