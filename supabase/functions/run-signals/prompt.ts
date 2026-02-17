@@ -25,6 +25,12 @@ export function buildIoradPrompt(
     .map((l) => `- ${l.label}: ${l.help_center_url}`)
     .join("\n");
 
+  const libraryJson = JSON.stringify(
+    (libraryLinks || []).map((l) => ({ label: l.label, help_center_url: l.help_center_url })),
+    null,
+    2
+  );
+
   if (promptTemplate && promptTemplate.trim()) {
     const filled = promptTemplate
       .replace(/\{\{company_name\}\}/g, companyName)
@@ -35,7 +41,8 @@ export function buildIoradPrompt(
       .replace(/\{\{contact_name\}\}/g, contact)
       .replace(/\{\{contact_title\}\}/g, title)
       .replace(/\{\{persona\}\}/g, selectedPersona)
-      .replace(/\{\{library_links\}\}/g, libraryList);
+      .replace(/\{\{library_links\}\}/g, libraryList)
+      .replace(/\{\{iorad_libraries\}\}/g, libraryJson);
 
     return `${systemPrompt}\n\n${filled}`;
   }
