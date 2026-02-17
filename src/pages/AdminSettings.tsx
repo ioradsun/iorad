@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Save, Loader2, Plus, Trash2, GripVertical, Sun, Moon, Palette } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Save, Loader2, Plus, Trash2, GripVertical, Sun, Moon, Shield, User } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "@/hooks/useTheme";
 
@@ -30,20 +31,141 @@ export default function AdminSettings() {
         <h1 className="text-2xl font-bold tracking-tight">Admin Settings</h1>
         <p className="text-sm text-muted-foreground mt-1">Configure AI, processing, partners, and compelling events.</p>
       </div>
-      <Tabs defaultValue="appearance" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+      <Tabs defaultValue="people" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-6">
+          <TabsTrigger value="people">People</TabsTrigger>
           <TabsTrigger value="appearance">Appearance</TabsTrigger>
           <TabsTrigger value="ai">AI & Prompt</TabsTrigger>
           <TabsTrigger value="events">Compelling Events</TabsTrigger>
           <TabsTrigger value="partners">Partners</TabsTrigger>
           <TabsTrigger value="processing">Processing</TabsTrigger>
         </TabsList>
+        <TabsContent value="people"><PeopleTab /></TabsContent>
         <TabsContent value="appearance"><AppearanceTab /></TabsContent>
         <TabsContent value="ai"><AIConfigTab /></TabsContent>
         <TabsContent value="events"><CompellingEventsTab /></TabsContent>
         <TabsContent value="partners"><PartnersTab /></TabsContent>
         <TabsContent value="processing"><ProcessingTab /></TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+// ─── PEOPLE TAB ───
+interface PeopleUser {
+  id: string;
+  email: string;
+  name: string;
+  avatar: string | null;
+  role: string;
+  last_sign_in: string | null;
+  created_at: string;
+}
+
+function PeopleTab() {
+  const queryClient = useQueryClient();
+
+  const { data: users, isLoading } = useQuery<PeopleUser[]>({
+    queryKey: ["admin-people"],
+    queryFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/list-users`,
+        {
+          headers: {
+            Authorization: `Bearer ${session?.access_token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+  });
+
+  const toggleRole = useMutation({
+    mutationFn: async ({ user_id, role }: { user_id: string; role: string }) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/list-users`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${session?.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ user_id, role }),
+        }
+      );
+      if (!res.ok) throw new Error(await res.text());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-people"] });
+      toast.success("Role updated");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  if (isLoading) return <Loader />;
+
+  return (
+    <div className="space-y-4">
+      <div className="panel space-y-4">
+        <div className="panel-header">Team Members</div>
+        <p className="text-xs text-muted-foreground">
+          All @iorad.com users who have signed in. Admins have access to this settings page.
+        </p>
+        <div className="space-y-2">
+          {users?.map((u) => (
+            <div
+              key={u.id}
+              className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border bg-secondary/50"
+            >
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={u.avatar || undefined} />
+                <AvatarFallback className="text-xs">
+                  {u.name?.slice(0, 2).toUpperCase() || "?"}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate">{u.name}</div>
+                <div className="text-xs text-muted-foreground truncate">{u.email}</div>
+              </div>
+              {u.last_sign_in && (
+                <span className="text-xs text-muted-foreground hidden sm:block">
+                  Last sign-in: {new Date(u.last_sign_in).toLocaleDateString()}
+                </span>
+              )}
+              <button
+                onClick={() =>
+                  toggleRole.mutate({
+                    user_id: u.id,
+                    role: u.role === "admin" ? "user" : "admin",
+                  })
+                }
+                disabled={toggleRole.isPending}
+                className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-medium transition-colors ${
+                  u.role === "admin"
+                    ? "bg-primary/15 text-primary border border-primary/30"
+                    : "bg-muted text-muted-foreground border border-border hover:border-primary/30"
+                }`}
+              >
+                {u.role === "admin" ? (
+                  <Shield className="w-3 h-3" />
+                ) : (
+                  <User className="w-3 h-3" />
+                )}
+                {u.role === "admin" ? "Admin" : "Full User"}
+              </button>
+            </div>
+          ))}
+          {users?.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              No @iorad.com users have signed in yet.
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
