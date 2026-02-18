@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Loader2, CheckCircle2, XCircle,
@@ -9,6 +9,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Link } from "react-router-dom";
 import { formatDistanceToNow, format } from "date-fns";
+import { toast } from "sonner";
 
 
 
@@ -431,8 +432,27 @@ function ImportedCompanyRow({ company }: { company: any }) {
 // ── HubSpot Sync tab ──────────────────────────────────────────────────────────
 
 function HubSpotSyncTab() {
+  const qc = useQueryClient();
   const { data: jobs = [], isLoading: loadingJobs } = useHubspotJobs();
   const { data: companies = [], isLoading: loadingCompanies } = useRecentlyImported();
+
+  const triggerSync = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("import-from-hubspot", {
+        body: { action: "bulk_import" },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Bulk HubSpot sync started — running in background.");
+      qc.invalidateQueries({ queryKey: ["hubspot_jobs"] });
+    },
+    onError: (err: any) => {
+      toast.error(`Sync failed: ${err?.message || "Unknown error"}`);
+    },
+  });
 
   const activeJob = jobs.find((j: any) => j.status === "running");
   const recentJobs = jobs.slice(0, 5);
@@ -460,6 +480,23 @@ function HubSpotSyncTab() {
 
   return (
     <div className="space-y-5">
+      {/* Header row with sync button */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">HubSpot Sync</h2>
+        <button
+          onClick={() => triggerSync.mutate()}
+          disabled={triggerSync.isPending || !!activeJob}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {triggerSync.isPending ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <Download className="w-3.5 h-3.5" />
+          )}
+          {activeJob ? "Sync running…" : "Sync All Companies"}
+        </button>
+      </div>
+
       {/* Active job card */}
       {activeJob ? (
         <SyncJobSummary job={activeJob} />
