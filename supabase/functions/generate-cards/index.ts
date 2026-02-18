@@ -204,11 +204,28 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
     const aiData = await aiResponse.json();
     const rawContent = aiData.choices?.[0]?.message?.content || "";
 
-    // Parse JSON from response (strip markdown fences if present)
+    // Parse JSON from response — robustly extract first valid JSON object or array
     let parsed: any;
     try {
-      const cleaned = rawContent.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
-      parsed = JSON.parse(cleaned);
+      // 1. Strip markdown fences
+      let cleaned = rawContent
+        .replace(/^```json\s*/i, "")
+        .replace(/^```\s*/i, "")
+        .replace(/```\s*$/i, "")
+        .trim();
+
+      // 2. Try direct parse first
+      try {
+        parsed = JSON.parse(cleaned);
+      } catch {
+        // 3. Fallback: extract the first {...} or [...] block in case the model
+        //    wrapped the JSON in prose or thinking text
+        const objMatch = cleaned.match(/(\{[\s\S]*\})/);
+        const arrMatch = cleaned.match(/(\[[\s\S]*\])/);
+        const candidate = objMatch?.[1] ?? arrMatch?.[1];
+        if (!candidate) throw new Error("no JSON block found");
+        parsed = JSON.parse(candidate);
+      }
     } catch (e) {
       console.error("Failed to parse AI response as JSON:", rawContent.substring(0, 500));
       throw new Error("AI returned invalid JSON");
