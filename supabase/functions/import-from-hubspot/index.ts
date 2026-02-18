@@ -202,32 +202,27 @@ async function getAllContactPropertyNames(apiKey: string): Promise<string[]> {
   } catch { return []; }
 }
 
-// Pull recently created companies from HubSpot (manual sync)
+// Pull recently created OR modified companies from HubSpot (auto sync safety net)
 async function syncRecentCompanies(supabase: any) {
   const apiKey = Deno.env.get("HUBSPOT_API_KEY");
   if (!apiKey) throw new Error("HUBSPOT_API_KEY not configured");
 
   const allProps = await getAllCompanyPropertyNames(apiKey);
   const properties = allProps.length > 0 ? allProps.join(",") : "name,domain,industry,country,numberofemployees";
-  
-  // Fetch companies created in the last 7 days
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  // Look back 2 hours to catch anything webhooks may have missed
+  const lookback = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
 
   const searchBody = {
     filterGroups: [
-      {
-        filters: [
-          {
-            propertyName: "createdate",
-            operator: "GTE",
-            value: sevenDaysAgo,
-          },
-        ],
-      },
+      // Companies created in the last 2 hours
+      { filters: [{ propertyName: "createdate", operator: "GTE", value: lookback }] },
+      // Companies modified in the last 2 hours
+      { filters: [{ propertyName: "hs_lastmodifieddate", operator: "GTE", value: lookback }] },
     ],
     properties: properties.split(","),
     limit: 100,
-    sorts: [{ propertyName: "createdate", direction: "DESCENDING" }],
+    sorts: [{ propertyName: "hs_lastmodifieddate", direction: "DESCENDING" }],
   };
 
   const res = await fetch("https://api.hubapi.com/crm/v3/objects/companies/search", {
