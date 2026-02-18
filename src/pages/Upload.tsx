@@ -334,6 +334,7 @@ function ManualAddForm() {
     name: "",
     domain: "",
     partner: "",
+    source_type: "outbound" as "inbound" | "outbound",
   });
   const [saving, setSaving] = useState(false);
 
@@ -352,9 +353,10 @@ function ManualAddForm() {
       await insertCompanies.mutateAsync([{
         name,
         domain,
-        partner: form.partner || null,
+        partner: form.source_type === "outbound" ? (form.partner || null) : null,
         is_existing_customer: false,
-      }]);
+        source_type: form.source_type,
+      } as any]);
       toast.success(`Added ${name}`);
       navigate("/");
     } catch (err: any) {
@@ -365,8 +367,30 @@ function ManualAddForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="panel space-y-4">
+    <form onSubmit={handleSubmit} className="panel space-y-5">
       <div className="panel-header">Add a Company</div>
+
+      {/* Source type switcher */}
+      <div className="space-y-2">
+        <Label className="text-xs">Source Type</Label>
+        <div className="flex items-center bg-secondary rounded-md p-0.5 gap-0.5 w-fit">
+          {(["inbound", "outbound"] as const).map(tab => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => update("source_type", tab)}
+              className={`px-4 py-1.5 rounded text-xs font-medium capitalize transition-all ${
+                form.source_type === tab
+                  ? "bg-card text-foreground shadow-sm shadow-black/[0.06]"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2 col-span-2 sm:col-span-1">
           <Label className="text-xs">Company Name *</Label>
@@ -389,15 +413,17 @@ function ManualAddForm() {
             maxLength={255}
           />
         </div>
-        <div className="space-y-2 col-span-2">
-          <Label className="text-xs">Partner</Label>
-          <Select value={form.partner} onValueChange={v => update("partner", v)}>
-            <SelectTrigger className="bg-secondary"><SelectValue placeholder="Select partner" /></SelectTrigger>
-            <SelectContent className="bg-background z-50">
-              {PARTNERS.map(p => <SelectItem key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
+        {form.source_type === "outbound" && (
+          <div className="space-y-2 col-span-2">
+            <Label className="text-xs">Partner</Label>
+            <Select value={form.partner} onValueChange={v => update("partner", v)}>
+              <SelectTrigger className="bg-secondary"><SelectValue placeholder="Select partner" /></SelectTrigger>
+              <SelectContent className="bg-background z-50">
+                {PARTNERS.map(p => <SelectItem key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
       <Button type="submit" disabled={saving || !form.name.trim()} className="w-full gap-2">
         {saving ? <>Adding…</> : <><Plus className="w-4 h-4" />Add Company</>}
