@@ -1,84 +1,176 @@
 
+# Restructure: Company Categories & Stages
 
-# Restructure Company Detail into 4 Tabs
+## What's Changing
 
-## Overview
+The current binary `inbound / outbound` classification is replaced with a **3-category × 4-stage** model:
 
-Split the current monolithic Company Detail page into **4 tabs**: Company, Strategy, Outreach, and Story. Each tab has its own "Generate" button where applicable. The Story tab adds two user-editable fields: a Loom video URL and an iorad tutorial URL, both saved to the `companies` table for per-company persistence.
+- **Categories**: `school` (EDU), `business` (corporate/B2B), `partner` (LMS resellers: Seismic, Docebo, etc.)
+- **Stages**: `prospect` → `active_opp` → `customer` → `expansion`
 
-## Tab Structure
+Each category has its own AI prompt set. Stage is injected as a context variable into the prompt at generation time.
+
+---
+
+## Data Migration
+
+Existing companies are automatically migrated using this mapping:
 
 ```text
-+----------------------------------------------------------+
-| Header: Company Name / Domain / Score / Status            |
-| [Run v] dropdown (stays global)                           |
-+----------------------------------------------------------+
-| [Company] [Strategy] [Outreach] [Story]                   |
-+----------------------------------------------------------+
+source_type = "inbound"               → category = "business", stage = "prospect"
+source_type = "outbound" + partner    → category = "partner",  stage = "prospect"
+source_type = "outbound", no partner  → category = "business", stage = "prospect"
 ```
 
-### Tab 1: Company (default)
-- Contacts section (existing)
-- Company metadata pills (existing)
-- Extra panel (Score, Signals, Analysis, History) -- now open by default since it's the main content here
+The `source_type` column is kept in the database for now (backward-compatible), but all new code will use `category` and `stage`.
 
-### Tab 2: Strategy
-- "Generate Cards" button at top
-- Dashboard Cards grid (Account Summary, ICP Fit, AI Strategy, etc.)
-- Story Assets (Loom script config + iorad tutorial config from AI generation)
+---
 
-### Tab 3: Outreach
-- "Generate Cards" button at top (shared generation with Strategy -- same edge function produces both)
-- Email Sequence (5-touch accordion)
-- LinkedIn Sequence (5-step accordion)
+## Implementation Plan
 
-### Tab 4: Story
-- Two input fields at the top:
-  - **Loom Video URL** -- paste a Loom share URL, renders as embedded video
-  - **iorad Tutorial URL** -- paste an iorad link, replaces the hardcoded tutorial in the customer story page
-- Both fields save to new columns on the `companies` table (`loom_url`, `iorad_url`)
-- Below the inputs, show embedded previews:
-  - Loom video iframe (using Loom's embed format)
-  - iorad tutorial iframe (same embed pattern as EmbedDemo)
-- Readiness indicators: shows green badge when URL is populated
-- Link to open the full customer story page (existing route)
+### 1. Database Migration (schema)
 
-## Database Changes
+Add two new columns to the `companies` table:
 
-Add two nullable text columns to the `companies` table:
+```sql
+ALTER TABLE companies
+  ADD COLUMN category text NOT NULL DEFAULT 'business',
+  ADD COLUMN stage    text NOT NULL DEFAULT 'prospect';
+```
 
-| Column | Type | Purpose |
-|--------|------|---------|
-| loom_url | text | Loom video share URL for this company's story |
-| iorad_url | text | iorad tutorial URL replacing the hardcoded default |
+Run the auto-migration logic in the same migration:
 
-These are user-entered per company and used by:
-1. The Story tab on the Company Detail page (edit + preview)
-2. The CustomerStory/EmbedDemo component (reads `iorad_url` from the company record instead of the hardcoded URL)
+```sql
+-- outbound with partner → partner/prospect
+UPDATE companies
+  SET category = 'partner', stage = 'prospect'
+  WHERE source_type = 'outbound' AND partner IS NOT NULL;
 
-## Technical Details
+-- outbound without partner → business/prospect
+UPDATE companies
+  SET category = 'business', stage = 'prospect'
+  WHERE source_type = 'outbound' AND (partner IS NULL OR partner = '');
 
-### Files to modify
+-- inbound → business/prospect
+UPDATE companies
+  SET category = 'business', stage = 'prospect'
+  WHERE source_type = 'inbound';
+```
 
-| File | Changes |
-|------|---------|
-| `src/pages/CompanyDetail.tsx` | Wrap content in Radix Tabs; split into 4 tab panels; add Loom/iorad URL inputs with save; add embedded previews |
-| `src/pages/story/EmbedDemo.tsx` | Read `iorad_url` from company record (passed via context or prop) instead of using the hardcoded fallback |
-| `src/hooks/useSupabase.ts` | Add a `useUpdateCompany` mutation hook for saving loom_url/iorad_url |
+### 2. Database Migration (ai_config prompts)
 
-### Migration
-- `ALTER TABLE companies ADD COLUMN loom_url text, ADD COLUMN iorad_url text;`
+Add three new prompt columns to `ai_config` — one system prompt per category:
 
-### Loom embed logic
-Loom share URLs follow the pattern `https://www.loom.com/share/{id}`. The embed URL is `https://www.loom.com/embed/{id}`. The UI will auto-convert share URLs to embed URLs for the iframe.
+```sql
+ALTER TABLE ai_config
+  ADD COLUMN school_system_prompt   text NOT NULL DEFAULT '',
+  ADD COLUMN school_prompt_template text NOT NULL DEFAULT '',
+  ADD COLUMN business_system_prompt   text NOT NULL DEFAULT '',
+  ADD COLUMN business_prompt_template text NOT NULL DEFAULT '',
+  ADD COLUMN partner_system_prompt   text NOT NULL DEFAULT '',
+  ADD COLUMN partner_prompt_template text NOT NULL DEFAULT '';
+```
 
-### iorad embed logic
-The iorad URL entered by the user gets `?oembed=1` appended (same pattern as the existing EmbedDemo component). This URL also flows through to the CustomerStory page so the public-facing story shows the correct tutorial.
+Pre-populate each with the existing relevant prompt so teams have a starting point:
+- `partner_*` ← current `system_prompt` + `prompt_template` (outbound)
+- `business_*` ← current `inbound_system_prompt` + `inbound_story_prompt`
+- `school_*` ← blank (new vertical)
 
-### Generate buttons
-- Strategy and Outreach tabs share the same "Generate Cards" call (the edge function produces cards + outreach + story assets in one call). The button appears on whichever tab is active, and generating refreshes data for both tabs.
-- The Story tab has a "Save" button for the Loom/iorad URLs (simple database update, no AI call needed).
+### 3. Dashboard (`src/pages/Dashboard.tsx`)
 
-### No Loom API integration
-There is no Loom connector available. Users paste their Loom share URL manually. The embed renders immediately as a preview. This is the standard approach -- Loom's embed iframe works with just the URL.
+**Replace** the `inbound / outbound` tab switcher with a **3-tab category filter**: `School | Business | Partner`.
 
+Each tab shows a count badge. The KPI strip changes:
+- "Total tracked" stays
+- "New inbound (24h)" → "New this week" (counts across all categories)
+- "New outbound (24h)" → removed, replaced with a stage breakdown mini-bar
+
+A **stage filter** (pill group: All / Prospect / Active Opp / Customer / Expansion) sits below the category tabs so users can slice within a category.
+
+The `SourcePill` component becomes a `StagePill` showing the stage (e.g. `Prospect`, `Customer`).
+
+### 4. Upload / Add Company Form (`src/pages/Upload.tsx`)
+
+**Replace** the `inbound / outbound` switcher with a **category selector**: School / Business / Partner.
+
+Add a **stage selector**: Prospect / Active Opp / Customer / Expansion (defaults to Prospect).
+
+Partner field is only shown when category = `partner` (same logic as today's outbound-only partner field).
+
+CSV column mapping adds `category` and `stage` as recognised headers alongside a backward-compat fallback that maps `source_type = inbound` → `business`.
+
+### 5. Company Detail Page (`src/pages/CompanyDetail.tsx`)
+
+**Header metadata row**: replace the source type badge with editable `Category` and `Stage` fields (inline `Select` dropdowns), so reps can move a company between stages directly.
+
+**Regeneration logic**: the `isInbound` check that gates Apollo contact lookup and profile extraction is replaced by `category === "partner"` check (only partner companies get HubSpot-sourced contacts; school and business still get Apollo enrichment).
+
+**Story URL**: the `source_type === "inbound"` guard for story URL construction changes to `category !== "partner"` (school and business use `company_cards.id` story URLs; partner still uses the `/:partner/:customer/stories/:contact` slug).
+
+### 6. AI Generation (`supabase/functions/generate-cards/index.ts`)
+
+The `isInbound` flag is replaced by `company.category`:
+
+```typescript
+const categoryPromptMap: Record<string, string> = {
+  school:   aiConfig?.school_system_prompt   || "",
+  business: aiConfig?.business_system_prompt || "",
+  partner:  aiConfig?.partner_system_prompt  || "",
+};
+const systemPrompt = categoryPromptMap[company.category] || "";
+```
+
+The `stage` is injected into the user-facing context object so the AI can tailor its output:
+
+```typescript
+const context = {
+  ...
+  category: company.category,   // "school" | "business" | "partner"
+  stage:    company.stage,       // "prospect" | "active_opp" | "customer" | "expansion"
+  ...
+};
+```
+
+### 7. Run-Signals (`supabase/functions/run-signals/index.ts`)
+
+Replace the `source_type` reference with `company.category`. The `PARTNER_PERSONA_MAP` stays as-is since it's keyed by `partner` name, not `source_type`.
+
+### 8. Admin Settings (`src/pages/AdminSettings.tsx`)
+
+**AI & Prompts tab**: replace the `Inbound Prompt / Outbound Prompt / AI` sub-tabs with **`School | Business | Partner | AI`**.
+
+Each category sub-tab contains:
+- System Prompt textarea
+- Prompt Template textarea (the "mega prompt" / story template)
+- Plus the individual section prompts (Strategy, Outreach, Story, Transcript) inherited from today's structure
+
+The export `.md` filename and section labels update accordingly.
+
+### 9. Partner Story (`src/pages/CustomerStory.tsx` & `src/data/partnerMeta.ts`)
+
+No structural change needed. The story URL routing already uses `partner` field. The `partnerMeta` inbound → `school` rename update: the fallback key `"inbound"` becomes `"business"` to match the new neutral category key for business/school. School companies will get the same neutral (no-partner-logo) hero treatment.
+
+---
+
+## Files Changed
+
+| File | Change |
+|---|---|
+| `supabase/migrations/...` | Add `category` + `stage` columns, migrate data, add prompt columns to `ai_config` |
+| `src/pages/Dashboard.tsx` | 3-tab category filter, stage pill filter, updated KPIs |
+| `src/pages/Upload.tsx` | Category + Stage selectors in manual form; CSV mapping |
+| `src/types/index.ts` | Update `CSVRow` type with `category` + `stage` |
+| `src/pages/CompanyDetail.tsx` | Category/stage editable badges, updated `isInbound` logic |
+| `supabase/functions/generate-cards/index.ts` | Category-based prompt selection + stage context |
+| `supabase/functions/run-signals/index.ts` | Replace `source_type` checks with `category` |
+| `src/pages/AdminSettings.tsx` | 4-tab AI prompt panel (School / Business / Partner / AI) |
+| `src/data/partnerMeta.ts` | Rename `inbound` key to `business` for fallback |
+| `src/pages/CustomerStory.tsx` | Update fallback key reference |
+
+---
+
+## Notes
+
+- `source_type` column is preserved in the database (not dropped) for safety — old code referencing it won't break immediately.
+- The `is_existing_customer` flag is retained; the HubSpot lifecycle check in `generate-cards` continues to set it, but now the Customer/Expansion _stage_ is the primary UX signal for that status.
+- No changes to routing, auth, or the public story microsite beyond the partner-meta key rename.
