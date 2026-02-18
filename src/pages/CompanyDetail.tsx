@@ -1179,10 +1179,6 @@ export default function CompanyDetail() {
             <div className="panel text-center py-8">
               <Sparkles className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
               <p className="text-sm text-muted-foreground mb-3">No dashboard cards generated yet.</p>
-              <Button size="sm" className="gap-1.5 text-xs" onClick={generateCards} disabled={generatingCards}>
-                {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                Generate Cards
-              </Button>
             </div>
           )}
         </TabsContent>
@@ -1224,10 +1220,6 @@ export default function CompanyDetail() {
             <div className="panel text-center py-8">
               <Mail className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
               <p className="text-sm text-muted-foreground mb-3">No outreach assets generated yet.</p>
-              <Button size="sm" className="gap-1.5 text-xs" onClick={generateCards} disabled={generatingCards}>
-                {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                Generate Cards
-              </Button>
             </div>
           )}
         </TabsContent>
