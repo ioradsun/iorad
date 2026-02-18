@@ -85,7 +85,14 @@ function ActiveJobBanner() {
       {job && <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />}
       <span>
         {job
-          ? <>Generating stories{currentCompany ? ` — ${currentCompany}` : ""}</>
+          ? job.trigger === "bulk_import"
+            ? <>
+                Syncing with HubSpot
+                {job.companies_processed > 0
+                  ? ` — ${job.companies_processed}${job.total_companies_targeted > 0 ? `/${job.total_companies_targeted}` : ""} companies`
+                  : "…"}
+              </>
+            : <>Generating stories{currentCompany ? ` — ${currentCompany}` : ""}</>
           : null}
         {waitingCount !== undefined && waitingCount > 0 && (
           <span className={job ? "ml-3 opacity-70" : ""}>
