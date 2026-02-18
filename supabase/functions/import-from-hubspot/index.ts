@@ -1160,12 +1160,17 @@ async function bulkImportCompanies(
 
   const newTotal = totalProcessed + imported + updated;
 
-  // Update job progress (accumulate across chains)
+  // Update job progress BEFORE firing the chain so the UI sees progress
   if (currentJobId) {
     await supabase.from("processing_jobs").update({
       companies_processed: newTotal,
       companies_succeeded: newTotal,
       companies_failed: errors,
+      ...(hasMore ? {} : {
+        status: "completed",
+        finished_at: new Date().toISOString(),
+        total_companies_targeted: newTotal,
+      }),
     }).eq("id", currentJobId);
   }
 
@@ -1183,17 +1188,8 @@ async function bulkImportCompanies(
       }),
     }).catch((e: any) => console.error("bulk_import self-chain error:", e.message));
   } else {
-    // All pages done — finalize job and kick off scoring
+    // All pages done — kick off scoring
     console.log(`bulk_import: all pages done — total=${newTotal}, triggering score_all`);
-    if (currentJobId) {
-      await supabase.from("processing_jobs").update({
-        status: "completed",
-        finished_at: new Date().toISOString(),
-        total_companies_targeted: newTotal,
-        companies_processed: newTotal,
-        companies_succeeded: newTotal,
-      }).eq("id", currentJobId);
-    }
     fetch(`${supabaseUrl}/functions/v1/score-companies`, {
       method: "POST",
       headers: { Authorization: `Bearer ${serviceRoleKey}`, "Content-Type": "application/json" },
