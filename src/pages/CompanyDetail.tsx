@@ -166,7 +166,7 @@ export default function CompanyDetail() {
   const [fixingDomain, setFixingDomain] = useState(false);
   const [analyzingMeeting, setAnalyzingMeeting] = useState<string | null>(null);
   const [contactSearch, setContactSearch] = useState("");
-  const [extractingProfiles, setExtractingProfiles] = useState(false);
+  // extractingProfiles state removed — extraction is now part of the generate pipeline
 
   const effectiveContactId = selectedContactId || contacts[0]?.id || "";
   const { data: companyCards, isLoading: cardsLoading } = useCompanyCards(id, effectiveContactId || undefined);
@@ -350,20 +350,7 @@ export default function CompanyDetail() {
     }
   };
 
-  const extractProfiles = async () => {
-    if (!id) return;
-    setExtractingProfiles(true);
-    toast.info("Extracting AI product usage profiles…");
-    try {
-      const { data, error } = await supabase.functions.invoke("extract-contact-profile", { body: { company_id: id } });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      toast.success(`Extracted ${data?.profiles_extracted || 0} profiles`);
-      queryClient.invalidateQueries({ queryKey: ["contacts", id] });
-    } catch (e: any) { toast.error(e.message || "Profile extraction failed"); }
-    finally { setExtractingProfiles(false); }
-  };
-
+  // Profile extraction is now handled automatically inside generate-cards pipeline
   const generateCards = async () => {
     if (!id) return;
     setGeneratingCards(true);
@@ -568,12 +555,6 @@ export default function CompanyDetail() {
                 )}
               </div>
               <div className="flex items-center gap-1">
-              {contacts.some((c: any) => c.hubspot_properties && Object.keys(c.hubspot_properties).length > 0) && (
-                <Button size="sm" variant="ghost" className="gap-1 text-xs h-7" onClick={extractProfiles} disabled={extractingProfiles}>
-                  {extractingProfiles ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Brain className="w-3.5 h-3.5" />}
-                  {extractingProfiles ? "Extracting…" : "Extract Profiles"}
-                </Button>
-              )}
               <Dialog open={addContactOpen} onOpenChange={setAddContactOpen}>
                 <DialogTrigger asChild>
                   <Button size="sm" variant="ghost" className="gap-1 text-xs h-7"><Plus className="w-3.5 h-3.5" /> Add</Button>
@@ -634,7 +615,7 @@ export default function CompanyDetail() {
                   ? `/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories/${firstName}`
                   : null;
                 return (
-                  <div key={contact.id} className="p-2 rounded-md hover:bg-secondary/30 transition-colors space-y-2">
+                  <div key={contact.id} className="p-2 rounded-md hover:bg-secondary/30 transition-colors space-y-1.5">
                     <div className="flex items-center gap-4">
                       <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                         <UserSearch className="w-4 h-4 text-primary" />
@@ -642,7 +623,6 @@ export default function CompanyDetail() {
                       <div className="flex-1 min-w-0 space-y-0.5">
                         <div className="text-sm font-medium truncate">{contact.name}</div>
                         {contact.title && <div className="text-xs text-muted-foreground truncate">{contact.title}</div>}
-                        {contact.source && <span className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-muted-foreground">{contact.source}</span>}
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {storyUrl && snap && (
@@ -652,211 +632,85 @@ export default function CompanyDetail() {
                         {contact.linkedin && <a href={contact.linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary"><Linkedin className="w-4 h-4" /></a>}
                       </div>
                     </div>
-                    {/* AI-Extracted Profile (Pass 1) */}
+                    {/* AI Profile — directly under name */}
                     {(() => {
                       const profile = (contact as any).contact_profile;
                       if (!profile) return null;
                       return (
-                        <Collapsible className="ml-[52px]">
-                          <CollapsibleTrigger className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-primary hover:text-primary/80 transition-colors py-1">
-                            <Brain className="w-3 h-3" />
-                            <span>AI Profile — {profile.engagement_tier?.replace(/_/g, " ")} · {profile.adoption_stage?.replace(/_/g, " ")}</span>
-                            <ChevronRight className="w-3 h-3 transition-transform [[data-state=open]>&]:rotate-90" />
-                          </CollapsibleTrigger>
-                          <CollapsibleContent className="space-y-2 pt-1 pb-2">
-                            {profile.primary_use_case && (
-                              <div className="text-xs text-foreground/80">
-                                <span className="text-muted-foreground font-medium">Use Case:</span> {profile.primary_use_case}
-                              </div>
+                        <div className="ml-[52px] space-y-1.5">
+                          {/* Tier badges */}
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {profile.engagement_tier && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded border border-primary/20 bg-primary/10 text-primary font-medium">
+                                {profile.engagement_tier.replace(/_/g, " ")}
+                              </span>
                             )}
-                            {profile.account_narrative && (
-                              <div className="text-xs text-foreground/70 italic leading-relaxed">{profile.account_narrative}</div>
+                            {profile.adoption_stage && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded border border-border/50 bg-secondary/30 text-foreground font-medium">
+                                {profile.adoption_stage.replace(/_/g, " ")}
+                              </span>
                             )}
-                            {profile.key_metrics && (
-                              <div className="flex flex-wrap gap-1.5">
-                                {profile.key_metrics.plan && (
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded border border-primary/20 bg-primary/10 text-primary font-medium">{profile.key_metrics.plan}</span>
-                                )}
-                                {profile.key_metrics.tutorials_created > 0 && (
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded border border-border/50 bg-secondary/30 text-muted-foreground">
-                                    Created: <span className="text-foreground font-medium">{profile.key_metrics.tutorials_created}</span>
-                                  </span>
-                                )}
-                                {profile.key_metrics.tutorials_viewed > 0 && (
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded border border-border/50 bg-secondary/30 text-muted-foreground">
-                                    Views: <span className="text-foreground font-medium">{profile.key_metrics.tutorials_viewed}</span>
-                                  </span>
-                                )}
-                                {profile.key_metrics.days_since_last_active != null && (
-                                  <span className={`text-[10px] px-1.5 py-0.5 rounded border ${profile.key_metrics.days_since_last_active > 30 ? "border-destructive/30 bg-destructive/10 text-destructive" : "border-border/50 bg-secondary/30 text-muted-foreground"}`}>
-                                    Last Active: <span className="font-medium">{profile.key_metrics.days_since_last_active}d ago</span>
-                                  </span>
-                                )}
-                              </div>
+                            {profile.key_metrics?.plan && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded border border-accent bg-accent/50 text-accent-foreground font-medium">
+                                {profile.key_metrics.plan}
+                              </span>
                             )}
-                            {profile.tools_documented?.length > 0 && (
-                              <div className="text-xs text-muted-foreground">
-                                <span className="font-medium">Documenting:</span> {profile.tools_documented.join(", ")}
-                              </div>
+                            {profile.key_metrics?.days_since_last_active != null && (
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${profile.key_metrics.days_since_last_active > 30 ? "border-destructive/30 bg-destructive/10 text-destructive" : "border-border/50 bg-secondary/30 text-muted-foreground"}`}>
+                                {profile.key_metrics.days_since_last_active}d ago
+                              </span>
                             )}
-                            {profile.deployment_channels?.length > 0 && (
-                              <div className="text-xs text-muted-foreground">
-                                <span className="font-medium">Deployed to:</span> {profile.deployment_channels.join(", ")}
-                              </div>
-                            )}
-                            {profile.expansion_signals?.length > 0 && (
-                              <div className="space-y-0.5">
-                                <div className="text-[10px] font-mono uppercase tracking-wider text-primary">Expansion Signals</div>
-                                <ul className="space-y-0.5">
-                                  {profile.expansion_signals.map((s: string, i: number) => (
-                                    <li key={i} className="text-xs text-foreground/80 flex items-start gap-1.5">
-                                      <TrendingUp className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
-                                      <span>{s}</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                            {profile.risk_signals?.length > 0 && (
-                              <div className="space-y-0.5">
-                                <div className="text-[10px] font-mono uppercase tracking-wider text-destructive">Risk Signals</div>
-                                <ul className="space-y-0.5">
-                                  {profile.risk_signals.map((s: string, i: number) => (
-                                    <li key={i} className="text-xs text-foreground/80 flex items-start gap-1.5">
-                                      <AlertCircle className="w-3 h-3 text-destructive mt-0.5 flex-shrink-0" />
-                                      <span>{s}</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                            {profile.recommended_angles?.length > 0 && (
-                              <div className="space-y-0.5">
-                                <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Outreach Angles</div>
-                                <ul className="space-y-0.5">
-                                  {profile.recommended_angles.map((a: string, i: number) => (
-                                    <li key={i} className="text-xs text-foreground/80 flex items-start gap-1.5">
-                                      <Target className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
-                                      <span>{a}</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                          </CollapsibleContent>
-                        </Collapsible>
+                          </div>
+                          {/* Use case + narrative */}
+                          {profile.primary_use_case && (
+                            <div className="text-xs text-foreground/80">{profile.primary_use_case}</div>
+                          )}
+                          {profile.account_narrative && (
+                            <div className="text-xs text-foreground/60 italic leading-relaxed">{profile.account_narrative}</div>
+                          )}
+                          {/* Expansion & risk signals inline */}
+                          {(profile.expansion_signals?.length > 0 || profile.risk_signals?.length > 0) && (
+                            <div className="space-y-0.5">
+                              {profile.expansion_signals?.map((s: string, i: number) => (
+                                <div key={`exp-${i}`} className="text-[11px] text-foreground/70 flex items-start gap-1.5">
+                                  <TrendingUp className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
+                                  <span>{s}</span>
+                                </div>
+                              ))}
+                              {profile.risk_signals?.map((s: string, i: number) => (
+                                <div key={`risk-${i}`} className="text-[11px] text-foreground/70 flex items-start gap-1.5">
+                                  <AlertCircle className="w-3 h-3 text-destructive mt-0.5 flex-shrink-0" />
+                                  <span>{s}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       );
                     })()}
-                    {/* Product usage metrics from HubSpot contact properties */}
+                    {/* Bottom row: source tag + key metric tags */}
                     {(() => {
-                      const hp = (contact as any).hubspot_properties;
-                      if (!hp || Object.keys(hp).length === 0) return null;
-
-                      // Tier 1: Core product usage
-                      const coreMetrics = [
-                        { label: "Plan", value: hp.plan_name, color: "bg-primary/10 text-primary border-primary/20" },
-                        { label: "Account", value: hp.account__type, color: "bg-primary/10 text-primary border-primary/20" },
-                        { label: "Category", value: hp.account_type, color: "bg-secondary text-foreground border-border/50" },
-                        { label: "Profile", value: hp.engagement_profile, color: "bg-accent/50 text-accent-foreground border-accent" },
-                      ].filter(m => m.value && m.value !== "--" && m.value !== "0");
-
-                      // Tier 2: Tutorial metrics + session analytics
-                      const sessions = parseInt(hp.hs_analytics_num_visits, 10) || 0;
-                      const firstVisit = hp.hs_analytics_first_visit_timestamp ? new Date(hp.hs_analytics_first_visit_timestamp).getTime() : 0;
-                      const lastVisit = hp.hs_analytics_last_visit_timestamp ? new Date(hp.hs_analytics_last_visit_timestamp).getTime() : 0;
-                      const totalMinutes = firstVisit && lastVisit && lastVisit > firstVisit ? Math.round((lastVisit - firstVisit) / 60000) : 0;
-                      const avgMinPerSession = sessions > 0 && totalMinutes > 0 ? Math.round(totalMinutes / sessions) : 0;
-                      const formatDuration = (mins: number) => mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
-
-                      const tutorialMetrics = [
-                        { label: "Tutorials", value: hp.tutorials_created },
-                        { label: "Valid", value: hp.tutorials_valid_owned },
-                        { label: "Learned", value: hp.tutorials_learned },
-                        { label: "Views", value: hp.tutorials_views },
-                        { label: "Libraries", value: hp.help_centers_owned || hp.libraries_owned },
-                        { label: "Sessions", value: sessions > 0 ? String(sessions) : null },
-                        { label: "Avg Time/Session", value: avgMinPerSession > 0 ? formatDuration(avgMinPerSession) : null },
-                        { label: "Total Time", value: totalMinutes > 0 ? formatDuration(totalMinutes) : null },
-                        { label: "Page Views", value: hp.hs_analytics_num_page_views },
-                      ].filter(m => m.value !== null && m.value !== undefined && m.value !== "" && m.value !== "0" && m.value !== 0);
-
-                      // Tier 3: What they're documenting & where they embed
-                      const contextMetrics = [
-                        { label: "Documenting", value: hp.first_embed_tutorial_base_domain_name || hp.referral_signup_tutorial_base_domain },
-                        { label: "Embedded In", value: hp.first_embed_base_domain_name },
-                        { label: "Use Case", value: hp.creator_use_case?.replace(/_/g, " ") },
-                        { label: "LMS", value: hp.are_you_using_a_learning_management_system__lms__ },
-                      ].filter(m => m.value && m.value !== "--");
-
-                      // Tier 4: Integrations & connections
-                      const extensionStr = hp.extension_connections;
-                      const apiStr = hp.api_connections;
-                      const integrations = [extensionStr, apiStr].filter(Boolean);
-
-                      // Tier 5: Activity dates
-                      const dateMetrics = [
-                        { label: "Last Active", value: hp.last_active_date ? new Date(hp.last_active_date).toLocaleDateString() : null },
-                        { label: "Last Created", value: hp.last_tutorial_create_date ? new Date(hp.last_tutorial_create_date).toLocaleDateString() : null },
-                        { label: "First Created", value: hp.first_tutorial_create_date ? new Date(hp.first_tutorial_create_date).toLocaleDateString() : null },
-                      ].filter(m => m.value);
-
-                      const hasAny = coreMetrics.length > 0 || tutorialMetrics.length > 0 || contextMetrics.length > 0 || integrations.length > 0 || dateMetrics.length > 0;
-                      if (!hasAny) return null;
+                      const profile = (contact as any).contact_profile;
+                      const tags: { label: string; value: string }[] = [];
+                      if (profile?.key_metrics) {
+                        const km = profile.key_metrics;
+                        if (km.tutorials_created > 0) tags.push({ label: "Created", value: String(km.tutorials_created) });
+                        if (km.tutorials_viewed > 0) tags.push({ label: "Views", value: String(km.tutorials_viewed) });
+                        if (km.libraries_owned > 0) tags.push({ label: "Libraries", value: String(km.libraries_owned) });
+                        if (km.sessions > 0) tags.push({ label: "Sessions", value: String(km.sessions) });
+                      }
+                      if (profile?.tools_documented?.length > 0) tags.push({ label: "Docs", value: profile.tools_documented.join(", ") });
+                      if (profile?.deployment_channels?.length > 0) tags.push({ label: "Deploy", value: profile.deployment_channels.join(", ") });
 
                       return (
-                        <div className="ml-[52px] space-y-1.5">
-                          {/* Core identity badges */}
-                          {coreMetrics.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5">
-                              {coreMetrics.map(m => (
-                                <span key={m.label} className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${m.color}`}>
-                                  {String(m.value)}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          {/* Tutorial & usage numbers */}
-                          {tutorialMetrics.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5">
-                              {tutorialMetrics.map(m => (
-                                <span key={m.label} className="text-[10px] px-1.5 py-0.5 rounded border border-border/50 bg-secondary/30 text-muted-foreground">
-                                  <span className="font-mono uppercase tracking-wider">{m.label}:</span>{" "}
-                                  <span className="text-foreground font-medium">{String(m.value)}</span>
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          {/* What they document & embed into */}
-                          {contextMetrics.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5">
-                              {contextMetrics.map(m => (
-                                <span key={m.label} className="text-[10px] px-1.5 py-0.5 rounded border border-primary/20 bg-primary/5 text-muted-foreground">
-                                  <span className="font-mono uppercase tracking-wider">{m.label}:</span>{" "}
-                                  <span className="text-primary font-medium">{String(m.value)}</span>
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          {/* Integrations */}
-                          {integrations.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5">
-                              <span className="text-[10px] px-1.5 py-0.5 rounded border border-border/50 bg-secondary/20 text-muted-foreground">
-                                <span className="font-mono uppercase tracking-wider">Integrations:</span>{" "}
-                                <span className="text-foreground font-medium">{integrations.join(", ")}</span>
-                              </span>
-                            </div>
-                          )}
-                          {/* Activity dates */}
-                          {dateMetrics.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5">
-                              {dateMetrics.map(m => (
-                                <span key={m.label} className="text-[10px] px-1.5 py-0.5 rounded border border-border/30 bg-muted/30 text-muted-foreground">
-                                  <span className="font-mono uppercase tracking-wider">{m.label}:</span>{" "}
-                                  <span className="text-foreground">{m.value}</span>
-                                </span>
-                              ))}
-                            </div>
-                          )}
+                        <div className="ml-[52px] flex flex-wrap gap-1.5">
+                          {contact.source && <span className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-muted-foreground">{contact.source}</span>}
+                          {tags.map(t => (
+                            <span key={t.label} className="text-[10px] px-1.5 py-0.5 rounded border border-border/30 bg-muted/30 text-muted-foreground">
+                              <span className="font-mono uppercase tracking-wider">{t.label}:</span>{" "}
+                              <span className="text-foreground">{t.value}</span>
+                            </span>
+                          ))}
                         </div>
                       );
                     })()}
