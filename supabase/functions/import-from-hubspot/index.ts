@@ -78,6 +78,11 @@ Deno.serve(async (req) => {
       return await syncByHubSpotId(supabase, body.hubspot_id);
     }
 
+    // Bulk import all HubSpot companies created in the last 12 months (self-chaining)
+    if (body.action === "bulk_import") {
+      return await bulkImportCompanies(supabase, body.after || null, body.job_id || null);
+    }
+
     // Validate HubSpot webhook signature only when a signature header is actually present
     const signature = req.headers.get("X-HubSpot-Signature") || req.headers.get("x-hubspot-signature");
     if (signature) {
@@ -1073,8 +1078,147 @@ async function listHubSpotCompanies(search: string, after: string | null) {
   );
 }
 
-// ── Sync a single HubSpot company by HubSpot ID ───────────────────────────────
-async function syncByHubSpotId(supabase: any, hubspotId: string) {
+// ── Bulk Import: all HubSpot companies created in the last 12 months ────────
+// Self-chaining: processes 50 companies per invocation to stay under timeout
+async function bulkImportCompanies(supabase: any, after: string | null, jobId: string | null) {
+  const apiKey = Deno.env.get("HUBSPOT_API_KEY");
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  if (!apiKey) {
+    return new Response(JSON.stringify({ error: "HUBSPOT_API_KEY not configured" }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // Create or reuse a processing job to track progress
+  let currentJobId = jobId;
+  if (!currentJobId) {
+    const { data: job } = await supabase.from("processing_jobs").insert({
+      trigger: "bulk_import",
+      status: "running",
+      settings_snapshot: { action: "bulk_import", started: new Date().toISOString() },
+    }).select("id").single();
+    currentJobId = job?.id || null;
+    console.log(`bulk_import: created job ${currentJobId}`);
+  }
+
+  const twelveMonthsAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+
+  // HubSpot search: companies created in last 12 months
+  const searchBody: any = {
+    filterGroups: [{
+      filters: [{
+        propertyName: "createdate",
+        operator: "GTE",
+        value: twelveMonthsAgo,
+      }],
+    }],
+    properties: ["name", "domain", "industry", "country", "numberofemployees", "lifecyclestage",
+      "createdate", "hs_lastmodifieddate", "hubspot_owner_id"],
+    limit: 50,
+    sorts: [{ propertyName: "createdate", direction: "DESCENDING" }],
+  };
+  if (after) searchBody.after = after;
+
+  const res = await fetch("https://api.hubapi.com/crm/v3/objects/companies/search", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify(searchBody),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    console.error(`bulk_import: HubSpot search failed [${res.status}]: ${text}`);
+    if (currentJobId) {
+      await supabase.from("processing_jobs").update({
+        status: "failed",
+        finished_at: new Date().toISOString(),
+        error_summary: `HubSpot search failed: ${text.slice(0, 300)}`,
+      }).eq("id", currentJobId);
+    }
+    return new Response(JSON.stringify({ error: `HubSpot search failed: ${res.status}` }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const data = await res.json();
+  const companies = data.results || [];
+  const nextAfter = data.paging?.next?.after || null;
+  const hasMore = !!nextAfter;
+
+  console.log(`bulk_import: processing ${companies.length} companies (after=${after}, hasMore=${hasMore})`);
+
+  let imported = 0;
+  let updated = 0;
+  let errors = 0;
+
+  for (const hsCompany of companies) {
+    try {
+      const domain = (hsCompany.properties?.domain || "").toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+      const { isNew } = await upsertCompany(supabase, hsCompany);
+
+      // Get the actual company ID we upserted
+      if (domain) {
+        const { data: dbCo } = await supabase.from("companies").select("id").eq("domain", domain).maybeSingle();
+        if (dbCo?.id) {
+          await importContactsForCompany(supabase, hsCompany.id, dbCo.id);
+          await supabase.from("companies").update({ scout_synced_at: new Date().toISOString() }).eq("id", dbCo.id);
+        }
+      }
+
+      if (isNew) imported++; else updated++;
+    } catch (err: any) {
+      console.warn(`bulk_import: error for ${hsCompany.properties?.name}: ${err.message}`);
+      errors++;
+    }
+  }
+
+  // Update job progress
+  if (currentJobId) {
+    await supabase.from("processing_jobs").update({
+      companies_processed: (imported + updated),
+      companies_succeeded: imported + updated,
+      companies_failed: errors,
+    }).eq("id", currentJobId);
+  }
+
+  // Self-chain if there are more pages
+  if (hasMore) {
+    console.log(`bulk_import: self-chaining with after=${nextAfter}`);
+    fetch(`${supabaseUrl}/functions/v1/import-from-hubspot`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${serviceRoleKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "bulk_import", after: nextAfter, job_id: currentJobId }),
+    }).catch((e: any) => console.error("bulk_import self-chain error:", e.message));
+  } else {
+    // All pages done — kick off scoring
+    console.log(`bulk_import: all pages done, triggering score_all`);
+    if (currentJobId) {
+      await supabase.from("processing_jobs").update({
+        status: "completed",
+        finished_at: new Date().toISOString(),
+      }).eq("id", currentJobId);
+    }
+    fetch(`${supabaseUrl}/functions/v1/score-companies`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${serviceRoleKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "score_all", offset: 0 }),
+    }).catch((e: any) => console.error("score_all trigger error:", e.message));
+  }
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      imported,
+      updated,
+      errors,
+      has_more: hasMore,
+      job_id: currentJobId,
+    }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 

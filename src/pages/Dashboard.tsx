@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Building2, Search, Loader2, ArrowUpDown, ExternalLink, RefreshCw } from "lucide-react";
-import { useCompanies, useSignalCounts, useProcessingJobs } from "@/hooks/useSupabase";
+import { Building2, Search, Loader2, ArrowUpDown, ExternalLink, RefreshCw, Download, Zap } from "lucide-react";
+import { useCompanies, useSignalCounts, useProcessingJobs, useBulkImport, useScoreCompanies } from "@/hooks/useSupabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import HubSpotPickerModal from "@/components/HubSpotPickerModal";
 
-type SortKey = "name" | "last_score_total" | "signals_count" | "updated_at" | "created_at";
+type SortKey = "name" | "last_score_total" | "signals_count" | "updated_at" | "created_at" | "scout_score";
 type CategoryTab = "school" | "business" | "partner";
 type StageFilter = "all" | "prospect" | "active_opp" | "customer" | "expansion";
 
@@ -44,8 +44,10 @@ export default function Dashboard() {
   const qc = useQueryClient();
   const [syncingHubspot, setSyncingHubspot] = useState(false);
   const [hubspotPickerOpen, setHubspotPickerOpen] = useState(false);
+  const bulkImport = useBulkImport();
+  const scoreCompanies = useScoreCompanies();
 
-  const [sortKey, setSortKey] = useState<SortKey>("created_at");
+  const [sortKey, setSortKey] = useState<SortKey>("scout_score");
   const [sortAsc, setSortAsc] = useState(false);
   const [search, setSearch] = useState("");
   const [partnerFilter, setPartnerFilter] = useState<string>("all");
@@ -68,6 +70,26 @@ export default function Dashboard() {
     }
   };
 
+  const handleBulkImport = async () => {
+    toast.info("Starting bulk HubSpot import (last 12 months)… this runs in the background.", { duration: 6000 });
+    try {
+      const result = await bulkImport.mutateAsync();
+      toast.success(`Bulk import started — ${result.imported ?? 0} new, ${result.updated ?? 0} updated. Scout scoring will run automatically.`);
+    } catch (err: any) {
+      toast.error(`Bulk import failed: ${err?.message || "Unknown error"}`);
+    }
+  };
+
+  const handleRefreshScores = async () => {
+    toast.info("Refreshing Scout Scores…");
+    try {
+      const result = await scoreCompanies.mutateAsync("score_all");
+      toast.success(`Scoring started — ${result.scored ?? 0} companies scored in first batch.`);
+    } catch (err: any) {
+      toast.error(`Scoring failed: ${err?.message || "Unknown error"}`);
+    }
+  };
+
   const companiesWithSignals = useMemo(() => {
     return companies.map(c => ({ ...c, signals_count: signalCounts[c.id] || 0 }));
   }, [companies, signalCounts]);
@@ -87,6 +109,7 @@ export default function Dashboard() {
         case "signals_count": av = a.signals_count; bv = b.signals_count; break;
         case "updated_at": av = a.updated_at; bv = b.updated_at; break;
         case "created_at": av = a.created_at; bv = b.created_at; break;
+        case "scout_score": av = (a as any).scout_score ?? -1; bv = (b as any).scout_score ?? -1; break;
         default: av = 0; bv = 0;
       }
       if (av < bv) return sortAsc ? -1 : 1;
@@ -240,7 +263,27 @@ export default function Dashboard() {
           </Select>
         )}
 
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5 font-medium h-8 text-xs"
+            onClick={handleRefreshScores}
+            disabled={scoreCompanies.isPending}
+          >
+            {scoreCompanies.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+            Refresh Scores
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5 font-medium h-8 text-xs"
+            onClick={handleBulkImport}
+            disabled={bulkImport.isPending}
+          >
+            {bulkImport.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+            Bulk Import (12mo)
+          </Button>
           <Button
             size="sm"
             className="gap-1.5 font-medium"
@@ -306,6 +349,9 @@ export default function Dashboard() {
                   <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Rep</span>
                 </th>
               )}
+              <th className="text-left px-5 py-3.5 hidden md:table-cell">
+                <SortHeader label="Scout" field="scout_score" />
+              </th>
               <th className="text-left px-5 py-3.5 hidden lg:table-cell">
                 <SortHeader label="Added" field="created_at" />
               </th>
@@ -352,6 +398,9 @@ export default function Dashboard() {
                     )}
                   </td>
                 )}
+                <td className="px-5 py-4 hidden md:table-cell">
+                  <ScoutBadge score={(company as any).scout_score ?? null} />
+                </td>
                 <td className="px-5 py-4 hidden lg:table-cell">
                   <span className="text-[14px] text-muted-foreground">
                     {new Date(company.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
@@ -462,6 +511,21 @@ function CategoryPill({ category }: { category: string }) {
   return (
     <span className={`inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded border ${colors}`}>
       {labelMap[category] || category}
+    </span>
+  );
+}
+
+function ScoutBadge({ score }: { score: number | null }) {
+  if (score === null) return <span className="text-muted-foreground text-xs">—</span>;
+  let cls = "";
+  let tier = "";
+  if (score >= 75) { cls = "bg-destructive/15 text-destructive border-destructive/30"; tier = "Hot"; }
+  else if (score >= 50) { cls = "bg-warning/15 text-warning border-warning/30"; tier = "Warm"; }
+  else if (score >= 25) { cls = "bg-muted text-muted-foreground border-border"; tier = "Lukewarm"; }
+  else { cls = "bg-info/10 text-info border-info/20"; tier = "Cold"; }
+  return (
+    <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded border ${cls}`}>
+      {score} <span className="font-normal opacity-70">{tier}</span>
     </span>
   );
 }

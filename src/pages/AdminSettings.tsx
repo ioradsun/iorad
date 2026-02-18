@@ -28,13 +28,14 @@ export default function AdminSettings() {
   return (
     <div className="max-w-4xl mx-auto">
       <Tabs defaultValue="people" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="people">People</TabsTrigger>
           <TabsTrigger value="appearance">Appearance</TabsTrigger>
           <TabsTrigger value="ai">AI & Prompts</TabsTrigger>
-          <TabsTrigger value="events">Compelling Events</TabsTrigger>
+          <TabsTrigger value="events">Events</TabsTrigger>
           <TabsTrigger value="partners">Partners</TabsTrigger>
           <TabsTrigger value="processing">Processing</TabsTrigger>
+          <TabsTrigger value="scout">Scout</TabsTrigger>
         </TabsList>
         <TabsContent value="people"><PeopleTab /></TabsContent>
         <TabsContent value="appearance"><AppearanceTab /></TabsContent>
@@ -42,6 +43,7 @@ export default function AdminSettings() {
         <TabsContent value="events"><CompellingEventsTab /></TabsContent>
         <TabsContent value="partners"><PartnersTab /></TabsContent>
         <TabsContent value="processing"><ProcessingTab /></TabsContent>
+        <TabsContent value="scout"><ScoutTab /></TabsContent>
       </Tabs>
     </div>
   );
@@ -1493,4 +1495,181 @@ function ProcessingTab() {
 
 function Loader() {
   return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
+}
+
+// ─── SCOUT TAB ───
+function ScoutTab() {
+  const queryClient = useQueryClient();
+  const [prompt, setPrompt] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [scoring, setScoring] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const { data: aiConfig, isLoading } = useQuery({
+    queryKey: ["ai_config"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("ai_config").select("*").eq("id", 1).maybeSingle();
+      if (error) throw error;
+      return data as any;
+    },
+  });
+
+  useEffect(() => {
+    if (aiConfig?.scout_scoring_prompt) setPrompt(aiConfig.scout_scoring_prompt);
+  }, [aiConfig]);
+
+  const handleSavePrompt = async () => {
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("ai_config").update({ scout_scoring_prompt: prompt }).eq("id", 1);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ["ai_config"] });
+      toast.success("Scout prompt saved");
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleRunScoring = async () => {
+    setScoring(true);
+    toast.info("Running Scout scoring across all companies…");
+    try {
+      const { data, error } = await supabase.functions.invoke("score-companies", { body: { action: "score_all" } });
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ["companies"] });
+      toast.success(`Scoring started — ${data?.scored ?? 0} companies in first batch. Full run continues in background.`);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setScoring(false); }
+  };
+
+  const handleBulkImport = async () => {
+    setImporting(true);
+    toast.info("Starting bulk HubSpot import (last 12 months)…", { duration: 6000 });
+    try {
+      const { data, error } = await supabase.functions.invoke("import-from-hubspot", { body: { action: "bulk_import" } });
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ["companies"] });
+      toast.success(`Import started — ${data?.imported ?? 0} new, ${data?.updated ?? 0} updated. Scoring will run automatically.`);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setImporting(false); }
+  };
+
+  const CRON_SQL = `-- Run in your backend SQL console to enable 12-hour auto-sync
+-- Requires pg_cron and pg_net extensions to be enabled first
+SELECT cron.schedule(
+  'scout-auto-sync',
+  '0 */12 * * *',
+  $$
+  SELECT net.http_post(
+    url := '${import.meta.env.VITE_SUPABASE_URL}/functions/v1/score-companies',
+    headers := '{"Content-Type":"application/json","Authorization":"Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}"}'::jsonb,
+    body := '{"action":"auto_sync"}'::jsonb
+  );
+  $$
+);`;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(CRON_SQL);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    toast.success("SQL copied to clipboard");
+  };
+
+  if (isLoading) return <Loader />;
+
+  return (
+    <div className="space-y-6">
+      {/* Actions */}
+      <div className="panel space-y-4">
+        <div className="panel-header">Scout Score Actions</div>
+        <p className="text-xs text-muted-foreground">
+          Scout Score (0–100) ranks companies by tutorial creation activity, commercial stage, recency, and HubSpot intent.
+          Scores are sorted: Hot (75+), Warm (50–74), Lukewarm (25–49), Cold (0–24).
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <Button onClick={handleRunScoring} disabled={scoring} className="gap-2">
+            {scoring ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+            Run Scoring Now
+          </Button>
+          <Button onClick={handleBulkImport} disabled={importing} variant="outline" className="gap-2">
+            {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            Bulk Import from HubSpot (12mo)
+          </Button>
+        </div>
+      </div>
+
+      {/* Score Breakdown Legend */}
+      <div className="panel space-y-4">
+        <div className="panel-header">Score Breakdown</div>
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-border">
+              <th className="text-left py-2 text-muted-foreground font-medium">Component</th>
+              <th className="text-right py-2 text-muted-foreground font-medium">Max pts</th>
+              <th className="text-left py-2 pl-4 text-muted-foreground font-medium">Key signals</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border/50">
+            {[
+              { name: "Tutorial Activity", max: 60, signals: "Creator exists (+20), recent <14d (+15), multi-user (+5 each), viewer <30d (+8), monthly answerer (+7), extension (+5)" },
+              { name: "Commercial Motion", max: 20, signals: "Expansion (+20), Customer (+15), Active Opp (+10), Existing Prospect (+5)" },
+              { name: "Recency", max: 10, signals: "Last contacted <7d (+10), <30d (+7), <90d (+3)" },
+              { name: "HubSpot Intent", max: 10, signals: "HS score >70 (+10), >40 (+5), email opens+clicks >10 (+3), embed domain (+2)" },
+            ].map(row => (
+              <tr key={row.name}>
+                <td className="py-2 font-medium text-foreground">{row.name}</td>
+                <td className="py-2 text-right tabular-nums font-semibold text-primary">{row.max}</td>
+                <td className="py-2 pl-4 text-muted-foreground">{row.signals}</td>
+              </tr>
+            ))}
+            <tr className="border-t border-border">
+              <td className="py-2 font-bold text-foreground">Total</td>
+              <td className="py-2 text-right tabular-nums font-bold text-foreground">100</td>
+              <td />
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* Scoring Prompt */}
+      <div className="panel space-y-4">
+        <div className="panel-header">AI Summary Prompt</div>
+        <p className="text-xs text-muted-foreground">
+          This prompt is used by Gemini to generate a 2–3 sentence activity narrative when a company's score changes by ≥5 points.
+        </p>
+        <Textarea
+          value={prompt}
+          onChange={e => setPrompt(e.target.value)}
+          rows={12}
+          className="font-mono text-xs bg-secondary"
+        />
+        <Button onClick={handleSavePrompt} disabled={saving} className="gap-2">
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          Save Prompt
+        </Button>
+      </div>
+
+      {/* Auto-sync setup */}
+      <div className="panel space-y-4">
+        <div className="panel-header">Auto-Sync (12-hour schedule)</div>
+        <p className="text-xs text-muted-foreground">
+          Run this SQL in your backend SQL console to enable automatic 12-hour syncing. Requires <code className="bg-secondary px-1 rounded">pg_cron</code> and <code className="bg-secondary px-1 rounded">pg_net</code> extensions to be enabled.
+        </p>
+        <div className="relative">
+          <pre className="bg-secondary text-xs font-mono p-4 rounded-lg overflow-x-auto text-foreground/80 leading-relaxed">
+            {CRON_SQL}
+          </pre>
+          <Button
+            size="sm"
+            variant="outline"
+            className="absolute top-2 right-2 gap-1.5 text-xs h-7"
+            onClick={handleCopy}
+          >
+            {copied ? <CheckCircle2 className="w-3 h-3 text-success" /> : <Download className="w-3 h-3" />}
+            {copied ? "Copied!" : "Copy SQL"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 }

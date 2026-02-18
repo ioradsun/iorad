@@ -24,3 +24,6 @@ verify_jwt = false
 [functions.find-contacts]
 verify_jwt = false
 
+[functions.score-companies]
+verify_jwt = false
+

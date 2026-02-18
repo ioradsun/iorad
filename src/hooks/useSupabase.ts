@@ -314,3 +314,40 @@ export function useCustomerActivity(companyId: string | undefined) {
     },
   });
 }
+
+// ---- Score Companies (Scout Score) ----
+export function useScoreCompanies() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (action: "score_all" | "score_one" | "auto_sync" = "score_all") => {
+      const { data, error } = await supabase.functions.invoke("score-companies", {
+        body: { action },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["companies"] });
+    },
+  });
+}
+
+// ---- Bulk Import from HubSpot (12 months) ----
+export function useBulkImport() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("import-from-hubspot", {
+        body: { action: "bulk_import" },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["companies"] });
+      qc.invalidateQueries({ queryKey: ["processing_jobs"] });
+    },
+  });
+}
