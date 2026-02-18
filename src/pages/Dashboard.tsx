@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Building2, Search, Loader2, ArrowUpDown, ExternalLink, RefreshCw, Download, Zap } from "lucide-react";
+import { Building2, Search, Loader2, ArrowUpDown, ExternalLink, RefreshCw, Download, Zap, ChevronDown, RefreshCcw, Repeat2 } from "lucide-react";
 import { useCompanies, useSignalCounts, useProcessingJobs, useBulkImport, useScoreCompanies } from "@/hooks/useSupabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,6 +36,94 @@ const STAGE_COLORS: Record<string, string> = {
   customer:   "bg-success/10 text-success border-success/20",
   expansion:  "bg-primary/10 text-primary border-primary/20",
 };
+
+// ── HubSpot Sync split-dropdown ──────────────────────────────────────────────
+function HubSpotSyncButton({
+  onManual,
+  onAuto,
+  isLoading,
+}: {
+  onManual: () => void;
+  onAuto: () => void;
+  isLoading: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      {/* Main button + chevron split */}
+      <div className="flex items-stretch rounded-md overflow-hidden border border-border">
+        {/* Primary action: Manual */}
+        <button
+          onClick={() => { onManual(); setOpen(false); }}
+          disabled={isLoading}
+          className="flex items-center gap-1.5 px-3 h-8 text-xs font-medium bg-card text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+        >
+          {isLoading
+            ? <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+            : <Repeat2 className="w-3.5 h-3.5 text-primary" />}
+          HubSpot Sync
+        </button>
+
+        {/* Divider */}
+        <div className="w-px bg-border" />
+
+        {/* Chevron toggle */}
+        <button
+          onClick={() => setOpen(v => !v)}
+          className="flex items-center px-1.5 h-8 bg-card text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          aria-label="More sync options"
+        >
+          <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-150 ${open ? "rotate-180" : ""}`} />
+        </button>
+      </div>
+
+      {/* Dropdown menu */}
+      {open && (
+        <div
+          className="absolute right-0 mt-1.5 w-52 rounded-lg border border-border bg-card shadow-lg z-50 overflow-hidden"
+          style={{ top: "100%" }}
+        >
+          <div className="px-3 py-2 border-b border-border">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">HubSpot Sync</p>
+          </div>
+
+          <button
+            onClick={() => { onManual(); setOpen(false); }}
+            disabled={isLoading}
+            className="w-full flex items-start gap-3 px-3 py-2.5 text-left hover:bg-muted transition-colors disabled:opacity-50"
+          >
+            <Download className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary" />
+            <div>
+              <p className="text-xs font-medium text-foreground">Manual</p>
+              <p className="text-[11px] text-muted-foreground leading-snug">Pull all companies now</p>
+            </div>
+          </button>
+
+          <button
+            onClick={() => { onAuto(); setOpen(false); }}
+            className="w-full flex items-start gap-3 px-3 py-2.5 text-left hover:bg-muted transition-colors border-t border-border"
+          >
+            <RefreshCcw className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary" />
+            <div>
+              <p className="text-xs font-medium text-foreground">Auto</p>
+              <p className="text-[11px] text-muted-foreground leading-snug">Pick a HubSpot company to watch</p>
+            </div>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const { data: companies = [], isLoading } = useCompanies();
@@ -278,28 +366,13 @@ export default function Dashboard() {
             {scoreCompanies.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
             Refresh Scores
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1.5 font-medium h-8 text-xs"
-            onClick={handleBulkImport}
-            disabled={bulkImport.isPending}
-          >
-            {bulkImport.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-            Bulk Import (All)
-          </Button>
-          <Button
-            size="sm"
-            className="gap-1.5 font-medium"
-            style={{
-              background: "var(--btn-primary-bg)",
-              color: "var(--btn-primary-fg)",
-              borderRadius: "var(--btn-radius)",
-            }}
-            onClick={() => setHubspotPickerOpen(true)}
-          >
-            Import from HubSpot
-          </Button>
+
+          {/* HubSpot Sync dropdown */}
+          <HubSpotSyncButton
+            onManual={handleBulkImport}
+            onAuto={() => setHubspotPickerOpen(true)}
+            isLoading={bulkImport.isPending}
+          />
         </div>
       </div>
 
