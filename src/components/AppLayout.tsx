@@ -25,7 +25,8 @@ function ActiveJobBanner() {
 
   const processed = job.companies_processed ?? 0;
   const total = job.total_companies_targeted ?? 0;
-  const pct = total > 0 ? Math.round((processed / total) * 100) : 0;
+  const succeeded = job.companies_succeeded ?? 0;
+  const failed = job.companies_failed ?? 0;
 
   return (
     <div
@@ -38,17 +39,13 @@ function ActiveJobBanner() {
     >
       <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
       <span>
-        Batch processing running — {processed} / {total} companies
-        {pct > 0 && ` (${pct}%)`}
-        &nbsp;·&nbsp;
-        {job.companies_succeeded} done
-        {job.companies_failed > 0 && `, ${job.companies_failed} failed`}
+        Generating stories — {succeeded} done{failed > 0 ? `, ${failed} failed` : ""}, {processed} / {total} processed
       </span>
       <Link
         to="/jobs"
         className="ml-auto underline underline-offset-2 opacity-70 hover:opacity-100 transition-opacity"
       >
-        View details
+        View status
       </Link>
     </div>
   );
