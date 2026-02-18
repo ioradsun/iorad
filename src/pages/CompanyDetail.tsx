@@ -1052,6 +1052,16 @@ export default function CompanyDetail() {
                   return null;
                 };
 
+                const getIoradActivity = (contact: any) => {
+                  const hp = (contact.hubspot_properties as any) || {};
+                  return {
+                    isCreator: !!hp.first_tutorial_create_date,
+                    isViewer: !!(hp.first_tutorial_view_date || hp.first_tutorial_learn_date),
+                    monthAnswers: parseInt(hp.answers_with_own_tutorial_month_count || "0", 10) || 0,
+                    hasExtension: parseInt(hp.extension_connections || "0", 10) > 0,
+                  };
+                };
+
                 return (
                   <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollSnapType: "x mandatory" }}>
                     {filtered.map((contact) => {
@@ -1063,6 +1073,7 @@ export default function CompanyDetail() {
                       const profile = (contact as any).contact_profile;
                       const isGenerating = generatingContactId === contact.id;
                       const rankBadge = getRankBadge(contact);
+                      const ioradActivity = getIoradActivity(contact);
                       return (
                         <div key={contact.id} className="border border-border/50 rounded-lg bg-secondary/20 hover:bg-secondary/30 transition-colors flex flex-col flex-shrink-0 w-48" style={{ scrollSnapAlign: "start" }}>
                           {/* Card top */}
@@ -1094,6 +1105,31 @@ export default function CompanyDetail() {
                                 <div className="text-[12px] text-muted-foreground leading-snug line-clamp-2">{contact.title}</div>
                               )}
                             </div>
+                            {/* iorad activity indicators */}
+                            {(ioradActivity.isCreator || ioradActivity.isViewer || ioradActivity.hasExtension || ioradActivity.monthAnswers > 0) && (
+                              <div className="flex flex-wrap gap-1">
+                                {ioradActivity.isCreator && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded border border-primary/30 bg-primary/10 text-primary font-medium flex items-center gap-0.5" title="Has created tutorials">
+                                    <BookOpen className="w-2.5 h-2.5" /> Creator
+                                  </span>
+                                )}
+                                {ioradActivity.isViewer && !ioradActivity.isCreator && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded border border-info/30 bg-info/10 text-info font-medium flex items-center gap-0.5" title="Has viewed tutorials">
+                                    <Eye className="w-2.5 h-2.5" /> Viewer
+                                  </span>
+                                )}
+                                {ioradActivity.monthAnswers > 0 && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded border border-warning/30 bg-warning/10 text-warning font-medium" title={`${ioradActivity.monthAnswers} answers this month`}>
+                                    {ioradActivity.monthAnswers} ans/mo
+                                  </span>
+                                )}
+                                {ioradActivity.hasExtension && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded border border-border/40 bg-secondary text-muted-foreground font-medium flex items-center gap-0.5" title="Extension connected">
+                                    <Zap className="w-2.5 h-2.5" /> Ext
+                                  </span>
+                                )}
+                              </div>
+                            )}
                             {/* Email */}
                             {contact.email && (
                               <a
