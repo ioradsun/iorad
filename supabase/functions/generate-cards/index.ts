@@ -177,7 +177,7 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
       },
       body: JSON.stringify({
         model,
-        max_tokens: 16384,
+        max_tokens: 32768,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -207,27 +207,47 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
     // Parse JSON from response — robustly extract first valid JSON object or array
     let parsed: any;
     try {
-      // 1. Strip markdown fences
+      // 1. Strip markdown fences and thinking tags
       let cleaned = rawContent
         .replace(/^```json\s*/i, "")
         .replace(/^```\s*/i, "")
         .replace(/```\s*$/i, "")
+        .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
         .trim();
 
       // 2. Try direct parse first
       try {
         parsed = JSON.parse(cleaned);
       } catch {
-        // 3. Fallback: extract the first {...} or [...] block in case the model
-        //    wrapped the JSON in prose or thinking text
+        // 3. Fallback: extract the first {...} or [...] block
         const objMatch = cleaned.match(/(\{[\s\S]*\})/);
         const arrMatch = cleaned.match(/(\[[\s\S]*\])/);
         const candidate = objMatch?.[1] ?? arrMatch?.[1];
-        if (!candidate) throw new Error("no JSON block found");
-        parsed = JSON.parse(candidate);
+        if (candidate) {
+          try {
+            parsed = JSON.parse(candidate);
+          } catch {
+            // 4. Last resort: truncated JSON — try to find the last complete top-level key
+            //    by progressively trimming from the end until we get valid JSON
+            let attempt = candidate;
+            for (let i = 0; i < 20; i++) {
+              const lastComma = attempt.lastIndexOf(",");
+              if (lastComma === -1) break;
+              attempt = attempt.substring(0, lastComma) + "}";
+              try {
+                parsed = JSON.parse(attempt);
+                console.warn(`Recovered truncated JSON after ${i + 1} trim(s)`);
+                break;
+              } catch { /* keep trimming */ }
+            }
+            if (!parsed) throw new Error("no valid JSON block found after recovery attempts");
+          }
+        } else {
+          throw new Error("no JSON block found in response");
+        }
       }
     } catch (e) {
-      console.error("Failed to parse AI response as JSON:", rawContent.substring(0, 500));
+      console.error("Failed to parse AI response as JSON:", rawContent.substring(0, 800));
       throw new Error("AI returned invalid JSON");
     }
 
