@@ -93,109 +93,21 @@
     --pill-radius: 9999px;
     --pill-font-size: var(--font-size-xs);
 
-    /* Story page tokens — dark */
-    --story-bg: #0A0A0F;
-    --story-fg: #ffffff;
-    --story-muted: rgba(255,255,255,0.50);
-    --story-subtle: rgba(255,255,255,0.30);
-    --story-border: rgba(255,255,255,0.06);
-    --story-surface: rgba(255,255,255,0.02);
-    --story-accent: #34d399;
-    --story-accent-dim: rgba(52,211,153,0.15);
-    --story-accent-border: rgba(52,211,153,0.20);
-    --story-accent-strong: #6ee7b7;
-    --story-gradient-from: #34d399;
-    --story-gradient-to: #5eead4;
-    --story-cta-bg: #10b981;
-    --story-cta-fg: #000000;
-    --story-cta-hover: #34d399;
-    --story-btn-bg: #ffffff;
-    --story-btn-fg: #0A0A0F;
-  }
+    /* Stat card icon tokens */
+    --stat-total-bg: hsl(var(--primary) / 0.10);
+    --stat-total-fg: hsl(var(--primary));
+    --stat-inbound-bg: hsl(152 60% 50% / 0.12);
+    --stat-inbound-fg: hsl(152 55% 45%);
+    --stat-outbound-bg: hsl(217 80% 60% / 0.12);
+    --stat-outbound-fg: hsl(217 75% 58%);
 
-  .light {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 0%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 0%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 0%;
-
-    --primary: 308 100% 42%;
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 0 0% 96%;
-    --secondary-foreground: 0 0% 22%;
-
-    --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 44%;
-
-    --accent: 308 100% 96%;
-    --accent-foreground: 0 0% 15%;
-
-    --destructive: 355 100% 45%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 0 0% 0% / 0.10;
-    --input: 0 0% 0% / 0.10;
-    --ring: 308 100% 42%;
-
-    --success: 142 70% 40%;
-    --success-foreground: 0 0% 100%;
-    --warning: 38 90% 50%;
-    --warning-foreground: 38 90% 15%;
-    --info: 210 80% 50%;
-    --info-foreground: 0 0% 100%;
-
-    --score-high: 308 100% 42%;
-    --score-medium: 38 90% 50%;
-    --score-low: 0 70% 50%;
-
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 0 0% 22%;
-    --sidebar-primary: 308 100% 42%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 96%;
-    --sidebar-accent-foreground: 0 0% 22%;
-    --sidebar-border: 0 0% 0% / 0.10;
-    --sidebar-ring: 308 100% 42%;
-
-    --font-display: 'Libre Franklin', sans-serif;
-    --font-body: 'Libre Franklin', sans-serif;
-
-    /* Font sizes */
-    --font-size-title: 2rem;
-    --font-size-sub: 1.3125rem;
-    --font-size-body: 0.9375rem;
-    --font-size-sm: 0.875rem;
-    --font-size-xs: 0.75rem;
-
-    /* Button tokens */
-    --btn-primary-bg: hsl(var(--primary));
-    --btn-primary-fg: hsl(var(--primary-foreground));
-    --btn-primary-hover: hsl(var(--primary) / 0.85);
-    --btn-secondary-bg: hsl(var(--secondary));
-    --btn-secondary-fg: hsl(var(--secondary-foreground));
-    --btn-destructive-bg: hsl(var(--destructive));
-    --btn-destructive-fg: hsl(var(--destructive-foreground));
-    --btn-radius: var(--radius);
-    --btn-font-size: var(--font-size-sm);
-
-    /* Pill / Badge tokens */
-    --pill-success-bg: hsl(var(--success) / 0.12);
-    --pill-success-fg: hsl(var(--success));
-    --pill-warning-bg: hsl(38 90% 50% / 0.12);
-    --pill-warning-fg: hsl(38 90% 60%);
-    --pill-error-bg: hsl(0 70% 50% / 0.12);
-    --pill-error-fg: hsl(0 70% 55%);
-    --pill-info-bg: hsl(var(--info) / 0.12);
-    --pill-info-fg: hsl(var(--info));
-    --pill-neutral-bg: hsl(215 15% 50% / 0.15);
-    --pill-neutral-fg: hsl(215 15% 55%);
-    --pill-radius: 9999px;
-    --pill-font-size: var(--font-size-xs);
+    /* Source type pill tokens */
+    --source-inbound-bg: hsl(152 60% 50% / 0.10);
+    --source-inbound-fg: hsl(152 55% 45%);
+    --source-inbound-border: hsl(152 60% 50% / 0.35);
+    --source-outbound-bg: hsl(217 80% 60% / 0.10);
+    --source-outbound-fg: hsl(217 75% 58%);
+    --source-outbound-border: hsl(217 80% 60% / 0.35);
 
 
     --story-bg: #ffffff;
@@ -215,7 +127,24 @@
     --story-cta-hover: #383838;
     --story-btn-bg: #000000;
     --story-btn-fg: #ffffff;
+
+    /* Stat card icon tokens — light */
+    --stat-total-bg: hsl(var(--primary) / 0.10);
+    --stat-total-fg: hsl(var(--primary));
+    --stat-inbound-bg: hsl(152 60% 40% / 0.12);
+    --stat-inbound-fg: hsl(152 55% 38%);
+    --stat-outbound-bg: hsl(217 80% 55% / 0.12);
+    --stat-outbound-fg: hsl(217 75% 52%);
+
+    /* Source type pill tokens — light */
+    --source-inbound-bg: hsl(152 60% 40% / 0.10);
+    --source-inbound-fg: hsl(152 55% 38%);
+    --source-inbound-border: hsl(152 60% 40% / 0.35);
+    --source-outbound-bg: hsl(217 80% 55% / 0.10);
+    --source-outbound-fg: hsl(217 75% 52%);
+    --source-outbound-border: hsl(217 80% 55% / 0.35);
   }
+
 }
 
 @layer base {
