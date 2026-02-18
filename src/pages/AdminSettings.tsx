@@ -1201,6 +1201,11 @@ function BulkGeneratePanel() {
       }
       if (abortRef.current) break;
 
+      // Mark which company is currently processing
+      await supabase.from("processing_jobs").update({
+        settings_snapshot: { current_company: company.name },
+      }).eq("id", jobRow.id);
+
       try {
         const isInbound = company.source_type === "inbound";
 
@@ -1241,11 +1246,12 @@ function BulkGeneratePanel() {
         setResults(prev => [...prev, result]);
       }
 
-      // Update the single job row after each company
+      // Update the single job row after each company (store current company name for the status page)
       await supabase.from("processing_jobs").update({
         companies_processed: localResults.length,
         companies_succeeded: succeeded,
         companies_failed: failed,
+        settings_snapshot: { current_company: companies[localResults.length]?.name ?? null },
       }).eq("id", jobRow.id);
     }
 
