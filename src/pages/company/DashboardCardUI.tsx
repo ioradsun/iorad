@@ -63,7 +63,7 @@ export function DashboardCardUI({ card }: { card: DashboardCard }) {
                   <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">{f.label}:</span>{" "}
                   <span className="text-foreground/90">{f.value}</span>
                 </div>
-                <TruthBadge status={f.status} />
+                <TruthBadge status={f.status} source={f.source} />
               </div>
             ))}
           </div>
