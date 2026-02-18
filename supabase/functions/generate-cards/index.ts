@@ -177,6 +177,7 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
       },
       body: JSON.stringify({
         model,
+        max_tokens: 16384,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
