@@ -505,6 +505,58 @@ Deno.serve(async (req) => {
       }
 
       // ── OUTBOUND PATH (original logic below) ────────────────────────────────
+
+      // Step 0: Check HubSpot for an existing customer record by domain
+      if (company.domain) {
+        try {
+          const hubspotKey = Deno.env.get("HUBSPOT_API_KEY");
+          if (hubspotKey) {
+            const hsSearchBody = {
+              filterGroups: [
+                {
+                  filters: [
+                    { propertyName: "domain", operator: "EQ", value: company.domain },
+                  ],
+                },
+              ],
+              properties: ["name", "domain", "hs_object_id", "lifecyclestage", "customer"],
+              limit: 1,
+            };
+            const hsRes = await fetch("https://api.hubapi.com/crm/v3/objects/companies/search", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${hubspotKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(hsSearchBody),
+            });
+            if (hsRes.ok) {
+              const hsData = await hsRes.json();
+              const hsCompany = hsData.results?.[0];
+              if (hsCompany) {
+                const lifecycle = (hsCompany.properties?.lifecyclestage || "").toLowerCase();
+                const isCustomer = lifecycle === "customer" || lifecycle === "evangelist";
+                if (isCustomer) {
+                  await supabase.from("companies")
+                    .update({ is_existing_customer: true })
+                    .eq("id", company.id);
+                  console.log(`HubSpot: ${company.name} flagged as existing customer (lifecycle: ${lifecycle})`);
+                } else {
+                  console.log(`HubSpot: ${company.name} found in HubSpot (lifecycle: ${lifecycle}) — not a customer`);
+                }
+              } else {
+                console.log(`HubSpot: no record found for domain ${company.domain}`);
+              }
+            } else {
+              const errText = await hsRes.text();
+              console.warn(`HubSpot customer check failed for ${company.domain}: ${hsRes.status} ${errText.slice(0, 200)}`);
+            }
+          }
+        } catch (hsErr: any) {
+          console.warn(`HubSpot customer check error for ${company.name}: ${hsErr.message}`);
+        }
+      }
+
       let signals: { title: string; url: string; type: string; excerpt: string }[] = [];
 
       // Step 1: Search signals (unless score_only or snapshot_only)
