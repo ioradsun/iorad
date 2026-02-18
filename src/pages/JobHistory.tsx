@@ -206,6 +206,7 @@ export default function JobHistory() {
       await qc.invalidateQueries({ queryKey: ["active_running_job"] });
       await qc.invalidateQueries({ queryKey: ["active_job"] });
       await qc.invalidateQueries({ queryKey: ["company_queue_data"] });
+      await qc.invalidateQueries({ queryKey: ["banner_waiting_count"] });
       toast.success(`Queue cleared — ${waitingIds.length} waiting companies removed.`);
     } catch (err: any) {
       toast.error(`Failed to clear: ${err?.message || "Unknown error"}`);
