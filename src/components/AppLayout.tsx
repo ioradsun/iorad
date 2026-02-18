@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { LayoutDashboard, LogOut, Shield, Loader2 } from "lucide-react";
 import ioradLogoDark from "@/assets/iorad-logo-new.png";
 import ioradLogoLight from "@/assets/iorad-logo-light.png";
@@ -39,6 +39,9 @@ function useWaitingCount() {
 function ActiveJobBanner() {
   const { data: job } = useActiveJob();
   const { data: waitingCount } = useWaitingCount();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const isOnJobsPage = location.pathname === "/jobs";
 
   const { data: currentItem } = useQuery({
     queryKey: ["banner_current_item", job?.id],
@@ -85,12 +88,12 @@ function ActiveJobBanner() {
           </span>
         )}
       </span>
-      <Link
-        to="/jobs"
-        className="ml-auto underline underline-offset-2 opacity-70 hover:opacity-100 transition-opacity"
+      <button
+        onClick={() => isOnJobsPage ? navigate(-1) : navigate("/jobs")}
+        className="ml-auto underline underline-offset-2 opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
       >
-        View status
-      </Link>
+        {isOnJobsPage ? "Close Status" : "View status"}
+      </button>
     </div>
   );
 }
