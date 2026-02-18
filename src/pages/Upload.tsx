@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload as UploadIcon, FileText, AlertTriangle, CheckCircle2, X, Building2, Globe, Users, Plus, Copy, ExternalLink, ArrowLeft } from "lucide-react";
+import { Upload as UploadIcon, FileText, AlertTriangle, CheckCircle2, X, Building2, Globe, Users, Plus, ArrowLeft } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
@@ -167,25 +167,20 @@ export default function UploadPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Add Companies</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Upload a CSV, manually add, or import from Clay.
+              Add manually or upload a CSV.
             </p>
           </div>
         </div>
       </div>
 
       <Tabs defaultValue="manual" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="manual">Add Manually</TabsTrigger>
           <TabsTrigger value="upload">CSV Upload</TabsTrigger>
-          <TabsTrigger value="clay">Clay Import</TabsTrigger>
         </TabsList>
 
         <TabsContent value="manual">
           <ManualAddForm />
-        </TabsContent>
-
-        <TabsContent value="clay">
-          <ClayImportInfo />
         </TabsContent>
 
         <TabsContent value="upload" className="space-y-6">
@@ -432,111 +427,3 @@ function ManualAddForm() {
   );
 }
 
-function ClayImportInfo() {
-  const webhookUrl = `https://hpdfvqbrmyztmgensfdz.supabase.co/functions/v1/import-from-clay`;
-
-  const copyUrl = () => {
-    navigator.clipboard.writeText(webhookUrl);
-    toast.success("Webhook URL copied to clipboard");
-  };
-
-  const fieldMapping = [
-    { clay: "Company / Company Name / name", field: "name" },
-    { clay: "Domain / Website", field: "domain" },
-    { clay: "Industry", field: "industry" },
-    { clay: "Country / HQ Country", field: "hq_country" },
-    { clay: "Headcount / Employee Count", field: "headcount" },
-    { clay: "Partner", field: "partner" },
-    { clay: "Persona", field: "persona" },
-  ];
-
-  const contactFields = [
-    { clay: "contacts[].name / Contact Name", field: "contacts[].name" },
-    { clay: "contacts[].title / Job Title", field: "contacts[].title" },
-    { clay: "contacts[].email / Contact Email", field: "contacts[].email" },
-    { clay: "contacts[].linkedin / LinkedIn URL", field: "contacts[].linkedin" },
-  ];
-
-  return (
-    <div className="space-y-4">
-      <div className="panel space-y-4">
-        <div className="panel-header">Clay Webhook Setup</div>
-        <p className="text-sm text-muted-foreground">
-          Use Clay's <strong>HTTP API</strong> action to push enriched rows to this webhook. Each row will be upserted into your companies table (matched by domain).
-        </p>
-
-        <div className="space-y-2">
-          <Label className="text-xs">Webhook URL</Label>
-          <div className="flex gap-2">
-            <Input value={webhookUrl} readOnly className="bg-secondary font-mono text-xs" />
-            <Button variant="outline" size="icon" onClick={copyUrl} title="Copy URL">
-              <Copy className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label className="text-xs">HTTP Method</Label>
-          <p className="text-sm font-mono bg-secondary rounded px-3 py-2">POST</p>
-        </div>
-
-        <div className="space-y-2">
-          <Label className="text-xs">Content-Type Header</Label>
-          <p className="text-sm font-mono bg-secondary rounded px-3 py-2">application/json</p>
-        </div>
-      </div>
-
-      <div className="panel space-y-3">
-        <div className="panel-header">Field Mapping</div>
-        <p className="text-xs text-muted-foreground">
-          Name your Clay columns using any of these labels — the webhook auto-maps them.
-        </p>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left py-1.5 px-2 text-xs font-mono uppercase tracking-wider text-muted-foreground">Clay Column</th>
-                <th className="text-left py-1.5 px-2 text-xs font-mono uppercase tracking-wider text-muted-foreground">Maps To</th>
-              </tr>
-            </thead>
-            <tbody>
-              {fieldMapping.map((m, i) => (
-                <tr key={i} className="border-b border-border/30">
-                  <td className="py-1.5 px-2 text-xs text-muted-foreground">{m.clay}</td>
-                  <td className="py-1.5 px-2 text-xs font-mono text-primary">{m.field}</td>
-                </tr>
-              ))}
-              <tr className="border-b"><td colSpan={2} className="py-2 px-2 text-xs font-mono uppercase tracking-wider text-muted-foreground bg-secondary/50">Contacts (multiple per company)</td></tr>
-              {contactFields.map((m, i) => (
-                <tr key={`c-${i}`} className="border-b border-border/30">
-                  <td className="py-1.5 px-2 text-xs text-muted-foreground">{m.clay}</td>
-                  <td className="py-1.5 px-2 text-xs font-mono text-primary">{m.field}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="panel space-y-3">
-        <div className="panel-header">How to Set Up in Clay</div>
-        <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
-          <li>Open your Clay table with enriched company data</li>
-          <li>Add an <strong>HTTP API</strong> enrichment (or action)</li>
-          <li>Set method to <strong>POST</strong> and paste the webhook URL above</li>
-          <li>Set <strong>Content-Type: application/json</strong> in headers</li>
-          <li>In the body, map your Clay columns to the field names shown above</li>
-          <li>Run the column — companies will appear in your dashboard</li>
-        </ol>
-        <a
-          href="https://university.clay.com/docs/http-api-integration-overview"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
-        >
-          <ExternalLink className="w-3 h-3" /> Clay HTTP API docs
-        </a>
-      </div>
-    </div>
-  );
-}
