@@ -218,34 +218,22 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
     const assets_json = parsed.assets || {};
     const account_json = parsed.account || {};
 
-    // Upsert into company_cards (per-contact)
+    // Upsert into company_cards — use onConflict to handle the unique constraint safely
     const upsertRow: Record<string, unknown> = {
       company_id,
       cards_json,
       assets_json,
       account_json,
       model_version: model,
+      contact_id: contact_id || null,
     };
-    if (contact_id) upsertRow.contact_id = contact_id;
-
-    // Delete existing then insert
-    if (contact_id) {
-      await sb
-        .from("company_cards")
-        .delete()
-        .eq("company_id", company_id)
-        .eq("contact_id", contact_id);
-    } else {
-      await sb
-        .from("company_cards")
-        .delete()
-        .eq("company_id", company_id)
-        .is("contact_id", null);
-    }
 
     const { error: upsertErr } = await sb
       .from("company_cards")
-      .insert(upsertRow);
+      .upsert(upsertRow, {
+        onConflict: "company_id",
+        ignoreDuplicates: false,
+      });
 
     if (upsertErr) {
       console.error("Upsert error:", upsertErr);
