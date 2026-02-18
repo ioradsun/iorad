@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import HubSpotPickerModal from "@/components/HubSpotPickerModal";
+import ImportStatusBanner from "@/components/ImportStatusBanner";
 
 type SortKey = "name" | "last_score_total" | "signals_count" | "updated_at" | "created_at" | "scout_score";
 type CategoryTab = "school" | "business" | "partner";
@@ -217,6 +218,9 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* ── Import / Scoring status banner ── */}
+      <ImportStatusBanner />
 
       {/* ── Category Tabs ── */}
       <div className="flex flex-wrap items-center gap-2.5">
