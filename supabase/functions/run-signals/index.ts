@@ -392,9 +392,35 @@ Deno.serve(async (req) => {
           console.warn("Inbound profile extraction failed, using raw data:", extractErr.message);
         }
 
+        // Step 0b: Run Firecrawl web signal search (same as outbound) if domain is available
+        if (company.domain && (mode === "full" || mode === "signals_only")) {
+          try {
+            console.log(`Inbound web signals: searching for ${company.name}`);
+            const webSignals = await searchSignals(company, firecrawlKey);
+            for (const sig of webSignals) {
+              await supabase.from("signals").upsert(
+                {
+                  company_id: company.id,
+                  title: sig.title,
+                  url: sig.url,
+                  type: sig.type,
+                  raw_excerpt: sig.excerpt,
+                  evidence_snippets: [],
+                  last_seen_at: new Date().toISOString(),
+                },
+                { onConflict: "company_id,url" }
+              );
+            }
+            signalsCount += webSignals.length;
+            console.log(`Inbound web signals: ${webSignals.length} found for ${company.name}`);
+          } catch (sigErr: any) {
+            console.warn("Inbound web signal search failed:", sigErr.message);
+          }
+        }
+
         // Step 1: Compute behavioral score from contacts
         const inboundResult = await scoreInboundCompany(supabase, company.id);
-        signalsCount = inboundResult.contacts_scored;
+        signalsCount += inboundResult.contacts_scored;
         snapshotStatus = inboundResult.best_score > 0 ? "Generated" : "Low Signal";
 
         // Step 2: Build snapshot JSON with inbound framing
