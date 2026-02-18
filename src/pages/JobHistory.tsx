@@ -1,8 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, CheckCircle2, Clock, XCircle, Inbox } from "lucide-react";
+import { Loader2, CheckCircle2, Clock, XCircle, Inbox, Play, Pause } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 
 // Companies created within the last 48 hours are considered "new" (recently
 // imported from HubSpot and queued for auto-generation).
@@ -122,11 +125,15 @@ function CompanyList({ companies, emptyMessage }: { companies: any[]; emptyMessa
 // ── Main page ───────────────────────────────────────────────────────────────
 
 export default function JobHistory() {
+  const qc = useQueryClient();
+  const [actionLoading, setActionLoading] = useState(false);
+
   const { data: queueData, isLoading: loadingQueue } = useCompanyQueueData();
   const { data: activeJob, isLoading: loadingActive } = useActiveRunningJob();
   const { data: currentItem } = useCurrentlyProcessingCompany(activeJob?.id);
 
   const isLoading = loadingQueue || loadingActive;
+  const isRunning = !!activeJob;
   const currentCompany =
     (currentItem?.companies as any)?.name ??
     (activeJob?.settings_snapshot as any)?.current_company ??
@@ -137,17 +144,81 @@ export default function JobHistory() {
   const notStarted = queueData?.notStarted ?? [];
   const failed     = queueData?.failed     ?? [];
 
+  const handleStart = async () => {
+    setActionLoading(true);
+    try {
+      const { error } = await supabase.functions.invoke("run-signals", {
+        body: { offset: 0 },
+      });
+      if (error) throw error;
+      await qc.invalidateQueries({ queryKey: ["active_running_job"] });
+      await qc.invalidateQueries({ queryKey: ["company_queue_data"] });
+      toast.success("Processing started — new imports will be generated first.");
+    } catch (err: any) {
+      toast.error(`Failed to start: ${err?.message || "Unknown error"}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handlePause = async () => {
+    if (!activeJob) return;
+    setActionLoading(true);
+    try {
+      const { error } = await supabase
+        .from("processing_jobs")
+        .update({ status: "canceled", finished_at: new Date().toISOString() })
+        .eq("id", activeJob.id);
+      if (error) throw error;
+      await qc.invalidateQueries({ queryKey: ["active_running_job"] });
+      await qc.invalidateQueries({ queryKey: ["active_job"] });
+      toast.success("Paused — current company will finish, then the queue stops.");
+    } catch (err: any) {
+      toast.error(`Failed to pause: ${err?.message || "Unknown error"}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Processing Status</h1>
-        <p className="text-sm text-muted-foreground mt-1">Story generation queue</p>
+      {/* ── Header + Start/Pause ── */}
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Processing Status</h1>
+          <p className="text-sm text-muted-foreground mt-1">Story generation queue</p>
+        </div>
+        {!isLoading && (
+          isRunning ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={handlePause}
+              disabled={actionLoading}
+            >
+              {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pause className="w-4 h-4" />}
+              Pause
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              className="gap-2"
+              onClick={handleStart}
+              disabled={actionLoading || waiting.length === 0}
+            >
+              {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+              Start{waiting.length > 0 ? ` (${waiting.length})` : ""}
+            </Button>
+          )
+        )}
       </div>
 
-      {activeJob && (
+      {/* ── Running indicator ── */}
+      {isRunning && (
         <div className="panel flex items-center gap-3">
           <Loader2 className="w-4 h-4 animate-spin text-primary flex-shrink-0" />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="text-xs text-muted-foreground">Currently processing</div>
             <div className="text-sm font-medium truncate">{currentCompany ?? "—"}</div>
           </div>
