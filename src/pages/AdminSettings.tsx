@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Save, Loader2, Plus, Trash2, GripVertical, Sun, Moon, Shield, User } from "lucide-react";
+import { Save, Loader2, Plus, Trash2, GripVertical, Sun, Moon, Shield, User, Download } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "@/hooks/useTheme";
 
@@ -414,10 +414,47 @@ function AIConfigTab() {
         </div>
       ))}
 
-      <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="w-full gap-2">
-        {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-        Save AI Config
-      </Button>
+      <div className="flex gap-3">
+        <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="flex-1 gap-2">
+          {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          Save AI Config
+        </Button>
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={() => {
+            const sections: { label: string; value: string }[] = [
+              { label: "System Prompt (Global)", value: prompt },
+              { label: "Story Mega Prompt Template", value: promptTemplate },
+              { label: "Company Tab Prompt", value: companyPrompt },
+              { label: "Strategy Tab Prompt", value: strategyPrompt },
+              { label: "Outreach Tab Prompt", value: outreachPrompt },
+              { label: "Custom Loom & iorad Prompt", value: storyPrompt },
+              { label: "Transcript Analysis Prompt", value: transcriptPrompt },
+              { label: "Strategy Tab Prompt (Inbound)", value: inboundStrategyPrompt },
+              { label: "Outreach Tab Prompt (Inbound)", value: inboundOutreachPrompt },
+              { label: "Custom Loom & iorad Prompt (Inbound)", value: inboundStoryPrompt },
+              { label: "Transcript Analysis Prompt (Inbound)", value: inboundTranscriptPrompt },
+            ];
+            const md = sections
+              .map(({ label, value }) =>
+                `## ${label}\n\n\`\`\`\n${(value || "").trim() || "(empty)"}\n\`\`\``
+              )
+              .join("\n\n---\n\n");
+            const blob = new Blob([`# iorad AI Prompt Configuration\n\nExported: ${new Date().toISOString()}\n\n---\n\n${md}`], { type: "text/markdown" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `iorad-prompts-${new Date().toISOString().slice(0, 10)}.md`;
+            a.click();
+            URL.revokeObjectURL(url);
+            toast.success("Prompts exported as Markdown");
+          }}
+        >
+          <Download className="w-4 h-4" />
+          Export Markdown
+        </Button>
+      </div>
     </div>
   );
 }
