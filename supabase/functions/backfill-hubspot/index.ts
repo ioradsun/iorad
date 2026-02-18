@@ -33,13 +33,13 @@ function scoreCompanyAsync(companyId: string) {
 }
 
 // ── Self-chain: call ourselves with the next cursor ──────────────────────────
-function chainNext(after: string, totalProcessed: number) {
+function chainNext(after: string, totalProcessed: number, totalSkipped: number, jobId: string | null) {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   fetch(`${supabaseUrl}/functions/v1/backfill-hubspot`, {
     method: "POST",
     headers: { Authorization: `Bearer ${serviceRoleKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ after, total_processed: totalProcessed }),
+    body: JSON.stringify({ after, total_processed: totalProcessed, total_skipped: totalSkipped, job_id: jobId }),
   }).catch((err) => console.error("chain error:", err.message));
 }
 
@@ -160,10 +160,28 @@ Deno.serve(async (req) => {
 
     const after: string | null = body.after ?? null;
     const totalProcessed: number = body.total_processed ?? 0;
+    // job_id is passed along so all self-chain calls update the same job record
+    let jobId: string | null = body.job_id ?? null;
 
     console.log(`backfill-hubspot: page after=${after ?? "start"}, total so far=${totalProcessed}`);
 
-    // Fetch property names (cached across invocations via module scope isn't reliable, just fetch)
+    // ── Create a processing_jobs record on the first call ─────────────────────
+    if (!jobId) {
+      const { data: job, error: jobErr } = await supabase
+        .from("processing_jobs")
+        .insert({
+          trigger: "hubspot_backfill",
+          status: "running",
+          settings_snapshot: { type: "backfill", started: new Date().toISOString() },
+          total_companies_targeted: 0,
+        })
+        .select("id")
+        .single();
+      if (jobErr) console.error("Failed to create job record:", jobErr.message);
+      else jobId = job.id;
+    }
+
+    // Fetch property names
     const allProps = await getAllPropertyNames(apiKey);
     const properties = allProps.length > 0
       ? allProps.join(",")
@@ -179,7 +197,6 @@ Deno.serve(async (req) => {
         const { companyId, isNew } = await upsertCompany(supabase, hs);
         imported++;
         if (isNew) {
-          // Only score genuinely new companies to avoid re-scoring everything on every daily run
           scoreCompanyAsync(companyId);
         }
       } catch (err: any) {
@@ -189,11 +206,22 @@ Deno.serve(async (req) => {
     }
 
     const newTotal = totalProcessed + imported;
+    const newSkipped = (body.total_skipped ?? 0) + skipped;
     console.log(`backfill-hubspot: imported=${imported} skipped=${skipped} total=${newTotal} nextAfter=${nextAfter ?? "done"}`);
+
+    // ── Update job record with latest progress ────────────────────────────────
+    if (jobId) {
+      await supabase.from("processing_jobs").update({
+        companies_processed: newTotal,
+        companies_succeeded: newTotal,
+        companies_failed: newSkipped,
+        ...(nextAfter ? {} : { status: "completed", finished_at: new Date().toISOString() }),
+      }).eq("id", jobId);
+    }
 
     // Self-chain if there are more pages
     if (nextAfter) {
-      chainNext(nextAfter, newTotal);
+      chainNext(nextAfter, newTotal, newSkipped, jobId);
       return new Response(
         JSON.stringify({ status: "chaining", imported, skipped, total_so_far: newTotal, next_after: nextAfter }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -202,7 +230,7 @@ Deno.serve(async (req) => {
 
     console.log(`backfill-hubspot: COMPLETE — total companies processed: ${newTotal}`);
     return new Response(
-      JSON.stringify({ status: "complete", total_processed: newTotal, skipped }),
+      JSON.stringify({ status: "complete", total_processed: newTotal, skipped: newSkipped }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err: any) {
