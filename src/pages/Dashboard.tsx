@@ -296,12 +296,16 @@ export default function Dashboard() {
               <th className="text-left px-5 py-3.5 hidden sm:table-cell">
                 <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Stage</span>
               </th>
-              <th className="text-left px-5 py-3.5 hidden md:table-cell">
-                <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Partner</span>
-              </th>
-              <th className="text-left px-5 py-3.5 hidden lg:table-cell">
-                <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Rep</span>
-              </th>
+              {activeTab === "partner" && (
+                <th className="text-left px-5 py-3.5 hidden md:table-cell">
+                  <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Partner</span>
+                </th>
+              )}
+              {activeTab === "partner" && (
+                <th className="text-left px-5 py-3.5 hidden lg:table-cell">
+                  <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Rep</span>
+                </th>
+              )}
               <th className="text-left px-5 py-3.5 hidden lg:table-cell">
                 <SortHeader label="Added" field="created_at" />
               </th>
@@ -335,15 +339,19 @@ export default function Dashboard() {
                 <td className="px-5 py-4 hidden sm:table-cell">
                   <StagePill stage={(company as any).stage || "prospect"} />
                 </td>
-                <td className="px-5 py-4 hidden md:table-cell">
-                  <span className="text-[14px] text-muted-foreground">{company.partner || "—"}</span>
-                </td>
-                <td className="px-5 py-4 hidden lg:table-cell">
-                  <span className="text-[14px] text-muted-foreground">{company.partner_rep_name || "—"}</span>
-                  {company.partner_rep_email && (
-                    <div className="text-[13px] text-muted-foreground/60 mt-0.5">{company.partner_rep_email}</div>
-                  )}
-                </td>
+                {activeTab === "partner" && (
+                  <td className="px-5 py-4 hidden md:table-cell">
+                    <span className="text-[14px] text-muted-foreground">{company.partner || "—"}</span>
+                  </td>
+                )}
+                {activeTab === "partner" && (
+                  <td className="px-5 py-4 hidden lg:table-cell">
+                    <span className="text-[14px] text-muted-foreground">{company.partner_rep_name || "—"}</span>
+                    {company.partner_rep_email && (
+                      <div className="text-[13px] text-muted-foreground/60 mt-0.5">{company.partner_rep_email}</div>
+                    )}
+                  </td>
+                )}
                 <td className="px-5 py-4 hidden lg:table-cell">
                   <span className="text-[14px] text-muted-foreground">
                     {new Date(company.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
