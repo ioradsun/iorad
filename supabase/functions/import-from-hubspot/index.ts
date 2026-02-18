@@ -68,6 +68,16 @@ Deno.serve(async (req) => {
       return await syncSingleCompany(supabase, body.domain, body.company_id);
     }
 
+    // List all HubSpot companies for the picker UI
+    if (body.action === "list_companies") {
+      return await listHubSpotCompanies(body.search || "", body.after || null);
+    }
+
+    // Sync a specific HubSpot company by its HubSpot ID
+    if (body.action === "sync_hubspot_id") {
+      return await syncByHubSpotId(supabase, body.hubspot_id);
+    }
+
     // Validate HubSpot webhook signature only when a signature header is actually present
     const signature = req.headers.get("X-HubSpot-Signature") || req.headers.get("x-hubspot-signature");
     if (signature) {
@@ -873,4 +883,86 @@ async function syncSingleCompany(supabase: any, domain: string | undefined, comp
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
+}
+
+// ── List all HubSpot companies (for picker UI) ────────────────────────────────
+async function listHubSpotCompanies(search: string, after: string | null) {
+  const apiKey = Deno.env.get("HUBSPOT_API_KEY");
+  if (!apiKey) throw new Error("HUBSPOT_API_KEY not configured");
+
+  const properties = ["name", "domain", "industry", "country", "lifecyclestage", "numberofemployees", "createdate"];
+
+  let url: string;
+  let fetchOpts: RequestInit;
+
+  if (search && search.trim()) {
+    // Use search endpoint for text queries
+    url = "https://api.hubapi.com/crm/v3/objects/companies/search";
+    const searchBody: any = {
+      query: search.trim(),
+      properties,
+      limit: 50,
+      sorts: [{ propertyName: "name", direction: "ASCENDING" }],
+    };
+    if (after) searchBody.after = after;
+    fetchOpts = {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(searchBody),
+    };
+  } else {
+    // List all companies paginated
+    const params = new URLSearchParams({
+      limit: "100",
+      properties: properties.join(","),
+      sorts: "name",
+    });
+    if (after) params.set("after", after);
+    url = `https://api.hubapi.com/crm/v3/objects/companies?${params}`;
+    fetchOpts = { headers: { Authorization: `Bearer ${apiKey}` } };
+  }
+
+  const res = await fetch(url, fetchOpts);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`HubSpot list error [${res.status}]: ${text}`);
+  }
+
+  const data = await res.json();
+  const results = (data.results || []).map((c: any) => ({
+    hubspot_id: c.id,
+    name: c.properties?.name || "",
+    domain: c.properties?.domain || "",
+    industry: c.properties?.industry || "",
+    country: c.properties?.country || "",
+    lifecycle: c.properties?.lifecyclestage || "",
+    employees: c.properties?.numberofemployees || "",
+  }));
+
+  return new Response(
+    JSON.stringify({
+      companies: results,
+      paging: data.paging || null,
+    }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+// ── Sync a single HubSpot company by HubSpot ID ───────────────────────────────
+async function syncByHubSpotId(supabase: any, hubspotId: string) {
+  const company = await fetchHubSpotCompany(hubspotId);
+  if (!company) {
+    return new Response(JSON.stringify({ error: "Company not found in HubSpot" }), {
+      status: 404,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const { companyId, isNew } = await upsertCompany(supabase, company);
+  await importContactsForCompany(supabase, hubspotId, companyId);
+
+  return new Response(
+    JSON.stringify({ success: true, company_id: companyId, is_new: isNew, name: company.properties?.name }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
 }
