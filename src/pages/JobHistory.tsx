@@ -104,18 +104,19 @@ function useHubspotJobs() {
   return useQuery({
     queryKey: ["hubspot_jobs"],
     queryFn: async () => {
-      // All jobs with action=bulk_import or trigger=bulk_import, last 20
       const { data } = await supabase
         .from("processing_jobs")
         .select("*")
         .order("started_at", { ascending: false })
-        .limit(20);
-      // Filter to import-related jobs by settings_snapshot or trigger
+        .limit(30);
+      // Include all HubSpot-related jobs: bulk import, sync, backfill
       return (data || []).filter((j: any) =>
         j.trigger === "bulk_import" ||
         j.trigger === "hubspot_sync" ||
+        j.trigger === "hubspot_backfill" ||
         (j.settings_snapshot as any)?.action === "bulk_import" ||
-        (j.settings_snapshot as any)?.action === "sync"
+        (j.settings_snapshot as any)?.action === "sync" ||
+        (j.settings_snapshot as any)?.type === "backfill"
       );
     },
     refetchInterval: 5_000,
@@ -212,7 +213,11 @@ function SyncJobSummary({ job }: { job: any }) {
             {isRunning ? "Syncing…" : job.status}
           </span>
           <span className="text-xs text-muted-foreground">
-            {snap.action === "bulk_import" ? "All companies" : snap.action ?? "HubSpot sync"}
+            {job.trigger === "hubspot_backfill"
+              ? "Full backfill"
+              : snap.action === "bulk_import"
+              ? "All companies"
+              : snap.action ?? "HubSpot sync"}
           </span>
         </div>
         <span className="text-xs text-muted-foreground tabular-nums">
