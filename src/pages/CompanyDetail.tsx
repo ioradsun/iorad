@@ -486,6 +486,13 @@ export default function CompanyDetail() {
             </p>
           )}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {(accountData?.industry?.value || company.industry) && (
+              <Card className="bg-secondary/30"><CardContent className="p-3 flex flex-col items-start gap-1.5">
+                <Building2 className="w-4 h-4 text-primary" />
+                <span className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Industry</span>
+                <span className="text-[13px] font-medium text-foreground leading-tight">{accountData?.industry?.value || company.industry?.replace(/_/g, " ").toLowerCase()}</span>
+              </CardContent></Card>
+            )}
             {(accountData?.employees?.value || company.headcount) && (
               <Card className="bg-secondary/30"><CardContent className="p-3 flex flex-col items-start gap-1.5">
                 <Users className="w-4 h-4 text-primary" />
