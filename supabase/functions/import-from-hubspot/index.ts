@@ -6,7 +6,18 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Verify HubSpot webhook signature (v1: SHA-256 of clientSecret + rawBody, hex encoded)
+// Fire-and-forget Scout scoring for a single company after import
+function scoreCompanyAsync(companyId: string) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  fetch(`${supabaseUrl}/functions/v1/score-companies`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${serviceRoleKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "score_one", company_id: companyId }),
+  }).catch(err => console.error(`score-companies error for ${companyId}:`, err.message));
+}
+
+
 async function verifyHubSpotSignature(req: Request, rawBody: string): Promise<boolean> {
   const clientSecret = Deno.env.get("HUBSPOT_CLIENT_SECRET");
   if (!clientSecret) {
@@ -114,13 +125,9 @@ Deno.serve(async (req) => {
         await importContactsForCompany(supabase, objectId, companyId);
         imported++;
 
-        // Queue for auto-processing: only new companies without a story
-        if (isNew && !hasStory) {
-          toProcess.push(companyId);
-          console.log(`Queued for auto-processing: ${company.properties?.name || companyId}`);
-        } else {
-          console.log(`Skipping auto-process: ${company.properties?.name} (isNew=${isNew}, hasStory=${hasStory})`);
-        }
+        // Score immediately after import (fire-and-forget)
+        scoreCompanyAsync(companyId);
+        console.log(`Scored queued for: ${company.properties?.name || companyId}`);
       } catch (err: any) {
         errors.push(`Event ${event.objectId || "unknown"}: ${err.message}`);
         skipped++;
@@ -250,12 +257,13 @@ async function syncRecentCompanies(supabase: any) {
 
   for (const company of results) {
     try {
-      const { companyId, isNew, hasStory } = await upsertCompany(supabase, company);
-      // Fetch and save associated contacts
+      const { companyId, isNew } = await upsertCompany(supabase, company);
       await importContactsForCompany(supabase, company.id, companyId);
       imported++;
-
       if (isNew) autoQueued++;
+
+      // Score immediately after import (fire-and-forget)
+      scoreCompanyAsync(companyId);
     } catch (err: any) {
       errors.push(`${company.properties?.name || company.id}: ${err.message}`);
       skipped++;
@@ -1202,8 +1210,9 @@ async function syncByHubSpotId(supabase: any, hubspotId: string) {
   const { companyId, isNew, hasStory } = await upsertCompany(supabase, company);
   await importContactsForCompany(supabase, hubspotId, companyId);
 
-  // Update scout_synced_at
+  // Update scout_synced_at and score immediately
   await supabase.from("companies").update({ scout_synced_at: new Date().toISOString() }).eq("id", companyId);
+  scoreCompanyAsync(companyId);
 
   return new Response(
     JSON.stringify({
