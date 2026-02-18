@@ -31,7 +31,7 @@ export default function Dashboard() {
     setSyncingHubspot(true);
     try {
       const { error } = await supabase.functions.invoke("import-from-hubspot", {
-        body: { source: "manual_refresh" },
+        body: { action: "sync" },
       });
       if (error) throw error;
       await qc.invalidateQueries({ queryKey: ["companies"] });
