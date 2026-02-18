@@ -391,13 +391,64 @@ export default function CompanyDetail() {
     }
   };
 
-  // Unified generation: company intel → fathom → extract profiles → strategy → outreach → story
+  // Unified generation for both outbound and inbound
   const generateCards = async () => {
     if (!id) return;
     setGeneratingCards(true);
     const firstContactId = contacts[0]?.id || null;
     try {
-      // Step 1: Company intel
+      // Outbound-only: Step 0a — Run signals (Firecrawl)
+      if (companyAny?.source_type !== "inbound") {
+        setGenerateStep("Signals");
+        toast.info("Running signal search…");
+        const { data: sigData, error: sigErr } = await supabase.functions.invoke("run-signals", { body: { company_id: id, mode: "full" } });
+        if (sigErr) throw sigErr;
+        if (sigData?.error) throw new Error(sigData.error);
+        toast.success(`Signals complete — ${sigData?.signals_found ?? 0} found`);
+        queryClient.invalidateQueries({ queryKey: ["signals", id] });
+        queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
+      }
+
+      // Step 1: Sync Fathom meetings (both source types)
+      if (companyAny?.domain) {
+        setGenerateStep("Fathom Sync");
+        toast.info("Syncing Fathom meetings…");
+        try {
+          const { data: fData, error: fErr } = await supabase.functions.invoke("sync-fathom", {
+            body: { domain: companyAny.domain, company_id: id },
+          });
+          if (!fErr && !fData?.error) {
+            toast.success(`Fathom synced — ${fData?.meetings_synced ?? 0} meetings`);
+            queryClient.invalidateQueries({ queryKey: ["meetings", id] });
+          }
+        } catch (fe: any) {
+          console.warn("Fathom sync non-fatal:", fe.message);
+        }
+      }
+
+      // Outbound-only: Step 0b — Find contacts via Apollo
+      if (companyAny?.source_type !== "inbound") {
+        setGenerateStep("Contacts");
+        toast.info("Finding contacts via Apollo…");
+        setFindingContacts(true);
+        try {
+          const { data: contactData, error: contactErr } = await supabase.functions.invoke("find-contacts", { body: { company_id: id } });
+          if (contactErr) throw contactErr;
+          if (contactData?.error) throw new Error(contactData.error);
+          if (contactData?.contacts_found > 0) {
+            toast.success(`Found ${contactData.contacts_found} contacts`);
+          } else {
+            toast.warning("No contacts found — check company domain");
+          }
+          queryClient.invalidateQueries({ queryKey: ["contacts", id] });
+        } catch (ce: any) {
+          toast.error("Contact enrichment failed: " + (ce.message || "Unknown error"));
+        } finally {
+          setFindingContacts(false);
+        }
+      }
+
+      // Step 2: Company intel (AI cards)
       setGenerateStep("Company Intel");
       toast.info("Generating Company Intel…");
       {
@@ -408,53 +459,46 @@ export default function CompanyDetail() {
         if (data?.error) throw new Error(data.error);
       }
 
-      // Step 2: Sync & analyze Fathom if company has a domain
+      // Step 3: Analyze new Fathom transcripts (both source types)
       if (companyAny?.domain) {
-        setGenerateStep("Fathom Sync");
-        toast.info("Syncing Fathom meetings…");
         try {
-          const { data: fData, error: fErr } = await supabase.functions.invoke("sync-fathom", {
-            body: { domain: companyAny.domain, company_id: id },
-          });
-          if (fErr) throw fErr;
-          if (fData?.error) throw new Error(fData.error);
-          const synced = fData?.meetings_synced || 0;
-          if (synced > 0) {
-            toast.info(`Synced ${synced} meetings — analyzing transcripts…`);
-            const { data: freshMeetings } = await supabase
-              .from("meetings")
-              .select("id, transcript, transcript_analysis")
-              .eq("company_id", id!)
-              .not("transcript", "is", null)
-              .is("transcript_analysis", null);
-            if (freshMeetings && freshMeetings.length > 0) {
-              setGenerateStep("Analyzing Transcripts");
-              for (const m of freshMeetings) {
-                setAnalyzingMeeting(m.id);
-                try {
-                  const { data: aData, error: aErr } = await supabase.functions.invoke("analyze-transcript", {
-                    body: { meeting_id: m.id },
-                  });
-                  if (aErr) throw aErr;
-                  if (aData?.error) throw new Error(aData.error);
-                } catch (ae: any) {
-                  console.error(`Analysis failed for meeting ${m.id}:`, ae);
-                }
+          const { data: freshMeetings } = await supabase
+            .from("meetings")
+            .select("id, transcript, transcript_analysis")
+            .eq("company_id", id!)
+            .not("transcript", "is", null)
+            .is("transcript_analysis", null);
+          if (freshMeetings && freshMeetings.length > 0) {
+            setGenerateStep("Analyzing Transcripts");
+            for (const m of freshMeetings) {
+              setAnalyzingMeeting(m.id);
+              try {
+                await supabase.functions.invoke("analyze-transcript", { body: { meeting_id: m.id } });
+              } catch (ae: any) {
+                console.warn("Transcript analysis failed:", ae.message);
               }
-              setAnalyzingMeeting(null);
-              toast.success("Transcript analysis complete");
-              queryClient.invalidateQueries({ queryKey: ["meetings", id] });
             }
+            setAnalyzingMeeting(null);
+            toast.success("Transcript analysis complete");
+            queryClient.invalidateQueries({ queryKey: ["meetings", id] });
           }
-        } catch (fe: any) {
-          console.warn("Fathom sync non-fatal:", fe.message);
-          toast.warning("Fathom sync skipped: " + (fe.message || "unknown error"));
+        } catch (te: any) {
+          console.warn("Transcript analysis non-fatal:", te.message);
         }
       }
 
-      // Step 3: Extract contact profiles from HubSpot data
-      setGenerateStep("Contact Profiles");
-      toast.info("Extracting contact profiles…");
+      // Step 4: Extract contact profiles from HubSpot data (inbound only)
+      if (companyAny?.source_type === "inbound") {
+        setGenerateStep("Contact Profiles");
+        toast.info("Extracting contact profiles…");
+        try {
+          await supabase.functions.invoke("extract-contact-profile", { body: { company_id: id } });
+          queryClient.invalidateQueries({ queryKey: ["contacts", id] });
+        } catch (pe: any) {
+          console.warn("Profile extraction non-fatal:", pe.message);
+        }
+      }
+
       try {
         const { data: profileData } = await supabase.functions.invoke("extract-contact-profile", {
           body: { company_id: id },
@@ -466,7 +510,7 @@ export default function CompanyDetail() {
         console.warn("Profile extraction non-fatal:", pe.message);
       }
 
-      // Step 4: Strategy → Outreach → Story
+      // Step 5: Strategy → Outreach → Story
       const tabs = ["strategy", "outreach", "story"];
       const labels: Record<string, string> = { strategy: "Strategy", outreach: "Outreach", story: "Story" };
       for (const tab of tabs) {
@@ -617,8 +661,8 @@ export default function CompanyDetail() {
             <TabsTrigger value="onboarding" className="text-sm">Onboarding</TabsTrigger>
           </TabsList>
 
-          {/* Unified generate + view story buttons — visible on all tabs for inbound companies */}
-          {companyAny?.source_type === "inbound" && activeTab !== "onboarding" && (
+          {/* Unified generate + view story buttons — visible on all tabs for all companies */}
+          {activeTab !== "onboarding" && (
             <div className="flex items-center gap-2">
               {storyBaseUrl && (
                 <a href={storyBaseUrl} target="_blank" rel="noopener noreferrer">
@@ -631,7 +675,7 @@ export default function CompanyDetail() {
                 {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                 {generatingCards
                   ? generateStep ? `${generateStep}…` : "Generating…"
-                  : (isInboundStoryResponse || isInboundStrategyResponse || cards.length > 0 || assets.email_sequence) ? "Regenerate All" : "Generate All"}
+                  : (isInboundStoryResponse || isInboundStrategyResponse || cards.length > 0 || assets.email_sequence || signals.length > 0) ? "Regenerate All" : "Generate All"}
               </Button>
             </div>
           )}
@@ -641,13 +685,6 @@ export default function CompanyDetail() {
         <TabsContent value="company" className="space-y-6 mt-6">
           <div className="flex items-center justify-between">
             <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Company Intel</h3>
-            {/* For outbound companies, keep the dedicated signal-search regenerate button */}
-            {companyAny?.source_type !== "inbound" && (
-              <Button size="sm" className="gap-1.5 text-[13px]" onClick={() => regenerate("full")} disabled={regenerating}>
-                {regenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                {regenerating ? "Generating…" : signals.length > 0 ? "Regenerate" : "Generate"}
-              </Button>
-            )}
           </div>
 
           {/* Company Profile */}
