@@ -125,8 +125,8 @@ function useHubspotJobs() {
           j.trigger === "hubspot_backfill" ||
           snap.action === "bulk_import" ||
           snap.action === "sync" ||
+          snap.action === "fix_missing_contacts" ||
           snap.type === "backfill" ||
-          // Manual single-company syncs store the company name in current_company
           (j.trigger === "manual" && snap.current_company != null)
         );
       });
@@ -227,6 +227,8 @@ function SyncJobSummary({ job }: { job: any }) {
           <span className="text-xs text-muted-foreground">
             {job.trigger === "hubspot_backfill"
               ? "Full backfill"
+              : snap.action === "fix_missing_contacts"
+              ? "Fix missing contacts"
               : snap.action === "bulk_import"
               ? "All companies"
               : snap.current_company
@@ -454,12 +456,29 @@ function HubSpotSyncTab() {
     },
   });
 
+  const fixContacts = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("import-from-hubspot", {
+        body: { action: "fix_missing_contacts" },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Fixing missing contacts — running in background. This may take a while.");
+      qc.invalidateQueries({ queryKey: ["hubspot_jobs"] });
+    },
+    onError: (err: any) => {
+      toast.error(`Fix contacts failed: ${err?.message || "Unknown error"}`);
+    },
+  });
+
   const activeJob = jobs.find((j: any) => j.status === "running");
   const recentJobs = jobs.slice(0, 5);
 
   // Categorise companies
   const scored = companies.filter((c: any) => c.scout_score != null);
-  const notScored = companies.filter((c: any) => c.scout_score == null);
   const withContacts = companies.filter((c: any) => c.contact_count > 0);
   const noContacts = companies.filter((c: any) => c.contact_count === 0);
 
@@ -480,21 +499,36 @@ function HubSpotSyncTab() {
 
   return (
     <div className="space-y-5">
-      {/* Header row with sync button */}
-      <div className="flex items-center justify-between">
+      {/* Header row with buttons */}
+      <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">HubSpot Sync</h2>
-        <button
-          onClick={() => triggerSync.mutate()}
-          disabled={triggerSync.isPending || !!activeJob}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {triggerSync.isPending ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <Download className="w-3.5 h-3.5" />
-          )}
-          {activeJob ? "Sync running…" : "Sync All Companies"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => fixContacts.mutate()}
+            disabled={fixContacts.isPending || !!activeJob}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-border bg-card text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            title="Fetch contacts from HubSpot for all companies that currently have none"
+          >
+            {fixContacts.isPending ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <User className="w-3.5 h-3.5" />
+            )}
+            Fix Missing Contacts
+          </button>
+          <button
+            onClick={() => triggerSync.mutate()}
+            disabled={triggerSync.isPending || !!activeJob}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {triggerSync.isPending ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Download className="w-3.5 h-3.5" />
+            )}
+            {activeJob ? "Sync running…" : "Sync All Companies"}
+          </button>
+        </div>
       </div>
 
       {/* Active job card */}

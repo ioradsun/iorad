@@ -91,6 +91,11 @@ Deno.serve(async (req) => {
       return await bulkImportCompanies(supabase, body.after || null, body.job_id || null, body.total_processed || 0);
     }
 
+    // Fix missing contacts: fetch contacts from HubSpot for companies that have none (self-chaining)
+    if (body.action === "fix_missing_contacts") {
+      return await fixMissingContacts(supabase, body.offset || 0, body.job_id || null, body.total_processed || 0);
+    }
+
     // Validate HubSpot webhook signature only when a signature header is actually present
     const signature = req.headers.get("X-HubSpot-Signature") || req.headers.get("x-hubspot-signature");
     if (signature) {
@@ -1240,6 +1245,145 @@ async function syncByHubSpotId(supabase: any, hubspotId: string) {
       auto_generating: false,
       name: company.properties?.name,
     }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+// ── Fix Missing Contacts: targeted backfill for companies with 0 contacts ─────
+// Self-chaining: processes 20 companies per invocation, uses DB offset for pagination
+async function fixMissingContacts(
+  supabase: any,
+  offset: number,
+  jobId: string | null,
+  totalProcessed: number,
+) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const apiKey = Deno.env.get("HUBSPOT_API_KEY");
+  if (!apiKey) {
+    return new Response(JSON.stringify({ error: "HUBSPOT_API_KEY not configured" }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const BATCH = 20;
+
+  // Create job record on first call
+  let currentJobId = jobId;
+  if (!currentJobId) {
+    const { data: job, error: jobErr } = await supabase
+      .from("processing_jobs")
+      .insert({
+        trigger: "manual",
+        status: "running",
+        total_companies_targeted: 0,
+        settings_snapshot: { action: "fix_missing_contacts", started: new Date().toISOString() },
+      })
+      .select("id")
+      .single();
+    if (jobErr) console.warn(`fix_missing_contacts: job insert error: ${jobErr.message}`);
+    currentJobId = job?.id || null;
+    console.log(`fix_missing_contacts: created job ${currentJobId}`);
+  }
+
+  // Fetch companies that have no contacts at all, paginated by offset
+  const { data: companies, error: fetchErr } = await supabase
+    .from("companies")
+    .select("id, name, domain, hubspot_properties")
+    .not("id", "in",
+      supabase.from("contacts").select("company_id")
+    )
+    .range(offset, offset + BATCH - 1);
+
+  // Fallback if the NOT IN subquery doesn't work — use raw approach
+  let targets: any[] = companies || [];
+  if (fetchErr || !companies) {
+    console.warn(`fix_missing_contacts: primary query failed (${fetchErr?.message}), using fallback`);
+    // Fallback: fetch all company IDs that have contacts, then exclude
+    const { data: withContacts } = await supabase
+      .from("contacts")
+      .select("company_id");
+    const withContactSet = new Set((withContacts || []).map((r: any) => r.company_id));
+
+    const { data: allCompanies } = await supabase
+      .from("companies")
+      .select("id, name, domain, hubspot_properties")
+      .range(offset, offset + BATCH - 1);
+
+    targets = (allCompanies || []).filter((c: any) => !withContactSet.has(c.id));
+  }
+
+  console.log(`fix_missing_contacts: offset=${offset}, found ${targets.length} companies without contacts`);
+
+  if (targets.length === 0) {
+    // Done — no more companies missing contacts
+    if (currentJobId) {
+      await supabase.from("processing_jobs").update({
+        status: "completed",
+        finished_at: new Date().toISOString(),
+        total_companies_targeted: totalProcessed,
+        companies_processed: totalProcessed,
+        companies_succeeded: totalProcessed,
+      }).eq("id", currentJobId);
+    }
+    console.log(`fix_missing_contacts: complete — ${totalProcessed} companies fixed`);
+    return new Response(
+      JSON.stringify({ success: true, total_fixed: totalProcessed }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  let fixed = 0;
+  let errors = 0;
+
+  for (const company of targets) {
+    try {
+      // Get HubSpot ID from stored hubspot_properties
+      const hsProps = company.hubspot_properties as any || {};
+      const hubspotId = hsProps.hs_object_id || hsProps.hubspot_id;
+      if (!hubspotId) {
+        console.warn(`fix_missing_contacts: no HubSpot ID for company ${company.name}`);
+        errors++;
+        continue;
+      }
+
+      await importContactsForCompany(supabase, hubspotId, company.id);
+      fixed++;
+      // Re-score since contacts may affect scoring
+      scoreCompanyAsync(company.id);
+    } catch (err: any) {
+      console.warn(`fix_missing_contacts: error for ${company.name}: ${err.message}`);
+      errors++;
+    }
+  }
+
+  const newTotal = totalProcessed + fixed;
+  const newOffset = offset + BATCH;
+
+  // Update job progress
+  if (currentJobId) {
+    await supabase.from("processing_jobs").update({
+      companies_processed: newTotal,
+      companies_succeeded: newTotal,
+      companies_failed: errors,
+    }).eq("id", currentJobId);
+  }
+
+  // Self-chain to next batch
+  console.log(`fix_missing_contacts: fixed=${fixed} errors=${errors} total=${newTotal}, chaining offset=${newOffset}`);
+  fetch(`${supabaseUrl}/functions/v1/import-from-hubspot`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${serviceRoleKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "fix_missing_contacts",
+      offset: newOffset,
+      job_id: currentJobId,
+      total_processed: newTotal,
+    }),
+  }).catch((e: any) => console.error("fix_missing_contacts chain error:", e.message));
+
+  return new Response(
+    JSON.stringify({ success: true, fixed, errors, total_so_far: newTotal, next_offset: newOffset, job_id: currentJobId }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 }
