@@ -555,47 +555,6 @@ Deno.serve(async (req) => {
           snapshot_status: result.snapshot_status,
         }).eq("id", company.id);
 
-        // Push to Clay for contact enrichment
-        const clayApiKey = Deno.env.get("CLAY_API_KEY");
-        const clayTableId = Deno.env.get("CLAY_TABLE_ID");
-        if (clayApiKey && clayTableId) {
-          try {
-            const clayPayload = {
-              "Company Name": company.name,
-              "Domain": company.domain || "",
-              "Industry": company.industry || "",
-              "Partner": company.partner || "",
-              "Score": result.score_total,
-              "Snapshot Status": result.snapshot_status,
-              "Executive Framing": result.snapshot_json?.outbound_positioning?.executive_framing || result.snapshot_json?.executive_narrative || "",
-              "Min Contacts": 5,
-              "Job Title Keywords": "enablement, learning, change management, L&D, education, Customer Education, Partner enablement, readiness, sales enablement, revenue enablement",
-            };
-
-            const clayUrl = clayTableId.startsWith("http")
-              ? clayTableId
-              : `https://app.clay.com/api/v1/inputs/webhook/${clayTableId}`;
-            const clayResp = await fetch(clayUrl, {
-              method: "POST",
-              headers: {
-                "Authorization": `Bearer ${clayApiKey}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(clayPayload),
-            });
-
-            if (!clayResp.ok) {
-              const errText = await clayResp.text();
-              console.error(`Clay push failed for ${company.name}: ${clayResp.status} ${errText}`);
-            } else {
-              console.log(`Pushed ${company.name} to Clay table`);
-              await supabase.from("companies").update({ clay_pushed_at: new Date().toISOString() }).eq("id", company.id);
-            }
-          } catch (clayErr: any) {
-            console.error(`Clay push error for ${company.name}: ${clayErr.message}`);
-          }
-        }
-
         // Auto-enrich contacts based on partner→persona mapping
         const partnerKey = (company.partner || "").toLowerCase();
         const autoPersona = PARTNER_PERSONA_MAP[partnerKey];
