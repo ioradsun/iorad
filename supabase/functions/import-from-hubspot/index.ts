@@ -6,6 +6,37 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Verify HubSpot webhook signature (v1: HMAC-SHA256 of clientSecret + rawBody)
+async function verifyHubSpotSignature(req: Request, rawBody: string): Promise<boolean> {
+  const clientSecret = Deno.env.get("HUBSPOT_CLIENT_SECRET");
+  if (!clientSecret) {
+    console.warn("HUBSPOT_CLIENT_SECRET not set — skipping signature validation");
+    return true; // Gracefully allow if secret not configured
+  }
+
+  const signature = req.headers.get("X-HubSpot-Signature") || req.headers.get("x-hubspot-signature");
+  if (!signature) {
+    console.warn("No HubSpot signature header found");
+    return false;
+  }
+
+  // HubSpot v1: HMAC-SHA256(clientSecret + requestBody)
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(clientSecret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sigBytes = await crypto.subtle.sign("HMAC", key, encoder.encode(clientSecret + rawBody));
+  const expectedSig = Array.from(new Uint8Array(sigBytes))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  return expectedSig === signature;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -16,12 +47,30 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    const body = await req.json();
+    const rawBody = await req.text();
+    let body: any;
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    // HubSpot webhook sends an array of events
-    // Manual trigger can send { action: "sync" } to pull recent companies
+    // Manual sync trigger — skip signature check
     if (body.action === "sync") {
       return await syncRecentCompanies(supabase);
+    }
+
+    // Validate HubSpot webhook signature for all real webhook events
+    const isValid = await verifyHubSpotSignature(req, rawBody);
+    if (!isValid) {
+      console.error("HubSpot signature validation failed — rejecting request");
+      return new Response(JSON.stringify({ error: "Invalid signature" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Handle HubSpot webhook events (array of subscription events)
@@ -32,19 +81,11 @@ Deno.serve(async (req) => {
 
     for (const event of events) {
       try {
-        // HubSpot webhook event structure
         const objectId = event.objectId;
-        if (!objectId) {
-          skipped++;
-          continue;
-        }
+        if (!objectId) { skipped++; continue; }
 
-        // Fetch company details from HubSpot API
         const company = await fetchHubSpotCompany(objectId);
-        if (!company) {
-          skipped++;
-          continue;
-        }
+        if (!company) { skipped++; continue; }
 
         const companyId = await upsertCompany(supabase, company);
         await importContactsForCompany(supabase, objectId, companyId);
