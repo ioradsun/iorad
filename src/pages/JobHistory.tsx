@@ -45,8 +45,8 @@ function useCompanyQueueData() {
 
       // "Waiting" = no story + imported within threshold + not manually cleared
       const waiting = noStory.filter((c) => new Date(c.created_at) >= cutoff && c.snapshot_status == null);
-      // "Not Started" = no story + older than threshold (pre-existing records)
-      const notStarted = noStory.filter((c) => new Date(c.created_at) < cutoff);
+      // "Not Started" = no story + older than threshold + not manually cleared
+      const notStarted = noStory.filter((c) => new Date(c.created_at) < cutoff && c.snapshot_status !== "cleared");
 
       return { completed, waiting, notStarted, failed: Array.from(failedMap.values()) };
     },
@@ -196,19 +196,27 @@ export default function JobHistory() {
           .in("status", ["running", "queued"]);
       }
 
-      // Clear ALL companies without a story (both waiting + not started)
-      const allNoStoryIds = [
-        ...waiting.map((c: any) => c.id),
-        ...notStarted.map((c: any) => c.id),
-      ].filter(Boolean);
+      // Fetch live card IDs directly — don't rely on potentially stale client state
+      const { data: cardsData } = await supabase.from("company_cards").select("company_id");
+      const cardIds = (cardsData || []).map((c: any) => c.company_id);
 
-      if (allNoStoryIds.length > 0) {
+      // Fetch all companies without a card that still have null snapshot_status
+      const { data: toClear } = await supabase
+        .from("companies")
+        .select("id")
+        .is("snapshot_status", null);
+
+      const noCardIds = (toClear || [])
+        .map((c: any) => c.id)
+        .filter((id: string) => !new Set(cardIds).has(id));
+
+      if (noCardIds.length > 0) {
         const BATCH = 500;
-        for (let i = 0; i < allNoStoryIds.length; i += BATCH) {
+        for (let i = 0; i < noCardIds.length; i += BATCH) {
           await supabase
             .from("companies")
             .update({ snapshot_status: "cleared" })
-            .in("id", allNoStoryIds.slice(i, i + BATCH));
+            .in("id", noCardIds.slice(i, i + BATCH));
         }
       }
 
@@ -217,7 +225,7 @@ export default function JobHistory() {
       await qc.invalidateQueries({ queryKey: ["company_queue_data"] });
       await qc.invalidateQueries({ queryKey: ["banner_waiting_count"] });
       toast.success(
-        `Queue cleared — ${allNoStoryIds.length} companies removed.${activeJob ? " Running job canceled." : ""}`
+        `Queue cleared — ${noCardIds.length} companies removed.${activeJob ? " Running job canceled." : ""}`
       );
     } catch (err: any) {
       toast.error(`Failed to clear: ${err?.message || "Unknown error"}`);
