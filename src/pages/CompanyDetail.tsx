@@ -214,9 +214,25 @@ export default function CompanyDetail() {
       if (data?.error) throw new Error(data.error);
       toast.success(`Signals complete — ${data?.signals_found ?? 0} found for ${data?.company || "company"}`);
 
-      // Step 2: Find contacts via Apollo (skip for inbound companies — contacts come from HubSpot)
+      // Step 2: Sync Fathom meetings (if company has a domain)
+      if (companyAny?.domain) {
+        toast.info("Syncing Fathom meetings…");
+        try {
+          const { data: fData, error: fErr } = await supabase.functions.invoke("sync-fathom", {
+            body: { domain: companyAny.domain, company_id: id },
+          });
+          if (!fErr && !fData?.error) {
+            toast.success(`Fathom synced — ${fData?.meetings_synced ?? 0} meetings`);
+            queryClient.invalidateQueries({ queryKey: ["meetings", id] });
+          }
+        } catch (fe: any) {
+          console.warn("Fathom sync non-fatal:", fe.message);
+        }
+      }
+
+      // Step 3: Find contacts via Apollo (skip for inbound companies — contacts come from HubSpot)
       if (companyAny?.source_type !== "inbound") {
-        toast.info("Step 2/2 — Finding contacts via Apollo…");
+        toast.info("Step 3/3 — Finding contacts via Apollo…");
         setFindingContacts(true);
         try {
           const { data: contactData, error: contactErr } = await supabase.functions.invoke("find-contacts", { body: { company_id: id } });
