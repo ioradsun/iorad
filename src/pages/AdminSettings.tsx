@@ -167,6 +167,76 @@ function PeopleTab() {
 }
 
 // ─── APPEARANCE TAB ───
+
+function getCSSVarValue(name: string) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function exportAppStylesheet(theme: string) {
+  const tokens = [
+    "--background", "--foreground",
+    "--card", "--card-foreground",
+    "--popover", "--popover-foreground",
+    "--primary", "--primary-foreground",
+    "--secondary", "--secondary-foreground",
+    "--muted", "--muted-foreground",
+    "--accent", "--accent-foreground",
+    "--destructive", "--destructive-foreground",
+    "--border", "--input", "--ring",
+    "--success", "--success-foreground",
+    "--warning", "--warning-foreground",
+    "--info", "--info-foreground",
+    "--score-high", "--score-medium", "--score-low",
+    "--radius",
+    "--font-display", "--font-body",
+  ];
+
+  const lines = tokens.map(t => {
+    const val = getCSSVarValue(t);
+    return `  ${t}: ${val};`;
+  });
+
+  const css = `/* iorad Scout — App Stylesheet Export\n * Theme: ${theme === "light" ? "Clean Light" : "iorad Dark"}\n * Exported: ${new Date().toISOString()}\n */\n\n:root {\n${lines.join("\n")}\n}\n`;
+
+  const blob = new Blob([css], { type: "text/css" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `iorad-app-theme-${theme}-${new Date().toISOString().slice(0, 10)}.css`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast.success("App stylesheet exported");
+}
+
+function exportStoryStylesheet(theme: string) {
+  const tokens = [
+    "--story-bg", "--story-fg",
+    "--story-muted", "--story-subtle",
+    "--story-border", "--story-surface",
+    "--story-accent", "--story-accent-dim",
+    "--story-accent-border", "--story-accent-strong",
+    "--story-gradient-from", "--story-gradient-to",
+    "--story-cta-bg", "--story-cta-fg", "--story-cta-hover",
+    "--story-btn-bg", "--story-btn-fg",
+  ];
+
+  const lines = tokens.map(t => {
+    const val = getCSSVarValue(t);
+    return `  ${t}: ${val};`;
+  });
+
+  const css = `/* iorad Scout — Story Microsite Stylesheet Export\n * Theme: ${theme === "light" ? "Clean Light" : "iorad Dark"}\n * Exported: ${new Date().toISOString()}\n */\n\n:root {\n${lines.join("\n")}\n}\n`;
+
+  const blob = new Blob([css], { type: "text/css" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `iorad-story-theme-${theme}-${new Date().toISOString().slice(0, 10)}.css`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast.success("Story stylesheet exported");
+}
+
 function AppearanceTab() {
   const { theme, setTheme } = useTheme();
   return (
@@ -199,6 +269,49 @@ function AppearanceTab() {
             <span className="text-sm font-medium">Clean Light</span>
             <span className="text-xs text-muted-foreground">Light, corporate theme</span>
           </button>
+        </div>
+      </div>
+
+      <div className="panel space-y-4">
+        <div className="panel-header">Export Stylesheets</div>
+        <p className="text-xs text-muted-foreground">
+          Download the current theme's CSS variables as ready-to-use stylesheet files.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-lg border border-border bg-secondary/30 p-4 space-y-3">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">App Stylesheet</p>
+              <p className="text-xs text-muted-foreground">
+                All design tokens for the Scout admin app — backgrounds, typography, primary colours, status badges.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full gap-2"
+              onClick={() => exportAppStylesheet(theme)}
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export app.css
+            </Button>
+          </div>
+          <div className="rounded-lg border border-border bg-secondary/30 p-4 space-y-3">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Story Stylesheet</p>
+              <p className="text-xs text-muted-foreground">
+                All <code className="text-primary">--story-*</code> tokens for the public ABM microsite — backgrounds, accents, CTAs, gradients.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full gap-2"
+              onClick={() => exportStoryStylesheet(theme)}
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export story.css
+            </Button>
+          </div>
         </div>
       </div>
     </div>
