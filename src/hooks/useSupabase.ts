@@ -152,15 +152,10 @@ export function useProcessingJobs() {
       if (error) throw error;
       return data as DbProcessingJob[];
     },
-    refetchInterval: (query) => {
-      const jobs = query.state.data as DbProcessingJob[] | undefined;
-      const hasRunning = jobs?.some(j => j.status === "running");
-      return hasRunning ? 5000 : false;
-    },
   });
 }
 
-// ---- Active running batch job (for persistent status banner — real batches only) ----
+// ---- Active running job (for persistent banner across all pages) ----
 export function useActiveJob() {
   return useQuery({
     queryKey: ["active_job"],
@@ -169,7 +164,6 @@ export function useActiveJob() {
         .from("processing_jobs")
         .select("*")
         .eq("status", "running")
-        .gt("total_companies_targeted", 1)
         .order("started_at", { ascending: false })
         .limit(1)
         .maybeSingle();

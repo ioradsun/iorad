@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAppSettings, useUpdateSettings, useActiveJob, DbAppSettings } from "@/hooks/useSupabase";
+import { useAppSettings, useUpdateSettings, DbAppSettings } from "@/hooks/useSupabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1117,7 +1117,7 @@ function PartnersTab() {
 
 // ─── BULK GENERATE PANEL ───
 interface BulkCompany { id: string; name: string; source_type: string }
-interface BulkResult { id: string; name: string; status: "done" | "error" | "skipped"; message?: string }
+interface BulkResult { id: string; name: string; status: "done" | "error"; message?: string }
 
 function BulkGeneratePanel() {
   const [running, setRunning] = useState(false);
@@ -1126,27 +1126,15 @@ function BulkGeneratePanel() {
   const [current, setCurrent] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState<string | null>(null);
   const [loadingList, setLoadingList] = useState(false);
+  const [jobId, setJobId] = useState<string | null>(null);
   const abortRef = useRef(false);
-
-  // Reconnect to a running job when admin navigates back or re-logs in
-  const { data: activeJob } = useActiveJob();
-  const isRunningInBackground = !running && !!activeJob;
 
   const loadMissingStories = async () => {
     setLoadingList(true);
     try {
-      // Get all company IDs that already have a company_cards row
-      const { data: cardsRows } = await supabase
-        .from("company_cards")
-        .select("company_id");
+      const { data: cardsRows } = await supabase.from("company_cards").select("company_id");
       const existingIds = new Set((cardsRows || []).map((r: any) => r.company_id));
-
-      // Get all companies
-      const { data: allCompanies } = await supabase
-        .from("companies")
-        .select("id, name, source_type")
-        .order("name");
-
+      const { data: allCompanies } = await supabase.from("companies").select("id, name, source_type").order("name");
       const missing = (allCompanies || []).filter((c: any) => !existingIds.has(c.id));
       setCompanies(missing);
       setResults([]);
@@ -1157,13 +1145,11 @@ function BulkGeneratePanel() {
     }
   };
 
-  // Helper: invoke with 1 auto-retry on transient network errors
   const invokeWithRetry = async (fn: string, body: object, retries = 1): Promise<{ data: any; error: any }> => {
     for (let attempt = 0; attempt <= retries; attempt++) {
       const result = await supabase.functions.invoke(fn, { body });
       const isNetworkErr = result.error?.message?.includes("Failed to send a request");
       if (!isNetworkErr || attempt === retries) return result;
-      // Wait 2s before retrying
       await new Promise(r => setTimeout(r, 2000));
     }
     return { data: null, error: new Error("Max retries exceeded") };
@@ -1174,18 +1160,50 @@ function BulkGeneratePanel() {
     abortRef.current = false;
     setRunning(true);
     setResults([]);
+    setCurrent(null);
+    setCurrentStep(null);
 
-    // Use a local accumulator so we can pass accurate results to the notification
+    // Create ONE processing_jobs row for the entire run
+    const { data: jobRow, error: jobErr } = await supabase
+      .from("processing_jobs")
+      .insert({
+        status: "running",
+        trigger: "manual",
+        total_companies_targeted: companies.length,
+        companies_processed: 0,
+        companies_succeeded: 0,
+        companies_failed: 0,
+      })
+      .select()
+      .single();
+
+    if (jobErr || !jobRow) {
+      toast.error("Failed to create job record");
+      setRunning(false);
+      return;
+    }
+    setJobId(jobRow.id);
+
     const localResults: BulkResult[] = [];
+    let succeeded = 0;
+    let failed = 0;
 
     for (const company of companies) {
       if (abortRef.current) break;
       setCurrent(company.name);
 
+      // 1-minute delay between companies (except first)
+      if (localResults.length > 0) {
+        for (let s = 0; s < 60; s++) {
+          if (abortRef.current) break;
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      }
+      if (abortRef.current) break;
+
       try {
         const isInbound = company.source_type === "inbound";
 
-        // Step 1: Signals (outbound only)
         if (!isInbound) {
           setCurrentStep("Signals");
           const { data: sigData, error: sigErr } = await invokeWithRetry("run-signals", { company_id: company.id, mode: "full" });
@@ -1193,58 +1211,71 @@ function BulkGeneratePanel() {
           if (sigData?.error) throw new Error(sigData.error);
         }
 
-        // Step 2: Contacts via Apollo (outbound only)
         if (!isInbound) {
           setCurrentStep("Contacts");
           await invokeWithRetry("find-contacts", { company_id: company.id });
         }
 
-        // Step 3: Contact profiles (inbound)
         if (isInbound) {
           setCurrentStep("Profiles");
           await invokeWithRetry("extract-contact-profile", { company_id: company.id });
         }
 
-        // Step 4: Generate all content tabs
         const tabs = ["company", "strategy", "outreach", "story"];
         for (const tab of tabs) {
           if (abortRef.current) break;
-          setCurrentStep(`${tab.charAt(0).toUpperCase() + tab.slice(1)}`);
+          setCurrentStep(tab.charAt(0).toUpperCase() + tab.slice(1));
           const { data, error } = await invokeWithRetry("generate-cards", { company_id: company.id, tab });
           if (error) throw new Error(error.message || `${tab} generation failed`);
           if (data?.error) throw new Error(data.error);
         }
 
+        succeeded++;
         const result: BulkResult = { id: company.id, name: company.name, status: "done" };
         localResults.push(result);
         setResults(prev => [...prev, result]);
       } catch (e: any) {
+        failed++;
         const result: BulkResult = { id: company.id, name: company.name, status: "error", message: e.message };
         localResults.push(result);
         setResults(prev => [...prev, result]);
       }
+
+      // Update the single job row after each company
+      await supabase.from("processing_jobs").update({
+        companies_processed: localResults.length,
+        companies_succeeded: succeeded,
+        companies_failed: failed,
+      }).eq("id", jobRow.id);
     }
+
+    // Mark the job done
+    const finalStatus = abortRef.current ? "canceled" : "completed";
+    await supabase.from("processing_jobs").update({
+      status: finalStatus,
+      finished_at: new Date().toISOString(),
+      companies_processed: localResults.length,
+      companies_succeeded: succeeded,
+      companies_failed: failed,
+    }).eq("id", jobRow.id);
 
     setCurrent(null);
     setCurrentStep(null);
     setRunning(false);
+    setJobId(null);
 
-    // Send email notification to admins using accurate local results
-    const doneCount = localResults.filter(r => r.status === "done").length;
-    const errorCount = localResults.filter(r => r.status === "error").length;
+    // Send notification
     try {
       await supabase.functions.invoke("send-notification", {
         body: {
-          subject: `Bulk Story Generation Complete — ${doneCount} succeeded, ${errorCount} failed`,
+          subject: `Story Generation Complete — ${succeeded} succeeded, ${failed} failed`,
           results: localResults,
         },
       });
-      console.log("Admin notification sent");
     } catch (notifErr) {
       console.warn("Notification send failed (non-fatal):", notifErr);
     }
 
-    // Reload list to show what's still missing
     await loadMissingStories();
   };
 
@@ -1261,27 +1292,16 @@ function BulkGeneratePanel() {
         <span className="text-[11px] font-normal text-muted-foreground font-mono">Runs inbound + outbound</span>
       </div>
       <p className="text-xs text-muted-foreground leading-relaxed">
-        Finds every company with no story generated yet and runs the full pipeline (Signals → Contacts → Company Intel → Strategy → Outreach → Story) one at a time.
+        Finds every company with no story generated yet and runs the full pipeline one at a time with a 1-minute delay between each.
       </p>
-
-      {/* Background job reconnect banner */}
-      {isRunningInBackground && (
-        <div className="flex items-center gap-2.5 text-xs px-3 py-2.5 rounded-md" style={{ background: "hsl(var(--primary) / 0.08)", color: "hsl(var(--primary))", border: "1px solid hsl(var(--primary) / 0.2)" }}>
-          <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
-          <div className="flex-1">
-            <span className="font-medium">Batch job is running</span>
-            <span className="text-muted-foreground ml-1">— {activeJob!.companies_processed} / {activeJob!.total_companies_targeted} companies processed ({activeJob!.companies_succeeded} done{activeJob!.companies_failed > 0 ? `, ${activeJob!.companies_failed} failed` : ""})</span>
-          </div>
-        </div>
-      )}
 
       {/* Load / action buttons */}
       <div className="flex items-center gap-2">
-        <Button size="sm" variant="outline" onClick={loadMissingStories} disabled={loadingList || running || isRunningInBackground} className="gap-1.5">
+        <Button size="sm" variant="outline" onClick={loadMissingStories} disabled={loadingList || running} className="gap-1.5">
           {loadingList ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <AlertCircle className="w-3.5 h-3.5" />}
           {companies.length > 0 ? `${companies.length} companies need stories` : "Check Missing Stories"}
         </Button>
-        {companies.length > 0 && !running && !isRunningInBackground && (
+        {companies.length > 0 && !running && (
           <Button size="sm" onClick={runAll} className="gap-1.5">
             <Play className="w-3.5 h-3.5" /> Run {companies.length} Companies
           </Button>
@@ -1296,14 +1316,12 @@ function BulkGeneratePanel() {
       {/* Progress */}
       {(running || results.length > 0) && (
         <div className="space-y-2">
-          {/* Summary bar */}
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
             <span className="text-foreground font-medium">{done + errors} / {total}</span>
             {done > 0 && <span className="text-primary flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" />{done} done</span>}
             {errors > 0 && <span className="text-destructive flex items-center gap-1"><XCircle className="w-3.5 h-3.5" />{errors} failed</span>}
           </div>
 
-          {/* Progress bar */}
           <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden">
             <div
               className="h-full bg-primary rounded-full transition-all duration-300"
@@ -1311,15 +1329,16 @@ function BulkGeneratePanel() {
             />
           </div>
 
-          {/* Current company */}
           {current && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="w-3.5 h-3.5 animate-spin text-primary flex-shrink-0" />
-              <span className="truncate"><span className="text-foreground font-medium">{current}</span>{currentStep && <span> — {currentStep}…</span>}</span>
+              <span className="truncate">
+                <span className="text-foreground font-medium">{current}</span>
+                {currentStep && <span> — {currentStep}…</span>}
+              </span>
             </div>
           )}
 
-          {/* Results log (scroll after 5) */}
           {results.length > 0 && (
             <div className="max-h-[200px] overflow-y-auto space-y-1 mt-1 pr-1">
               {[...results].reverse().map(r => (

@@ -1,11 +1,56 @@
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Loader2, CheckCircle2, XCircle, Clock, AlertTriangle } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useProcessingJobs, useJobItems } from "@/hooks/useSupabase";
-import { Clock, ChevronRight, AlertTriangle, CheckCircle2, Loader2, Zap, Users, Activity } from "lucide-react";
-import { motion } from "framer-motion";
-import { useState, useMemo } from "react";
-import StatusBadge from "@/components/StatusBadge";
 
-// ── Helpers ────────────────────────────────────────────────────────
+// How many companies have no story yet
+function useMissingStoriesCount() {
+  return useQuery({
+    queryKey: ["missing_stories_count"],
+    queryFn: async () => {
+      const { data: cards } = await supabase.from("company_cards").select("company_id");
+      const existingIds = new Set((cards || []).map((r: any) => r.company_id));
+      const { count } = await supabase.from("companies").select("id", { count: "exact", head: true });
+      return (count ?? 0) - existingIds.size;
+    },
+    refetchInterval: 10_000,
+  });
+}
+
+// The single active running job (if any)
+function useActiveRunningJob() {
+  return useQuery({
+    queryKey: ["active_running_job"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("processing_jobs")
+        .select("*")
+        .eq("status", "running")
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    refetchInterval: (q) => (q.state.data ? 5_000 : 10_000),
+  });
+}
+
+// Recent completed/canceled runs
+function useRecentJobs() {
+  return useQuery({
+    queryKey: ["recent_jobs"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("processing_jobs")
+        .select("*")
+        .in("status", ["completed", "canceled", "failed"])
+        .order("started_at", { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleString("en-US", {
@@ -18,264 +63,151 @@ function fmtDuration(start: string, end: string | null) {
   if (!end) return null;
   const ms = new Date(end).getTime() - new Date(start).getTime();
   if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
-  return `${Math.round(ms / 60_000)}m`;
+  const mins = Math.floor(ms / 60_000);
+  const hrs = Math.floor(mins / 60);
+  if (hrs > 0) return `${hrs}h ${mins % 60}m`;
+  return `${mins}m`;
 }
-
-// ── Group jobs that are really individual per-company auto-triggers ──
-// A "batch" job has total_companies_targeted > 1.
-// A "single" job has total_companies_targeted <= 1 (HubSpot auto-trigger).
-function categoriseJobs(jobs: any[]) {
-  const batches = jobs.filter(j => (j.total_companies_targeted ?? 0) > 1);
-  const singles = jobs.filter(j => (j.total_companies_targeted ?? 0) <= 1);
-  return { batches, singles };
-}
-
-// ── Main page ──────────────────────────────────────────────────────
 
 export default function JobHistory() {
-  const { data: jobs = [], isLoading } = useProcessingJobs();
-  const [expandedJob, setExpandedJob] = useState<string | null>(null);
-  const [showAllSingles, setShowAllSingles] = useState(false);
+  const { data: missingCount, isLoading: loadingCount } = useMissingStoriesCount();
+  const { data: activeJob, isLoading: loadingActive } = useActiveRunningJob();
+  const { data: recentJobs = [], isLoading: loadingRecent } = useRecentJobs();
 
-  const { batches, singles } = useMemo(() => categoriseJobs(jobs), [jobs]);
-
-  // Summarise the singles as one aggregate row
-  const singlesSummary = useMemo(() => {
-    if (!singles.length) return null;
-    const succeeded = singles.filter(j => j.companies_succeeded > 0).length;
-    const failed = singles.filter(j => j.companies_failed > 0).length;
-    const latest = singles[0];
-    return { succeeded, failed, total: singles.length, latest };
-  }, [singles]);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
-      </div>
-    );
-  }
+  const isLoading = loadingCount || loadingActive || loadingRecent;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-2xl mx-auto space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Processing Jobs</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Batch runs and per-company auto-triggers from HubSpot.
-        </p>
+        <h1 className="text-2xl font-bold tracking-tight">Processing Status</h1>
+        <p className="text-sm text-muted-foreground mt-1">Story generation progress</p>
       </div>
 
-      {jobs.length === 0 && (
-        <div className="panel text-center py-12 text-muted-foreground text-sm">
-          No processing jobs yet. Run a signal scan to get started.
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
         </div>
-      )}
+      ) : (
+        <div className="space-y-6">
 
-      {/* ── HubSpot Auto-trigger Summary ── */}
-      {singlesSummary && (
-        <section className="space-y-2">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            <Zap className="w-3.5 h-3.5" />
-            HubSpot Auto-triggers
+          {/* ── Missing stories count ── */}
+          <div className="panel flex items-center justify-between">
+            <div>
+              <div className="text-sm font-medium text-muted-foreground">Companies without stories</div>
+              <div className="text-3xl font-bold tracking-tight mt-0.5">
+                {missingCount ?? "—"}
+              </div>
+            </div>
+            <Link
+              to="/settings?tab=processing"
+              className="text-xs text-primary hover:underline underline-offset-2"
+            >
+              Generate stories →
+            </Link>
           </div>
-          <div className="panel">
-            <div className="flex items-start justify-between gap-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2.5">
-                  <Users className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                  <span className="text-sm font-medium">
-                    {singlesSummary.total} companies auto-processed from HubSpot
+
+          {/* ── Active job ── */}
+          {activeJob ? (
+            <div className="panel space-y-3">
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                <span className="font-semibold text-sm">Running now</span>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>
+                    <span className="text-foreground font-medium">{activeJob.companies_processed}</span>
+                    {" / "}
+                    <span className="text-foreground font-medium">{activeJob.total_companies_targeted}</span>
+                    {" companies processed"}
+                  </span>
+                  <span>
+                    {activeJob.companies_succeeded > 0 && (
+                      <span className="text-primary">{activeJob.companies_succeeded} done</span>
+                    )}
+                    {activeJob.companies_failed > 0 && (
+                      <span className="text-destructive ml-2">{activeJob.companies_failed} failed</span>
+                    )}
                   </span>
                 </div>
-                <div className="text-xs text-muted-foreground pl-6">
-                  {singlesSummary.succeeded} succeeded
-                  {singlesSummary.failed > 0 && (
-                    <span className="text-destructive ml-2">· {singlesSummary.failed} failed</span>
-                  )}
-                  {" · "}Last: {fmtDate(singlesSummary.latest.started_at)}
+                <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: activeJob.total_companies_targeted > 0
+                        ? `${Math.round((activeJob.companies_processed / activeJob.total_companies_targeted) * 100)}%`
+                        : "0%",
+                      background: "hsl(var(--primary))",
+                    }}
+                  />
                 </div>
               </div>
-              <button
-                onClick={() => setShowAllSingles(v => !v)}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 flex-shrink-0 mt-0.5"
-              >
-                {showAllSingles ? "Hide" : "Show all"}
-                <ChevronRight className={`w-3.5 h-3.5 transition-transform ${showAllSingles ? "rotate-90" : ""}`} />
-              </button>
-            </div>
 
-            {showAllSingles && (
-              <div className="mt-4 border-t pt-3 space-y-1 max-h-72 overflow-y-auto">
-                {singles.map(job => (
-                  <SingleJobRow key={job.id} job={job} />
-                ))}
+              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                Started {fmtDate(activeJob.started_at)}
               </div>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* ── Batch Jobs ── */}
-      {batches.length > 0 && (
-        <section className="space-y-2">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            <Activity className="w-3.5 h-3.5" />
-            Batch Runs
-          </div>
-          <div className="space-y-3">
-            {batches.map(job => (
-              <BatchJobCard
-                key={job.id}
-                job={job}
-                expanded={expandedJob === job.id}
-                onToggle={() => setExpandedJob(expandedJob === job.id ? null : job.id)}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-    </div>
-  );
-}
-
-// ── Single (per-company) job row ───────────────────────────────────
-
-function SingleJobRow({ job }: { job: any }) {
-  const duration = fmtDuration(job.started_at, job.finished_at);
-  return (
-    <div className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-secondary/40 text-sm">
-      <div className="flex items-center gap-2">
-        {job.status === "running" ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin text-primary flex-shrink-0" />
-        ) : job.companies_failed > 0 ? (
-          <AlertTriangle className="w-3.5 h-3.5 text-destructive flex-shrink-0" />
-        ) : (
-          <CheckCircle2 className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-        )}
-        <span className="text-foreground">{fmtDate(job.started_at)}</span>
-      </div>
-      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-        {duration && <span>{duration}</span>}
-        <StatusBadge status={job.status} />
-      </div>
-    </div>
-  );
-}
-
-// ── Batch job card ─────────────────────────────────────────────────
-
-function BatchJobCard({ job, expanded, onToggle }: { job: any; expanded: boolean; onToggle: () => void }) {
-  const { data: items = [] } = useJobItems(expanded ? job.id : undefined);
-  const duration = fmtDuration(job.started_at, job.finished_at);
-  const isRunning = job.status === "running";
-
-  const pct = job.total_companies_targeted > 0
-    ? Math.round((job.companies_processed / job.total_companies_targeted) * 100)
-    : 0;
-
-  return (
-    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="panel overflow-hidden">
-      <button onClick={onToggle} className="w-full flex items-center justify-between gap-4">
-        {/* Left: status + label */}
-        <div className="flex items-center gap-3 min-w-0">
-          {isRunning
-            ? <Loader2 className="w-4 h-4 animate-spin text-primary flex-shrink-0" />
-            : job.status === "failed"
-            ? <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0" />
-            : <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
-          }
-          <div className="text-left min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold">
-                {isRunning ? "Running" : "Batch Complete"}
-              </span>
-              <StatusBadge status={job.status} />
             </div>
-            <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
-              <Clock className="w-3 h-3" />
-              {fmtDate(job.started_at)}
-              {duration && <span>· {duration}</span>}
-            </div>
-          </div>
-        </div>
-
-        {/* Right: progress */}
-        <div className="flex items-center gap-4 flex-shrink-0">
-          <div className="text-right hidden sm:block">
-            <div className="text-xs font-mono">
-              <span className="text-foreground font-semibold">{job.companies_succeeded}</span>
-              <span className="text-muted-foreground"> / {job.total_companies_targeted} companies</span>
-            </div>
-            {job.companies_failed > 0 && (
-              <div className="text-xs text-destructive">{job.companies_failed} failed</div>
-            )}
-          </div>
-          <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`} />
-        </div>
-      </button>
-
-      {/* Progress bar — only while running */}
-      {isRunning && job.total_companies_targeted > 0 && (
-        <div className="mt-3 space-y-1">
-          <div className="w-full h-1.5 rounded-full bg-secondary overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{ width: `${pct}%`, background: "hsl(var(--primary))" }}
-            />
-          </div>
-          <div className="text-xs text-muted-foreground">{pct}% — {job.companies_processed} processed</div>
-        </div>
-      )}
-
-      {/* Error summary */}
-      {job.error_summary && (
-        <div className="mt-3 flex items-start gap-2 text-xs text-destructive/80 bg-destructive/10 rounded p-2">
-          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />{job.error_summary}
-        </div>
-      )}
-
-      {/* Per-company items */}
-      {expanded && (
-        <motion.div
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: "auto", opacity: 1 }}
-          className="mt-4 border-t pt-3"
-        >
-          {items.length === 0 ? (
-            <p className="text-xs text-muted-foreground py-2">No company-level records for this job.</p>
           ) : (
-            <div className="space-y-0.5 max-h-80 overflow-y-auto">
-              {items.map((item: any) => (
-                <div key={item.id} className="flex items-center justify-between text-sm py-1.5 px-2 rounded hover:bg-secondary/30">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    {item.status === "succeeded"
-                      ? <CheckCircle2 className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-                      : item.status === "failed"
-                      ? <AlertTriangle className="w-3.5 h-3.5 text-destructive flex-shrink-0" />
-                      : <Clock className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />}
-                    <Link
-                      to={`/company/${item.company_id}`}
-                      className="hover:text-primary transition-colors truncate"
-                      onClick={e => e.stopPropagation()}
-                    >
-                      {item.companies?.name || item.company_id}
-                    </Link>
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground flex-shrink-0">
-                    <span className="font-mono">{item.signals_found_count} signals</span>
-                    {item.snapshot_status && <StatusBadge status={item.snapshot_status} />}
-                    {item.error_message && (
-                      <span className="text-destructive max-w-[180px] truncate" title={item.error_message}>
-                        {item.error_message}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
+            <div className="panel text-center py-8 text-muted-foreground text-sm">
+              No active run. Start one from{" "}
+              <Link to="/settings?tab=processing" className="text-primary hover:underline">
+                Admin → Processing
+              </Link>.
             </div>
           )}
-        </motion.div>
+
+          {/* ── Recent runs ── */}
+          {recentJobs.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Recent Runs
+              </div>
+              <div className="panel divide-y divide-border/50">
+                {recentJobs.map((job: any) => {
+                  const duration = fmtDuration(job.started_at, job.finished_at);
+                  const pct = job.total_companies_targeted > 0
+                    ? Math.round((job.companies_succeeded / job.total_companies_targeted) * 100)
+                    : 0;
+
+                  return (
+                    <div key={job.id} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        {job.status === "completed" && job.companies_failed === 0
+                          ? <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
+                          : job.status === "failed"
+                          ? <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0" />
+                          : job.status === "canceled"
+                          ? <XCircle className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                          : <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
+                        }
+                        <div className="min-w-0">
+                          <div className="text-sm text-muted-foreground">{fmtDate(job.started_at)}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground flex-shrink-0">
+                        <span className="font-mono">
+                          <span className="text-foreground">{job.companies_succeeded}</span>
+                          /{job.total_companies_targeted}
+                          {job.companies_failed > 0 && (
+                            <span className="text-destructive ml-1">({job.companies_failed} failed)</span>
+                          )}
+                        </span>
+                        {duration && <span>{duration}</span>}
+                        {job.status === "canceled" && (
+                          <span className="text-muted-foreground italic">canceled</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+        </div>
       )}
-    </motion.div>
+    </div>
   );
 }
