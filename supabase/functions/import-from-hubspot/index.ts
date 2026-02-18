@@ -63,6 +63,11 @@ Deno.serve(async (req) => {
       return await syncRecentCompanies(supabase);
     }
 
+    // Per-company sync — triggered from Company Detail page
+    if (body.action === "sync_company") {
+      return await syncSingleCompany(supabase, body.domain, body.company_id);
+    }
+
     // Validate HubSpot webhook signature only when a signature header is actually present
     const signature = req.headers.get("X-HubSpot-Signature") || req.headers.get("x-hubspot-signature");
     if (signature) {
@@ -560,5 +565,105 @@ async function importWebAnalyticsEvents(
     }
   } catch (err: any) {
     console.warn(`Web analytics import error for contact ${hubspotContactId}: ${err.message}`);
+  }
+}
+
+// ── Sync a single company by domain — called from Company Detail page ──────
+async function syncSingleCompany(supabase: any, domain: string | undefined, companyId: string | undefined) {
+  const apiKey = Deno.env.get("HUBSPOT_API_KEY");
+  if (!apiKey) {
+    return new Response(JSON.stringify({ error: "HUBSPOT_API_KEY not configured" }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  if (!domain && !companyId) {
+    return new Response(JSON.stringify({ error: "domain or company_id required" }), {
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  try {
+    // Search HubSpot by domain
+    const allProps = await getAllCompanyPropertyNames(apiKey);
+    const searchBody = {
+      filterGroups: [
+        { filters: [{ propertyName: "domain", operator: "EQ", value: domain }] },
+      ],
+      properties: allProps.length > 0 ? allProps : ["name", "domain", "lifecyclestage", "numberofemployees", "industry"],
+      limit: 1,
+    };
+
+    const hsRes = await fetch("https://api.hubapi.com/crm/v3/objects/companies/search", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(searchBody),
+    });
+
+    if (!hsRes.ok) {
+      const text = await hsRes.text();
+      throw new Error(`HubSpot search failed [${hsRes.status}]: ${text.slice(0, 300)}`);
+    }
+
+    const hsData = await hsRes.json();
+    const hsCompany = hsData.results?.[0];
+
+    if (!hsCompany) {
+      return new Response(
+        JSON.stringify({ success: true, found: false, message: `No HubSpot record found for domain: ${domain}` }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const props = hsCompany.properties || {};
+    const lifecycle = (props.lifecyclestage || "").toLowerCase();
+    const isCustomer = lifecycle === "customer" || lifecycle === "evangelist";
+
+    // Update company record
+    if (companyId) {
+      const updates: Record<string, any> = {
+        hubspot_properties: props,
+        ...(isCustomer ? { is_existing_customer: true } : {}),
+        ...(props.industry ? { industry: props.industry } : {}),
+        ...(props.numberofemployees ? { headcount: parseInt(String(props.numberofemployees), 10) || undefined } : {}),
+      };
+      await supabase.from("companies").update(updates).eq("id", companyId);
+      console.log(`sync_company: updated ${domain} (customer: ${isCustomer}, lifecycle: ${lifecycle})`);
+
+      // Import associated contacts
+      let contactsImported = 0;
+      try {
+        await importContactsForCompany(supabase, hsCompany.id, companyId);
+        const { count } = await supabase
+          .from("contacts")
+          .select("id", { count: "exact", head: true })
+          .eq("company_id", companyId)
+          .eq("source", "hubspot");
+        contactsImported = count || 0;
+      } catch (ce: any) {
+        console.warn(`Contact import error: ${ce.message}`);
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          found: true,
+          is_existing_customer: isCustomer,
+          lifecycle_stage: lifecycle,
+          contacts_imported: contactsImported,
+          hubspot_id: hsCompany.id,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({ success: true, found: true, is_existing_customer: isCustomer, lifecycle_stage: lifecycle }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (err: any) {
+    console.error("syncSingleCompany error:", err);
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 }

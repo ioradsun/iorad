@@ -30,6 +30,42 @@ serve(async (req) => {
       .single();
     if (compErr || !company) throw new Error(compErr?.message || "Company not found");
 
+    // ── HubSpot customer check (outbound only) ─────────────────────────────
+    // Run before generating so the AI gets accurate is_existing_customer context
+    if (company.source_type !== "inbound" && company.domain) {
+      try {
+        const hubspotKey = Deno.env.get("HUBSPOT_API_KEY");
+        if (hubspotKey) {
+          const hsRes = await fetch("https://api.hubapi.com/crm/v3/objects/companies/search", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${hubspotKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              filterGroups: [{ filters: [{ propertyName: "domain", operator: "EQ", value: company.domain }] }],
+              properties: ["name", "domain", "lifecyclestage"],
+              limit: 1,
+            }),
+          });
+          if (hsRes.ok) {
+            const hsData = await hsRes.json();
+            const hsCompany = hsData.results?.[0];
+            if (hsCompany) {
+              const lifecycle = (hsCompany.properties?.lifecyclestage || "").toLowerCase();
+              const isCustomer = lifecycle === "customer" || lifecycle === "evangelist";
+              if (isCustomer) {
+                await sb.from("companies").update({ is_existing_customer: true }).eq("id", company_id);
+                company.is_existing_customer = true;
+                console.log(`HubSpot: ${company.name} flagged as existing customer (lifecycle: ${lifecycle})`);
+              }
+            }
+          } else {
+            console.warn(`HubSpot check failed [${hsRes.status}] for ${company.domain}`);
+          }
+        }
+      } catch (hsErr: any) {
+        console.warn(`HubSpot customer check error: ${hsErr.message}`);
+      }
+    }
+
     // Step 0: Extract contact profiles (Pass 1) for any contacts with HubSpot data but no profile yet
     const { data: unprofiledContacts } = await sb
       .from("contacts")
