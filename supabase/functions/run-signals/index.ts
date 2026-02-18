@@ -23,6 +23,115 @@ interface CompanyRow {
   industry: string | null;
   partner: string | null;
   persona: string | null;
+  source_type: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INBOUND BEHAVIORAL SCORING (mirrors extract-contact-profile logic)
+// Aggregates scores across all contacts for a company and returns best/avg.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface InboundScoreResult {
+  best_score: number;
+  avg_score: number;
+  best_tier: number;
+  best_tier_label: string;
+  contacts_scored: number;
+}
+
+function daysSinceStr(isoString: string | null | undefined): number | null {
+  if (!isoString) return null;
+  const ts = new Date(isoString).getTime();
+  if (isNaN(ts)) return null;
+  return Math.floor((Date.now() - ts) / (1000 * 60 * 60 * 24));
+}
+
+function scoreContact(hp: Record<string, any>): number {
+  let score = 0;
+
+  // 1. Engagement (max 25)
+  const pageViews = parseInt(hp.hs_analytics_num_page_views || hp.num_page_views || "0", 10) || 0;
+  let eng = pageViews >= 50 ? 15 : pageViews >= 20 ? 10 : pageViews >= 5 ? 5 : 2;
+  const lastVisit = daysSinceStr(hp.hs_analytics_last_visit_timestamp);
+  if (lastVisit !== null && lastVisit <= 7) eng += 5;
+  const lastEmail = daysSinceStr(hp.hs_email_last_engagement);
+  if (lastEmail !== null && lastEmail <= 14) eng += 5;
+  score += Math.min(25, eng);
+
+  // 2. Conversion (max 20)
+  const convDays = daysSinceStr(hp.recent_conversion_date);
+  if (convDays !== null && convDays <= 14) {
+    const ev = (hp.recent_conversion_event_name || "").toLowerCase();
+    if (ev.includes("demo")) score += 20;
+    else if (ev.includes("pric") || ev.includes("upgrad") || ev.includes("plan")) score += 15;
+    else if (ev.includes("download") || ev.includes("resource") || ev.includes("guide")) score += 10;
+    else score += 5;
+  }
+
+  // 3. Commercial (max 20)
+  const lc = (hp.lifecyclestage || "").toLowerCase();
+  let commercial = lc.includes("opportunit") ? 20 : lc.includes("salesqualif") ? 15 :
+    lc.includes("marketingqu") ? 10 : lc.includes("lead") ? 5 : lc.includes("subscriber") ? 2 : 0;
+  if (parseInt(hp.num_associated_deals || "0", 10) > 0) commercial = Math.min(20, commercial + 5);
+  score += commercial;
+
+  // 4. Momentum (max 20)
+  const created = daysSinceStr(hp.createdate);
+  const modified = daysSinceStr(hp.lastmodifieddate);
+  if (created !== null && created <= 7) score += 10;
+  if (modified !== null && modified <= 7) score += 10;
+  score = Math.min(score, score); // cap individual components handled above
+
+  // 5. Volume (max 15)
+  score += pageViews > 100 ? 15 : pageViews >= 50 ? 10 : pageViews >= 20 ? 5 : 2;
+
+  // HubSpot score bonus (max 10)
+  const hs = parseInt(hp.hubspotscore || "0", 10);
+  if (hs > 0) score += Math.min(10, Math.round(hs / 10));
+
+  return Math.min(100, score);
+}
+
+async function scoreInboundCompany(
+  supabase: any,
+  companyId: string
+): Promise<InboundScoreResult> {
+  const { data: contacts } = await supabase
+    .from("contacts")
+    .select("hubspot_properties, contact_profile")
+    .eq("company_id", companyId)
+    .not("hubspot_properties", "is", null);
+
+  if (!contacts || contacts.length === 0) {
+    return { best_score: 0, avg_score: 0, best_tier: 4, best_tier_label: "Dormant", contacts_scored: 0 };
+  }
+
+  const scores: number[] = [];
+
+  for (const contact of contacts) {
+    // Use pre-computed score from contact_profile if available
+    const profile = contact.contact_profile;
+    if (profile && typeof profile.inbound_score === "number") {
+      scores.push(profile.inbound_score);
+    } else if (contact.hubspot_properties && Object.keys(contact.hubspot_properties).length > 0) {
+      scores.push(scoreContact(contact.hubspot_properties as Record<string, any>));
+    }
+  }
+
+  if (scores.length === 0) {
+    return { best_score: 0, avg_score: 0, best_tier: 4, best_tier_label: "Dormant", contacts_scored: 0 };
+  }
+
+  const best = Math.max(...scores);
+  const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+
+  let best_tier = 4;
+  let best_tier_label = "Dormant";
+  if      (best >= 70) { best_tier = 1; best_tier_label = "Strategic Inbound"; }
+  else if (best >= 45) { best_tier = 2; best_tier_label = "Emerging Momentum"; }
+  else if (best >= 20) { best_tier = 3; best_tier_label = "Early Stage"; }
+
+  return { best_score: best, avg_score: avg, best_tier, best_tier_label, contacts_scored: scores.length };
 }
 
 async function searchSignals(
@@ -180,8 +289,12 @@ Deno.serve(async (req) => {
     if (!lovableKey) throw new Error("LOVABLE_API_KEY not configured");
 
     // Load AI config, compelling events, and library links from DB
-    const { data: aiConfigRow } = await supabase.from("ai_config").select("system_prompt, model, prompt_template").eq("id", 1).single();
-    const aiConfig = aiConfigRow || { system_prompt: "You are a GTM strategist for iorad.", model: "google/gemini-2.5-flash", prompt_template: "" };
+    const { data: aiConfigRow } = await supabase
+      .from("ai_config")
+      .select("system_prompt, inbound_system_prompt, model, prompt_template")
+      .eq("id", 1)
+      .single();
+    const aiConfig = aiConfigRow || { system_prompt: "You are a GTM strategist for iorad.", inbound_system_prompt: "", model: "google/gemini-2.5-flash", prompt_template: "" };
 
     const { data: eventsRows } = await supabase.from("compelling_events").select("label").eq("is_active", true).order("sort_order");
     const compellingEvents = (eventsRows || []).map((e: any) => e.label);
@@ -203,7 +316,7 @@ Deno.serve(async (req) => {
       // Single company mode
       const { data, error: compErr } = await supabase
         .from("companies")
-        .select("id, name, domain, industry, partner, persona")
+        .select("id, name, domain, industry, partner, persona, source_type")
         .eq("id", singleCompanyId)
         .maybeSingle();
       if (compErr) throw compErr;
@@ -213,7 +326,7 @@ Deno.serve(async (req) => {
       // Batch mode — get 1 company at the given offset
       const { data: companies, error: compErr } = await supabase
         .from("companies")
-        .select("id, name, domain, industry, partner, persona")
+        .select("id, name, domain, industry, partner, persona, source_type")
         .order("last_processed_at", { ascending: true, nullsFirst: true })
         .range(offset, offset);
 
@@ -259,8 +372,105 @@ Deno.serve(async (req) => {
     let errorMsg: string | null = null;
 
     try {
-      console.log(`Processing: ${company.name} (mode: ${mode})`);
+      const isInbound = company.source_type === "inbound";
+      console.log(`Processing: ${company.name} (mode: ${mode}, inbound: ${isInbound})`);
 
+      // ── INBOUND PATH: behavioral scoring from HubSpot properties ───────────
+      if (isInbound) {
+        // Step 0: Run contact profile extraction first to ensure scores are fresh
+        try {
+          const extractUrl = `${supabaseUrl}/functions/v1/extract-contact-profile`;
+          await fetch(extractUrl, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${serviceRoleKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ company_id: company.id }),
+          });
+        } catch (extractErr: any) {
+          console.warn("Inbound profile extraction failed, using raw data:", extractErr.message);
+        }
+
+        // Step 1: Compute behavioral score from contacts
+        const inboundResult = await scoreInboundCompany(supabase, company.id);
+        signalsCount = inboundResult.contacts_scored;
+        snapshotStatus = inboundResult.best_score > 0 ? "Generated" : "Low Signal";
+
+        // Step 2: Build snapshot JSON with inbound framing
+        const snapshotJson = {
+          why_now: `Behavioral momentum detected. Best contact score: ${inboundResult.best_score}/100 (${inboundResult.best_tier_label}).`,
+          inbound_tier: inboundResult.best_tier,
+          inbound_tier_label: inboundResult.best_tier_label,
+          best_contact_score: inboundResult.best_score,
+          avg_contact_score: inboundResult.avg_score,
+          contacts_scored: inboundResult.contacts_scored,
+          confidence_level: inboundResult.best_tier === 1 ? "High" : inboundResult.best_tier === 2 ? "Medium" : "Low",
+          confidence_reason: `Scored from ${inboundResult.contacts_scored} HubSpot contact(s) using behavioral momentum model (page views, conversion events, lifecycle stage, recency).`,
+        };
+
+        await supabase.from("snapshots").insert({
+          company_id: company.id,
+          score_total: inboundResult.best_score,
+          score_breakdown: {
+            inbound_tier: inboundResult.best_tier,
+            best_contact_score: inboundResult.best_score,
+            avg_contact_score: inboundResult.avg_score,
+            contacts_scored: inboundResult.contacts_scored,
+          },
+          snapshot_json: snapshotJson,
+          model_version: "inbound-behavioral-v1",
+          prompt_version: "tiered-scoring",
+        });
+
+        await supabase.from("companies").update({
+          last_processed_at: new Date().toISOString(),
+          last_score_total: inboundResult.best_score,
+          snapshot_status: snapshotStatus,
+        }).eq("id", company.id);
+
+        console.log(`Inbound: ${company.name} — Score: ${inboundResult.best_score} (Tier ${inboundResult.best_tier}: ${inboundResult.best_tier_label})`);
+
+        // Save job item and return early (no Firecrawl, no Clay push for inbound)
+        await supabase.from("processing_job_items").insert({
+          job_id: activeJobId,
+          company_id: company.id,
+          status: "succeeded",
+          started_at: new Date().toISOString(),
+          finished_at: new Date().toISOString(),
+          signals_found_count: signalsCount,
+          snapshot_status: snapshotStatus,
+          error_message: null,
+        });
+
+        const { data: jd } = await supabase
+          .from("processing_jobs")
+          .select("companies_processed, companies_succeeded, companies_failed")
+          .eq("id", activeJobId)
+          .single();
+
+        await supabase.from("processing_jobs").update({
+          companies_processed: (jd?.companies_processed || 0) + 1,
+          companies_succeeded: (jd?.companies_succeeded || 0) + 1,
+        }).eq("id", activeJobId);
+
+        return new Response(
+          JSON.stringify({
+            job_id: activeJobId,
+            company: company.name,
+            status: "succeeded",
+            signals_found: signalsCount,
+            snapshot_status: snapshotStatus,
+            inbound_tier: inboundResult.best_tier,
+            inbound_tier_label: inboundResult.best_tier_label,
+            next_offset: offset + 1,
+            done: false,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // ── OUTBOUND PATH (original logic below) ────────────────────────────────
       let signals: { title: string; url: string; type: string; excerpt: string }[] = [];
 
       // Step 1: Search signals (unless score_only or snapshot_only)
