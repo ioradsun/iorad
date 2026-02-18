@@ -21,8 +21,24 @@ const menuItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
 ];
 
+function useWaitingCount() {
+  return useQuery({
+    queryKey: ["banner_waiting_count"],
+    queryFn: async () => {
+      const [{ data: cards }, { count }] = await Promise.all([
+        supabase.from("company_cards").select("company_id"),
+        supabase.from("companies").select("id", { count: "exact", head: true }),
+      ]);
+      const cardIds = new Set((cards || []).map((c: any) => c.company_id));
+      return (count ?? 0) - cardIds.size;
+    },
+    refetchInterval: 15_000,
+  });
+}
+
 function ActiveJobBanner() {
   const { data: job } = useActiveJob();
+  const { data: waitingCount } = useWaitingCount();
 
   const { data: currentItem } = useQuery({
     queryKey: ["banner_current_item", job?.id],
@@ -40,12 +56,14 @@ function ActiveJobBanner() {
     refetchInterval: 3_000,
   });
 
-  if (!job) return null;
+  if (!job && (waitingCount === undefined || waitingCount === 0)) return null;
 
   const currentCompany =
-    (currentItem?.companies as any)?.name ??
-    (job.settings_snapshot as any)?.current_company ??
-    null;
+    job
+      ? ((currentItem?.companies as any)?.name ??
+         (job.settings_snapshot as any)?.current_company ??
+         null)
+      : null;
 
   return (
     <div
@@ -56,9 +74,16 @@ function ActiveJobBanner() {
         color: "hsl(var(--primary))",
       }}
     >
-      <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
+      {job && <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />}
       <span>
-        Generating stories{currentCompany ? ` — ${currentCompany}` : ""}
+        {job
+          ? <>Generating stories{currentCompany ? ` — ${currentCompany}` : ""}</>
+          : null}
+        {waitingCount !== undefined && waitingCount > 0 && (
+          <span className={job ? "ml-3 opacity-70" : ""}>
+            {waitingCount} waiting
+          </span>
+        )}
       </span>
       <Link
         to="/jobs"
