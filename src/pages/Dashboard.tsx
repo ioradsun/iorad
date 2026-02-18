@@ -158,11 +158,11 @@ export default function Dashboard() {
             placeholder="Search…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="pl-8 h-8 text-sm bg-card border-border/60 focus-visible:ring-2 focus-visible:ring-ring/40"
+            className="pl-8 h-8 text-sm bg-card border-border/40 focus-visible:ring-2 focus-visible:ring-ring/40"
           />
         </div>
         <Select value={sourceFilter} onValueChange={setSourceFilter}>
-          <SelectTrigger className="w-[140px] h-8 text-xs bg-card border-border/60">
+          <SelectTrigger className="w-[140px] h-8 text-xs bg-card border-border/40">
             <SelectValue placeholder="All sources" />
           </SelectTrigger>
           <SelectContent>
@@ -173,7 +173,7 @@ export default function Dashboard() {
         </Select>
         {partners.length > 0 && (
           <Select value={partnerFilter} onValueChange={setPartnerFilter}>
-            <SelectTrigger className="w-[160px] h-8 text-xs bg-card border-border/60">
+            <SelectTrigger className="w-[160px] h-8 text-xs bg-card border-border/40">
               <SelectValue placeholder="All partners" />
             </SelectTrigger>
             <SelectContent>
@@ -192,10 +192,10 @@ export default function Dashboard() {
       </div>
 
       {/* ── Table ── */}
-      <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+      <div className="rounded-lg border border-border/40 bg-card overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-border/50">
+            <tr className="border-b border-border/30">
               <th className="text-left px-5 py-3">
                 <SortHeader label="Company" field="name" />
               </th>
@@ -214,7 +214,7 @@ export default function Dashboard() {
               <th className="px-5 py-3 w-28" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-border/40">
+          <tbody className="divide-y divide-border/25">
             {filtered.map((company, i) => (
               <motion.tr
                 key={company.id}
@@ -296,7 +296,7 @@ function KpiCard({
   iconBg: string;
 }) {
   return (
-    <div className="bg-card border border-border/60 rounded-lg px-5 py-4 flex items-center gap-4">
+    <div className="bg-card border border-border/40 rounded-lg px-5 py-4 flex items-center gap-4">
       <div
         className="rounded-md p-2 shrink-0"
         style={{ background: iconBg }}
