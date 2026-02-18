@@ -30,6 +30,37 @@ serve(async (req) => {
       .single();
     if (compErr || !company) throw new Error(compErr?.message || "Company not found");
 
+    // Step 0: Extract contact profiles (Pass 1) for any contacts with HubSpot data but no profile yet
+    const { data: unprofiledContacts } = await sb
+      .from("contacts")
+      .select("id")
+      .eq("company_id", company_id)
+      .not("hubspot_properties", "is", null)
+      .is("contact_profile", null);
+
+    if (unprofiledContacts && unprofiledContacts.length > 0) {
+      console.log(`Extracting profiles for ${unprofiledContacts.length} contacts before generation…`);
+      try {
+        const extractUrl = `${supabaseUrl}/functions/v1/extract-contact-profile`;
+        const extractRes = await fetch(extractUrl, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${supabaseKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ company_id }),
+        });
+        if (extractRes.ok) {
+          const extractData = await extractRes.json();
+          console.log(`Profile extraction: ${extractData.profiles_extracted} extracted`);
+        } else {
+          console.warn("Profile extraction failed, continuing with raw data:", await extractRes.text());
+        }
+      } catch (extractErr) {
+        console.warn("Profile extraction error, continuing:", extractErr);
+      }
+    }
+
     // Load contacts, signals, latest snapshot in parallel
     const [contactsRes, signalsRes, snapshotRes, aiConfigRes] = await Promise.all([
       sb.from("contacts").select("*").eq("company_id", company_id),
