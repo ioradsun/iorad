@@ -267,7 +267,7 @@ export default function CompanyDetail() {
     finally { setRegenerating(false); }
   };
 
-  const PERSONAS = ["Learning & Development", "Sales Enablement", "Revenue Enablement", "Customer Education", "Partner Enablement"];
+  const PERSONAS = ["Learning & Development", "Enablement", "Customer Ed"];
 
   const syncFathom = async () => {
     if (!company?.domain) { toast.error("Company needs a domain to sync Fathom meetings"); return; }
@@ -480,19 +480,12 @@ export default function CompanyDetail() {
           </div>
 
           {/* Company Profile */}
-          {(accountData?.about?.text || company.domain) && (
+          {accountData?.about?.text && (
             <p className="text-[14px] text-foreground/80 leading-relaxed line-clamp-2">
-              {accountData?.about?.text || `${company.name} — ${company.domain}`}
+              {accountData.about.text}
             </p>
           )}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            {(accountData?.industry?.value || company.industry) && (
-              <Card className="bg-secondary/30"><CardContent className="p-3 flex flex-col items-start gap-1.5">
-                <Building2 className="w-4 h-4 text-primary" />
-                <span className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Industry</span>
-                 <span className="text-[13px] font-medium text-foreground leading-tight">{accountData?.industry?.value || company.industry?.replace(/_/g, " ").toLowerCase()}</span>
-              </CardContent></Card>
-            )}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {(accountData?.employees?.value || company.headcount) && (
               <Card className="bg-secondary/30"><CardContent className="p-3 flex flex-col items-start gap-1.5">
                 <Users className="w-4 h-4 text-primary" />
@@ -500,30 +493,11 @@ export default function CompanyDetail() {
                 <span className="text-[13px] font-medium text-foreground">{accountData?.employees?.value || `${company.headcount}+`}</span>
               </CardContent></Card>
             )}
-            {(accountData?.hq?.value || company.hq_country) && (
-              <Card className="bg-secondary/30"><CardContent className="p-3 flex flex-col items-start gap-1.5">
-                <MapPin className="w-4 h-4 text-primary" />
-                <span className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Headquarters</span>
-                <span className="text-[13px] font-medium text-foreground leading-tight">{accountData?.hq?.value || company.hq_country}</span>
-              </CardContent></Card>
-            )}
             {accountData?.revenue_range?.value && accountData.revenue_range.value !== "Unknown" && (
               <Card className="bg-secondary/30"><CardContent className="p-3 flex flex-col items-start gap-1.5">
                 <DollarSign className="w-4 h-4 text-primary" />
                 <span className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Revenue</span>
                 <span className="text-[13px] font-medium text-foreground">{accountData.revenue_range.value}</span>
-              </CardContent></Card>
-            )}
-            {company.domain && (
-              <Card className="bg-secondary/30"><CardContent className="p-3 flex flex-col items-start gap-1.5">
-                <Globe className="w-4 h-4 text-primary" />
-                <span className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Website</span>
-                <div className="flex items-center gap-1.5">
-                  <a href={`https://${company.domain}`} target="_blank" rel="noopener noreferrer" className="text-[13px] font-medium text-primary hover:underline">{company.domain}</a>
-                  <Button size="icon" variant="ghost" className="h-5 w-5" onClick={fixDomain} disabled={fixingDomain} title="AI fix domain">
-                    {fixingDomain ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3 text-muted-foreground" />}
-                  </Button>
-                </div>
               </CardContent></Card>
             )}
             {company.partner && (
