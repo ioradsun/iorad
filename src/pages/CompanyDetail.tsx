@@ -430,6 +430,18 @@ export default function CompanyDetail() {
 
   const cards = (companyCards?.cards_json as unknown as DashboardCard[] | null) || [];
   const assets = parseJson<{ email_sequence?: Record<string, EmailTouch>; linkedin_sequence?: LinkedInStep[]; story_assets?: StoryAssets }>(companyCards?.assets_json as Json) || {};
+  const rawAccountJson = parseJson<Record<string, unknown>>(companyCards?.account_json as Json) || {};
+  // Detect inbound strategy response: flat object stored in account_json (no cards array)
+  const isInboundStrategyResponse = cards.length === 0 && !!(rawAccountJson?.observed_behavior || rawAccountJson?.inferred_initiative);
+  const inboundStrategyFields: { label: string; key: string }[] = [
+    { label: "Observed Behavior", key: "observed_behavior" },
+    { label: "Inferred Initiative", key: "inferred_initiative" },
+    { label: "Execution Gap", key: "execution_gap" },
+    { label: "Institutionalization Play", key: "institutionalization_play" },
+    { label: "ROI Expansion Path", key: "roi_expansion_path" },
+    { label: "Cross-Team Opportunity", key: "cross_team_opportunity" },
+    { label: "Next Operational Step", key: "next_operational_step" },
+  ];
   const accountData = parseJson<{
     name?: string; about?: { text?: string; status?: string };
     industry?: { value?: string; status?: string };
@@ -1163,16 +1175,24 @@ export default function CompanyDetail() {
               <Loader2 className="w-5 h-5 animate-spin text-primary" />
               <span className="ml-2 text-sm text-muted-foreground">Loading cards…</span>
             </div>
+          ) : isInboundStrategyResponse ? (
+            <div className="space-y-3">
+              {inboundStrategyFields.map(({ label, key }) =>
+                rawAccountJson[key] ? (
+                  <div key={key} className="panel p-4 rounded-lg">
+                    <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground mb-1">{label}</div>
+                    <p className="text-[13px] leading-relaxed text-foreground/90">{String(rawAccountJson[key])}</p>
+                  </div>
+                ) : null
+              )}
+            </div>
           ) : cards.length > 0 ? (
             <>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {cards.map((card, i) => <DashboardCardUI key={card.id || i} card={card} />)}
               </div>
               {assets.story_assets && (assets.story_assets.primary_asset || assets.story_assets.supporting_asset) && (
-                <>
-                  <div className="glow-line" />
-                  <StoryAssetsUI storyAssets={assets.story_assets} />
-                </>
+                <StoryAssetsUI storyAssets={assets.story_assets} />
               )}
             </>
           ) : (
