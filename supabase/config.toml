@@ -27,3 +27,6 @@ verify_jwt = false
 [functions.score-companies]
 verify_jwt = false
 
+[functions.backfill-hubspot]
+verify_jwt = false
+
