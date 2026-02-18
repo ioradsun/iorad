@@ -242,6 +242,13 @@ async function scoreOneCompany(
     .select("id, name, title, hubspot_properties")
     .eq("company_id", companyId);
 
+  // Guard: require contacts before scoring — contacts carry the iorad product activity
+  // data (tutorial creates, views, extension connections) that the score depends on.
+  if (!contacts || contacts.length === 0) {
+    console.log(`scoreOneCompany: skipping ${company.name} — no contacts yet`);
+    return { scored: false, score: 0, changed: false };
+  }
+
   const breakdown = calculateScoutScore(company, contacts || []);
   const prevScore = company.scout_score ?? null;
   const scoreChanged = prevScore === null || Math.abs(breakdown.total - prevScore) >= 5;
