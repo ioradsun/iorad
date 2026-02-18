@@ -22,6 +22,7 @@ export type Database = {
           inbound_outreach_prompt: string
           inbound_story_prompt: string
           inbound_strategy_prompt: string
+          inbound_system_prompt: string
           inbound_transcript_prompt: string
           model: string
           outreach_prompt: string
@@ -39,6 +40,7 @@ export type Database = {
           inbound_outreach_prompt?: string
           inbound_story_prompt?: string
           inbound_strategy_prompt?: string
+          inbound_system_prompt?: string
           inbound_transcript_prompt?: string
           model?: string
           outreach_prompt?: string
@@ -56,6 +58,7 @@ export type Database = {
           inbound_outreach_prompt?: string
           inbound_story_prompt?: string
           inbound_strategy_prompt?: string
+          inbound_system_prompt?: string
           inbound_transcript_prompt?: string
           model?: string
           outreach_prompt?: string
