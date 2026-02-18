@@ -26,16 +26,12 @@ const AVAILABLE_MODELS = [
 
 export default function AdminSettings() {
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Admin Settings</h1>
-        <p className="text-sm text-muted-foreground mt-1">Configure AI, processing, partners, and compelling events.</p>
-      </div>
+    <div className="max-w-4xl mx-auto">
       <Tabs defaultValue="people" className="space-y-6">
         <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="people">People</TabsTrigger>
           <TabsTrigger value="appearance">Appearance</TabsTrigger>
-          <TabsTrigger value="ai">AI & Prompt</TabsTrigger>
+          <TabsTrigger value="ai">AI & Prompts</TabsTrigger>
           <TabsTrigger value="events">Compelling Events</TabsTrigger>
           <TabsTrigger value="partners">Partners</TabsTrigger>
           <TabsTrigger value="processing">Processing</TabsTrigger>
@@ -220,29 +216,36 @@ function AIConfigTab() {
     },
   });
   const queryClient = useQueryClient();
-  const [prompt, setPrompt] = useState("");
+
+  // Outbound state
+  const [outboundSystemPrompt, setOutboundSystemPrompt] = useState("");
   const [promptTemplate, setPromptTemplate] = useState("");
   const [companyPrompt, setCompanyPrompt] = useState("");
   const [strategyPrompt, setStrategyPrompt] = useState("");
   const [outreachPrompt, setOutreachPrompt] = useState("");
   const [storyPrompt, setStoryPrompt] = useState("");
   const [transcriptPrompt, setTranscriptPrompt] = useState("");
+
+  // Inbound state
+  const [inboundSystemPrompt, setInboundSystemPrompt] = useState("");
   const [inboundStrategyPrompt, setInboundStrategyPrompt] = useState("");
   const [inboundOutreachPrompt, setInboundOutreachPrompt] = useState("");
   const [inboundStoryPrompt, setInboundStoryPrompt] = useState("");
   const [inboundTranscriptPrompt, setInboundTranscriptPrompt] = useState("");
+
+  // AI state
   const [model, setModel] = useState("");
-  
 
   useEffect(() => {
     if (data) {
-      setPrompt(data.system_prompt);
+      setOutboundSystemPrompt((data as any).system_prompt || "");
       setPromptTemplate((data as any).prompt_template || "");
       setCompanyPrompt((data as any).company_prompt || "");
       setStrategyPrompt((data as any).strategy_prompt || "");
       setOutreachPrompt((data as any).outreach_prompt || "");
       setStoryPrompt((data as any).story_prompt || "");
       setTranscriptPrompt((data as any).transcript_prompt || "");
+      setInboundSystemPrompt((data as any).inbound_system_prompt || "");
       setInboundStrategyPrompt((data as any).inbound_strategy_prompt || "");
       setInboundOutreachPrompt((data as any).inbound_outreach_prompt || "");
       setInboundStoryPrompt((data as any).inbound_story_prompt || "");
@@ -254,13 +257,14 @@ function AIConfigTab() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("ai_config").update({
-        system_prompt: prompt,
+        system_prompt: outboundSystemPrompt,
         prompt_template: promptTemplate,
         company_prompt: companyPrompt,
         strategy_prompt: strategyPrompt,
         outreach_prompt: outreachPrompt,
         story_prompt: storyPrompt,
         transcript_prompt: transcriptPrompt,
+        inbound_system_prompt: inboundSystemPrompt,
         inbound_strategy_prompt: inboundStrategyPrompt,
         inbound_outreach_prompt: inboundOutreachPrompt,
         inbound_story_prompt: inboundStoryPrompt,
@@ -276,205 +280,162 @@ function AIConfigTab() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const handleExport = () => {
+    const sections = [
+      { label: "Inbound — System Prompt", value: inboundSystemPrompt },
+      { label: "Inbound — Strategy Tab Prompt", value: inboundStrategyPrompt },
+      { label: "Inbound — Outreach Tab Prompt", value: inboundOutreachPrompt },
+      { label: "Inbound — Custom Loom & iorad Prompt", value: inboundStoryPrompt },
+      { label: "Inbound — Transcript Analysis Prompt", value: inboundTranscriptPrompt },
+      { label: "Outbound — System Prompt", value: outboundSystemPrompt },
+      { label: "Outbound — Story Mega Prompt Template", value: promptTemplate },
+      { label: "Outbound — Company Tab Prompt", value: companyPrompt },
+      { label: "Outbound — Strategy Tab Prompt", value: strategyPrompt },
+      { label: "Outbound — Outreach Tab Prompt", value: outreachPrompt },
+      { label: "Outbound — Custom Loom & iorad Prompt", value: storyPrompt },
+      { label: "Outbound — Transcript Analysis Prompt", value: transcriptPrompt },
+    ];
+    const md = sections
+      .map(({ label, value }) => `## ${label}\n\n\`\`\`\n${(value || "").trim() || "(empty)"}\n\`\`\``)
+      .join("\n\n---\n\n");
+    const blob = new Blob([`# iorad AI Prompt Configuration\n\nExported: ${new Date().toISOString()}\n\n---\n\n${md}`], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `iorad-prompts-${new Date().toISOString().slice(0, 10)}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Prompts exported as Markdown");
+  };
+
   if (isLoading) return <Loader />;
 
-  const outboundPromptSections = [
-    {
-      key: "company",
-      label: "Company Tab Prompt",
-      description: "Prompt for generating the Company overview tab content (account summary, key facts).",
-      value: companyPrompt,
-      setter: setCompanyPrompt,
-    },
-    {
-      key: "strategy",
-      label: "Strategy Tab Prompt",
-      description: "Prompt for generating Strategy tab content (dashboard cards, plays, leverage points).",
-      value: strategyPrompt,
-      setter: setStrategyPrompt,
-    },
-    {
-      key: "outreach",
-      label: "Outreach Tab Prompt",
-      description: "Prompt for generating Outreach tab content (email sequences, LinkedIn messages).",
-      value: outreachPrompt,
-      setter: setOutreachPrompt,
-    },
-    {
-      key: "story",
-      label: "Custom Loom & iorad Prompt",
-      description: "Prompt for generating Story tab content — produces bespoke Loom scripts and iorad tutorial assets.",
-      value: storyPrompt,
-      setter: setStoryPrompt,
-    },
-    {
-      key: "transcript",
-      label: "Transcript Analysis Prompt",
-      description: "Prompt for analyzing Fathom meeting transcripts — extracts strategic account intelligence for CS handoff.",
-      value: transcriptPrompt,
-      setter: setTranscriptPrompt,
-    },
+  const inboundSections = [
+    { key: "inbound_strategy", label: "Strategy Tab", description: "Qualification, discovery, and conversion strategy for warm leads.", value: inboundStrategyPrompt, setter: setInboundStrategyPrompt },
+    { key: "inbound_outreach", label: "Outreach Tab", description: "Nurture sequences, demo follow-ups, and onboarding-oriented messaging.", value: inboundOutreachPrompt, setter: setInboundOutreachPrompt },
+    { key: "inbound_story", label: "Custom Loom & iorad", description: "Personalized welcome Loom scripts and getting-started iorad tutorials.", value: inboundStoryPrompt, setter: setInboundStoryPrompt },
+    { key: "inbound_transcript", label: "Transcript Analysis", description: "Analyze inbound demo/onboarding call transcripts — extract adoption signals and expansion opportunities.", value: inboundTranscriptPrompt, setter: setInboundTranscriptPrompt },
   ];
 
-  const inboundPromptSections = [
-    {
-      key: "inbound_strategy",
-      label: "Strategy Tab Prompt (Inbound)",
-      description: "Prompt for inbound leads — focus on qualification, discovery, and conversion strategy rather than cold outreach.",
-      value: inboundStrategyPrompt,
-      setter: setInboundStrategyPrompt,
-    },
-    {
-      key: "inbound_outreach",
-      label: "Outreach Tab Prompt (Inbound)",
-      description: "Prompt for inbound leads — nurture sequences, demo follow-ups, and onboarding-oriented messaging.",
-      value: inboundOutreachPrompt,
-      setter: setInboundOutreachPrompt,
-    },
-    {
-      key: "inbound_story",
-      label: "Custom Loom & iorad Prompt (Inbound)",
-      description: "Prompt for inbound leads — personalized welcome Loom scripts and getting-started iorad tutorials.",
-      value: inboundStoryPrompt,
-      setter: setInboundStoryPrompt,
-    },
-    {
-      key: "inbound_transcript",
-      label: "Transcript Analysis Prompt (Inbound)",
-      description: "Prompt for analyzing inbound demo/onboarding call transcripts — extract adoption signals and expansion opportunities.",
-      value: inboundTranscriptPrompt,
-      setter: setInboundTranscriptPrompt,
-    },
+  const outboundSections = [
+    { key: "company", label: "Company Tab", description: "Company overview tab content (account summary, key facts).", value: companyPrompt, setter: setCompanyPrompt },
+    { key: "strategy", label: "Strategy Tab", description: "Strategy tab content (dashboard cards, plays, leverage points).", value: strategyPrompt, setter: setStrategyPrompt },
+    { key: "outreach", label: "Outreach Tab", description: "Outreach tab content (email sequences, LinkedIn messages).", value: outreachPrompt, setter: setOutreachPrompt },
+    { key: "story", label: "Custom Loom & iorad", description: "Story tab content — produces bespoke Loom scripts and iorad tutorial assets.", value: storyPrompt, setter: setStoryPrompt },
+    { key: "transcript", label: "Transcript Analysis", description: "Fathom meeting transcript analysis — extracts strategic account intelligence for CS handoff.", value: transcriptPrompt, setter: setTranscriptPrompt },
   ];
+
+  const SaveBar = () => (
+    <div className="flex gap-3 pt-2">
+      <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="flex-1 gap-2">
+        {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+        Save
+      </Button>
+      <Button variant="outline" className="gap-2" onClick={handleExport}>
+        <Download className="w-4 h-4" />
+        Export .md
+      </Button>
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
-      <div className="panel space-y-4">
-        <div className="panel-header">Model Selection</div>
-        <Select value={model} onValueChange={setModel}>
-          <SelectTrigger className="bg-secondary"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {AVAILABLE_MODELS.map(m => (
-              <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="panel space-y-4">
-        <div className="panel-header">System Prompt (Global)</div>
-        <p className="text-xs text-muted-foreground">High-level system instruction prepended to every generation.</p>
-        <Textarea
-          value={prompt}
-          onChange={e => setPrompt(e.target.value)}
-          className="bg-secondary font-mono text-xs min-h-[200px]"
-        />
-      </div>
-      <div className="panel space-y-4">
-        <div className="panel-header">Story Mega Prompt Template</div>
-        <p className="text-xs text-muted-foreground">
-          Full prompt template with JSON schema for story microsites. Placeholders: <code className="text-primary">{"{{company_name}}"}</code>, <code className="text-primary">{"{{signals}}"}</code>, etc.
-        </p>
-        <Textarea
-          value={promptTemplate}
-          onChange={e => setPromptTemplate(e.target.value)}
-          className="bg-secondary font-mono text-xs min-h-[300px]"
-        />
-      </div>
+    <div className="space-y-4">
+      <Tabs defaultValue="inbound" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="inbound">Inbound Prompt</TabsTrigger>
+          <TabsTrigger value="outbound">Outbound Prompt</TabsTrigger>
+          <TabsTrigger value="ai">AI</TabsTrigger>
+        </TabsList>
 
-      {/* ── INBOUND PROMPTS (top — require per-customer customization) ── */}
-      <div className="flex items-center gap-3">
-        <div className="panel-header text-lg flex-1">Inbound Prompts</div>
-        <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-          Warm Leads · HubSpot
-        </span>
-      </div>
-      <p className="text-xs text-muted-foreground -mt-4">
-        Prompts for inbound leads. Each requires customization — these run first and take priority.
-      </p>
+        {/* ── INBOUND ── */}
+        <TabsContent value="inbound" className="space-y-6">
+          <div className="panel space-y-4 border-l-2 border-primary/40">
+            <div className="panel-header">System Prompt</div>
+            <p className="text-xs text-muted-foreground">High-level system instruction prepended to every inbound generation.</p>
+            <Textarea
+              value={inboundSystemPrompt}
+              onChange={e => setInboundSystemPrompt(e.target.value)}
+              className="bg-secondary font-mono text-xs min-h-[200px]"
+              placeholder="Enter the inbound system prompt here…"
+            />
+          </div>
+          {inboundSections.map(({ key, label, description, value, setter }) => (
+            <div key={key} className="panel space-y-4 border-l-2 border-primary/40">
+              <div className="panel-header">{label}</div>
+              <p className="text-xs text-muted-foreground">{description}</p>
+              <Textarea
+                value={value}
+                onChange={e => setter(e.target.value)}
+                className="bg-secondary font-mono text-xs min-h-[300px]"
+                placeholder={`Enter the inbound ${label.toLowerCase()} prompt here…`}
+              />
+            </div>
+          ))}
+          <SaveBar />
+        </TabsContent>
 
-      {inboundPromptSections.map(({ key, label, description, value, setter }) => (
-        <div key={key} className="panel space-y-4 border-l-2 border-primary/30">
-          <div className="panel-header">{label}</div>
-          <p className="text-xs text-muted-foreground">{description}</p>
-          <Textarea
-            value={value}
-            onChange={e => setter(e.target.value)}
-            className="bg-secondary font-mono text-xs min-h-[300px]"
-            placeholder={`Enter the ${label.toLowerCase()} here…`}
-          />
-        </div>
-      ))}
+        {/* ── OUTBOUND ── */}
+        <TabsContent value="outbound" className="space-y-6">
+          <div className="panel space-y-4">
+            <div className="panel-header">System Prompt</div>
+            <p className="text-xs text-muted-foreground">High-level system instruction prepended to every outbound generation.</p>
+            <Textarea
+              value={outboundSystemPrompt}
+              onChange={e => setOutboundSystemPrompt(e.target.value)}
+              className="bg-secondary font-mono text-xs min-h-[200px]"
+              placeholder="Enter the outbound system prompt here…"
+            />
+          </div>
+          <div className="panel space-y-4">
+            <div className="panel-header">Story Mega Prompt Template</div>
+            <p className="text-xs text-muted-foreground">
+              Full prompt template with JSON schema for story microsites. Placeholders: <code className="text-primary">{"{{company_name}}"}</code>, <code className="text-primary">{"{{signals}}"}</code>, etc.
+            </p>
+            <Textarea
+              value={promptTemplate}
+              onChange={e => setPromptTemplate(e.target.value)}
+              className="bg-secondary font-mono text-xs min-h-[300px]"
+              placeholder="Enter the story mega prompt template here…"
+            />
+          </div>
+          {outboundSections.map(({ key, label, description, value, setter }) => (
+            <div key={key} className="panel space-y-4">
+              <div className="panel-header">{label}</div>
+              <p className="text-xs text-muted-foreground">{description}</p>
+              <Textarea
+                value={value}
+                onChange={e => setter(e.target.value)}
+                className="bg-secondary font-mono text-xs min-h-[300px]"
+                placeholder={`Enter the outbound ${label.toLowerCase()} prompt here…`}
+              />
+            </div>
+          ))}
+          <SaveBar />
+        </TabsContent>
 
-      {/* ── OUTBOUND PROMPTS (below — cold outreach defaults) ── */}
-      <div className="flex items-center gap-3 pt-4">
-        <div className="panel-header text-lg flex-1">Outbound Prompts</div>
-        <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
-          Cold Outreach · Default
-        </span>
-      </div>
-      <p className="text-xs text-muted-foreground -mt-4">
-        Default prompts for outbound prospecting. Used when no inbound override exists.
-      </p>
-
-      {outboundPromptSections.map(({ key, label, description, value, setter }) => (
-        <div key={key} className="panel space-y-4">
-          <div className="panel-header">{label}</div>
-          <p className="text-xs text-muted-foreground">{description}</p>
-          <Textarea
-            value={value}
-            onChange={e => setter(e.target.value)}
-            className="bg-secondary font-mono text-xs min-h-[300px]"
-            placeholder={`Enter the ${label.toLowerCase()} here…`}
-          />
-        </div>
-      ))}
-
-      <div className="flex gap-3">
-        <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="flex-1 gap-2">
-          {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          Save AI Config
-        </Button>
-        <Button
-          variant="outline"
-          className="gap-2"
-          onClick={() => {
-            const sections: { label: string; value: string }[] = [
-              { label: "System Prompt (Global)", value: prompt },
-              { label: "Story Mega Prompt Template", value: promptTemplate },
-              { label: "Company Tab Prompt", value: companyPrompt },
-              { label: "Strategy Tab Prompt", value: strategyPrompt },
-              { label: "Outreach Tab Prompt", value: outreachPrompt },
-              { label: "Custom Loom & iorad Prompt", value: storyPrompt },
-              { label: "Transcript Analysis Prompt", value: transcriptPrompt },
-              { label: "Strategy Tab Prompt (Inbound)", value: inboundStrategyPrompt },
-              { label: "Outreach Tab Prompt (Inbound)", value: inboundOutreachPrompt },
-              { label: "Custom Loom & iorad Prompt (Inbound)", value: inboundStoryPrompt },
-              { label: "Transcript Analysis Prompt (Inbound)", value: inboundTranscriptPrompt },
-            ];
-            const md = sections
-              .map(({ label, value }) =>
-                `## ${label}\n\n\`\`\`\n${(value || "").trim() || "(empty)"}\n\`\`\``
-              )
-              .join("\n\n---\n\n");
-            const blob = new Blob([`# iorad AI Prompt Configuration\n\nExported: ${new Date().toISOString()}\n\n---\n\n${md}`], { type: "text/markdown" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `iorad-prompts-${new Date().toISOString().slice(0, 10)}.md`;
-            a.click();
-            URL.revokeObjectURL(url);
-            toast.success("Prompts exported as Markdown");
-          }}
-        >
-          <Download className="w-4 h-4" />
-          Export Markdown
-        </Button>
-      </div>
+        {/* ── AI ── */}
+        <TabsContent value="ai" className="space-y-6">
+          <div className="panel space-y-4">
+            <div className="panel-header">Model Selection</div>
+            <p className="text-xs text-muted-foreground">The AI model used for all content generation.</p>
+            <Select value={model} onValueChange={setModel}>
+              <SelectTrigger className="bg-secondary"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {AVAILABLE_MODELS.map(m => (
+                  <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <SaveBar />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
 
 // ─── COMPELLING EVENTS TAB ───
+
 function CompellingEventsTab() {
   const queryClient = useQueryClient();
   const { data: events, isLoading } = useQuery({

@@ -1,0 +1,1 @@
+ALTER TABLE public.ai_config ADD COLUMN IF NOT EXISTS inbound_system_prompt TEXT NOT NULL DEFAULT '';
