@@ -72,7 +72,7 @@ export default function Dashboard() {
   };
 
   const handleBulkImport = async () => {
-    toast.info("Starting bulk HubSpot import (last 12 months)… this runs in the background.", { duration: 6000 });
+    toast.info("Starting bulk HubSpot import (all companies)… this runs in the background.", { duration: 6000 });
     try {
       const result = await bulkImport.mutateAsync();
       toast.success(`Bulk import started — ${result.imported ?? 0} new, ${result.updated ?? 0} updated. Scout scoring will run automatically.`);
@@ -286,7 +286,7 @@ export default function Dashboard() {
             disabled={bulkImport.isPending}
           >
             {bulkImport.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-            Bulk Import (12mo)
+            Bulk Import (All)
           </Button>
           <Button
             size="sm"

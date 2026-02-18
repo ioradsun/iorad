@@ -1544,7 +1544,7 @@ function ScoutTab() {
 
   const handleBulkImport = async () => {
     setImporting(true);
-    toast.info("Starting bulk HubSpot import (last 12 months)…", { duration: 6000 });
+    toast.info("Starting bulk HubSpot import (all companies)…", { duration: 6000 });
     try {
       const { data, error } = await supabase.functions.invoke("import-from-hubspot", { body: { action: "bulk_import" } });
       if (error) throw error;
@@ -1593,7 +1593,7 @@ SELECT cron.schedule(
           </Button>
           <Button onClick={handleBulkImport} disabled={importing} variant="outline" className="gap-2">
             {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-            Bulk Import from HubSpot (12mo)
+            Bulk Import from HubSpot (All Companies)
           </Button>
         </div>
       </div>
