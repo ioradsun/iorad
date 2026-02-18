@@ -255,6 +255,7 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
     }
 
     // Inbound STORY response: flat object with behavior_acknowledged, momentum_observed, etc.
+    let isInboundStory = false;
     if (
       cards_json.length === 0 &&
       Object.keys(assets_json).length === 0 &&
@@ -262,6 +263,7 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
       (parsed.behavior_acknowledged || parsed.momentum_observed || parsed.initiative_translation)
     ) {
       account_json = { ...parsed, _type: "inbound_story" };
+      isInboundStory = true;
     }
 
     // Upsert into company_cards — use onConflict to handle the unique constraint safely
@@ -284,6 +286,87 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
     if (upsertErr) {
       console.error("Upsert error:", upsertErr);
       throw new Error(upsertErr.message);
+    }
+
+    // For inbound story: also write the rich narrative into the snapshot so the public
+    // microsite (CustomerStory.tsx) renders the personalized brief instead of a blank template.
+    if (isInboundStory && activeTab === "story") {
+      const p = parsed;
+
+      // Map inbound story fields → snapshot_json schema used by CustomerStory.tsx
+      const whatsHappening: any[] = [];
+      if (p.behavior_acknowledged) whatsHappening.push({ title: "Behavior Acknowledged", detail: p.behavior_acknowledged });
+      if (p.momentum_observed)    whatsHappening.push({ title: "Momentum Observed", detail: p.momentum_observed });
+      if (p.initiative_translation) whatsHappening.push({ title: "Initiative Translation", detail: p.initiative_translation });
+
+      const executionFriction: string[] = [];
+      if (p.scale_risk)               executionFriction.push(p.scale_risk);
+      if (p.institutionalization_gap) executionFriction.push(p.institutionalization_gap);
+
+      const inboundSnapshotJson: Record<string, unknown> = {
+        // Core narrative sections
+        whats_happening: whatsHappening,
+        functional_implications: p.executive_translation || "",
+        execution_friction: executionFriction,
+        real_cost: p.real_cost_if_stalled ? [p.real_cost_if_stalled] : [],
+        blind_spot: p.institutionalization_gap || "",
+        reinforcement_journey: p.reinforcement_journey || "",
+        why_now: p.why_now || "",
+        cta: p.cta || "",
+        // Strategic plays (same schema as outbound)
+        strategic_plays: (p.strategic_plays || []).map((play: any) => ({
+          name: play.name || "",
+          objective: play.objective || "",
+          why_now: play.why_now || "",
+          what_it_looks_like: play.what_it_looks_like || "",
+          expected_impact: play.expected_impact || "",
+        })),
+        // Reinforcement preview
+        reinforcement_preview: p.reinforcement_preview ? {
+          detected_tool: p.reinforcement_preview.detected_tool || "",
+          library_url: p.reinforcement_preview.library_url || null,
+          description: p.reinforcement_preview.description || "",
+        } : undefined,
+        // Internal signals for meta display
+        internal_signals: {
+          primary_persona: p.persona || company.persona || "",
+          confidence_level: "High",
+          urgency: p.intent_tier === "Tier 1" ? "High Momentum" : p.intent_tier === "Tier 2" ? "Active" : "Emerging",
+          signal_types: ["inbound_behavior"],
+          enterprise_systems: [],
+          operational_risks: p.real_cost_if_stalled ? [p.real_cost_if_stalled] : [],
+          hiring_intensity: "",
+          platform_rollout: p.upside_if_executed || "",
+        },
+        // Preserve scoring
+        inbound_tier: latestSnapshot?.score_total ? Math.ceil(latestSnapshot.score_total / 25) : undefined,
+        upside_if_executed: p.upside_if_executed || "",
+        // Opening hook for hero section
+        opening_hook: {
+          subject_line: p.initiative_translation || `${company.name} — Institutionalization Brief`,
+          opening_paragraph: p.behavior_acknowledged || "",
+        },
+      };
+
+      // Update the latest snapshot with the rich story content
+      const existingSnapshot = latestSnapshot;
+      if (existingSnapshot) {
+        const { error: snapUpdateErr } = await sb
+          .from("snapshots")
+          .update({
+            snapshot_json: {
+              ...(existingSnapshot.snapshot_json as Record<string, unknown> || {}),
+              ...inboundSnapshotJson,
+            },
+          })
+          .eq("id", existingSnapshot.id);
+
+        if (snapUpdateErr) {
+          console.warn("Snapshot update failed (non-fatal):", snapUpdateErr.message);
+        } else {
+          console.log(`Inbound story mapped into snapshot for ${company.name}`);
+        }
+      }
     }
 
     console.log(`Cards generated and saved for ${company.name}`);
