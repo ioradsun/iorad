@@ -152,6 +152,30 @@ export function useProcessingJobs() {
       if (error) throw error;
       return data as DbProcessingJob[];
     },
+    refetchInterval: (query) => {
+      const jobs = query.state.data as DbProcessingJob[] | undefined;
+      const hasRunning = jobs?.some(j => j.status === "running");
+      return hasRunning ? 5000 : false;
+    },
+  });
+}
+
+// ---- Active running job (for persistent status banner) ----
+export function useActiveJob() {
+  return useQuery({
+    queryKey: ["active_job"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("processing_jobs")
+        .select("*")
+        .eq("status", "running")
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data as DbProcessingJob | null;
+    },
+    refetchInterval: 5000,
   });
 }
 

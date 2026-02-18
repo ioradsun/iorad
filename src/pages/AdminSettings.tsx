@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAppSettings, useUpdateSettings, DbAppSettings } from "@/hooks/useSupabase";
+import { useAppSettings, useUpdateSettings, useActiveJob, DbAppSettings } from "@/hooks/useSupabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1128,6 +1128,10 @@ function BulkGeneratePanel() {
   const [loadingList, setLoadingList] = useState(false);
   const abortRef = useRef(false);
 
+  // Reconnect to a running job when admin navigates back or re-logs in
+  const { data: activeJob } = useActiveJob();
+  const isRunningInBackground = !running && !!activeJob;
+
   const loadMissingStories = async () => {
     setLoadingList(true);
     try {
@@ -1260,13 +1264,24 @@ function BulkGeneratePanel() {
         Finds every company with no story generated yet and runs the full pipeline (Signals → Contacts → Company Intel → Strategy → Outreach → Story) one at a time.
       </p>
 
+      {/* Background job reconnect banner */}
+      {isRunningInBackground && (
+        <div className="flex items-center gap-2.5 text-xs px-3 py-2.5 rounded-md" style={{ background: "hsl(var(--primary) / 0.08)", color: "hsl(var(--primary))", border: "1px solid hsl(var(--primary) / 0.2)" }}>
+          <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
+          <div className="flex-1">
+            <span className="font-medium">Batch job is running</span>
+            <span className="text-muted-foreground ml-1">— {activeJob!.companies_processed} / {activeJob!.total_companies_targeted} companies processed ({activeJob!.companies_succeeded} done{activeJob!.companies_failed > 0 ? `, ${activeJob!.companies_failed} failed` : ""})</span>
+          </div>
+        </div>
+      )}
+
       {/* Load / action buttons */}
       <div className="flex items-center gap-2">
-        <Button size="sm" variant="outline" onClick={loadMissingStories} disabled={loadingList || running} className="gap-1.5">
+        <Button size="sm" variant="outline" onClick={loadMissingStories} disabled={loadingList || running || isRunningInBackground} className="gap-1.5">
           {loadingList ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <AlertCircle className="w-3.5 h-3.5" />}
           {companies.length > 0 ? `${companies.length} companies need stories` : "Check Missing Stories"}
         </Button>
-        {companies.length > 0 && !running && (
+        {companies.length > 0 && !running && !isRunningInBackground && (
           <Button size="sm" onClick={runAll} className="gap-1.5">
             <Play className="w-3.5 h-3.5" /> Run {companies.length} Companies
           </Button>
