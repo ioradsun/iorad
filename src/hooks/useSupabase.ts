@@ -160,7 +160,7 @@ export function useProcessingJobs() {
   });
 }
 
-// ---- Active running job (for persistent status banner) ----
+// ---- Active running batch job (for persistent status banner — real batches only) ----
 export function useActiveJob() {
   return useQuery({
     queryKey: ["active_job"],
@@ -169,6 +169,7 @@ export function useActiveJob() {
         .from("processing_jobs")
         .select("*")
         .eq("status", "running")
+        .gt("total_companies_targeted", 1)
         .order("started_at", { ascending: false })
         .limit(1)
         .maybeSingle();
