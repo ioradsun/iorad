@@ -1063,49 +1063,89 @@ export default function CompanyDetail() {
                 };
 
                 return (
-                  <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollSnapType: "x mandatory" }}>
+                  <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollSnapType: "x mandatory" }}>
                     {filtered.map((contact) => {
                       const firstName = contact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "");
                       const storyUrl = company.partner
                         ? `/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories/${firstName}`
                         : null;
                       const initials = contact.name.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase();
-                      const profile = (contact as any).contact_profile;
+                      const profile = (contact as any).contact_profile as any;
                       const isGenerating = generatingContactId === contact.id;
                       const rankBadge = getRankBadge(contact);
                       const ioradActivity = getIoradActivity(contact);
+                      const hasSnap = snapshots.length > 0;
+
                       return (
-                        <div key={contact.id} className="border border-border/50 rounded-lg bg-secondary/20 hover:bg-secondary/30 transition-colors flex flex-col flex-shrink-0 w-48" style={{ scrollSnapAlign: "start" }}>
-                          {/* Card top */}
+                        <div
+                          key={contact.id}
+                          className="group border border-border/50 rounded-lg bg-secondary/20 hover:bg-secondary/30 transition-colors flex flex-col flex-shrink-0 w-72 relative"
+                          style={{ scrollSnapAlign: "start" }}
+                        >
+                          {/* Hover overlay: Generate button */}
+                          <div className="absolute inset-0 z-10 rounded-lg bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none group-hover:pointer-events-auto">
+                            <Button
+                              size="sm"
+                              className="gap-1.5 shadow-lg"
+                              onClick={() => generateForContact(contact.id)}
+                              disabled={isGenerating || !!generatingContactId}
+                            >
+                              {isGenerating
+                                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Generating…</>
+                                : <><Sparkles className="w-3.5 h-3.5" />Generate Cards</>}
+                            </Button>
+                          </div>
+
                           <div className="p-3 flex flex-col gap-2 flex-1">
-                             {/* Avatar + rank badge + delete row */}
+                            {/* Top row: avatar + rank + delete */}
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex items-center gap-2">
                                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 text-[13px] font-semibold text-primary">
                                   {initials}
                                 </div>
-                                {rankBadge && (
-                                  <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold ${rankBadge.cls}`}>
-                                    {rankBadge.label}
-                                  </span>
-                                )}
+                                <div className="flex flex-col gap-1">
+                                  {rankBadge && (
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold w-fit ${rankBadge.cls}`}>
+                                      {rankBadge.label}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
-                              <button
-                                onClick={() => setDeleteContactId(contact.id)}
-                                className="text-muted-foreground hover:text-destructive transition-colors mt-0.5"
-                                title="Delete contact"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              <div className="flex items-center gap-1.5">
+                                {contact.linkedin && (
+                                  <a href={contact.linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" title="LinkedIn">
+                                    <Linkedin className="w-3.5 h-3.5" />
+                                  </a>
+                                )}
+                                {storyUrl && hasSnap && (
+                                  <a href={storyUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" title="View story">
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                  </a>
+                                )}
+                                <button
+                                  onClick={() => setDeleteContactId(contact.id)}
+                                  className="text-muted-foreground hover:text-destructive transition-colors"
+                                  title="Delete contact"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
+
                             {/* Name + title */}
                             <div className="space-y-0.5">
-                              <div className="text-[14px] font-semibold leading-tight line-clamp-1">{contact.name}</div>
+                              <div className="text-[14px] font-semibold leading-tight">{contact.name}</div>
                               {contact.title && (
-                                <div className="text-[12px] text-muted-foreground leading-snug line-clamp-2">{contact.title}</div>
+                                <div className="text-[12px] text-muted-foreground leading-snug">{contact.title}</div>
+                              )}
+                              {contact.email && (
+                                <a href={`mailto:${contact.email}`} className="text-[11px] text-muted-foreground hover:text-primary flex items-center gap-1 truncate" title={contact.email}>
+                                  <Mail className="w-3 h-3 flex-shrink-0" /><span className="truncate">{contact.email}</span>
+                                </a>
                               )}
                             </div>
-                            {/* iorad activity indicators */}
+
+                            {/* iorad activity badges */}
                             {(ioradActivity.isCreator || ioradActivity.isViewer || ioradActivity.hasExtension || ioradActivity.monthAnswers > 0) && (
                               <div className="flex flex-wrap gap-1">
                                 {ioradActivity.isCreator && (
@@ -1130,66 +1170,47 @@ export default function CompanyDetail() {
                                 )}
                               </div>
                             )}
-                            {/* Email */}
-                            {contact.email && (
-                              <a
-                                href={`mailto:${contact.email}`}
-                                className="text-[11px] text-muted-foreground hover:text-primary flex items-center gap-1 truncate"
-                                title={contact.email}
-                              >
-                                <Mail className="w-3 h-3 flex-shrink-0" />
-                                <span className="truncate">{contact.email}</span>
-                              </a>
-                            )}
-                            {/* Source + profile badges */}
-                            {(contact.source || profile?.engagement_tier) && (
-                              <div className="flex flex-wrap gap-1">
-                                {contact.source && (
-                                  <span className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-muted-foreground">{contact.source}</span>
+
+                            {/* Key metrics row if profile exists */}
+                            {profile?.key_metrics && (
+                              <div className="flex gap-2 text-[10px] text-muted-foreground">
+                                {profile.key_metrics.tutorials_created != null && (
+                                  <span title="Tutorials created"><span className="font-semibold text-foreground">{profile.key_metrics.tutorials_created}</span> created</span>
                                 )}
-                                {profile?.engagement_tier && (
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded border border-primary/20 bg-primary/10 text-primary font-medium">
-                                    {profile.engagement_tier.replace(/_/g, " ")}
-                                  </span>
+                                {profile.key_metrics.tutorials_viewed != null && (
+                                  <span title="Tutorials viewed"><span className="font-semibold text-foreground">{profile.key_metrics.tutorials_viewed}</span> viewed</span>
                                 )}
-                                {profile?.adoption_stage && (
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded border border-border/50 bg-secondary/30 text-foreground font-medium">
-                                    {profile.adoption_stage.replace(/_/g, " ")}
-                                  </span>
+                                {profile.key_metrics.plan && (
+                                  <span className="ml-auto text-[10px] px-1.5 py-0 rounded bg-secondary text-muted-foreground">{profile.key_metrics.plan}</span>
                                 )}
                               </div>
                             )}
+
+                            {/* AI summary */}
+                            {profile?.account_narrative ? (
+                              <div className="mt-1 pt-2 border-t border-border/40">
+                                <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-4">{profile.account_narrative}</p>
+                              </div>
+                            ) : (
+                              <div className="mt-1 pt-2 border-t border-border/40">
+                                <p className="text-[11px] text-muted-foreground/50 italic">Hover to generate AI summary</p>
+                              </div>
+                            )}
                           </div>
-                          {/* Card footer */}
-                          <div className="px-3 pb-3 pt-1 flex items-center gap-1.5">
-                            <Button
-                              size="sm"
-                              className="flex-1 h-7 text-[12px] gap-1"
-                              onClick={() => generateForContact(contact.id)}
-                              disabled={isGenerating || !!generatingContactId}
-                            >
-                              {isGenerating
-                                ? <><Loader2 className="w-3 h-3 animate-spin" />Generating…</>
-                                : <><Sparkles className="w-3 h-3" />Generate</>}
-                            </Button>
-                            <div className="flex items-center gap-1">
-                              {contact.linkedin && (
-                                <a href={contact.linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" title="LinkedIn">
-                                  <Linkedin className="w-4 h-4" />
-                                </a>
-                              )}
-                              {storyUrl && snap && (
-                                <a href={storyUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" title="View story">
-                                  <ExternalLink className="w-4 h-4" />
-                                </a>
-                              )}
+
+                          {/* Generating spinner shown at bottom when active */}
+                          {isGenerating && (
+                            <div className="px-3 pb-3 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                              <Loader2 className="w-3 h-3 animate-spin" /> Generating…
                             </div>
-                          </div>
+                          )}
                         </div>
                       );
                     })}
                   </div>
                 );
+
+
               })() : companyAny?.buyer_name ? (
                 <div className="flex items-center gap-4 p-2 rounded-md hover:bg-secondary/30 transition-colors">
                   <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center"><UserSearch className="w-4 h-4 text-primary" /></div>
