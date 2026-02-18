@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Building2, ArrowDownRight, ArrowUpRight, Search, Loader2, Plus, ArrowUpDown, ExternalLink, RefreshCw } from "lucide-react";
+import { Building2, Search, Loader2, Plus, ArrowUpDown, ExternalLink, RefreshCw } from "lucide-react";
 import { useCompanies, useSignalCounts, useProcessingJobs } from "@/hooks/useSupabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,7 +11,29 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 
 type SortKey = "name" | "last_score_total" | "signals_count" | "updated_at" | "created_at";
-type SourceTab = "inbound" | "outbound";
+type CategoryTab = "school" | "business" | "partner";
+type StageFilter = "all" | "prospect" | "active_opp" | "customer" | "expansion";
+
+const CATEGORY_LABELS: Record<CategoryTab, string> = {
+  school: "School",
+  business: "Business",
+  partner: "Partner",
+};
+
+const STAGE_LABELS: Record<StageFilter, string> = {
+  all: "All",
+  prospect: "Prospect",
+  active_opp: "Active Opp",
+  customer: "Customer",
+  expansion: "Expansion",
+};
+
+const STAGE_COLORS: Record<string, string> = {
+  prospect:   "bg-muted text-muted-foreground border-border",
+  active_opp: "bg-info/10 text-info border-info/20",
+  customer:   "bg-success/10 text-success border-success/20",
+  expansion:  "bg-primary/10 text-primary border-primary/20",
+};
 
 export default function Dashboard() {
   const { data: companies = [], isLoading } = useCompanies();
@@ -25,7 +47,8 @@ export default function Dashboard() {
   const [sortAsc, setSortAsc] = useState(false);
   const [search, setSearch] = useState("");
   const [partnerFilter, setPartnerFilter] = useState<string>("all");
-  const [activeTab, setActiveTab] = useState<SourceTab>("inbound");
+  const [activeTab, setActiveTab] = useState<CategoryTab>("business");
+  const [stageFilter, setStageFilter] = useState<StageFilter>("all");
 
   const handleHubspotSync = async () => {
     setSyncingHubspot(true);
@@ -35,7 +58,7 @@ export default function Dashboard() {
       });
       if (error) throw error;
       await qc.invalidateQueries({ queryKey: ["companies"] });
-      toast.success("HubSpot sync complete — inbound companies updated.");
+      toast.success("HubSpot sync complete — business companies updated.");
     } catch (err: any) {
       toast.error(`HubSpot sync failed: ${err?.message || "Unknown error"}`);
     } finally {
@@ -71,10 +94,22 @@ export default function Dashboard() {
     return list;
   }, [search, partnerFilter, sortKey, sortAsc, companiesWithSignals]);
 
-  const inbound = useMemo(() => sorted.filter(c => (c as any).source_type === "inbound"), [sorted]);
-  const outbound = useMemo(() => sorted.filter(c => (c as any).source_type !== "inbound"), [sorted]);
-  // When searching, show all results regardless of active tab
-  const activeList = search ? sorted : (activeTab === "inbound" ? inbound : outbound);
+  // Category buckets
+  const byCategory = useMemo(() => ({
+    school:   sorted.filter(c => (c as any).category === "school"),
+    business: sorted.filter(c => (c as any).category === "business" || !(c as any).category),
+    partner:  sorted.filter(c => (c as any).category === "partner"),
+  }), [sorted]);
+
+  // Active list: search shows all, otherwise filter by category + stage
+  const activeList = useMemo(() => {
+    if (search) return sorted;
+    let list = byCategory[activeTab] || [];
+    if (stageFilter !== "all") {
+      list = list.filter(c => (c as any).stage === stageFilter);
+    }
+    return list;
+  }, [search, sorted, byCategory, activeTab, stageFilter]);
 
   const partners = useMemo(() => {
     const set = new Set(companies.map(c => c.partner).filter(Boolean) as string[]);
@@ -83,20 +118,20 @@ export default function Dashboard() {
 
   const stats = useMemo(() => {
     const now = Date.now();
-    const oneDayAgo = now - 24 * 60 * 60 * 1000;
-    let newInbound = 0;
-    let newOutbound = 0;
-    let lastInboundDate: Date | null = null;
+    const oneWeekAgo = now - 7 * 24 * 60 * 60 * 1000;
+    let newThisWeek = 0;
     for (const c of companies) {
       const createdAt = new Date(c.created_at);
-      if ((c as any).source_type === "inbound") {
-        if (!lastInboundDate || createdAt > lastInboundDate) lastInboundDate = createdAt;
-        if (createdAt.getTime() >= oneDayAgo) newInbound++;
-      } else {
-        if (createdAt.getTime() >= oneDayAgo) newOutbound++;
-      }
+      if (createdAt.getTime() >= oneWeekAgo) newThisWeek++;
     }
-    return { total: companies.length, newInbound, newOutbound, lastInboundDate };
+
+    // Stage breakdown across all companies
+    const stageCounts = { prospect: 0, active_opp: 0, customer: 0, expansion: 0 };
+    for (const c of companies) {
+      const stage = (c as any).stage || "prospect";
+      if (stage in stageCounts) stageCounts[stage as keyof typeof stageCounts]++;
+    }
+    return { total: companies.length, newThisWeek, stageCounts };
   }, [companies]);
 
   const toggleSort = (key: SortKey) => {
@@ -123,6 +158,8 @@ export default function Dashboard() {
     );
   }
 
+  const stageFilters: StageFilter[] = ["all", "prospect", "active_opp", "customer", "expansion"];
+
   return (
     <div className="max-w-6xl mx-auto px-1 space-y-6">
 
@@ -135,41 +172,43 @@ export default function Dashboard() {
           iconBg="var(--stat-total-bg)"
         />
         <KpiCard
-          value={stats.newInbound}
-          label="New inbound (24h)"
-          icon={<ArrowDownRight className="w-4 h-4" style={{ color: "var(--stat-inbound-fg)" }} />}
+          value={stats.newThisWeek}
+          label="New this week"
+          icon={<Building2 className="w-4 h-4" style={{ color: "var(--stat-inbound-fg)" }} />}
           iconBg="var(--stat-inbound-bg)"
-          subtitle={stats.lastInboundDate
-            ? `Last: ${stats.lastInboundDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })} ${stats.lastInboundDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}`
-            : undefined}
           onRefresh={handleHubspotSync}
           refreshing={syncingHubspot}
         />
-        <KpiCard
-          value={stats.newOutbound}
-          label="New outbound (24h)"
-          icon={<ArrowUpRight className="w-4 h-4" style={{ color: "var(--stat-outbound-fg)" }} />}
-          iconBg="var(--stat-outbound-bg)"
-        />
+        {/* Stage breakdown mini-card */}
+        <div className="bg-card shadow-sm shadow-black/[0.04] rounded-lg px-5 py-4">
+          <div className="text-[13px] font-medium text-muted-foreground mb-2.5 leading-tight">Pipeline stages</div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+            {(Object.entries(stats.stageCounts) as [string, number][]).map(([stage, count]) => (
+              <div key={stage} className="flex items-center justify-between gap-2">
+                <span className="text-[11px] text-muted-foreground capitalize">{stage.replace("_", " ")}</span>
+                <span className="text-[13px] font-semibold tabular-nums text-foreground">{count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* ── Toolbar ── */}
+      {/* ── Category Tabs ── */}
       <div className="flex flex-wrap items-center gap-2.5">
-        {/* Source switcher */}
         <div className="flex items-center bg-secondary rounded-md p-0.5 gap-0.5">
-          {(["inbound", "outbound"] as SourceTab[]).map(tab => (
+          {(["school", "business", "partner"] as CategoryTab[]).map(tab => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-3.5 py-1.5 rounded text-sm font-medium capitalize transition-all ${
+              onClick={() => { setActiveTab(tab); setStageFilter("all"); }}
+              className={`px-3.5 py-1.5 rounded text-sm font-medium transition-all ${
                 activeTab === tab
                   ? "bg-card text-foreground shadow-sm shadow-black/[0.06]"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {tab}
+              {CATEGORY_LABELS[tab]}
               <span className="ml-1.5 tabular-nums text-xs text-muted-foreground">
-                {tab === "inbound" ? inbound.length : outbound.length}
+                {byCategory[tab].length}
               </span>
             </button>
           ))}
@@ -185,7 +224,7 @@ export default function Dashboard() {
           />
         </div>
 
-        {activeTab === "outbound" && partners.length > 0 && (
+        {activeTab === "partner" && partners.length > 0 && (
           <Select value={partnerFilter} onValueChange={setPartnerFilter}>
             <SelectTrigger className="w-[160px] h-8 text-xs bg-secondary border-0 focus:ring-1 focus:ring-ring/30">
               <SelectValue placeholder="All partners" />
@@ -217,6 +256,30 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* ── Stage pill filter ── */}
+      {!search && (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {stageFilters.map(stage => (
+            <button
+              key={stage}
+              onClick={() => setStageFilter(stage)}
+              className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${
+                stageFilter === stage
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/40"
+              }`}
+            >
+              {STAGE_LABELS[stage]}
+              {stage !== "all" && (
+                <span className="ml-1.5 tabular-nums opacity-70">
+                  {byCategory[activeTab].filter(c => (c as any).stage === stage).length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* ── Table ── */}
       <div className="rounded-lg bg-card overflow-hidden">
         <table className="w-full">
@@ -227,9 +290,12 @@ export default function Dashboard() {
               </th>
               {search && (
                 <th className="text-left px-5 py-3.5 hidden sm:table-cell">
-                  <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Source</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Category</span>
                 </th>
               )}
+              <th className="text-left px-5 py-3.5 hidden sm:table-cell">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Stage</span>
+              </th>
               <th className="text-left px-5 py-3.5 hidden md:table-cell">
                 <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Partner</span>
               </th>
@@ -263,9 +329,12 @@ export default function Dashboard() {
                 </td>
                 {search && (
                   <td className="px-5 py-4 hidden sm:table-cell">
-                    <SourcePill type={(company as any).source_type || "outbound"} />
+                    <CategoryPill category={(company as any).category || "business"} />
                   </td>
                 )}
+                <td className="px-5 py-4 hidden sm:table-cell">
+                  <StagePill stage={(company as any).stage || "prospect"} />
+                </td>
                 <td className="px-5 py-4 hidden md:table-cell">
                   <span className="text-[14px] text-muted-foreground">{company.partner || "—"}</span>
                 </td>
@@ -301,10 +370,10 @@ export default function Dashboard() {
             ))}
             {activeList.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-5 py-16 text-center text-sm text-muted-foreground">
+                <td colSpan={7} className="px-5 py-16 text-center text-sm text-muted-foreground">
                   {companies.length === 0
                     ? "No companies yet — upload a CSV to get started."
-                    : `No ${activeTab} companies match your filters.`}
+                    : `No ${CATEGORY_LABELS[activeTab]} companies match your filters.`}
                 </td>
               </tr>
             )}
@@ -362,22 +431,27 @@ function KpiCard({
   );
 }
 
-function SourcePill({ type }: { type: string }) {
-  const isInbound = type === "inbound";
+function StagePill({ stage }: { stage: string }) {
+  const colors = STAGE_COLORS[stage] || STAGE_COLORS.prospect;
+  const label = STAGE_LABELS[stage as StageFilter] || stage;
   return (
-    <span
-      className="inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded border"
-      style={isInbound ? {
-        background: "var(--source-inbound-bg)",
-        color: "var(--source-inbound-fg)",
-        borderColor: "var(--source-inbound-border)",
-      } : {
-        background: "var(--source-outbound-bg)",
-        color: "var(--source-outbound-fg)",
-        borderColor: "var(--source-outbound-border)",
-      }}
-    >
-      {type}
+    <span className={`inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded border ${colors}`}>
+      {label}
+    </span>
+  );
+}
+
+function CategoryPill({ category }: { category: string }) {
+  const colorMap: Record<string, string> = {
+    school:   "bg-info/10 text-info border-info/20",
+    business: "bg-muted text-muted-foreground border-border",
+    partner:  "bg-primary/10 text-primary border-primary/20",
+  };
+  const colors = colorMap[category] || colorMap.business;
+  const labelMap: Record<string, string> = { school: "School", business: "Business", partner: "Partner" };
+  return (
+    <span className={`inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded border ${colors}`}>
+      {labelMap[category] || category}
     </span>
   );
 }

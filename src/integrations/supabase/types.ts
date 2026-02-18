@@ -16,6 +16,8 @@ export type Database = {
     Tables: {
       ai_config: {
         Row: {
+          business_prompt_template: string
+          business_system_prompt: string
           cards_prompt_template: string
           company_prompt: string
           id: number
@@ -26,7 +28,11 @@ export type Database = {
           inbound_transcript_prompt: string
           model: string
           outreach_prompt: string
+          partner_prompt_template: string
+          partner_system_prompt: string
           prompt_template: string
+          school_prompt_template: string
+          school_system_prompt: string
           story_prompt: string
           strategy_prompt: string
           system_prompt: string
@@ -34,6 +40,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          business_prompt_template?: string
+          business_system_prompt?: string
           cards_prompt_template?: string
           company_prompt?: string
           id?: number
@@ -44,7 +52,11 @@ export type Database = {
           inbound_transcript_prompt?: string
           model?: string
           outreach_prompt?: string
+          partner_prompt_template?: string
+          partner_system_prompt?: string
           prompt_template?: string
+          school_prompt_template?: string
+          school_system_prompt?: string
           story_prompt?: string
           strategy_prompt?: string
           system_prompt?: string
@@ -52,6 +64,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          business_prompt_template?: string
+          business_system_prompt?: string
           cards_prompt_template?: string
           company_prompt?: string
           id?: number
@@ -62,7 +76,11 @@ export type Database = {
           inbound_transcript_prompt?: string
           model?: string
           outreach_prompt?: string
+          partner_prompt_template?: string
+          partner_system_prompt?: string
           prompt_template?: string
+          school_prompt_template?: string
+          school_system_prompt?: string
           story_prompt?: string
           strategy_prompt?: string
           system_prompt?: string
@@ -131,6 +149,7 @@ export type Database = {
           buyer_linkedin: string | null
           buyer_name: string | null
           buyer_title: string | null
+          category: string
           clay_pushed_at: string | null
           created_at: string
           domain: string | null
@@ -151,6 +170,7 @@ export type Database = {
           persona: string | null
           snapshot_status: string | null
           source_type: string
+          stage: string
           updated_at: string
         }
         Insert: {
@@ -158,6 +178,7 @@ export type Database = {
           buyer_linkedin?: string | null
           buyer_name?: string | null
           buyer_title?: string | null
+          category?: string
           clay_pushed_at?: string | null
           created_at?: string
           domain?: string | null
@@ -178,6 +199,7 @@ export type Database = {
           persona?: string | null
           snapshot_status?: string | null
           source_type?: string
+          stage?: string
           updated_at?: string
         }
         Update: {
@@ -185,6 +207,7 @@ export type Database = {
           buyer_linkedin?: string | null
           buyer_name?: string | null
           buyer_title?: string | null
+          category?: string
           clay_pushed_at?: string | null
           created_at?: string
           domain?: string | null
@@ -205,6 +228,7 @@ export type Database = {
           persona?: string | null
           snapshot_status?: string | null
           source_type?: string
+          stage?: string
           updated_at?: string
         }
         Relationships: []
