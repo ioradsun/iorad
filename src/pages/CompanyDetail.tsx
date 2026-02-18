@@ -1037,7 +1037,7 @@ export default function CompanyDetail() {
                   return (c.name?.toLowerCase().includes(q) || c.title?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q));
                 });
                 return (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                  <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollSnapType: "x mandatory" }}>
                     {filtered.map((contact) => {
                       const firstName = contact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "");
                       const storyUrl = company.partner
@@ -1047,7 +1047,7 @@ export default function CompanyDetail() {
                       const profile = (contact as any).contact_profile;
                       const isGenerating = generatingContactId === contact.id;
                       return (
-                        <div key={contact.id} className="border border-border/50 rounded-lg bg-secondary/20 hover:bg-secondary/30 transition-colors flex flex-col">
+                        <div key={contact.id} className="border border-border/50 rounded-lg bg-secondary/20 hover:bg-secondary/30 transition-colors flex flex-col flex-shrink-0 w-48" style={{ scrollSnapAlign: "start" }}>
                           {/* Card top */}
                           <div className="p-3 flex flex-col gap-2 flex-1">
                             {/* Avatar + delete row */}
