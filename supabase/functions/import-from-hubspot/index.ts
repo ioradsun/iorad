@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
 
     // Bulk import all HubSpot companies created in the last 12 months (self-chaining)
     if (body.action === "bulk_import") {
-      return await bulkImportCompanies(supabase, body.after || null, body.job_id || null);
+      return await bulkImportCompanies(supabase, body.after || null, body.job_id || null, body.total_processed || 0);
     }
 
     // Validate HubSpot webhook signature only when a signature header is actually present
@@ -1080,7 +1080,12 @@ async function listHubSpotCompanies(search: string, after: string | null) {
 
 // ── Bulk Import: all HubSpot companies created in the last 12 months ────────
 // Self-chaining: processes 50 companies per invocation to stay under timeout
-async function bulkImportCompanies(supabase: any, after: string | null, jobId: string | null) {
+async function bulkImportCompanies(
+  supabase: any,
+  after: string | null,
+  jobId: string | null,
+  totalProcessed = 0,
+) {
   const apiKey = Deno.env.get("HUBSPOT_API_KEY");
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -1091,53 +1096,48 @@ async function bulkImportCompanies(supabase: any, after: string | null, jobId: s
     });
   }
 
-  // Create or reuse a processing job to track progress
+  // Create job on first call (after === null && jobId === null)
   let currentJobId = jobId;
   if (!currentJobId) {
-    const { data: job } = await supabase.from("processing_jobs").insert({
-      trigger: "bulk_import",
-      status: "running",
-      settings_snapshot: { action: "bulk_import", started: new Date().toISOString() },
-    }).select("id").single();
+    const { data: job, error: jobErr } = await supabase
+      .from("processing_jobs")
+      .insert({
+        trigger: "manual",
+        status: "running",
+        total_companies_targeted: 0,
+        settings_snapshot: { action: "bulk_import", started: new Date().toISOString() },
+      })
+      .select("id")
+      .single();
+    if (jobErr) console.warn(`bulk_import: job insert error: ${jobErr.message}`);
     currentJobId = job?.id || null;
     console.log(`bulk_import: created job ${currentJobId}`);
   }
 
-  const twelveMonthsAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+  // ── Fetch ALL companies from HubSpot using the list endpoint (no date filter)
+  // Using GET /crm/v3/objects/companies with pagination cursor
+  const params = new URLSearchParams({
+    limit: "100",
+    properties: "name,domain,industry,country,numberofemployees,lifecyclestage,createdate,hs_lastmodifieddate,hubspot_owner_id",
+    archived: "false",
+  });
+  if (after) params.set("after", after);
 
-  // HubSpot search: companies created in last 12 months
-  const searchBody: any = {
-    filterGroups: [{
-      filters: [{
-        propertyName: "createdate",
-        operator: "GTE",
-        value: twelveMonthsAgo,
-      }],
-    }],
-    properties: ["name", "domain", "industry", "country", "numberofemployees", "lifecyclestage",
-      "createdate", "hs_lastmodifieddate", "hubspot_owner_id"],
-    limit: 50,
-    sorts: [{ propertyName: "createdate", direction: "DESCENDING" }],
-  };
-  if (after) searchBody.after = after;
-
-  const res = await fetch("https://api.hubapi.com/crm/v3/objects/companies/search", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify(searchBody),
+  const res = await fetch(`https://api.hubapi.com/crm/v3/objects/companies?${params}`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
   });
 
   if (!res.ok) {
     const text = await res.text();
-    console.error(`bulk_import: HubSpot search failed [${res.status}]: ${text}`);
+    console.error(`bulk_import: HubSpot list failed [${res.status}]: ${text}`);
     if (currentJobId) {
       await supabase.from("processing_jobs").update({
         status: "failed",
         finished_at: new Date().toISOString(),
-        error_summary: `HubSpot search failed: ${text.slice(0, 300)}`,
+        error_summary: `HubSpot list failed: ${text.slice(0, 300)}`,
       }).eq("id", currentJobId);
     }
-    return new Response(JSON.stringify({ error: `HubSpot search failed: ${res.status}` }), {
+    return new Response(JSON.stringify({ error: `HubSpot list failed: ${res.status}` }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
@@ -1147,7 +1147,7 @@ async function bulkImportCompanies(supabase: any, after: string | null, jobId: s
   const nextAfter = data.paging?.next?.after || null;
   const hasMore = !!nextAfter;
 
-  console.log(`bulk_import: processing ${companies.length} companies (after=${after}, hasMore=${hasMore})`);
+  console.log(`bulk_import: processing ${companies.length} companies (after=${after ?? "start"}, hasMore=${hasMore})`);
 
   let imported = 0;
   let updated = 0;
@@ -1155,16 +1155,27 @@ async function bulkImportCompanies(supabase: any, after: string | null, jobId: s
 
   for (const hsCompany of companies) {
     try {
-      const domain = (hsCompany.properties?.domain || "").toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+      const domain = (hsCompany.properties?.domain || "")
+        .toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
       const { isNew } = await upsertCompany(supabase, hsCompany);
 
-      // Get the actual company ID we upserted
+      // Resolve DB company id (needed for no-domain companies too)
+      let dbId: string | null = null;
       if (domain) {
         const { data: dbCo } = await supabase.from("companies").select("id").eq("domain", domain).maybeSingle();
-        if (dbCo?.id) {
-          await importContactsForCompany(supabase, hsCompany.id, dbCo.id);
-          await supabase.from("companies").update({ scout_synced_at: new Date().toISOString() }).eq("id", dbCo.id);
-        }
+        dbId = dbCo?.id || null;
+      }
+      if (!dbId) {
+        const { data: dbCo } = await supabase.from("companies")
+          .select("id").eq("name", (hsCompany.properties?.name || "").trim()).maybeSingle();
+        dbId = dbCo?.id || null;
+      }
+
+      if (dbId) {
+        await importContactsForCompany(supabase, hsCompany.id, dbId);
+        await supabase.from("companies")
+          .update({ scout_synced_at: new Date().toISOString() })
+          .eq("id", dbId);
       }
 
       if (isNew) imported++; else updated++;
@@ -1174,30 +1185,40 @@ async function bulkImportCompanies(supabase: any, after: string | null, jobId: s
     }
   }
 
-  // Update job progress
+  const newTotal = totalProcessed + imported + updated;
+
+  // Update job progress (accumulate across chains)
   if (currentJobId) {
     await supabase.from("processing_jobs").update({
-      companies_processed: (imported + updated),
-      companies_succeeded: imported + updated,
+      companies_processed: newTotal,
+      companies_succeeded: newTotal,
       companies_failed: errors,
     }).eq("id", currentJobId);
   }
 
-  // Self-chain if there are more pages
+  // Self-chain for next page
   if (hasMore) {
-    console.log(`bulk_import: self-chaining with after=${nextAfter}`);
+    console.log(`bulk_import: self-chaining with after=${nextAfter}, totalSoFar=${newTotal}`);
     fetch(`${supabaseUrl}/functions/v1/import-from-hubspot`, {
       method: "POST",
       headers: { Authorization: `Bearer ${serviceRoleKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "bulk_import", after: nextAfter, job_id: currentJobId }),
+      body: JSON.stringify({
+        action: "bulk_import",
+        after: nextAfter,
+        job_id: currentJobId,
+        total_processed: newTotal,
+      }),
     }).catch((e: any) => console.error("bulk_import self-chain error:", e.message));
   } else {
-    // All pages done — kick off scoring
-    console.log(`bulk_import: all pages done, triggering score_all`);
+    // All pages done — finalize job and kick off scoring
+    console.log(`bulk_import: all pages done — total=${newTotal}, triggering score_all`);
     if (currentJobId) {
       await supabase.from("processing_jobs").update({
         status: "completed",
         finished_at: new Date().toISOString(),
+        total_companies_targeted: newTotal,
+        companies_processed: newTotal,
+        companies_succeeded: newTotal,
       }).eq("id", currentJobId);
     }
     fetch(`${supabaseUrl}/functions/v1/score-companies`, {
@@ -1213,6 +1234,7 @@ async function bulkImportCompanies(supabase: any, after: string | null, jobId: s
       imported,
       updated,
       errors,
+      total_processed: newTotal,
       has_more: hasMore,
       job_id: currentJobId,
     }),
