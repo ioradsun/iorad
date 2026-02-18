@@ -6,6 +6,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useActiveJob } from "@/hooks/useSupabase";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -21,12 +23,29 @@ const menuItems = [
 
 function ActiveJobBanner() {
   const { data: job } = useActiveJob();
+
+  const { data: currentItem } = useQuery({
+    queryKey: ["banner_current_item", job?.id],
+    enabled: !!job?.id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("processing_job_items")
+        .select("*, companies(name)")
+        .eq("job_id", job!.id)
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    refetchInterval: 3_000,
+  });
+
   if (!job) return null;
 
-  const processed = job.companies_processed ?? 0;
-  const total = job.total_companies_targeted ?? 0;
-  const succeeded = job.companies_succeeded ?? 0;
-  const failed = job.companies_failed ?? 0;
+  const currentCompany =
+    (currentItem?.companies as any)?.name ??
+    (job.settings_snapshot as any)?.current_company ??
+    null;
 
   return (
     <div
@@ -39,7 +58,7 @@ function ActiveJobBanner() {
     >
       <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
       <span>
-        Generating stories — {succeeded} done{failed > 0 ? `, ${failed} failed` : ""}, {processed} / {total} processed
+        Generating stories{currentCompany ? ` — ${currentCompany}` : ""}
       </span>
       <Link
         to="/jobs"
