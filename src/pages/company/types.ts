@@ -22,7 +22,7 @@ export interface SnapshotJSON {
   competitive_insulation?: string[];
 }
 
-export interface CardField { label: string; value: string; status?: string }
+export interface CardField { label: string; value: string; status?: string; source?: string }
 export interface CardAction { label: string; value: string }
 export interface Strategy { title: string; pitch: string; why_now: string; proof: string; what_to_validate: string[]; sources: string[] }
 export interface DashboardCard { id: string; title: string; priority: string; fields?: CardField[]; actions?: CardAction[]; strategies?: Strategy[] }
