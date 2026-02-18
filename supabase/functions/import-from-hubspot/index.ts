@@ -78,6 +78,7 @@ Deno.serve(async (req) => {
     let imported = 0;
     let skipped = 0;
     const errors: string[] = [];
+    const toProcess: string[] = []; // company IDs to auto-process
 
     for (const event of events) {
       try {
@@ -87,19 +88,65 @@ Deno.serve(async (req) => {
         const company = await fetchHubSpotCompany(objectId);
         if (!company) { skipped++; continue; }
 
-        const companyId = await upsertCompany(supabase, company);
+        const { companyId, isNew, hasStory } = await upsertCompany(supabase, company);
         await importContactsForCompany(supabase, objectId, companyId);
         imported++;
+
+        // Queue for auto-processing: only new companies without a story
+        if (isNew && !hasStory) {
+          toProcess.push(companyId);
+          console.log(`Queued for auto-processing: ${company.properties?.name || companyId}`);
+        } else {
+          console.log(`Skipping auto-process: ${company.properties?.name} (isNew=${isNew}, hasStory=${hasStory})`);
+        }
       } catch (err: any) {
         errors.push(`Event ${event.objectId || "unknown"}: ${err.message}`);
         skipped++;
       }
     }
 
-    console.log(`HubSpot webhook: ${imported} imported, ${skipped} skipped`);
+    console.log(`HubSpot webhook: ${imported} imported, ${skipped} skipped, ${toProcess.length} queued for processing`);
+
+    // Fire background processing — respond to HubSpot immediately, then process sequentially
+    if (toProcess.length > 0) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+      const runSequential = async () => {
+        for (const companyId of toProcess) {
+          try {
+            console.log(`Auto-processing inbound company: ${companyId}`);
+            const res = await fetch(`${supabaseUrl}/functions/v1/run-signals`, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${serviceRoleKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ company_id: companyId, mode: "full" }),
+            });
+            const result = await res.json();
+            console.log(`Auto-processing done for ${companyId}:`, result?.status || result?.error || "ok");
+          } catch (err: any) {
+            console.error(`Auto-processing failed for ${companyId}:`, err.message);
+          }
+          // 1-minute gap between companies if there are multiple
+          if (toProcess.indexOf(companyId) < toProcess.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 60_000));
+          }
+        }
+      };
+
+      // @ts-ignore - EdgeRuntime available in Supabase edge functions
+      if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) {
+        // @ts-ignore
+        EdgeRuntime.waitUntil(runSequential());
+      } else {
+        runSequential().catch(console.error);
+      }
+    }
 
     return new Response(
-      JSON.stringify({ success: true, imported, skipped, errors: errors.slice(0, 10) }),
+      JSON.stringify({ success: true, imported, skipped, queued: toProcess.length, errors: errors.slice(0, 10) }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err: any) {
@@ -239,8 +286,9 @@ async function syncRecentCompanies(supabase: any) {
   );
 }
 
-// Upsert a HubSpot company into our companies table, returns the company ID
-async function upsertCompany(supabase: any, hubspotCompany: any): Promise<string> {
+// Upsert a HubSpot company into our companies table
+// Returns { companyId, isNew, hasStory } so caller can decide whether to auto-process
+async function upsertCompany(supabase: any, hubspotCompany: any): Promise<{ companyId: string; isNew: boolean; hasStory: boolean }> {
   const props = hubspotCompany.properties || {};
   const domain = props.domain
     ? props.domain.toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "")
@@ -262,20 +310,21 @@ async function upsertCompany(supabase: any, hubspotCompany: any): Promise<string
   if (domain) {
     const { data: existing } = await supabase
       .from("companies")
-      .select("id")
+      .select("id, snapshot_status")
       .eq("domain", domain)
       .maybeSingle();
 
     if (existing) {
       await supabase.from("companies").update(companyData).eq("id", existing.id);
-      return existing.id;
+      const hasStory = existing.snapshot_status === "Generated";
+      return { companyId: existing.id, isNew: false, hasStory };
     }
   }
 
   // Insert new company
-  const { data: inserted, error } = await supabase.from("companies").insert(companyData).select("id").single();
+  const { data: inserted, error } = await supabase.from("companies").insert(companyData).select("id, snapshot_status").single();
   if (error) throw error;
-  return inserted.id;
+  return { companyId: inserted.id, isNew: true, hasStory: false };
 }
 
 // Fetch contacts associated with a HubSpot company and save them
