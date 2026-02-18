@@ -254,6 +254,16 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
       };
     }
 
+    // Inbound STORY response: flat object with behavior_acknowledged, momentum_observed, etc.
+    if (
+      cards_json.length === 0 &&
+      Object.keys(assets_json).length === 0 &&
+      Object.keys(account_json).length === 0 &&
+      (parsed.behavior_acknowledged || parsed.momentum_observed || parsed.initiative_translation)
+    ) {
+      account_json = { ...parsed, _type: "inbound_story" };
+    }
+
     // Upsert into company_cards — use onConflict to handle the unique constraint safely
     const upsertRow: Record<string, unknown> = {
       company_id,

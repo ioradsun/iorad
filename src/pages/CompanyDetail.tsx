@@ -446,6 +446,8 @@ export default function CompanyDetail() {
   const rawAccountJson = parseJson<Record<string, unknown>>(companyCards?.account_json as Json) || {};
   // Detect inbound strategy response: flat object stored in account_json (no cards array)
   const isInboundStrategyResponse = cards.length === 0 && !!(rawAccountJson?.observed_behavior || rawAccountJson?.inferred_initiative);
+  // Detect inbound story response
+  const isInboundStoryResponse = !!(rawAccountJson?._type === "inbound_story" || rawAccountJson?.behavior_acknowledged || rawAccountJson?.momentum_observed);
   const inboundStrategyFields: { label: string; key: string }[] = [
     { label: "Observed Behavior", key: "observed_behavior" },
     { label: "Inferred Initiative", key: "inferred_initiative" },
@@ -1294,10 +1296,88 @@ export default function CompanyDetail() {
               )}
               <Button size="sm" className="gap-1.5 text-[13px]" onClick={generateCards} disabled={generatingCards}>
                 {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                {generatingCards ? "Generating…" : (assets.story_assets ? "Regenerate" : "Generate")}
+                {generatingCards ? "Generating…" : (isInboundStoryResponse || assets.story_assets ? "Regenerate" : "Generate")}
               </Button>
             </div>
           </div>
+
+          {/* Inbound Story — AI-Generated Institutional Brief */}
+          {isInboundStoryResponse && (
+            <div className="space-y-4">
+              <div className="glow-line" />
+
+              {/* Header meta */}
+              <div className="flex flex-wrap items-center gap-2">
+                {rawAccountJson.intent_tier && (
+                  <Badge variant="outline" className="text-[11px]">Tier: {String(rawAccountJson.intent_tier)}</Badge>
+                )}
+                {rawAccountJson.momentum_score !== undefined && (
+                  <Badge variant="outline" className="text-[11px]">Momentum Score: {String(rawAccountJson.momentum_score)}</Badge>
+                )}
+                {rawAccountJson.persona && (
+                  <Badge variant="secondary" className="text-[11px]">{String(rawAccountJson.persona)}</Badge>
+                )}
+              </div>
+
+              {/* Narrative sections */}
+              {[
+                { label: "Behavior Acknowledged", key: "behavior_acknowledged" },
+                { label: "Momentum Observed", key: "momentum_observed" },
+                { label: "Initiative Translation", key: "initiative_translation" },
+                { label: "Scale Risk", key: "scale_risk" },
+                { label: "Institutionalization Gap", key: "institutionalization_gap" },
+                { label: "Executive Translation", key: "executive_translation" },
+                { label: "Reinforcement Journey", key: "reinforcement_journey" },
+                { label: "Real Cost If Stalled", key: "real_cost_if_stalled" },
+                { label: "Upside If Executed", key: "upside_if_executed" },
+                { label: "Why Now", key: "why_now" },
+                { label: "CTA", key: "cta" },
+              ].map(({ label, key }) =>
+                rawAccountJson[key] ? (
+                  <div key={key} className="panel p-4 rounded-lg space-y-1">
+                    <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">{label}</div>
+                    <p className="text-[13px] leading-relaxed text-foreground/90 whitespace-pre-line">{String(rawAccountJson[key])}</p>
+                  </div>
+                ) : null
+              )}
+
+              {/* Strategic Plays */}
+              {Array.isArray(rawAccountJson.strategic_plays) && (rawAccountJson.strategic_plays as any[]).length > 0 && (
+                <div className="space-y-3">
+                  <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Strategic Expansion Plays</div>
+                  <div className="grid grid-cols-1 gap-3">
+                    {(rawAccountJson.strategic_plays as any[]).map((play: any, i: number) => (
+                      <div key={i} className="panel p-4 rounded-lg border border-border/60 space-y-2">
+                        <div className="font-semibold text-[13px] text-foreground">{play.name}</div>
+                        {play.objective && <p className="text-[12px] text-muted-foreground"><span className="font-mono uppercase tracking-wider text-[10px]">Objective:</span> {play.objective}</p>}
+                        {play.why_now && <p className="text-[12px] text-muted-foreground"><span className="font-mono uppercase tracking-wider text-[10px]">Why Now:</span> {play.why_now}</p>}
+                        {play.what_it_looks_like && <p className="text-[12px] text-foreground/80 leading-relaxed"><span className="font-mono uppercase tracking-wider text-[10px]">What It Looks Like:</span> {play.what_it_looks_like}</p>}
+                        {play.expected_impact && <p className="text-[12px] text-primary/90"><span className="font-mono uppercase tracking-wider text-[10px]">Expected Impact:</span> {play.expected_impact}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Reinforcement Preview */}
+              {rawAccountJson.reinforcement_preview && typeof rawAccountJson.reinforcement_preview === "object" && (
+                <div className="panel p-4 rounded-lg space-y-2">
+                  <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Reinforcement Preview</div>
+                  {(rawAccountJson.reinforcement_preview as any).detected_tool && (
+                    <p className="text-[13px]"><span className="text-muted-foreground text-[11px]">Detected Tool:</span> {(rawAccountJson.reinforcement_preview as any).detected_tool}</p>
+                  )}
+                  {(rawAccountJson.reinforcement_preview as any).library_url && (
+                    <a href={(rawAccountJson.reinforcement_preview as any).library_url} target="_blank" rel="noopener noreferrer" className="text-primary text-[13px] underline">
+                      View Library →
+                    </a>
+                  )}
+                  {(rawAccountJson.reinforcement_preview as any).description && (
+                    <p className="text-[13px] text-foreground/80 leading-relaxed">{(rawAccountJson.reinforcement_preview as any).description}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* URL Inputs */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
