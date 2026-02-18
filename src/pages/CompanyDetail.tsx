@@ -525,10 +525,11 @@ export default function CompanyDetail() {
   const cards = (companyCards?.cards_json as unknown as DashboardCard[] | null) || [];
   const assets = parseJson<{ email_sequence?: Record<string, EmailTouch>; linkedin_sequence?: LinkedInStep[]; story_assets?: StoryAssets }>(companyCards?.assets_json as Json) || {};
   const rawAccountJson = parseJson<Record<string, unknown>>(companyCards?.account_json as Json) || {};
-  // Detect inbound strategy response: flat object stored in account_json (no cards array)
-  const isInboundStrategyResponse = cards.length === 0 && !!(rawAccountJson?.observed_behavior || rawAccountJson?.inferred_initiative);
+  // Detect inbound strategy response: flat object stored in account_json (with _type marker or legacy detection)
+  const isInboundStrategyResponse = !!(rawAccountJson?._type === "inbound_strategy" ||
+    (cards.length === 0 && (rawAccountJson?.observed_behavior || rawAccountJson?.inferred_initiative || rawAccountJson?.momentum_observed) && rawAccountJson?._type !== "inbound_story"));
   // Detect inbound story response
-  const isInboundStoryResponse = !!(rawAccountJson?._type === "inbound_story" || rawAccountJson?.behavior_acknowledged || rawAccountJson?.momentum_observed);
+  const isInboundStoryResponse = !!(rawAccountJson?._type === "inbound_story" || (rawAccountJson?.behavior_acknowledged && rawAccountJson?._type !== "inbound_strategy"));
   const inboundStrategyFields: { label: string; key: string }[] = [
     { label: "Observed Behavior", key: "observed_behavior" },
     { label: "Inferred Initiative", key: "inferred_initiative" },
@@ -588,7 +589,7 @@ export default function CompanyDetail() {
               {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
               {generatingCards
                 ? generateStep ? `${generateStep}…` : "Generating…"
-                : (isInboundStoryResponse || cards.length > 0 || assets.email_sequence) ? "Regenerate All" : "Generate All"}
+                : (isInboundStoryResponse || isInboundStrategyResponse || cards.length > 0 || assets.email_sequence) ? "Regenerate All" : "Generate All"}
             </Button>
           )}
         </div>
