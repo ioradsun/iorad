@@ -68,22 +68,29 @@ Deno.serve(async (req) => {
     const titleKeywords = (searchPersona && PERSONA_TITLES[searchPersona]) || TITLE_KEYWORDS;
     console.log(`Apollo search for: ${company.name} (domain: ${company.domain}, persona: ${searchPersona || "default"})`);
 
-    // Helper: run Apollo People Search with given params
-    async function apolloSearch(params: Record<string, unknown>, useTitles = true) {
-      const searchParams: Record<string, unknown> = { per_page: 10, page: 1, ...params };
-      if (useTitles) searchParams.person_titles = titleKeywords;
-      const resp = await fetch(`${APOLLO_BASE}/mixed_people/api_search`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Api-Key": apolloKey! },
-        body: JSON.stringify(searchParams),
-      });
-      if (!resp.ok) {
-        const errText = await resp.text();
-        console.error(`Apollo search error: ${resp.status} ${errText}`);
-        throw new Error(`Apollo People Search error: ${resp.status}`);
+    // Helper: run Apollo People Search with pagination (up to maxPages * 100 results)
+    async function apolloSearch(params: Record<string, unknown>, useTitles = true, maxPages = 5) {
+      const allPeople: any[] = [];
+      for (let page = 1; page <= maxPages; page++) {
+        const searchParams: Record<string, unknown> = { per_page: 100, page, ...params };
+        if (useTitles) searchParams.person_titles = titleKeywords;
+        const resp = await fetch(`${APOLLO_BASE}/mixed_people/api_search`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Api-Key": apolloKey! },
+          body: JSON.stringify(searchParams),
+        });
+        if (!resp.ok) {
+          const errText = await resp.text();
+          console.error(`Apollo search error: ${resp.status} ${errText}`);
+          throw new Error(`Apollo People Search error: ${resp.status}`);
+        }
+        const result = await resp.json();
+        const people = result.people || [];
+        allPeople.push(...people);
+        // Stop if we got fewer results than requested (last page)
+        if (people.length < 100) break;
       }
-      const result = await resp.json();
-      return result.people || [];
+      return allPeople;
     }
 
     // Try domain first, then company name, then broader org search
@@ -167,37 +174,42 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Step 2: Enrich top contacts to get emails (up to 10 at a time via bulk)
-    const toEnrich = people.slice(0, 10);
-    const enrichDetails: Record<string, unknown>[] = [];
-
-    // Use bulk enrichment for efficiency (max 10 per call)
-    const bulkResp = await fetch(`${APOLLO_BASE}/people/bulk_match`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Api-Key": apolloKey,
-      },
-      body: JSON.stringify({
-        details: toEnrich.map((p: any) => ({
-          id: p.id,
-          first_name: p.first_name,
-          last_name: p.last_name,
-          organization_name: p.organization?.name || company.name,
-          domain: company.domain || undefined,
-        })),
-        reveal_personal_emails: false,
-      }),
-    });
-
-    let enrichedPeople = toEnrich;
-    if (bulkResp.ok) {
-      const bulkResult = await bulkResp.json();
-      if (bulkResult.matches && bulkResult.matches.length > 0) {
-        enrichedPeople = bulkResult.matches;
+    // Step 2: Enrich contacts in batches of 10 (Apollo bulk_match limit)
+    console.log(`Enriching ${people.length} contacts via Apollo bulk_match…`);
+    let enrichedPeople: any[] = [];
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < people.length; i += BATCH_SIZE) {
+      const batch = people.slice(i, i + BATCH_SIZE);
+      try {
+        const bulkResp = await fetch(`${APOLLO_BASE}/people/bulk_match`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Api-Key": apolloKey },
+          body: JSON.stringify({
+            details: batch.map((p: any) => ({
+              id: p.id,
+              first_name: p.first_name,
+              last_name: p.last_name,
+              organization_name: p.organization?.name || company.name,
+              domain: company.domain || undefined,
+            })),
+            reveal_personal_emails: false,
+          }),
+        });
+        if (bulkResp.ok) {
+          const bulkResult = await bulkResp.json();
+          if (bulkResult.matches?.length > 0) {
+            enrichedPeople.push(...bulkResult.matches);
+          } else {
+            enrichedPeople.push(...batch);
+          }
+        } else {
+          console.warn(`Apollo bulk_match batch ${i}-${i + BATCH_SIZE} failed: ${bulkResp.status}, using raw results`);
+          enrichedPeople.push(...batch);
+        }
+      } catch (be: any) {
+        console.warn(`Apollo bulk_match batch error:`, be.message);
+        enrichedPeople.push(...batch);
       }
-    } else {
-      console.warn(`Apollo bulk enrichment failed: ${bulkResp.status}, using search results only`);
     }
 
     // Step 3: Upsert contacts — strict title filter applied here
