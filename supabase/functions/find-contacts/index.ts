@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
 
     if (!apolloKey) throw new Error("APOLLO_API_KEY not configured");
 
-    const { company_id, persona } = await req.json();
+    const { company_id, persona, name_hint } = await req.json();
     if (!company_id) throw new Error("company_id is required");
 
     const { data: company, error: compErr } = await supabase
@@ -89,7 +89,16 @@ Deno.serve(async (req) => {
     // Try domain first, then company name, then broader org search
     let people: any[] = [];
 
-    if (company.domain) {
+    // If a specific person name is provided, do a targeted person search first
+    if (name_hint && company.domain) {
+      people = await apolloSearch({
+        q_organization_domains_list: [company.domain],
+        q_person_name: name_hint.trim(),
+      }, false);
+      console.log(`Apollo name_hint search (${name_hint}): ${people.length} results`);
+    }
+
+    if (people.length === 0 && company.domain) {
       people = await apolloSearch({ q_organization_domains_list: [company.domain] });
       console.log(`Apollo domain search (${company.domain}): ${people.length} results`);
     }
