@@ -13,8 +13,8 @@ serve(async (req) => {
   try {
     const { subject, results } = await req.json();
 
-    const HUBSPOT_API_KEY = Deno.env.get("HUBSPOT_API_KEY");
-    if (!HUBSPOT_API_KEY) throw new Error("HUBSPOT_API_KEY not configured");
+    const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+    if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY not configured");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -90,60 +90,31 @@ serve(async (req) => {
 </body>
 </html>`;
 
-    // Use HubSpot single-send transactional email
-    // Requires a transactional email template created in HubSpot
-    // Fallback: send via SMTP-style using engagements v1 email activity
     let sent = 0;
     const errors: string[] = [];
 
     for (const admin of admins) {
       try {
-        // First ensure contact exists in HubSpot
-        const upsertRes = await fetch("https://api.hubapi.com/crm/v3/objects/contacts", {
+        const res = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${HUBSPOT_API_KEY}`,
+            Authorization: `Bearer ${RESEND_API_KEY}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            properties: { email: admin.email, firstname: admin.name },
-          }),
-        });
-        // 409 = already exists, both are fine
-        if (!upsertRes.ok && upsertRes.status !== 409) {
-          const t = await upsertRes.text();
-          console.warn(`Contact upsert failed for ${admin.email}: ${t}`);
-        }
-
-        // Send email via HubSpot marketing single-send API
-        const sendRes = await fetch("https://api.hubapi.com/marketing/v3/transactional/single-email/send", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${HUBSPOT_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            message: {
-              to: admin.email,
-            },
-            contactProperties: {
-              firstname: admin.name,
-              email: admin.email,
-            },
-            customProperties: {
-              subject: subject || "Bulk Story Generation Complete",
-              html_body: htmlBody,
-            },
+            from: "iorad Intelligence <notifications@iorad.com>",
+            to: [admin.email],
+            subject: subject || "Bulk Story Generation Complete",
+            html: htmlBody,
           }),
         });
 
-        if (sendRes.ok) {
+        if (res.ok) {
           sent++;
           console.log(`Notification sent to ${admin.email}`);
         } else {
-          const errText = await sendRes.text();
-          console.warn(`HubSpot send failed for ${admin.email} (${sendRes.status}): ${errText}`);
-          // Log the error but don't fail the whole function
+          const errText = await res.text();
+          console.warn(`Resend failed for ${admin.email} (${res.status}): ${errText}`);
           errors.push(`${admin.email}: ${errText.substring(0, 100)}`);
         }
       } catch (emailErr) {
