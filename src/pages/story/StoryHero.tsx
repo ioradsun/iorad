@@ -74,8 +74,12 @@ export default function StoryHero({ customer, pm }: StoryHeroProps) {
               <div className="h-12 w-12 md:h-14 md:w-14 rounded-2xl flex items-center justify-center overflow-hidden" style={{ background: "var(--story-bg)", border: "1px solid var(--story-border)" }}>
                 <img src={ioradLogo} alt="iorad" className="h-5 md:h-6 object-contain" />
               </div>
-              <Connector />
-              <LogoPill src={partnerLogoUrl} alt={pm.label} fallbackLabel={pm.label} />
+              {pm.key !== "inbound" && (
+                <>
+                  <Connector />
+                  <LogoPill src={partnerLogoUrl} alt={pm.label} fallbackLabel={pm.label} />
+                </>
+              )}
               <Connector />
               <LogoPill src={customerLogoUrl} alt={customer.name} fallbackLabel={customer.name} />
             </div>
