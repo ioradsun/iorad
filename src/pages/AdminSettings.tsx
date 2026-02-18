@@ -1210,6 +1210,21 @@ function BulkGeneratePanel() {
     setCurrentStep(null);
     setRunning(false);
 
+    // Send email notification to admins
+    const finalResults = results; // capture before state updates
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      await supabase.functions.invoke("send-notification", {
+        body: {
+          subject: `Bulk Story Generation Complete — ${done} succeeded, ${errors} failed`,
+          results: finalResults,
+        },
+      });
+      console.log("Admin notification sent");
+    } catch (notifErr) {
+      console.warn("Notification send failed (non-fatal):", notifErr);
+    }
+
     // Reload list to show what's still missing
     await loadMissingStories();
   };
