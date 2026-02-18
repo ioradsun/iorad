@@ -3,6 +3,35 @@ import { supabase } from "@/integrations/supabase/client";
 
 type Theme = "dark" | "light";
 
+const APP_VARS_KEY = "iorad-custom-app-vars";
+const STORY_VARS_KEY = "iorad-custom-story-vars";
+
+/** Apply a record of CSS custom properties to the document root */
+export function applyCustomVars(vars: Record<string, string>) {
+  const root = document.documentElement;
+  for (const [k, v] of Object.entries(vars)) {
+    root.style.setProperty(k, v);
+  }
+}
+
+/** Remove previously applied custom vars from the document root */
+export function clearCustomVars(vars: Record<string, string>) {
+  const root = document.documentElement;
+  for (const k of Object.keys(vars)) {
+    root.style.removeProperty(k);
+  }
+}
+
+/** Load and reapply saved overrides from localStorage */
+function reapplySavedVars() {
+  try {
+    const appRaw = localStorage.getItem(APP_VARS_KEY);
+    if (appRaw) applyCustomVars(JSON.parse(appRaw));
+    const storyRaw = localStorage.getItem(STORY_VARS_KEY);
+    if (storyRaw) applyCustomVars(JSON.parse(storyRaw));
+  } catch {}
+}
+
 interface ThemeContextValue {
   theme: Theme;
   setTheme: (t: Theme) => void;
@@ -12,7 +41,6 @@ const ThemeContext = createContext<ThemeContextValue>({ theme: "dark", setTheme:
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>("dark");
-  const [loaded, setLoaded] = useState(false);
 
   // Fetch theme from DB on mount
   useEffect(() => {
@@ -26,11 +54,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         if (dbTheme === "light" || dbTheme === "dark") {
           setThemeState(dbTheme);
         }
-        setLoaded(true);
       });
   }, []);
 
-  // Apply class to <html>
+  // Apply class to <html>, then reapply any custom var overrides on top
   useEffect(() => {
     const root = document.documentElement;
     if (theme === "light") {
@@ -38,11 +65,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     } else {
       root.classList.remove("light");
     }
+    // Re-stamp overrides after theme class change (theme class can override inline styles in some browsers)
+    reapplySavedVars();
   }, [theme]);
 
   const setTheme = async (t: Theme) => {
     setThemeState(t);
-    // Persist to DB
     await supabase
       .from("app_settings")
       .update({ theme: t } as any)

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAppSettings, useUpdateSettings, DbAppSettings } from "@/hooks/useSupabase";
@@ -9,9 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Save, Loader2, Plus, Trash2, GripVertical, Sun, Moon, Shield, User, Download } from "lucide-react";
+import { Save, Loader2, Plus, Trash2, GripVertical, Sun, Moon, Shield, User, Download, Upload, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme, applyCustomVars, clearCustomVars } from "@/hooks/useTheme";
 
 const AVAILABLE_MODELS = [
   { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash (default)" },
@@ -168,73 +168,182 @@ function PeopleTab() {
 
 // ─── APPEARANCE TAB ───
 
+const APP_VARS_KEY = "iorad-custom-app-vars";
+const STORY_VARS_KEY = "iorad-custom-story-vars";
+
+const APP_TOKENS = [
+  "--background", "--foreground",
+  "--card", "--card-foreground",
+  "--popover", "--popover-foreground",
+  "--primary", "--primary-foreground",
+  "--secondary", "--secondary-foreground",
+  "--muted", "--muted-foreground",
+  "--accent", "--accent-foreground",
+  "--destructive", "--destructive-foreground",
+  "--border", "--input", "--ring",
+  "--success", "--success-foreground",
+  "--warning", "--warning-foreground",
+  "--info", "--info-foreground",
+  "--score-high", "--score-medium", "--score-low",
+  "--radius", "--font-display", "--font-body",
+];
+
+const STORY_TOKENS = [
+  "--story-bg", "--story-fg",
+  "--story-muted", "--story-subtle",
+  "--story-border", "--story-surface",
+  "--story-accent", "--story-accent-dim",
+  "--story-accent-border", "--story-accent-strong",
+  "--story-gradient-from", "--story-gradient-to",
+  "--story-cta-bg", "--story-cta-fg", "--story-cta-hover",
+  "--story-btn-bg", "--story-btn-fg",
+];
+
 function getCSSVarValue(name: string) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
-function exportAppStylesheet(theme: string) {
-  const tokens = [
-    "--background", "--foreground",
-    "--card", "--card-foreground",
-    "--popover", "--popover-foreground",
-    "--primary", "--primary-foreground",
-    "--secondary", "--secondary-foreground",
-    "--muted", "--muted-foreground",
-    "--accent", "--accent-foreground",
-    "--destructive", "--destructive-foreground",
-    "--border", "--input", "--ring",
-    "--success", "--success-foreground",
-    "--warning", "--warning-foreground",
-    "--info", "--info-foreground",
-    "--score-high", "--score-medium", "--score-low",
-    "--radius",
-    "--font-display", "--font-body",
-  ];
-
-  const lines = tokens.map(t => {
-    const val = getCSSVarValue(t);
-    return `  ${t}: ${val};`;
-  });
-
-  const css = `/* iorad Scout — App Stylesheet Export\n * Theme: ${theme === "light" ? "Clean Light" : "iorad Dark"}\n * Exported: ${new Date().toISOString()}\n */\n\n:root {\n${lines.join("\n")}\n}\n`;
-
-  const blob = new Blob([css], { type: "text/css" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `iorad-app-theme-${theme}-${new Date().toISOString().slice(0, 10)}.css`;
-  a.click();
-  URL.revokeObjectURL(url);
-  toast.success("App stylesheet exported");
+function buildCSS(tokens: string[], themeLabel: string, label: string) {
+  const lines = tokens.map(t => `  ${t}: ${getCSSVarValue(t)};`);
+  return `/* iorad Scout — ${label} Export\n * Theme: ${themeLabel}\n * Exported: ${new Date().toISOString()}\n */\n\n:root {\n${lines.join("\n")}\n}\n`;
 }
 
-function exportStoryStylesheet(theme: string) {
-  const tokens = [
-    "--story-bg", "--story-fg",
-    "--story-muted", "--story-subtle",
-    "--story-border", "--story-surface",
-    "--story-accent", "--story-accent-dim",
-    "--story-accent-border", "--story-accent-strong",
-    "--story-gradient-from", "--story-gradient-to",
-    "--story-cta-bg", "--story-cta-fg", "--story-cta-hover",
-    "--story-btn-bg", "--story-btn-fg",
-  ];
-
-  const lines = tokens.map(t => {
-    const val = getCSSVarValue(t);
-    return `  ${t}: ${val};`;
-  });
-
-  const css = `/* iorad Scout — Story Microsite Stylesheet Export\n * Theme: ${theme === "light" ? "Clean Light" : "iorad Dark"}\n * Exported: ${new Date().toISOString()}\n */\n\n:root {\n${lines.join("\n")}\n}\n`;
-
+function downloadCSS(css: string, filename: string) {
   const blob = new Blob([css], { type: "text/css" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `iorad-story-theme-${theme}-${new Date().toISOString().slice(0, 10)}.css`;
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
-  toast.success("Story stylesheet exported");
+}
+
+/** Parse CSS custom properties from a CSS file string */
+function parseCSSVars(cssText: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  // Match --var-name: value; inside :root or bare
+  const regex = /(--[\w-]+)\s*:\s*([^;]+);/g;
+  let match;
+  while ((match = regex.exec(cssText)) !== null) {
+    result[match[1].trim()] = match[2].trim();
+  }
+  return result;
+}
+
+function StylesheetCard({
+  title,
+  description,
+  tokens,
+  storageKey,
+  exportFilename,
+  exportLabel,
+}: {
+  title: string;
+  description: React.ReactNode;
+  tokens: string[];
+  storageKey: string;
+  exportFilename: string;
+  exportLabel: string;
+}) {
+  const { theme } = useTheme();
+  const themeLabel = theme === "light" ? "Clean Light" : "iorad Dark";
+  const importRef = useRef<HTMLInputElement>(null);
+  const [hasOverride, setHasOverride] = useState(!!localStorage.getItem(storageKey));
+
+  const handleExport = () => {
+    downloadCSS(buildCSS(tokens, themeLabel, title), exportFilename);
+    toast.success(`${title} exported`);
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const cssText = ev.target?.result as string;
+        const vars = parseCSSVars(cssText);
+        const count = Object.keys(vars).length;
+        if (count === 0) {
+          toast.error("No CSS custom properties found in file.");
+          return;
+        }
+        applyCustomVars(vars);
+        localStorage.setItem(storageKey, JSON.stringify(vars));
+        setHasOverride(true);
+        toast.success(`Imported ${count} CSS variables from ${file.name}`);
+      } catch {
+        toast.error("Failed to parse CSS file.");
+      }
+    };
+    reader.readAsText(file);
+    // Reset so same file can be re-imported
+    e.target.value = "";
+  };
+
+  const handleReset = () => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) clearCustomVars(JSON.parse(raw));
+    } catch {}
+    localStorage.removeItem(storageKey);
+    setHasOverride(false);
+    toast.success(`${title} overrides cleared — reload to restore defaults`);
+  };
+
+  return (
+    <div className="rounded-lg border border-border bg-secondary/30 p-4 space-y-3">
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium">{title}</p>
+          {hasOverride && (
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+              custom
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <Button variant="outline" size="sm" className="gap-1.5" onClick={handleExport}>
+          <Download className="w-3.5 h-3.5" />
+          Export
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5"
+          onClick={() => importRef.current?.click()}
+        >
+          <Upload className="w-3.5 h-3.5" />
+          Import
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5 text-muted-foreground"
+          onClick={handleReset}
+          disabled={!hasOverride}
+          title="Remove custom overrides and restore defaults"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          Reset
+        </Button>
+      </div>
+      <input
+        ref={importRef}
+        type="file"
+        accept=".css,text/css"
+        className="hidden"
+        onChange={handleImport}
+      />
+      {hasOverride && (
+        <p className="text-[11px] text-muted-foreground">
+          Custom overrides active. Reload the page to re-apply after a theme switch.
+        </p>
+      )}
+    </div>
+  );
 }
 
 function AppearanceTab() {
@@ -273,52 +382,35 @@ function AppearanceTab() {
       </div>
 
       <div className="panel space-y-4">
-        <div className="panel-header">Export Stylesheets</div>
+        <div className="panel-header">Stylesheets</div>
         <p className="text-xs text-muted-foreground">
-          Download the current theme's CSS variables as ready-to-use stylesheet files.
+          Export the current theme tokens as CSS files, or import a modified stylesheet to override them live.
+          Changes apply instantly and persist across page reloads.
         </p>
         <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-lg border border-border bg-secondary/30 p-4 space-y-3">
-            <div className="space-y-1">
-              <p className="text-sm font-medium">App Stylesheet</p>
-              <p className="text-xs text-muted-foreground">
-                All design tokens for the Scout admin app — backgrounds, typography, primary colours, status badges.
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full gap-2"
-              onClick={() => exportAppStylesheet(theme)}
-            >
-              <Download className="w-3.5 h-3.5" />
-              Export app.css
-            </Button>
-          </div>
-          <div className="rounded-lg border border-border bg-secondary/30 p-4 space-y-3">
-            <div className="space-y-1">
-              <p className="text-sm font-medium">Story Stylesheet</p>
-              <p className="text-xs text-muted-foreground">
-                All <code className="text-primary">--story-*</code> tokens for the public ABM microsite — backgrounds, accents, CTAs, gradients.
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full gap-2"
-              onClick={() => exportStoryStylesheet(theme)}
-            >
-              <Download className="w-3.5 h-3.5" />
-              Export story.css
-            </Button>
-          </div>
+          <StylesheetCard
+            title="App Stylesheet"
+            description="Design tokens for the Scout admin app — backgrounds, typography, primary colours, status badges."
+            tokens={APP_TOKENS}
+            storageKey={APP_VARS_KEY}
+            exportFilename={`iorad-app-theme-${theme}-${new Date().toISOString().slice(0, 10)}.css`}
+            exportLabel="Export app.css"
+          />
+          <StylesheetCard
+            title="Story Stylesheet"
+            description={<>All <code className="text-primary">--story-*</code> tokens for the public ABM microsite — backgrounds, accents, CTAs, gradients.</>}
+            tokens={STORY_TOKENS}
+            storageKey={STORY_VARS_KEY}
+            exportFilename={`iorad-story-theme-${theme}-${new Date().toISOString().slice(0, 10)}.css`}
+            exportLabel="Export story.css"
+          />
         </div>
       </div>
     </div>
   );
 }
 
-// ─── AI CONFIG TAB ───
+
 function AIConfigTab() {
   const { data, isLoading } = useQuery({
     queryKey: ["ai_config"],
