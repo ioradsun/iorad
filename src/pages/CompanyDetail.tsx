@@ -35,14 +35,14 @@ function TranscriptAnalysisView({ analysis }: { analysis: any }) {
   }
   const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <div className="mb-4">
-      <div className="text-[10px] font-mono uppercase tracking-wider text-primary mb-1.5">{title}</div>
+      <div className="text-[11px] font-mono uppercase tracking-widest text-primary mb-2">{title}</div>
       {children}
     </div>
   );
   const BulletList = ({ items }: { items: any[] }) => (
-    <ul className="space-y-1">
+    <ul className="space-y-1.5">
       {items.map((item: any, i: number) => (
-        <li key={i} className="text-xs text-foreground/80 flex items-start gap-1.5">
+        <li key={i} className="text-[13px] text-foreground/80 flex items-start gap-1.5 leading-relaxed">
           <span className="text-primary mt-0.5">•</span>
           <span>{typeof item === "string" ? item : JSON.stringify(item)}</span>
         </li>
@@ -451,29 +451,29 @@ export default function CompanyDetail() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4">
           <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors"><ArrowLeft className="w-5 h-5" /></Link>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">{company.name}</h1>
-            <p className="text-sm text-muted-foreground font-mono">{company.domain || "no domain"}</p>
+            <h1 className="text-[1.75rem] font-bold tracking-tight leading-tight">{company.name}</h1>
+            <p className="text-[13px] text-muted-foreground font-mono mt-0.5">{company.domain || "no domain"}</p>
           </div>
         </div>
       </div>
 
       <Tabs defaultValue="company" className="w-full" onValueChange={setActiveTab}>
         <TabsList className="w-full justify-start">
-          <TabsTrigger value="company">Company</TabsTrigger>
-          <TabsTrigger value="strategy">Strategy</TabsTrigger>
-          <TabsTrigger value="outreach">Outreach</TabsTrigger>
-          <TabsTrigger value="story">Story</TabsTrigger>
-          <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
+          <TabsTrigger value="company" className="text-sm">Company</TabsTrigger>
+          <TabsTrigger value="strategy" className="text-sm">Strategy</TabsTrigger>
+          <TabsTrigger value="outreach" className="text-sm">Outreach</TabsTrigger>
+          <TabsTrigger value="story" className="text-sm">Story</TabsTrigger>
+          <TabsTrigger value="onboarding" className="text-sm">Onboarding</TabsTrigger>
         </TabsList>
 
         {/* ============ TAB 1: COMPANY ============ */}
         <TabsContent value="company" className="space-y-6 mt-6">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Company Intel</h3>
-            <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => regenerate("full")} disabled={regenerating}>
+          <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Company Intel</h3>
+            <Button size="sm" variant="outline" className="gap-1.5 text-[13px]" onClick={() => regenerate("full")} disabled={regenerating}>
               {regenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
               {regenerating ? "Generating…" : signals.length > 0 ? "Regenerate" : "Generate"}
             </Button>
@@ -481,7 +481,7 @@ export default function CompanyDetail() {
 
           {/* Company Profile */}
           {(accountData?.about?.text || company.domain) && (
-            <p className="text-sm text-foreground/80 leading-relaxed line-clamp-2">
+            <p className="text-[14px] text-foreground/80 leading-relaxed line-clamp-2">
               {accountData?.about?.text || `${company.name} — ${company.domain}`}
             </p>
           )}
@@ -489,37 +489,37 @@ export default function CompanyDetail() {
             {(accountData?.industry?.value || company.industry) && (
               <Card className="bg-secondary/30"><CardContent className="p-3 flex flex-col items-start gap-1.5">
                 <Building2 className="w-4 h-4 text-primary" />
-                <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Industry</span>
-                <span className="text-sm font-medium text-foreground leading-tight">{accountData?.industry?.value || company.industry?.replace(/_/g, " ").toLowerCase()}</span>
+                <span className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Industry</span>
+                 <span className="text-[13px] font-medium text-foreground leading-tight">{accountData?.industry?.value || company.industry?.replace(/_/g, " ").toLowerCase()}</span>
               </CardContent></Card>
             )}
             {(accountData?.employees?.value || company.headcount) && (
               <Card className="bg-secondary/30"><CardContent className="p-3 flex flex-col items-start gap-1.5">
                 <Users className="w-4 h-4 text-primary" />
-                <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Employees</span>
-                <span className="text-sm font-medium text-foreground">{accountData?.employees?.value || `${company.headcount}+`}</span>
+                <span className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Employees</span>
+                <span className="text-[13px] font-medium text-foreground">{accountData?.employees?.value || `${company.headcount}+`}</span>
               </CardContent></Card>
             )}
             {(accountData?.hq?.value || company.hq_country) && (
               <Card className="bg-secondary/30"><CardContent className="p-3 flex flex-col items-start gap-1.5">
                 <MapPin className="w-4 h-4 text-primary" />
-                <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Headquarters</span>
-                <span className="text-sm font-medium text-foreground leading-tight">{accountData?.hq?.value || company.hq_country}</span>
+                <span className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Headquarters</span>
+                <span className="text-[13px] font-medium text-foreground leading-tight">{accountData?.hq?.value || company.hq_country}</span>
               </CardContent></Card>
             )}
             {accountData?.revenue_range?.value && accountData.revenue_range.value !== "Unknown" && (
               <Card className="bg-secondary/30"><CardContent className="p-3 flex flex-col items-start gap-1.5">
                 <DollarSign className="w-4 h-4 text-primary" />
-                <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Revenue</span>
-                <span className="text-sm font-medium text-foreground">{accountData.revenue_range.value}</span>
+                <span className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Revenue</span>
+                <span className="text-[13px] font-medium text-foreground">{accountData.revenue_range.value}</span>
               </CardContent></Card>
             )}
             {company.domain && (
               <Card className="bg-secondary/30"><CardContent className="p-3 flex flex-col items-start gap-1.5">
                 <Globe className="w-4 h-4 text-primary" />
-                <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Website</span>
+                <span className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Website</span>
                 <div className="flex items-center gap-1.5">
-                  <a href={`https://${company.domain}`} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary hover:underline">{company.domain}</a>
+                  <a href={`https://${company.domain}`} target="_blank" rel="noopener noreferrer" className="text-[13px] font-medium text-primary hover:underline">{company.domain}</a>
                   <Button size="icon" variant="ghost" className="h-5 w-5" onClick={fixDomain} disabled={fixingDomain} title="AI fix domain">
                     {fixingDomain ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3 text-muted-foreground" />}
                   </Button>
@@ -529,8 +529,8 @@ export default function CompanyDetail() {
             {company.partner && (
               <Card className="bg-secondary/30"><CardContent className="p-3 flex flex-col items-start gap-1.5">
                 <Briefcase className="w-4 h-4 text-primary" />
-                <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Partner</span>
-                <span className="text-sm font-medium text-foreground">{company.partner}</span>
+                <span className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Partner</span>
+                <span className="text-[13px] font-medium text-foreground">{company.partner}</span>
               </CardContent></Card>
             )}
           </div>
@@ -540,7 +540,7 @@ export default function CompanyDetail() {
             <Collapsible>
               <CollapsibleTrigger className="flex items-center gap-2 w-full text-left">
                 <ChevronRight className="w-4 h-4 text-muted-foreground transition-transform data-[state=open]:rotate-90" />
-                <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">iorad Product Data (HubSpot)</span>
+                <span className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">iorad Product Data (HubSpot)</span>
                 <Badge variant="outline" className="text-[9px] h-4 ml-auto">
                   {Object.entries(companyAny.hubspot_properties).filter(([_, v]) => v !== null && v !== "" && v !== undefined).length} properties
                 </Badge>
@@ -552,11 +552,11 @@ export default function CompanyDetail() {
                     .filter(([k]) => !["name", "domain", "industry", "country", "numberofemployees", "hs_object_id", "createdate", "hs_lastmodifieddate", "hs_pipeline"].includes(k))
                     .sort(([a], [b]) => a.localeCompare(b))
                     .map(([key, value]) => (
-                      <div key={key} className="px-3 py-2 rounded-lg border border-border/50 bg-secondary/20">
-                        <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground truncate" title={key}>
+                       <div key={key} className="px-3 py-2 rounded-lg border border-border/50 bg-secondary/20">
+                        <div className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground truncate" title={key}>
                           {key.replace(/_/g, " ").replace(/^hs /, "")}
                         </div>
-                        <div className="text-sm font-medium text-foreground mt-0.5 truncate" title={String(value)}>
+                        <div className="text-[13px] font-medium text-foreground mt-0.5 truncate" title={String(value)}>
                           {String(value).length > 80 ? String(value).slice(0, 80) + "…" : String(value)}
                         </div>
                       </div>
@@ -572,7 +572,7 @@ export default function CompanyDetail() {
               <div className="flex items-center gap-3">
                 <span>Contacts ({contacts.length || (companyAny?.buyer_name ? 1 : 0)})</span>
                 {findingContacts && (
-                  <span className="text-[10px] text-muted-foreground font-normal flex items-center gap-1">
+                  <span className="text-[11px] text-muted-foreground font-normal flex items-center gap-1">
                     <Loader2 className="w-3 h-3 animate-spin" />
                     Finding contacts via Apollo…
                   </span>
@@ -601,13 +601,13 @@ export default function CompanyDetail() {
             {/* Persona Search — only for outbound companies */}
             {companyAny?.source_type !== "inbound" && (
             <div className="flex items-center gap-2 flex-wrap px-4 pb-3">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Search by persona:</span>
+              <span className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Search by persona:</span>
               {PERSONAS.map((p) => (
                 <Button
                   key={p}
                   size="sm"
                   variant="outline"
-                  className="text-[11px] h-6 px-2 gap-1"
+                  className="text-[12px] h-7 px-2.5 gap-1"
                   disabled={!!searchingPersona || findingContacts}
                   onClick={() => searchByPersona(p)}
                 >
@@ -645,8 +645,8 @@ export default function CompanyDetail() {
                         <UserSearch className="w-4 h-4 text-primary" />
                       </div>
                       <div className="flex-1 min-w-0 space-y-0.5">
-                        <div className="text-sm font-medium truncate">{contact.name}</div>
-                        {contact.title && <div className="text-xs text-muted-foreground truncate">{contact.title}</div>}
+                        <div className="text-[14px] font-medium truncate">{contact.name}</div>
+                        {contact.title && <div className="text-[13px] text-muted-foreground truncate">{contact.title}</div>}
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {storyUrl && snap && (
@@ -744,8 +744,8 @@ export default function CompanyDetail() {
                 <div className="flex items-center gap-4 p-2 rounded-md hover:bg-secondary/30 transition-colors">
                   <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center"><UserSearch className="w-4 h-4 text-primary" /></div>
                   <div className="flex-1 min-w-0 space-y-0.5">
-                    <div className="text-sm font-medium">{companyAny.buyer_name}</div>
-                    {companyAny.buyer_title && <div className="text-xs text-muted-foreground">{companyAny.buyer_title}</div>}
+                    <div className="text-[14px] font-medium">{companyAny.buyer_name}</div>
+                    {companyAny.buyer_title && <div className="text-[13px] text-muted-foreground">{companyAny.buyer_title}</div>}
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {companyAny.buyer_email && <a href={`mailto:${companyAny.buyer_email}`} className="text-muted-foreground hover:text-primary"><Mail className="w-4 h-4" /></a>}
@@ -753,7 +753,7 @@ export default function CompanyDetail() {
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">No contacts yet. Add one manually or run enrichment.</p>
+                <p className="text-[14px] text-muted-foreground">No contacts yet. Add one manually or run enrichment.</p>
               )}
               </div>
             </ScrollArea>
@@ -767,10 +767,10 @@ export default function CompanyDetail() {
                   <PhoneCall className="w-4 h-4 text-primary" />
                 </div>
                 <div>
-                  <div className="text-sm font-medium text-foreground">
+                  <div className="text-[14px] font-medium text-foreground">
                     {meetings.length} Meeting{meetings.length !== 1 ? "s" : ""} Synced
                   </div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-[13px] text-muted-foreground">
                     {meetings.filter((m: any) => m.transcript_analysis).length} analyzed
                     {(syncingFathom || analyzingMeeting) && (
                       <span className="ml-2 inline-flex items-center gap-1">
@@ -781,7 +781,7 @@ export default function CompanyDetail() {
                   </div>
                 </div>
               </div>
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={syncFathom} disabled={syncingFathom || !!analyzingMeeting}>
+              <Button size="sm" variant="outline" className="gap-1.5 text-[13px]" onClick={syncFathom} disabled={syncingFathom || !!analyzingMeeting}>
                 {syncingFathom ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                 Sync Fathom
               </Button>
@@ -792,7 +792,7 @@ export default function CompanyDetail() {
             <div className="panel">
               <div className="panel-header flex items-center justify-between">
                 <span>iorad Expansion Analysis</span>
-                <span className="text-[10px] text-muted-foreground normal-case tracking-normal">
+                <span className="text-[11px] text-muted-foreground normal-case tracking-normal">
                   {latestSnapshot.model_version} · {latestSnapshot.prompt_version} · {new Date(latestSnapshot.created_at).toLocaleDateString()}
                 </span>
               </div>
@@ -1068,21 +1068,21 @@ export default function CompanyDetail() {
                         return (
                           <div key={signal.id} className="border rounded-md p-3 space-y-2">
                             <div className="flex items-start justify-between gap-3">
-                              <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2">
                                 {signal.type === "job" ? <Briefcase className="w-4 h-4 text-info flex-shrink-0" /> : <Newspaper className="w-4 h-4 text-warning flex-shrink-0" />}
                                 <div>
-                                  <div className="text-sm font-medium">{signal.title}</div>
-                                  <div className="text-xs text-muted-foreground">{signal.date || "No date"} · {signal.type}</div>
+                                  <div className="text-[14px] font-medium">{signal.title}</div>
+                                  <div className="text-[12px] text-muted-foreground">{signal.date || "No date"} · {signal.type}</div>
                                 </div>
                               </div>
                               <a href={signal.url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary flex-shrink-0"><ExternalLink className="w-3.5 h-3.5" /></a>
                             </div>
-                            {signal.raw_excerpt && <p className="text-xs text-muted-foreground leading-relaxed">{signal.raw_excerpt}</p>}
+                            {signal.raw_excerpt && <p className="text-[13px] text-muted-foreground leading-relaxed">{signal.raw_excerpt}</p>}
                             {snippets.length > 0 && (
                               <div className="space-y-1 pt-1 border-t border-border/50">
-                                <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Evidence Snippets</div>
+                                <div className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Evidence Snippets</div>
                                 {snippets.map((snippet, i) => (
-                                  <div key={i} className="text-xs text-accent-foreground bg-accent/20 rounded px-2 py-1.5 border-l-2 border-primary/40">"{snippet}"</div>
+                                  <div key={i} className="text-[13px] text-accent-foreground bg-accent/20 rounded px-2 py-1.5 border-l-2 border-primary/40">"{snippet}"</div>
                                 ))}
                               </div>
                             )}
@@ -1135,10 +1135,10 @@ export default function CompanyDetail() {
                   return (
                     <div key={evt.id} className="flex items-start gap-3 px-3 py-2 rounded-lg border border-border/50 bg-secondary/20 hover:bg-secondary/40 transition-colors">
                       <span className="text-base mt-0.5">{icon}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-foreground truncate">{evt.title}</div>
+                        <div className="flex-1 min-w-0">
+                        <div className="text-[14px] font-medium text-foreground truncate">{evt.title}</div>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <span className={`text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded border ${
+                          <span className={`text-[11px] font-mono uppercase tracking-widest px-1.5 py-0.5 rounded border ${
                             evt.activity_type === "FORM_SUBMISSION"
                               ? "border-emerald-500/40 text-emerald-400 bg-emerald-500/10"
                               : evt.activity_type?.includes("EMAIL")
@@ -1146,13 +1146,13 @@ export default function CompanyDetail() {
                               : "border-border text-muted-foreground bg-muted/50"
                           }`}>{evt.activity_type?.replace(/_/g, " ")}</span>
                           {evt.url && (
-                            <a href={evt.url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-primary hover:underline truncate max-w-[200px]">
+                            <a href={evt.url} target="_blank" rel="noopener noreferrer" className="text-[11px] text-primary hover:underline truncate max-w-[200px]">
                               {evt.url}
                             </a>
                           )}
                         </div>
                       </div>
-                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                      <span className="text-[11px] text-muted-foreground whitespace-nowrap">
                         {new Date(evt.occurred_at).toLocaleDateString()}{" "}
                         {new Date(evt.occurred_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </span>
@@ -1168,10 +1168,10 @@ export default function CompanyDetail() {
         <TabsContent value="strategy" className="space-y-6 mt-6">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Strategy & Cards</h3>
+            <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Strategy & Cards</h3>
               {contactSelector}
             </div>
-            <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={generateCards} disabled={generatingCards}>
+            <Button size="sm" variant="outline" className="gap-1.5 text-[13px]" onClick={generateCards} disabled={generatingCards}>
               {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
               {generatingCards ? "Generating…" : cards.length > 0 ? "Regenerate" : "Generate"}
             </Button>
@@ -1210,10 +1210,10 @@ export default function CompanyDetail() {
         <TabsContent value="outreach" className="space-y-6 mt-6">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Outreach Assets</h3>
+              <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Outreach Assets</h3>
               {contactSelector}
             </div>
-            <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={generateCards} disabled={generatingCards}>
+            <Button size="sm" variant="outline" className="gap-1.5 text-[13px]" onClick={generateCards} disabled={generatingCards}>
               {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
               {generatingCards ? "Generating…" : (assets.email_sequence || assets.linkedin_sequence) ? "Regenerate" : "Generate"}
             </Button>
@@ -1255,18 +1255,18 @@ export default function CompanyDetail() {
         <TabsContent value="story" className="space-y-6 mt-6">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Story Configuration</h3>
+              <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Story Configuration</h3>
               {contactSelector}
             </div>
             <div className="flex items-center gap-2">
               {storyBaseUrl && (
                 <a href={storyBaseUrl} target="_blank" rel="noopener noreferrer">
-                  <Button size="sm" className="gap-1.5 text-xs">
+                  <Button size="sm" className="gap-1.5 text-[13px]">
                     <Eye className="w-3.5 h-3.5" /> View Story
                   </Button>
                 </a>
               )}
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={generateCards} disabled={generatingCards}>
+              <Button size="sm" variant="outline" className="gap-1.5 text-[13px]" onClick={generateCards} disabled={generatingCards}>
                 {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                 {generatingCards ? "Generating…" : (assets.story_assets ? "Regenerate" : "Generate")}
               </Button>
