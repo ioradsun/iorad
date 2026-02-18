@@ -2,114 +2,127 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Libre+Franklin:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Libre+Franklin:wght@400;500;600;700&display=swap');
 
 @layer base {
   :root {
-    --background: 220 20% 7%;
-    --foreground: 210 20% 90%;
+    /* ── Surfaces ── */
+    --background: 210 18% 97%;
+    --foreground: 222 20% 14%;
 
-    --card: 220 18% 10%;
-    --card-foreground: 210 20% 90%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 20% 14%;
 
-    --popover: 220 18% 10%;
-    --popover-foreground: 210 20% 90%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 20% 14%;
 
-    --primary: 168 80% 45%;
-    --primary-foreground: 220 20% 7%;
+    /* ── Primary: muted indigo ── */
+    --primary: 222 40% 36%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 15% 15%;
-    --secondary-foreground: 210 20% 80%;
+    /* ── Secondary surface ── */
+    --secondary: 210 14% 94%;
+    --secondary-foreground: 222 15% 35%;
 
-    --muted: 220 15% 13%;
-    --muted-foreground: 215 15% 50%;
+    /* ── Muted ── */
+    --muted: 210 12% 93%;
+    --muted-foreground: 215 12% 52%;
 
-    --accent: 168 60% 30%;
-    --accent-foreground: 168 80% 85%;
+    /* ── Accent: very light tint of primary ── */
+    --accent: 222 40% 94%;
+    --accent-foreground: 222 40% 30%;
 
-    --destructive: 0 70% 50%;
-    --destructive-foreground: 210 40% 98%;
+    /* ── Semantic ── */
+    --destructive: 0 60% 48%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 220 15% 18%;
-    --input: 220 15% 18%;
-    --ring: 168 80% 45%;
+    /* ── Borders: extremely subtle ── */
+    --border: 215 14% 89%;
+    --input: 215 14% 89%;
+    --ring: 222 40% 50%;
+
+    /* ── Pink accent (kept for story/brand use) ── */
     --pink: 330 80% 55%;
     --pink-foreground: 0 0% 100%;
 
-    --radius: 0.375rem;
+    --radius: 0.5rem;
 
-    --success: 142 70% 45%;
-    --success-foreground: 142 70% 90%;
-    --warning: 38 90% 50%;
-    --warning-foreground: 38 90% 15%;
-    --info: 210 80% 55%;
-    --info-foreground: 210 80% 90%;
+    /* ── Status ── */
+    --success: 142 42% 38%;
+    --success-foreground: 142 30% 96%;
+    --warning: 38 72% 42%;
+    --warning-foreground: 38 60% 15%;
+    --info: 214 60% 44%;
+    --info-foreground: 214 60% 96%;
 
-    --score-high: 168 80% 45%;
-    --score-medium: 38 90% 50%;
-    --score-low: 0 70% 50%;
+    /* ── Score ── */
+    --score-high: 142 42% 38%;
+    --score-medium: 38 72% 42%;
+    --score-low: 0 60% 48%;
 
-    --sidebar-background: 220 20% 5%;
-    --sidebar-foreground: 210 20% 80%;
-    --sidebar-primary: 168 80% 45%;
-    --sidebar-primary-foreground: 220 20% 7%;
-    --sidebar-accent: 220 15% 12%;
-    --sidebar-accent-foreground: 210 20% 80%;
-    --sidebar-border: 220 15% 15%;
-    --sidebar-ring: 168 80% 45%;
+    /* ── Sidebar ── */
+    --sidebar-background: 222 22% 16%;
+    --sidebar-foreground: 210 14% 78%;
+    --sidebar-primary: 222 40% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 222 20% 22%;
+    --sidebar-accent-foreground: 210 14% 85%;
+    --sidebar-border: 222 15% 22%;
+    --sidebar-ring: 222 40% 55%;
 
-    --font-display: 'JetBrains Mono', monospace;
+    /* ── Typography ── */
+    --font-display: 'Inter', sans-serif;
     --font-body: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
 
-    /* Font sizes */
-    --font-size-title: 2rem;       /* 32px — page titles */
-    --font-size-sub: 1.3125rem;    /* 21px — sub-headings */
+    --font-size-title: 1.875rem;   /* 30px — page titles */
+    --font-size-sub: 1.25rem;      /* 20px — section headings */
     --font-size-body: 0.9375rem;   /* 15px — body text */
     --font-size-sm: 0.875rem;      /* 14px — secondary text */
-    --font-size-xs: 0.75rem;       /* 12px — labels, badges, mono tags */
+    --font-size-xs: 0.75rem;       /* 12px — labels, badges */
 
-    /* Button tokens */
+    /* ── Buttons ── */
     --btn-primary-bg: hsl(var(--primary));
     --btn-primary-fg: hsl(var(--primary-foreground));
-    --btn-primary-hover: hsl(var(--primary) / 0.85);
+    --btn-primary-hover: hsl(222 40% 30%);
     --btn-secondary-bg: hsl(var(--secondary));
     --btn-secondary-fg: hsl(var(--secondary-foreground));
     --btn-destructive-bg: hsl(var(--destructive));
     --btn-destructive-fg: hsl(var(--destructive-foreground));
-    --btn-radius: var(--radius);
+    --btn-radius: 0.5rem;
     --btn-font-size: var(--font-size-sm);
 
-    /* Pill / Badge tokens */
-    --pill-success-bg: hsl(var(--success) / 0.12);
-    --pill-success-fg: hsl(var(--success));
-    --pill-warning-bg: hsl(38 90% 50% / 0.12);
-    --pill-warning-fg: hsl(38 90% 65%);
-    --pill-error-bg: hsl(0 70% 50% / 0.12);
-    --pill-error-fg: hsl(0 70% 60%);
-    --pill-info-bg: hsl(var(--info) / 0.12);
-    --pill-info-fg: hsl(var(--info));
-    --pill-neutral-bg: hsl(215 15% 50% / 0.15);
-    --pill-neutral-fg: hsl(215 15% 60%);
-    --pill-radius: 9999px;
+    /* ── Pills / Badges ── */
+    --pill-success-bg: hsl(142 42% 38% / 0.10);
+    --pill-success-fg: hsl(142 38% 30%);
+    --pill-warning-bg: hsl(38 72% 42% / 0.10);
+    --pill-warning-fg: hsl(38 65% 34%);
+    --pill-error-bg: hsl(0 60% 48% / 0.10);
+    --pill-error-fg: hsl(0 55% 40%);
+    --pill-info-bg: hsl(214 60% 44% / 0.10);
+    --pill-info-fg: hsl(214 55% 36%);
+    --pill-neutral-bg: hsl(215 12% 52% / 0.10);
+    --pill-neutral-fg: hsl(215 10% 42%);
+    --pill-radius: 6px;
     --pill-font-size: var(--font-size-xs);
 
-    /* Stat card icon tokens */
-    --stat-total-bg: hsl(var(--primary) / 0.10);
-    --stat-total-fg: hsl(var(--primary));
-    --stat-inbound-bg: hsl(152 60% 50% / 0.12);
-    --stat-inbound-fg: hsl(152 55% 45%);
-    --stat-outbound-bg: hsl(217 80% 60% / 0.12);
-    --stat-outbound-fg: hsl(217 75% 58%);
+    /* ── Stat card icons ── */
+    --stat-total-bg: hsl(222 40% 36% / 0.08);
+    --stat-total-fg: hsl(222 40% 36%);
+    --stat-inbound-bg: hsl(142 42% 38% / 0.09);
+    --stat-inbound-fg: hsl(142 38% 30%);
+    --stat-outbound-bg: hsl(214 60% 44% / 0.09);
+    --stat-outbound-fg: hsl(214 55% 36%);
 
-    /* Source type pill tokens */
-    --source-inbound-bg: hsl(152 60% 50% / 0.10);
-    --source-inbound-fg: hsl(152 55% 45%);
-    --source-inbound-border: hsl(152 60% 50% / 0.35);
-    --source-outbound-bg: hsl(217 80% 60% / 0.10);
-    --source-outbound-fg: hsl(217 75% 58%);
-    --source-outbound-border: hsl(217 80% 60% / 0.35);
+    /* ── Source type pills ── */
+    --source-inbound-bg: hsl(142 42% 38% / 0.08);
+    --source-inbound-fg: hsl(142 38% 30%);
+    --source-inbound-border: hsl(142 42% 38% / 0.22);
+    --source-outbound-bg: hsl(214 60% 44% / 0.08);
+    --source-outbound-fg: hsl(214 55% 36%);
+    --source-outbound-border: hsl(214 60% 44% / 0.22);
 
-
+    /* ── Story microsite (unchanged) ── */
     --story-bg: #ffffff;
     --story-fg: #000000;
     --story-muted: #000000bf;
@@ -127,22 +140,6 @@
     --story-cta-hover: #383838;
     --story-btn-bg: #000000;
     --story-btn-fg: #ffffff;
-
-    /* Stat card icon tokens — light */
-    --stat-total-bg: hsl(var(--primary) / 0.10);
-    --stat-total-fg: hsl(var(--primary));
-    --stat-inbound-bg: hsl(152 60% 40% / 0.12);
-    --stat-inbound-fg: hsl(152 55% 38%);
-    --stat-outbound-bg: hsl(217 80% 55% / 0.12);
-    --stat-outbound-fg: hsl(217 75% 52%);
-
-    /* Source type pill tokens — light */
-    --source-inbound-bg: hsl(152 60% 40% / 0.10);
-    --source-inbound-fg: hsl(152 55% 38%);
-    --source-inbound-border: hsl(152 60% 40% / 0.35);
-    --source-outbound-bg: hsl(217 80% 55% / 0.10);
-    --source-outbound-fg: hsl(217 75% 52%);
-    --source-outbound-border: hsl(217 80% 55% / 0.35);
   }
 
 }
@@ -157,11 +154,13 @@
     font-family: var(--font-body);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    line-height: 1.5;
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
-    letter-spacing: -0.02em;
+    letter-spacing: -0.015em;
+    line-height: 1.25;
   }
 }
 
