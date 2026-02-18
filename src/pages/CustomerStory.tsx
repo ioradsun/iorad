@@ -370,7 +370,7 @@ export default function CustomerStory() {
     const syntheticSnapshot = { snapshot_json: inboundAccountJsonToSnapshotJson(accountJson, assetsJson) };
     const customer = snapshotToCustomer(inboundData.company, syntheticSnapshot);
     customer.contactName = formattedContactName;
-    const pm = staticPartnerMeta.seismic; // neutral default — no partner branding for inbound
+    const pm = staticPartnerMeta.inbound; // neutral — no partner branding for inbound leads
     return <StoryPage customer={customer} pm={pm} snapshotId={undefined} companyId={inboundData.company.id} loomUrl={inboundData.company.loom_url} ioradUrl={inboundData.company.iorad_url} />;
   }
 

@@ -9,6 +9,15 @@ export interface PartnerMeta {
 }
 
 export const partnerMeta: Record<string, PartnerMeta> = {
+  inbound: {
+    key: "inbound",
+    label: "",
+    domain: "",
+    positioning: "",
+    embedBullets: [],
+    color: "#6366F1",
+    gradient: "from-indigo-900/20 to-slate-900/10",
+  },
   seismic: {
     key: "seismic",
     label: "Seismic",
