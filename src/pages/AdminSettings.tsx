@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Save, Loader2, Plus, Trash2, GripVertical, Sun, Moon, Shield, User, Download, RotateCcw, ClipboardPaste } from "lucide-react";
+import { Save, Loader2, Plus, Trash2, GripVertical, Sun, Moon, Shield, User, Download, RotateCcw, ClipboardPaste, ChevronDown, ChevronRight, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme, applyCustomVars, clearCustomVars } from "@/hooks/useTheme";
 
@@ -171,33 +171,92 @@ function PeopleTab() {
 const APP_VARS_KEY = "iorad-custom-app-vars";
 const STORY_VARS_KEY = "iorad-custom-story-vars";
 
-const APP_TOKENS = [
-  "--background", "--foreground",
-  "--card", "--card-foreground",
-  "--popover", "--popover-foreground",
-  "--primary", "--primary-foreground",
-  "--secondary", "--secondary-foreground",
-  "--muted", "--muted-foreground",
-  "--accent", "--accent-foreground",
-  "--destructive", "--destructive-foreground",
-  "--border", "--input", "--ring",
-  "--success", "--success-foreground",
-  "--warning", "--warning-foreground",
-  "--info", "--info-foreground",
-  "--score-high", "--score-medium", "--score-low",
-  "--radius", "--font-display", "--font-body",
+/** Grouped token definitions — covers every CSS custom property used in the design system */
+const TOKEN_GROUPS: { label: string; key: string; tokens: string[] }[] = [
+  {
+    label: "Brand / Primary",
+    key: "brand",
+    tokens: [
+      "--primary", "--primary-foreground",
+      "--secondary", "--secondary-foreground",
+      "--accent", "--accent-foreground",
+      "--destructive", "--destructive-foreground",
+      "--ring",
+    ],
+  },
+  {
+    label: "Surfaces & Text",
+    key: "surfaces",
+    tokens: [
+      "--background", "--foreground",
+      "--card", "--card-foreground",
+      "--popover", "--popover-foreground",
+      "--muted", "--muted-foreground",
+      "--border", "--input",
+    ],
+  },
+  {
+    label: "Status / Scores",
+    key: "status",
+    tokens: [
+      "--success", "--success-foreground",
+      "--warning", "--warning-foreground",
+      "--info", "--info-foreground",
+      "--pink", "--pink-foreground",
+      "--score-high", "--score-medium", "--score-low",
+    ],
+  },
+  {
+    label: "Sidebar",
+    key: "sidebar",
+    tokens: [
+      "--sidebar-background", "--sidebar-foreground",
+      "--sidebar-primary", "--sidebar-primary-foreground",
+      "--sidebar-accent", "--sidebar-accent-foreground",
+      "--sidebar-border", "--sidebar-ring",
+    ],
+  },
+  {
+    label: "Typography & Spacing",
+    key: "typography",
+    tokens: [
+      "--font-display", "--font-body",
+      "--radius",
+    ],
+  },
 ];
 
-const STORY_TOKENS = [
-  "--story-bg", "--story-fg",
-  "--story-muted", "--story-subtle",
-  "--story-border", "--story-surface",
-  "--story-accent", "--story-accent-dim",
-  "--story-accent-border", "--story-accent-strong",
-  "--story-gradient-from", "--story-gradient-to",
-  "--story-cta-bg", "--story-cta-fg", "--story-cta-hover",
-  "--story-btn-bg", "--story-btn-fg",
+const STORY_TOKEN_GROUPS: { label: string; key: string; tokens: string[] }[] = [
+  {
+    label: "Story Surfaces",
+    key: "story-surfaces",
+    tokens: [
+      "--story-bg", "--story-fg",
+      "--story-muted", "--story-subtle",
+      "--story-border", "--story-surface",
+    ],
+  },
+  {
+    label: "Story Accent",
+    key: "story-accent",
+    tokens: [
+      "--story-accent", "--story-accent-dim",
+      "--story-accent-border", "--story-accent-strong",
+      "--story-gradient-from", "--story-gradient-to",
+    ],
+  },
+  {
+    label: "Story Buttons / CTAs",
+    key: "story-cta",
+    tokens: [
+      "--story-cta-bg", "--story-cta-fg", "--story-cta-hover",
+      "--story-btn-bg", "--story-btn-fg",
+    ],
+  },
 ];
+
+const ALL_APP_TOKENS = TOKEN_GROUPS.flatMap(g => g.tokens);
+const ALL_STORY_TOKENS = STORY_TOKEN_GROUPS.flatMap(g => g.tokens);
 
 function getCSSVarValue(name: string) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -218,10 +277,8 @@ function downloadCSS(css: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-/** Parse CSS custom properties from a CSS file string */
 function parseCSSVars(cssText: string): Record<string, string> {
   const result: Record<string, string> = {};
-  // Match --var-name: value; inside :root or bare
   const regex = /(--[\w-]+)\s*:\s*([^;]+);/g;
   let match;
   while ((match = regex.exec(cssText)) !== null) {
@@ -230,16 +287,151 @@ function parseCSSVars(cssText: string): Record<string, string> {
   return result;
 }
 
+/** Persist vars to localStorage and apply to DOM */
+function saveVars(storageKey: string, incoming: Record<string, string>, existingRaw: string | null) {
+  const existing = existingRaw ? JSON.parse(existingRaw) : {};
+  const merged = { ...existing, ...incoming };
+  applyCustomVars(merged);
+  localStorage.setItem(storageKey, JSON.stringify(merged));
+}
+
+/** Detect if a CSS value looks like a color (hex, hsl numbers, rgb, named) */
+function looksLikeColor(value: string): boolean {
+  return (
+    /^#[0-9a-f]{3,8}$/i.test(value) ||
+    /^rgba?\(/.test(value) ||
+    /^hsla?\(/.test(value) ||
+    /^\d+\s+\d/.test(value) // HSL triplet like "220 20% 7%"
+  );
+}
+
+/** Render a color swatch for a given computed var value */
+function ColorSwatch({ varName }: { varName: string }) {
+  const raw = getCSSVarValue(varName);
+  const isHSLTriplet = /^\d+\s+[\d.]+%\s+[\d.]+%/.test(raw);
+  const bg = isHSLTriplet ? `hsl(${raw})` : raw;
+  if (!raw || !looksLikeColor(raw)) return null;
+  return (
+    <span
+      className="inline-block w-4 h-4 rounded-sm border border-border flex-shrink-0"
+      style={{ background: bg }}
+      title={raw}
+    />
+  );
+}
+
+/** Single editable token row */
+function TokenRow({
+  name,
+  storageKey,
+  onSaved,
+}: {
+  name: string;
+  storageKey: string;
+  onSaved: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+
+  const currentValue = getCSSVarValue(name);
+
+  const startEdit = () => {
+    setDraft(currentValue);
+    setEditing(true);
+  };
+
+  const apply = () => {
+    if (!draft.trim()) return;
+    const override = { [name]: draft.trim() };
+    saveVars(storageKey, override, localStorage.getItem(storageKey));
+    setEditing(false);
+    onSaved();
+    toast.success(`${name} updated`);
+  };
+
+  const cancel = () => setEditing(false);
+
+  return (
+    <div className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-secondary/50 group">
+      <ColorSwatch varName={name} />
+      <span className="font-mono text-xs text-muted-foreground flex-1 truncate" title={name}>{name}</span>
+      {editing ? (
+        <>
+          <Input
+            className="h-6 text-xs font-mono w-48 px-1.5 py-0"
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") apply(); if (e.key === "Escape") cancel(); }}
+            autoFocus
+          />
+          <Button size="sm" className="h-6 text-xs px-2" onClick={apply}>Apply</Button>
+          <Button size="sm" variant="ghost" className="h-6 text-xs px-1" onClick={cancel}>✕</Button>
+        </>
+      ) : (
+        <>
+          <span className="font-mono text-xs text-foreground/70 max-w-[140px] truncate" title={currentValue}>{currentValue}</span>
+          <button
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-secondary"
+            onClick={startEdit}
+            title="Edit"
+          >
+            <Pencil className="w-3 h-3 text-muted-foreground" />
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Collapsible group of token rows */
+function TokenGroup({
+  label,
+  tokens,
+  storageKey,
+  onSaved,
+}: {
+  label: string;
+  tokens: string[];
+  storageKey: string;
+  onSaved: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="border border-border rounded-md overflow-hidden">
+      <button
+        className="w-full flex items-center justify-between px-3 py-2 bg-secondary/40 hover:bg-secondary/70 transition-colors text-left"
+        onClick={() => setOpen(o => !o)}
+      >
+        <span className="text-xs font-mono font-medium">{label}</span>
+        <span className="flex items-center gap-2">
+          <span className="text-[10px] text-muted-foreground">{tokens.length} tokens</span>
+          {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+        </span>
+      </button>
+      {open && (
+        <div className="divide-y divide-border/40 px-1 py-1">
+          {tokens.map(t => (
+            <TokenRow key={t} name={t} storageKey={storageKey} onSaved={onSaved} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Full stylesheet card with export, paste import, reset, and live inline editor */
 function StylesheetCard({
   title,
   description,
-  tokens,
+  tokenGroups,
+  allTokens,
   storageKey,
   exportFilename,
 }: {
   title: string;
   description: React.ReactNode;
-  tokens: string[];
+  tokenGroups: { label: string; key: string; tokens: string[] }[];
+  allTokens: string[];
   storageKey: string;
   exportFilename: string;
   exportLabel: string;
@@ -249,9 +441,11 @@ function StylesheetCard({
   const [hasOverride, setHasOverride] = useState(!!localStorage.getItem(storageKey));
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteValue, setPasteValue] = useState("");
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [, forceRefresh] = useState(0);
 
   const handleExport = () => {
-    downloadCSS(buildCSS(tokens, themeLabel, title), exportFilename);
+    downloadCSS(buildCSS(allTokens, themeLabel, title), exportFilename);
     toast.success(`${title} exported`);
   };
 
@@ -259,14 +453,14 @@ function StylesheetCard({
     const vars = parseCSSVars(pasteValue);
     const count = Object.keys(vars).length;
     if (count === 0) {
-      toast.error("No CSS custom properties found. Make sure you paste valid CSS with --variable: value; declarations.");
+      toast.error("No CSS custom properties found. Paste valid CSS with --variable: value; declarations.");
       return;
     }
-    applyCustomVars(vars);
-    localStorage.setItem(storageKey, JSON.stringify(vars));
+    saveVars(storageKey, vars, localStorage.getItem(storageKey));
     setHasOverride(true);
     setPasteOpen(false);
     setPasteValue("");
+    forceRefresh(n => n + 1);
     toast.success(`Applied ${count} CSS variables`);
   };
 
@@ -279,11 +473,18 @@ function StylesheetCard({
     setHasOverride(false);
     setPasteOpen(false);
     setPasteValue("");
+    forceRefresh(n => n + 1);
     toast.success(`${title} overrides cleared`);
+  };
+
+  const handleTokenSaved = () => {
+    setHasOverride(true);
+    forceRefresh(n => n + 1);
   };
 
   return (
     <div className="rounded-lg border border-border bg-secondary/30 p-4 space-y-3">
+      {/* Header */}
       <div className="space-y-1">
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium">{title}</p>
@@ -295,7 +496,9 @@ function StylesheetCard({
         </div>
         <p className="text-xs text-muted-foreground">{description}</p>
       </div>
-      <div className="grid grid-cols-3 gap-2">
+
+      {/* Actions */}
+      <div className="grid grid-cols-4 gap-2">
         <Button variant="outline" size="sm" className="gap-1.5" onClick={handleExport}>
           <Download className="w-3.5 h-3.5" />
           Export
@@ -304,10 +507,19 @@ function StylesheetCard({
           variant="outline"
           size="sm"
           className={`gap-1.5 ${pasteOpen ? "border-primary text-primary" : ""}`}
-          onClick={() => setPasteOpen((o) => !o)}
+          onClick={() => { setPasteOpen(o => !o); setEditorOpen(false); }}
         >
           <ClipboardPaste className="w-3.5 h-3.5" />
           Paste CSS
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className={`gap-1.5 ${editorOpen ? "border-primary text-primary" : ""}`}
+          onClick={() => { setEditorOpen(o => !o); setPasteOpen(false); }}
+        >
+          <Pencil className="w-3.5 h-3.5" />
+          Edit Tokens
         </Button>
         <Button
           variant="outline"
@@ -322,22 +534,38 @@ function StylesheetCard({
         </Button>
       </div>
 
+      {/* Paste CSS panel */}
       {pasteOpen && (
         <div className="space-y-2">
+          <p className="text-[11px] text-muted-foreground">Paste a CSS block with <code>--variable: value;</code> declarations:</p>
           <Textarea
-            className="font-mono text-xs min-h-[160px] resize-y"
-            placeholder={`:root {\n  --story-accent: #ff00d6;\n  --story-bg: #ffffff;\n  /* ... */\n}`}
+            className="font-mono text-xs min-h-[140px] resize-y"
+            placeholder={`:root {\n  --primary: 308 100% 42%;\n  --story-bg: #ffffff;\n  /* ... */\n}`}
             value={pasteValue}
             onChange={(e) => setPasteValue(e.target.value)}
             autoFocus
           />
           <div className="flex gap-2 justify-end">
-            <Button variant="ghost" size="sm" onClick={() => { setPasteOpen(false); setPasteValue(""); }}>
-              Cancel
-            </Button>
-            <Button size="sm" onClick={handleApplyPaste} disabled={!pasteValue.trim()}>
-              Apply
-            </Button>
+            <Button variant="ghost" size="sm" onClick={() => { setPasteOpen(false); setPasteValue(""); }}>Cancel</Button>
+            <Button size="sm" onClick={handleApplyPaste} disabled={!pasteValue.trim()}>Apply</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Inline token editor */}
+      {editorOpen && (
+        <div className="space-y-2">
+          <p className="text-[11px] text-muted-foreground">Click any token row to edit its value. Changes apply instantly.</p>
+          <div className="space-y-1.5">
+            {tokenGroups.map(g => (
+              <TokenGroup
+                key={g.key}
+                label={g.label}
+                tokens={g.tokens}
+                storageKey={storageKey}
+                onSaved={handleTokenSaved}
+              />
+            ))}
           </div>
         </div>
       )}
@@ -383,22 +611,24 @@ function AppearanceTab() {
       <div className="panel space-y-4">
         <div className="panel-header">Stylesheets</div>
         <p className="text-xs text-muted-foreground">
-          Export the current theme tokens as CSS files, or import a modified stylesheet to override them live.
-          Changes apply instantly and persist across page reloads.
+          Export theme tokens as CSS, edit individual tokens inline, or paste a full CSS override block.
+          Changes apply instantly and persist across reloads.
         </p>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-3">
           <StylesheetCard
             title="App Stylesheet"
-            description="Design tokens for the Scout admin app — backgrounds, typography, primary colours, status badges."
-            tokens={APP_TOKENS}
+            description="All design tokens for the Scout admin app — surfaces, brand colours, typography, sidebar, status badges."
+            tokenGroups={TOKEN_GROUPS}
+            allTokens={ALL_APP_TOKENS}
             storageKey={APP_VARS_KEY}
             exportFilename={`iorad-app-theme-${theme}-${new Date().toISOString().slice(0, 10)}.css`}
             exportLabel="Export app.css"
           />
           <StylesheetCard
             title="Story Stylesheet"
-            description={<>All <code className="text-primary">--story-*</code> tokens for the public ABM microsite — backgrounds, accents, CTAs, gradients.</>}
-            tokens={STORY_TOKENS}
+            description={<>All <code className="text-primary">--story-*</code> tokens for the public ABM microsite — surfaces, accents, gradients, CTAs.</>}
+            tokenGroups={STORY_TOKEN_GROUPS}
+            allTokens={ALL_STORY_TOKENS}
             storageKey={STORY_VARS_KEY}
             exportFilename={`iorad-story-theme-${theme}-${new Date().toISOString().slice(0, 10)}.css`}
             exportLabel="Export story.css"
@@ -408,6 +638,7 @@ function AppearanceTab() {
     </div>
   );
 }
+
 
 
 function AIConfigTab() {
