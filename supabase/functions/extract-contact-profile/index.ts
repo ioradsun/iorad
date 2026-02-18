@@ -6,6 +6,127 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DETERMINISTIC INBOUND SCORE  (no AI, 0–100 points)
+// Based on existing HubSpot contact properties only.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function daysSince(isoString: string | null | undefined): number | null {
+  if (!isoString) return null;
+  const ts = new Date(isoString).getTime();
+  if (isNaN(ts)) return null;
+  return Math.floor((Date.now() - ts) / (1000 * 60 * 60 * 24));
+}
+
+function scoreInboundContact(hp: Record<string, any>): {
+  inbound_score: number;
+  inbound_tier: number;
+  inbound_tier_label: string;
+  score_breakdown: Record<string, number>;
+} {
+  let score = 0;
+  const breakdown: Record<string, number> = {
+    engagement: 0,
+    conversion: 0,
+    commercial: 0,
+    momentum: 0,
+    volume: 0,
+  };
+
+  // ── 1. Engagement Intensity (max 25) ──────────────────────────────────────
+  const pageViews = parseInt(hp.hs_analytics_num_page_views || hp.num_page_views || "0", 10) || 0;
+  let engPV = 0;
+  if (pageViews >= 50)       engPV = 15;
+  else if (pageViews >= 20)  engPV = 10;
+  else if (pageViews >= 5)   engPV = 5;
+  else                       engPV = 2;
+
+  const daysSinceWebVisit = daysSince(hp.hs_analytics_last_visit_timestamp);
+  const recentWebVisit = daysSinceWebVisit !== null && daysSinceWebVisit <= 7 ? 5 : 0;
+
+  const daysSinceEmail = daysSince(hp.hs_email_last_engagement);
+  const recentEmail = daysSinceEmail !== null && daysSinceEmail <= 14 ? 5 : 0;
+
+  breakdown.engagement = Math.min(25, engPV + recentWebVisit + recentEmail);
+  score += breakdown.engagement;
+
+  // ── 2. Conversion Strength (max 20) ───────────────────────────────────────
+  const conversionDate = hp.recent_conversion_date;
+  const conversionEvent = (hp.recent_conversion_event_name || "").toLowerCase();
+  const daysSinceConv = daysSince(conversionDate);
+  const recentConversion = daysSinceConv !== null && daysSinceConv <= 14;
+
+  if (recentConversion) {
+    if (conversionEvent.includes("demo"))                   breakdown.conversion = 20;
+    else if (conversionEvent.includes("pric") ||
+             conversionEvent.includes("upgrad") ||
+             conversionEvent.includes("plan"))              breakdown.conversion = 15;
+    else if (conversionEvent.includes("download") ||
+             conversionEvent.includes("resource") ||
+             conversionEvent.includes("guide"))             breakdown.conversion = 10;
+    else                                                    breakdown.conversion = 5;
+  }
+  score += breakdown.conversion;
+
+  // ── 3. Commercial Proximity (max 20) ──────────────────────────────────────
+  const lifecycle = (hp.lifecyclestage || "").toLowerCase();
+  let lifecyclePts = 0;
+  if      (lifecycle.includes("opportunit"))  lifecyclePts = 20;
+  else if (lifecycle.includes("salesqualif")) lifecyclePts = 15;
+  else if (lifecycle.includes("marketingqu")) lifecyclePts = 10;
+  else if (lifecycle.includes("lead"))        lifecyclePts = 5;
+  else if (lifecycle.includes("subscriber"))  lifecyclePts = 2;
+
+  const dealBonus = parseInt(hp.num_associated_deals || "0", 10) > 0 ? 5 : 0;
+  breakdown.commercial = Math.min(20, lifecyclePts + dealBonus);
+  score += breakdown.commercial;
+
+  // ── 4. Recency & Momentum (max 20) ────────────────────────────────────────
+  const daysSinceCreated  = daysSince(hp.createdate);
+  const daysSinceModified = daysSince(hp.lastmodifieddate);
+  const freshCreate   = daysSinceCreated  !== null && daysSinceCreated  <= 7 ? 10 : 0;
+  const freshModified = daysSinceModified !== null && daysSinceModified <= 7 ? 10 : 0;
+  breakdown.momentum = Math.min(20, freshCreate + freshModified);
+  score += breakdown.momentum;
+
+  // ── 5. Volume / Intent Depth (max 15) ─────────────────────────────────────
+  let volumePts = 0;
+  if      (pageViews > 100)  volumePts = 15;
+  else if (pageViews >= 50)  volumePts = 10;
+  else if (pageViews >= 20)  volumePts = 5;
+  else                       volumePts = 2;
+  breakdown.volume = volumePts;
+  score += breakdown.volume;
+
+  // ── Also honor hubspotscore if present ───────────────────────────────────
+  const hubspotScore = parseInt(hp.hubspotscore || "0", 10);
+  if (hubspotScore > 0) {
+    // Blend: give up to 10 bonus points, scaled at 100 = 10 pts
+    const bonus = Math.round(Math.min(10, hubspotScore / 10));
+    score = Math.min(100, score + bonus);
+  }
+
+  const finalScore = Math.min(100, score);
+
+  // ── Tier assignment ───────────────────────────────────────────────────────
+  let inbound_tier = 4;
+  let inbound_tier_label = "Dormant";
+  if      (finalScore >= 70) { inbound_tier = 1; inbound_tier_label = "Strategic Inbound"; }
+  else if (finalScore >= 45) { inbound_tier = 2; inbound_tier_label = "Emerging Momentum"; }
+  else if (finalScore >= 20) { inbound_tier = 3; inbound_tier_label = "Early Stage"; }
+
+  return {
+    inbound_score: finalScore,
+    inbound_tier,
+    inbound_tier_label,
+    score_breakdown: breakdown,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI EXTRACTION PROMPT
+// ─────────────────────────────────────────────────────────────────────────────
+
 const EXTRACTION_PROMPT = `You are an expert product analytics interpreter for iorad, an interactive tutorial/walkthrough platform used for employee training, customer education, and partner enablement.
 
 Given a contact's raw HubSpot properties, extract a structured Product Usage Profile. Focus on signals that reveal:
@@ -47,6 +168,10 @@ Important:
 - days_since_last_active should be calculated from last_active_date relative to today
 - Be specific in narratives: mention actual products, numbers, and behaviors`;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// HANDLER
+// ─────────────────────────────────────────────────────────────────────────────
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -69,7 +194,6 @@ Deno.serve(async (req) => {
     if (contact_id) {
       contactIds = [contact_id];
     } else if (company_id) {
-      // Extract profiles for all contacts of a company that have HubSpot data
       const { data: contacts } = await sb
         .from("contacts")
         .select("id")
@@ -105,7 +229,10 @@ Deno.serve(async (req) => {
         const hp = contact.hubspot_properties;
         if (!hp || Object.keys(hp).length === 0) continue;
 
-        // Filter out null/empty/irrelevant properties to reduce token usage
+        // ── Deterministic inbound score (always computed, no AI needed) ──────
+        const inboundScoring = scoreInboundContact(hp as Record<string, any>);
+
+        // ── Filter out null/empty/irrelevant properties for AI prompt ─────────
         const meaningful: Record<string, any> = {};
         for (const [key, value] of Object.entries(hp)) {
           if (
@@ -114,7 +241,7 @@ Deno.serve(async (req) => {
             value !== "" &&
             value !== "--" &&
             value !== "0" &&
-            !(typeof value === "string" && value.startsWith("hs_v2_")) // skip internal HS tracking
+            !(typeof value === "string" && value.startsWith("hs_v2_"))
           ) {
             meaningful[key] = value;
           }
@@ -150,7 +277,6 @@ Return ONLY the JSON profile object.`;
           if (aiResponse.status === 429) {
             console.warn("Rate limited, waiting 5s before retry...");
             await new Promise((r) => setTimeout(r, 5000));
-            // Skip this one for now
             errors.push(`${contact.name}: Rate limited`);
             failed++;
             continue;
@@ -161,9 +287,18 @@ Return ONLY the JSON profile object.`;
         const aiData = await aiResponse.json();
         const rawContent = aiData.choices?.[0]?.message?.content || "";
 
-        // Parse JSON
+        // Parse AI profile JSON
         const cleaned = rawContent.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
-        const profile = JSON.parse(cleaned);
+        const aiProfile = JSON.parse(cleaned);
+
+        // ── Merge deterministic scoring INTO the profile ───────────────────
+        const profile = {
+          ...aiProfile,
+          inbound_score: inboundScoring.inbound_score,
+          inbound_tier: inboundScoring.inbound_tier,
+          inbound_tier_label: inboundScoring.inbound_tier_label,
+          inbound_score_breakdown: inboundScoring.score_breakdown,
+        };
 
         // Save to contacts table
         const { error: updateErr } = await sb
@@ -176,8 +311,13 @@ Return ONLY the JSON profile object.`;
 
         if (updateErr) throw updateErr;
 
+        // ── If this is a company-level batch, roll up the best score ─────────
+        // (handled downstream in run-signals; logged here for visibility)
+        console.log(
+          `Profile extracted for ${contact.name} — Inbound Score: ${inboundScoring.inbound_score} (Tier ${inboundScoring.inbound_tier}: ${inboundScoring.inbound_tier_label})`
+        );
+
         extracted++;
-        console.log(`Profile extracted for ${contact.name}`);
 
         // Small delay between calls to avoid rate limits
         if (contacts && contacts.length > 1) {
