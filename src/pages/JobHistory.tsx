@@ -195,19 +195,30 @@ export default function JobHistory() {
           .eq("job_id", activeJob.id)
           .in("status", ["running", "queued"]);
       }
-      // Clear all waiting companies (mark as skipped so they leave the 48h queue)
-      const waitingIds = waiting.map((c: any) => c.id).filter(Boolean);
-      if (waitingIds.length > 0) {
-        await supabase
-          .from("companies")
-          .update({ snapshot_status: "cleared" })
-          .in("id", waitingIds);
+
+      // Clear ALL companies without a story (both waiting + not started)
+      const allNoStoryIds = [
+        ...waiting.map((c: any) => c.id),
+        ...notStarted.map((c: any) => c.id),
+      ].filter(Boolean);
+
+      if (allNoStoryIds.length > 0) {
+        const BATCH = 500;
+        for (let i = 0; i < allNoStoryIds.length; i += BATCH) {
+          await supabase
+            .from("companies")
+            .update({ snapshot_status: "cleared" })
+            .in("id", allNoStoryIds.slice(i, i + BATCH));
+        }
       }
+
       await qc.invalidateQueries({ queryKey: ["active_running_job"] });
       await qc.invalidateQueries({ queryKey: ["active_job"] });
       await qc.invalidateQueries({ queryKey: ["company_queue_data"] });
       await qc.invalidateQueries({ queryKey: ["banner_waiting_count"] });
-      toast.success(`Queue cleared — ${waitingIds.length} waiting companies removed.`);
+      toast.success(
+        `Queue cleared — ${allNoStoryIds.length} companies removed.${activeJob ? " Running job canceled." : ""}`
+      );
     } catch (err: any) {
       toast.error(`Failed to clear: ${err?.message || "Unknown error"}`);
     } finally {
@@ -252,7 +263,7 @@ export default function JobHistory() {
               size="sm"
               className="gap-2 text-muted-foreground hover:text-destructive"
               onClick={handleClearJob}
-              disabled={actionLoading || (waiting.length === 0 && !isRunning)}
+              disabled={actionLoading || (waiting.length === 0 && notStarted.length === 0 && !isRunning)}
               title="Cancel running job and clear all waiting companies from the queue"
             >
               <Trash2 className="w-4 h-4" />
