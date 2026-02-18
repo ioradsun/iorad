@@ -830,8 +830,16 @@ export default function CompanyDetail() {
       <div className="flex items-center gap-4">
           <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors"><ArrowLeft className="w-5 h-5" /></Link>
           <div>
-            <h1 className="text-[1.75rem] font-bold tracking-tight leading-tight">{company.name}</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-[1.75rem] font-bold tracking-tight leading-tight">{company.name}</h1>
+              {company.scout_score !== null && company.scout_score !== undefined && (
+                <ScoreCell score={company.scout_score} size="lg" />
+              )}
+            </div>
             <p className="text-[13px] text-muted-foreground font-mono mt-0.5">{company.domain || "no domain"}</p>
+            {company.scout_summary && (
+              <p className="text-[12px] text-muted-foreground mt-1 max-w-xl leading-relaxed italic">{company.scout_summary}</p>
+            )}
           </div>
         </div>
         {/* Category + Stage inline selectors */}

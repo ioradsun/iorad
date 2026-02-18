@@ -1219,6 +1219,9 @@ async function bulkImportCompanies(supabase: any, after: string | null, jobId: s
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 }
+
+// ── Sync a single company by its HubSpot ID ───────────────────────────────────
+async function syncByHubSpotId(supabase: any, hubspotId: string) {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
@@ -1233,10 +1236,12 @@ async function bulkImportCompanies(supabase: any, after: string | null, jobId: s
   const { companyId, isNew, hasStory } = await upsertCompany(supabase, company);
   await importContactsForCompany(supabase, hubspotId, companyId);
 
+  // Update scout_synced_at
+  await supabase.from("companies").update({ scout_synced_at: new Date().toISOString() }).eq("id", companyId);
+
   // Auto-generate story only for new companies without an existing story
   if (isNew && !hasStory) {
     console.log(`Auto-triggering run-signals for new company: ${company.properties?.name}`);
-    // Fire and forget — don't block the picker modal response
     fetch(`${supabaseUrl}/functions/v1/run-signals`, {
       method: "POST",
       headers: {
