@@ -65,13 +65,17 @@ export default function Dashboard() {
     const oneDayAgo = now - 24 * 60 * 60 * 1000;
     let newInbound = 0;
     let newOutbound = 0;
+    let lastInboundDate: Date | null = null;
     for (const c of companies) {
-      if (new Date(c.created_at).getTime() >= oneDayAgo) {
-        if ((c as any).source_type === "inbound") newInbound++;
-        else newOutbound++;
+      const createdAt = new Date(c.created_at);
+      if ((c as any).source_type === "inbound") {
+        if (!lastInboundDate || createdAt > lastInboundDate) lastInboundDate = createdAt;
+        if (createdAt.getTime() >= oneDayAgo) newInbound++;
+      } else {
+        if (createdAt.getTime() >= oneDayAgo) newOutbound++;
       }
     }
-    return { total: companies.length, newInbound, newOutbound };
+    return { total: companies.length, newInbound, newOutbound, lastInboundDate };
   }, [companies]);
 
   const toggleSort = (key: SortKey) => {
@@ -114,6 +118,9 @@ export default function Dashboard() {
           label="New inbound (24h)"
           icon={<ArrowDownRight className="w-4 h-4" style={{ color: "var(--stat-inbound-fg)" }} />}
           iconBg="var(--stat-inbound-bg)"
+          subtitle={stats.lastInboundDate
+            ? `Last: ${stats.lastInboundDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })} ${stats.lastInboundDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}`
+            : undefined}
         />
         <KpiCard
           value={stats.newOutbound}
@@ -292,11 +299,13 @@ function KpiCard({
   label,
   icon,
   iconBg,
+  subtitle,
 }: {
   value: number;
   label: string;
   icon: React.ReactNode;
   iconBg: string;
+  subtitle?: string;
 }) {
   return (
     <div className="bg-card shadow-sm shadow-black/[0.04] rounded-lg px-5 py-4 flex items-center gap-4">
@@ -308,6 +317,9 @@ function KpiCard({
           {value}
         </div>
         <div className="text-[13px] font-medium text-muted-foreground mt-1.5 leading-tight">{label}</div>
+        {subtitle && (
+          <div className="text-[11px] text-muted-foreground/60 mt-1 leading-tight">{subtitle}</div>
+        )}
       </div>
     </div>
   );
