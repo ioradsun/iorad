@@ -375,15 +375,84 @@ export default function CompanyDetail() {
     }
   };
 
-  // Unified generation: runs strategy → outreach → story in sequence using first contact only
+  // Unified generation: company intel → fathom → extract profiles → strategy → outreach → story
   const generateCards = async () => {
     if (!id) return;
     setGeneratingCards(true);
-    // Always use the first contact for generation
     const firstContactId = contacts[0]?.id || null;
-    const tabs = ["strategy", "outreach", "story"];
-    const labels: Record<string, string> = { strategy: "Strategy", outreach: "Outreach", story: "Story" };
     try {
+      // Step 1: Company intel
+      setGenerateStep("Company Intel");
+      toast.info("Generating Company Intel…");
+      {
+        const { data, error } = await supabase.functions.invoke("generate-cards", {
+          body: { company_id: id, tab: "company", ...(firstContactId ? { contact_id: firstContactId } : {}) },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+      }
+
+      // Step 2: Sync & analyze Fathom if company has a domain
+      if (companyAny?.domain) {
+        setGenerateStep("Fathom Sync");
+        toast.info("Syncing Fathom meetings…");
+        try {
+          const { data: fData, error: fErr } = await supabase.functions.invoke("sync-fathom", {
+            body: { domain: companyAny.domain, company_id: id },
+          });
+          if (fErr) throw fErr;
+          if (fData?.error) throw new Error(fData.error);
+          const synced = fData?.meetings_synced || 0;
+          if (synced > 0) {
+            toast.info(`Synced ${synced} meetings — analyzing transcripts…`);
+            const { data: freshMeetings } = await supabase
+              .from("meetings")
+              .select("id, transcript, transcript_analysis")
+              .eq("company_id", id!)
+              .not("transcript", "is", null)
+              .is("transcript_analysis", null);
+            if (freshMeetings && freshMeetings.length > 0) {
+              setGenerateStep("Analyzing Transcripts");
+              for (const m of freshMeetings) {
+                setAnalyzingMeeting(m.id);
+                try {
+                  const { data: aData, error: aErr } = await supabase.functions.invoke("analyze-transcript", {
+                    body: { meeting_id: m.id },
+                  });
+                  if (aErr) throw aErr;
+                  if (aData?.error) throw new Error(aData.error);
+                } catch (ae: any) {
+                  console.error(`Analysis failed for meeting ${m.id}:`, ae);
+                }
+              }
+              setAnalyzingMeeting(null);
+              toast.success("Transcript analysis complete");
+              queryClient.invalidateQueries({ queryKey: ["meetings", id] });
+            }
+          }
+        } catch (fe: any) {
+          console.warn("Fathom sync non-fatal:", fe.message);
+          toast.warning("Fathom sync skipped: " + (fe.message || "unknown error"));
+        }
+      }
+
+      // Step 3: Extract contact profiles from HubSpot data
+      setGenerateStep("Contact Profiles");
+      toast.info("Extracting contact profiles…");
+      try {
+        const { data: profileData } = await supabase.functions.invoke("extract-contact-profile", {
+          body: { company_id: id },
+        });
+        if (profileData?.profiles_extracted > 0) {
+          toast.info(`Extracted ${profileData.profiles_extracted} AI profiles`);
+        }
+      } catch (pe: any) {
+        console.warn("Profile extraction non-fatal:", pe.message);
+      }
+
+      // Step 4: Strategy → Outreach → Story
+      const tabs = ["strategy", "outreach", "story"];
+      const labels: Record<string, string> = { strategy: "Strategy", outreach: "Outreach", story: "Story" };
       for (const tab of tabs) {
         setGenerateStep(labels[tab]);
         toast.info(`Generating ${labels[tab]}…`);
@@ -393,11 +462,14 @@ export default function CompanyDetail() {
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
       }
-      toast.success("All tabs generated successfully");
+
+      toast.success("All content generated successfully");
       queryClient.invalidateQueries({ queryKey: ["company_cards", id] });
       queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
+      queryClient.invalidateQueries({ queryKey: ["contacts", id] });
+      queryClient.invalidateQueries({ queryKey: ["meetings", id] });
     } catch (e: any) { toast.error(e.message || "Failed to generate"); }
-    finally { setGeneratingCards(false); setGenerateStep(null); }
+    finally { setGeneratingCards(false); setGenerateStep(null); setAnalyzingMeeting(null); }
   };
 
   const selectedContact = contacts.find((c: any) => c.id === selectedContactId) || contacts[0] || null;
@@ -506,12 +578,12 @@ export default function CompanyDetail() {
             <TabsTrigger value="onboarding" className="text-sm">Onboarding</TabsTrigger>
           </TabsList>
 
-          {/* Unified generate button — only for inbound companies on the AI-driven tabs */}
-          {companyAny?.source_type === "inbound" && activeTab !== "company" && activeTab !== "onboarding" && (
+          {/* Unified generate button — visible on all tabs except Onboarding, for inbound companies */}
+          {companyAny?.source_type === "inbound" && activeTab !== "onboarding" && (
             <Button size="sm" className="gap-1.5 text-[13px]" onClick={generateCards} disabled={generatingCards}>
               {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
               {generatingCards
-                ? generateStep ? `Generating ${generateStep}…` : "Generating…"
+                ? generateStep ? `${generateStep}…` : "Generating…"
                 : (isInboundStoryResponse || cards.length > 0 || assets.email_sequence) ? "Regenerate All" : "Generate All"}
             </Button>
           )}
@@ -520,11 +592,14 @@ export default function CompanyDetail() {
         {/* ============ TAB 1: COMPANY ============ */}
         <TabsContent value="company" className="space-y-6 mt-6">
           <div className="flex items-center justify-between">
-          <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Company Intel</h3>
-            <Button size="sm" className="gap-1.5 text-[13px]" onClick={() => regenerate("full")} disabled={regenerating}>
-              {regenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-              {regenerating ? "Generating…" : signals.length > 0 ? "Regenerate" : "Generate"}
-            </Button>
+            <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Company Intel</h3>
+            {/* For outbound companies, keep the dedicated signal-search regenerate button */}
+            {companyAny?.source_type !== "inbound" && (
+              <Button size="sm" className="gap-1.5 text-[13px]" onClick={() => regenerate("full")} disabled={regenerating}>
+                {regenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                {regenerating ? "Generating…" : signals.length > 0 ? "Regenerate" : "Generate"}
+              </Button>
+            )}
           </div>
 
           {/* Company Profile */}
