@@ -6,12 +6,12 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Verify HubSpot webhook signature (v1: HMAC-SHA256 of clientSecret + rawBody)
+// Verify HubSpot webhook signature (v1: SHA-256 of clientSecret + rawBody, hex encoded)
 async function verifyHubSpotSignature(req: Request, rawBody: string): Promise<boolean> {
   const clientSecret = Deno.env.get("HUBSPOT_CLIENT_SECRET");
   if (!clientSecret) {
     console.warn("HUBSPOT_CLIENT_SECRET not set — skipping signature validation");
-    return true; // Gracefully allow if secret not configured
+    return true;
   }
 
   const signature = req.headers.get("X-HubSpot-Signature") || req.headers.get("x-hubspot-signature");
@@ -20,21 +20,18 @@ async function verifyHubSpotSignature(req: Request, rawBody: string): Promise<bo
     return false;
   }
 
-  // HubSpot v1: HMAC-SHA256(clientSecret + requestBody)
+  // HubSpot v1: SHA-256 hash of (clientSecret + requestBody), hex-encoded — NOT HMAC
   const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(clientSecret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const sigBytes = await crypto.subtle.sign("HMAC", key, encoder.encode(clientSecret + rawBody));
-  const expectedSig = Array.from(new Uint8Array(sigBytes))
+  const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(clientSecret + rawBody));
+  const expectedSig = Array.from(new Uint8Array(hashBuffer))
     .map(b => b.toString(16).padStart(2, "0"))
     .join("");
 
-  return expectedSig === signature;
+  const match = expectedSig === signature;
+  if (!match) {
+    console.error(`Signature mismatch — expected: ${expectedSig}, got: ${signature}`);
+  }
+  return match;
 }
 
 Deno.serve(async (req) => {
