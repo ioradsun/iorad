@@ -70,6 +70,87 @@ function useDbStory(partner?: string, customerSlug?: string) {
   });
 }
 
+// Inbound stories: look up by company_cards.id and build story from account_json
+function useInboundStory(cardsId?: string) {
+  return useQuery({
+    queryKey: ["inbound-story", cardsId],
+    enabled: !!cardsId,
+    queryFn: async () => {
+      const { data: card, error } = await supabase
+        .from("company_cards")
+        .select("*, companies(*)")
+        .eq("id", cardsId!)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!card) return null;
+
+      return { card, company: (card as any).companies };
+    },
+  });
+}
+
+// Convert inbound account_json → snapshot_json shape so snapshotToCustomer can render it
+function inboundAccountJsonToSnapshotJson(accountJson: Record<string, any>, assetsJson: Record<string, any>): Record<string, any> {
+  // The story tab writes to account_json root with _type: inbound_story
+  // Strategy tab writes under _strategy key
+  // We read whichever is richer
+  const root = accountJson;
+
+  const whatsHappening = [];
+  if (root.behavior_acknowledged || root.momentum_observed) {
+    if (root.behavior_acknowledged) whatsHappening.push({ title: "Behavior Acknowledged", detail: root.behavior_acknowledged });
+    if (root.momentum_observed)    whatsHappening.push({ title: "Momentum Observed", detail: root.momentum_observed });
+    if (root.initiative_translation) whatsHappening.push({ title: "Initiative Translation", detail: root.initiative_translation });
+  }
+
+  const executionFriction: string[] = [];
+  if (root.scale_risk)               executionFriction.push(root.scale_risk);
+  if (root.institutionalization_gap) executionFriction.push(root.institutionalization_gap);
+
+  const emailSeq = assetsJson?.email_sequence || {};
+  const outreachMeta = root._outreach_meta || {};
+
+  return {
+    whats_happening: whatsHappening,
+    functional_implications: root.executive_translation || "",
+    execution_friction: executionFriction,
+    real_cost: root.real_cost_if_stalled ? [root.real_cost_if_stalled] : [],
+    blind_spot: root.institutionalization_gap || "",
+    reinforcement_journey: root.reinforcement_journey || "",
+    why_now: root.why_now || "",
+    cta: root.cta || "",
+    strategic_plays: (root.strategic_plays || []).map((p: any) => ({
+      name: p.name || "",
+      objective: p.objective || "",
+      why_now: p.why_now || "",
+      what_it_looks_like: p.what_it_looks_like || "",
+      expected_impact: p.expected_impact || "",
+    })),
+    reinforcement_preview: root.reinforcement_preview ? {
+      detected_tool: root.reinforcement_preview.detected_tool || "",
+      library_url: root.reinforcement_preview.library_url || null,
+      description: root.reinforcement_preview.description || "",
+    } : undefined,
+    internal_signals: {
+      primary_persona: root.persona || "",
+      confidence_level: "High",
+      urgency: root.intent_tier === "Tier 1" ? "High Momentum" : root.intent_tier === "Tier 2" ? "Active" : "Emerging",
+      signal_types: ["inbound_behavior"],
+      enterprise_systems: [],
+      operational_risks: root.real_cost_if_stalled ? [root.real_cost_if_stalled] : [],
+      hiring_intensity: "",
+      platform_rollout: root.upside_if_executed || outreachMeta.upside_if_executed || "",
+    },
+    upside_if_executed: root.upside_if_executed || "",
+    opening_hook: {
+      subject_line: root.subject_line || root.initiative_translation || "",
+      opening_paragraph: root.opening_paragraph || root.behavior_acknowledged || "",
+    },
+    text_overrides: {},
+  };
+}
+
 function snapshotToCustomer(company: any, snap: any): Customer {
   const json = snap?.snapshot_json || {};
 
@@ -257,7 +338,11 @@ export default function CustomerStory() {
   const { id, partner, customer: customerParam, contactName } = useParams<{ id: string; partner: string; customer: string; contactName: string }>();
 
   const legacyCustomer = id ? customers.find((c) => c.id === id) : null;
-  const { data: dbData, isLoading } = useDbStory(partner, customerParam);
+  // Outbound: partner + customer slug path
+  const { data: dbData, isLoading: dbLoading } = useDbStory(partner, customerParam);
+  // Inbound: /stories/:id where id is a company_cards.id (no partner/customer in URL)
+  const isInboundRoute = !!id && !partner && !legacyCustomer;
+  const { data: inboundData, isLoading: inboundLoading } = useInboundStory(isInboundRoute ? id : undefined);
 
   const formattedContactName = contactName
     ? contactName.charAt(0).toUpperCase() + contactName.slice(1).toLowerCase()
@@ -268,7 +353,29 @@ export default function CustomerStory() {
     return <StoryPage customer={legacyCustomer} pm={pm} snapshotId={undefined} />;
   }
 
-  if (isLoading) {
+  // --- Inbound route: /stories/:company_cards_id ---
+  if (isInboundRoute) {
+    if (inboundLoading) {
+      return (
+        <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      );
+    }
+    if (!inboundData?.card || !inboundData?.company) {
+      return <NotFoundStory />;
+    }
+    const accountJson = (inboundData.card.account_json as Record<string, any>) || {};
+    const assetsJson = (inboundData.card.assets_json as Record<string, any>) || {};
+    const syntheticSnapshot = { snapshot_json: inboundAccountJsonToSnapshotJson(accountJson, assetsJson) };
+    const customer = snapshotToCustomer(inboundData.company, syntheticSnapshot);
+    customer.contactName = formattedContactName;
+    const pm = staticPartnerMeta.seismic; // neutral default — no partner branding for inbound
+    return <StoryPage customer={customer} pm={pm} snapshotId={undefined} companyId={inboundData.company.id} loomUrl={inboundData.company.loom_url} ioradUrl={inboundData.company.iorad_url} />;
+  }
+
+  // --- Outbound route: /:partner/:customer/stories/:contactName ---
+  if (dbLoading) {
     return (
       <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
