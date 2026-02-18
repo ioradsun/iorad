@@ -527,7 +527,7 @@ export default function CompanyDetail() {
   const rawAccountJson = parseJson<Record<string, unknown>>(companyCards?.account_json as Json) || {};
   // Strategy data is stored under _strategy key (dedicated namespace to avoid Story overwrite)
   const inboundStrategyData = (rawAccountJson?._strategy as Record<string, unknown>) || null;
-  const isInboundStrategyResponse = !!(inboundStrategyData?.momentum_observed || inboundStrategyData?.initiative_translation || inboundStrategyData?.observed_behavior);
+  const isInboundStrategyResponse = !!(inboundStrategyData?.momentum_observed || inboundStrategyData?.initiative_translation || inboundStrategyData?.observed_behavior || inboundStrategyData?.subject_line || inboundStrategyData?.opening_paragraph);
   // Story data is stored at root with _type: inbound_story
   const isInboundStoryResponse = !!(rawAccountJson?._type === "inbound_story" || rawAccountJson?.behavior_acknowledged);
   const inboundStrategyFields: { label: string; key: string }[] = [
@@ -594,7 +594,7 @@ export default function CompanyDetail() {
           {/* Unified generate + view story buttons — visible on all tabs for inbound companies */}
           {companyAny?.source_type === "inbound" && activeTab !== "onboarding" && (
             <div className="flex items-center gap-2">
-              {storyBaseUrl && isInboundStoryResponse && (
+              {storyBaseUrl && (
                 <a href={storyBaseUrl} target="_blank" rel="noopener noreferrer">
                   <Button size="sm" variant="outline" className="gap-1.5 text-[13px]">
                     <Eye className="w-3.5 h-3.5" /> View Story
@@ -1336,111 +1336,12 @@ export default function CompanyDetail() {
             </div>
           )}
         </TabsContent>
-          </div>
-          {cardsLoading ? (
-            <div className="flex items-center gap-2 py-4">
-              <Loader2 className="w-4 h-4 animate-spin text-primary" />
-              <span className="ml-2 text-sm text-muted-foreground">Loading cards…</span>
-            </div>
-          ) : isInboundStrategyResponse ? (
-            <div className="space-y-3">
-              {inboundStrategyFields.map(({ label, key }) =>
-                inboundStrategyData?.[key] ? (
-                  <div key={key} className="panel p-4 rounded-lg">
-                    <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground mb-1">{label}</div>
-                    <p className="text-[13px] leading-relaxed text-foreground/90">{String(inboundStrategyData[key])}</p>
-                  </div>
-                ) : null
-              )}
-              {Array.isArray(inboundStrategyData?.strategic_plays) && (inboundStrategyData.strategic_plays as any[]).length > 0 && (
-                <div className="panel p-4 rounded-lg space-y-3">
-                  <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Strategic Plays</div>
-                  {(inboundStrategyData.strategic_plays as any[]).map((play: any, i: number) => (
-                    <div key={i} className="border-l-2 border-primary/30 pl-3 space-y-1">
-                      <div className="text-[13px] font-semibold text-foreground">{play.name}</div>
-                      {play.objective && <div className="text-[12px] text-muted-foreground">{play.objective}</div>}
-                      {play.why_now && <div className="text-[12px] text-foreground/80"><span className="font-medium">Why now: </span>{play.why_now}</div>}
-                      {play.what_it_looks_like && <div className="text-[12px] text-foreground/80"><span className="font-medium">Looks like: </span>{play.what_it_looks_like}</div>}
-                      {play.expected_impact && <div className="text-[12px] text-primary font-medium">{play.expected_impact}</div>}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : cards.length > 0 ? (
-            <div className="space-y-4">
-              {cards.map((card) => <DashboardCardUI key={card.id} card={card} />)}
-            </div>
-          ) : (
-            <div className="panel text-center py-8">
-              <Sparkles className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground mb-3">No dashboard cards generated yet.</p>
-            </div>
-          )}
-        </TabsContent>
-          </div>
-
-          {cardsLoading ? (
-            <div className="flex items-center justify-center py-10">
-              <Loader2 className="w-5 h-5 animate-spin text-primary" />
-              <span className="ml-2 text-sm text-muted-foreground">Loading cards…</span>
-            </div>
-          ) : isInboundStrategyResponse ? (
-            <div className="space-y-3">
-              {inboundStrategyFields.map(({ label, key }) =>
-                inboundStrategyData?.[key] ? (
-                  <div key={key} className="panel p-4 rounded-lg">
-                    <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground mb-1">{label}</div>
-                    <p className="text-[13px] leading-relaxed text-foreground/90">{String(inboundStrategyData[key])}</p>
-                  </div>
-                ) : null
-              )}
-              {/* Strategic Plays */}
-              {Array.isArray(inboundStrategyData?.strategic_plays) && (inboundStrategyData.strategic_plays as any[]).length > 0 && (
-                <div className="panel p-4 rounded-lg space-y-3">
-                  <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Strategic Plays</div>
-                  {(inboundStrategyData.strategic_plays as any[]).map((play: any, i: number) => (
-                    <div key={i} className="border-l-2 border-primary/30 pl-3 space-y-1">
-                      <div className="text-[13px] font-semibold text-foreground">{play.name}</div>
-                      {play.objective && <div className="text-[12px] text-muted-foreground">{play.objective}</div>}
-                      {play.why_now && <div className="text-[12px] text-foreground/80"><span className="font-medium">Why now: </span>{play.why_now}</div>}
-                      {play.what_it_looks_like && <div className="text-[12px] text-foreground/80"><span className="font-medium">Looks like: </span>{play.what_it_looks_like}</div>}
-                      {play.expected_impact && <div className="text-[12px] text-primary font-medium">{play.expected_impact}</div>}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            </div>
-          ) : cards.length > 0 ? (
-            <>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {cards.map((card, i) => <DashboardCardUI key={card.id || i} card={card} />)}
-              </div>
-              {assets.story_assets && (assets.story_assets.primary_asset || assets.story_assets.supporting_asset) && (
-                <StoryAssetsUI storyAssets={assets.story_assets} />
-              )}
-            </>
-          ) : (
-            <div className="panel text-center py-8">
-              <Sparkles className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground mb-3">No dashboard cards generated yet.</p>
-            </div>
-          )}
-        </TabsContent>
 
         {/* ============ TAB 3: OUTREACH ============ */}
         <TabsContent value="outreach" className="space-y-6 mt-6">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Outreach Assets</h3>
-            </div>
-          ) : (
-            <div className="panel text-center py-8">
-              <Sparkles className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground mb-3">No dashboard cards generated yet.</p>
-            </div>
-          )}
-        </TabsContent>
+          </div>
           {cardsLoading ? (
             <div className="flex items-center justify-center py-10">
               <Loader2 className="w-5 h-5 animate-spin text-primary" />
@@ -1448,26 +1349,31 @@ export default function CompanyDetail() {
             </div>
           ) : (assets.email_sequence || assets.linkedin_sequence) ? (
             <div className="space-y-6">
-              {/* Inbound outreach metadata fields */}
-              {rawAccountJson && (rawAccountJson.intent_tier || rawAccountJson.behavior_acknowledged || rawAccountJson.momentum_frame) && (
-                <div className="space-y-3">
-                  {[
-                    { label: "Intent Tier", key: "intent_tier" },
-                    { label: "Behavior Acknowledged", key: "behavior_acknowledged" },
-                    { label: "Momentum Frame", key: "momentum_frame" },
-                    { label: "Expansion Opportunity", key: "expansion_opportunity" },
-                    { label: "Risk If Stalled", key: "risk_if_stalled" },
-                    { label: "Upside If Executed", key: "upside_if_executed" },
-                  ].map(({ label, key }) =>
-                    rawAccountJson[key] ? (
-                      <div key={key} className="panel p-4 rounded-lg">
-                        <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground mb-1">{label}</div>
-                        <p className="text-[13px] leading-relaxed text-foreground/90">{String(rawAccountJson[key])}</p>
-                      </div>
-                    ) : null
-                  )}
-                </div>
-              )}
+              {rawAccountJson._outreach_meta && typeof rawAccountJson._outreach_meta === "object" && (() => {
+                const meta = rawAccountJson._outreach_meta as Record<string, unknown>;
+                const metaFields = [
+                  { label: "Intent Tier", key: "intent_tier" },
+                  { label: "Behavior Acknowledged", key: "behavior_acknowledged" },
+                  { label: "Momentum Frame", key: "momentum_frame" },
+                  { label: "Expansion Opportunity", key: "expansion_opportunity" },
+                  { label: "Risk If Stalled", key: "risk_if_stalled" },
+                  { label: "Upside If Executed", key: "upside_if_executed" },
+                ];
+                const hasAny = metaFields.some(({ key }) => meta[key]);
+                if (!hasAny) return null;
+                return (
+                  <div className="space-y-3">
+                    {metaFields.map(({ label, key }) =>
+                      meta[key] ? (
+                        <div key={key} className="panel p-4 rounded-lg">
+                          <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground mb-1">{label}</div>
+                          <p className="text-[13px] leading-relaxed text-foreground/90">{String(meta[key])}</p>
+                        </div>
+                      ) : null
+                    )}
+                  </div>
+                );
+              })()}
               {assets.email_sequence && (
                 <div className="space-y-2">
                   <h4 className="text-sm font-medium flex items-center gap-2"><Mail className="w-4 h-4 text-primary" /> Email Sequence</h4>
