@@ -525,8 +525,19 @@ export default function CompanyDetail() {
   const cards = (companyCards?.cards_json as unknown as DashboardCard[] | null) || [];
   const assets = parseJson<{ email_sequence?: Record<string, EmailTouch>; linkedin_sequence?: LinkedInStep[]; story_assets?: StoryAssets }>(companyCards?.assets_json as Json) || {};
   const rawAccountJson = parseJson<Record<string, unknown>>(companyCards?.account_json as Json) || {};
-  // Strategy data is stored under _strategy key (dedicated namespace to avoid Story overwrite)
-  const inboundStrategyData = (rawAccountJson?._strategy as Record<string, unknown>) || null;
+  // Strategy data: check dedicated _strategy namespace first, then fall back to root-level fields
+  // (root-level exists when data was generated before the namespacing fix)
+  const inboundStrategyData: Record<string, unknown> | null = (() => {
+    const namespaced = rawAccountJson?._strategy as Record<string, unknown> | undefined;
+    if (namespaced && (namespaced.momentum_observed || namespaced.initiative_translation || namespaced.opening_paragraph || namespaced.subject_line || namespaced.observed_behavior)) {
+      return namespaced;
+    }
+    // Fallback: root-level fields (legacy data)
+    if (rawAccountJson?.momentum_observed || rawAccountJson?.initiative_translation || rawAccountJson?.opening_paragraph || rawAccountJson?.subject_line) {
+      return rawAccountJson;
+    }
+    return null;
+  })();
   const isInboundStrategyResponse = !!(inboundStrategyData?.momentum_observed || inboundStrategyData?.initiative_translation || inboundStrategyData?.observed_behavior || inboundStrategyData?.subject_line || inboundStrategyData?.opening_paragraph);
   // Story data is stored at root with _type: inbound_story
   const isInboundStoryResponse = !!(rawAccountJson?._type === "inbound_story" || rawAccountJson?.behavior_acknowledged);
@@ -559,11 +570,10 @@ export default function CompanyDetail() {
   const ioradEmbedUrl = toIoradEmbedUrl(effectiveIoradUrl);
 
   const firstContact = contacts[0] || (companyAny?.buyer_name ? { name: companyAny.buyer_name } : null);
-  // For partner-based (outbound) stories: /:partner/:customer/stories/:contactFirstName
-  // For inbound stories (no partner): /stories/:snapshotId, or fall back to company_cards id
-  const inboundStoryId = latestSnapshot?.id || (isInboundStoryResponse ? companyCards?.id : null);
-  const storyBaseUrl = companyAny?.source_type === "inbound" && inboundStoryId
-    ? `/stories/${inboundStoryId}`
+  // For inbound: use company_cards.id as the story ID (available as soon as any tab is generated)
+  // For outbound (partner-based): /:partner/:customer/stories/:contactFirstName
+  const storyBaseUrl = companyAny?.source_type === "inbound" && companyCards?.id
+    ? `/stories/${companyCards.id}`
     : firstContact && company.partner
       ? `/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories/${firstContact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "")}`
       : null;
