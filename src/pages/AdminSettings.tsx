@@ -1211,7 +1211,7 @@ function BulkGeneratePanel() {
 
         if (!isInbound) {
           setCurrentStep("Signals");
-          const { data: sigData, error: sigErr } = await invokeWithRetry("run-signals", { company_id: company.id, mode: "full" });
+          const { data: sigData, error: sigErr } = await invokeWithRetry("run-signals", { company_id: company.id, mode: "full", job_id: jobRow.id });
           if (sigErr) throw new Error(sigErr.message || "Signals step failed");
           if (sigData?.error) throw new Error(sigData.error);
         }
