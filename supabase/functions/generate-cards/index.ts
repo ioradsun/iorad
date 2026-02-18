@@ -233,16 +233,14 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
       // Keep strategy/story keys if already present, add/overwrite company key
       account_json = { ...account_json, _company: companyData };
     } else if (activeTab === "strategy") {
-      // Outbound: cards array. Inbound: flat object (observed_behavior etc.)
+      // Outbound: cards array. Inbound: flat object (mega prompt format)
       const isInboundStrategy =
         !parsed.cards &&
-        (parsed.observed_behavior || parsed.inferred_initiative || parsed.execution_gap ||
-         parsed.momentum_observed || parsed.initiative_translation);
+        (parsed.momentum_observed || parsed.initiative_translation || parsed.observed_behavior ||
+         parsed.inferred_initiative || parsed.execution_gap);
       if (isInboundStrategy) {
-        // Store inbound strategy fields at root of account_json WITH _type marker
-        // Preserve story data (_type: inbound_story) if already present
-        const preservedStoryData = account_json._type === "inbound_story" ? account_json : {};
-        account_json = { ...preservedStoryData, ...parsed, _type: "inbound_strategy", _company: account_json._company };
+        // Store inbound strategy under a DEDICATED key so Story doesn't overwrite it
+        account_json = { ...account_json, _strategy: parsed, _company: account_json._company };
       } else {
         cards_json = parsed.cards || parsed || [];
       }
@@ -254,10 +252,10 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
           email_sequence: parsed.email_sequence || null,
           linkedin_sequence: parsed.linkedin_sequence || null,
         };
-        // Store outreach metadata separately
+        // Store outreach metadata under dedicated key
         account_json = {
           ...account_json,
-          outreach_meta: {
+          _outreach_meta: {
             intent_tier: parsed.intent_tier || null,
             behavior_acknowledged: parsed.behavior_acknowledged || null,
             momentum_frame: parsed.momentum_frame || null,
@@ -272,9 +270,14 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
       }
     } else if (activeTab === "story") {
       if (parsed.behavior_acknowledged || parsed.momentum_observed || parsed.initiative_translation) {
-        // Inbound story: merge at root, preserve strategy fields and company data
-        const preserved = { _company: account_json._company };
-        account_json = { ...preserved, ...parsed, _type: "inbound_story" };
+        // Inbound story: store at root with _type marker, preserve _strategy + _company + _outreach_meta
+        account_json = {
+          _company: account_json._company,
+          _strategy: account_json._strategy,
+          _outreach_meta: account_json._outreach_meta,
+          ...parsed,
+          _type: "inbound_story",
+        };
       } else {
         // Outbound story: assets structure
         assets_json = { ...assets_json, ...(parsed.assets || {}) };

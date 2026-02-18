@@ -525,19 +525,26 @@ export default function CompanyDetail() {
   const cards = (companyCards?.cards_json as unknown as DashboardCard[] | null) || [];
   const assets = parseJson<{ email_sequence?: Record<string, EmailTouch>; linkedin_sequence?: LinkedInStep[]; story_assets?: StoryAssets }>(companyCards?.assets_json as Json) || {};
   const rawAccountJson = parseJson<Record<string, unknown>>(companyCards?.account_json as Json) || {};
-  // Detect inbound strategy response: flat object stored in account_json (with _type marker or legacy detection)
-  const isInboundStrategyResponse = !!(rawAccountJson?._type === "inbound_strategy" ||
-    (cards.length === 0 && (rawAccountJson?.observed_behavior || rawAccountJson?.inferred_initiative || rawAccountJson?.momentum_observed) && rawAccountJson?._type !== "inbound_story"));
-  // Detect inbound story response
-  const isInboundStoryResponse = !!(rawAccountJson?._type === "inbound_story" || (rawAccountJson?.behavior_acknowledged && rawAccountJson?._type !== "inbound_strategy"));
+  // Strategy data is stored under _strategy key (dedicated namespace to avoid Story overwrite)
+  const inboundStrategyData = (rawAccountJson?._strategy as Record<string, unknown>) || null;
+  const isInboundStrategyResponse = !!(inboundStrategyData?.momentum_observed || inboundStrategyData?.initiative_translation || inboundStrategyData?.observed_behavior);
+  // Story data is stored at root with _type: inbound_story
+  const isInboundStoryResponse = !!(rawAccountJson?._type === "inbound_story" || rawAccountJson?.behavior_acknowledged);
   const inboundStrategyFields: { label: string; key: string }[] = [
+    { label: "Momentum Observed", key: "momentum_observed" },
+    { label: "Initiative Translation", key: "initiative_translation" },
+    { label: "Scale Risk", key: "scale_risk" },
+    { label: "Institutionalization Gap", key: "institutionalization_gap" },
+    { label: "Executive Translation", key: "executive_translation" },
+    { label: "Real Cost If Stalled", key: "real_cost_if_stalled" },
+    { label: "Upside If Executed", key: "upside_if_executed" },
+    { label: "Why Now", key: "why_now" },
+    // Legacy fields (old prompt format)
     { label: "Observed Behavior", key: "observed_behavior" },
     { label: "Inferred Initiative", key: "inferred_initiative" },
     { label: "Execution Gap", key: "execution_gap" },
     { label: "Institutionalization Play", key: "institutionalization_play" },
     { label: "ROI Expansion Path", key: "roi_expansion_path" },
-    { label: "Cross-Team Opportunity", key: "cross_team_opportunity" },
-    { label: "Next Operational Step", key: "next_operational_step" },
   ];
   const accountData = parseJson<{
     name?: string; about?: { text?: string; status?: string };
@@ -553,9 +560,10 @@ export default function CompanyDetail() {
 
   const firstContact = contacts[0] || (companyAny?.buyer_name ? { name: companyAny.buyer_name } : null);
   // For partner-based (outbound) stories: /:partner/:customer/stories/:contactFirstName
-  // For inbound stories (no partner): /stories/:snapshotId
-  const storyBaseUrl = companyAny?.source_type === "inbound" && latestSnapshot
-    ? `/stories/${latestSnapshot.id}`
+  // For inbound stories (no partner): /stories/:snapshotId, or fall back to company_cards id
+  const inboundStoryId = latestSnapshot?.id || (isInboundStoryResponse ? companyCards?.id : null);
+  const storyBaseUrl = companyAny?.source_type === "inbound" && inboundStoryId
+    ? `/stories/${inboundStoryId}`
     : firstContact && company.partner
       ? `/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories/${firstContact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "")}`
       : null;
@@ -583,14 +591,23 @@ export default function CompanyDetail() {
             <TabsTrigger value="onboarding" className="text-sm">Onboarding</TabsTrigger>
           </TabsList>
 
-          {/* Unified generate button — visible on all tabs except Onboarding, for inbound companies */}
+          {/* Unified generate + view story buttons — visible on all tabs for inbound companies */}
           {companyAny?.source_type === "inbound" && activeTab !== "onboarding" && (
-            <Button size="sm" className="gap-1.5 text-[13px]" onClick={generateCards} disabled={generatingCards}>
-              {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-              {generatingCards
-                ? generateStep ? `${generateStep}…` : "Generating…"
-                : (isInboundStoryResponse || isInboundStrategyResponse || cards.length > 0 || assets.email_sequence) ? "Regenerate All" : "Generate All"}
-            </Button>
+            <div className="flex items-center gap-2">
+              {storyBaseUrl && isInboundStoryResponse && (
+                <a href={storyBaseUrl} target="_blank" rel="noopener noreferrer">
+                  <Button size="sm" variant="outline" className="gap-1.5 text-[13px]">
+                    <Eye className="w-3.5 h-3.5" /> View Story
+                  </Button>
+                </a>
+              )}
+              <Button size="sm" className="gap-1.5 text-[13px]" onClick={generateCards} disabled={generatingCards}>
+                {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                {generatingCards
+                  ? generateStep ? `${generateStep}…` : "Generating…"
+                  : (isInboundStoryResponse || isInboundStrategyResponse || cards.length > 0 || assets.email_sequence) ? "Regenerate All" : "Generate All"}
+              </Button>
+            </div>
           )}
         </div>
 
@@ -1278,6 +1295,90 @@ export default function CompanyDetail() {
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Strategy & Cards</h3>
           </div>
+          {cardsLoading ? (
+            <div className="flex items-center gap-2 py-4">
+              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+              <span className="ml-2 text-sm text-muted-foreground">Loading cards…</span>
+            </div>
+          ) : isInboundStrategyResponse ? (
+            <div className="space-y-3">
+              {inboundStrategyFields.map(({ label, key }) =>
+                inboundStrategyData?.[key] ? (
+                  <div key={key} className="panel p-4 rounded-lg">
+                    <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground mb-1">{label}</div>
+                    <p className="text-[13px] leading-relaxed text-foreground/90">{String(inboundStrategyData[key])}</p>
+                  </div>
+                ) : null
+              )}
+              {Array.isArray(inboundStrategyData?.strategic_plays) && (inboundStrategyData.strategic_plays as any[]).length > 0 && (
+                <div className="panel p-4 rounded-lg space-y-3">
+                  <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground mb-2">Strategic Plays</div>
+                  {(inboundStrategyData.strategic_plays as any[]).map((play: any, i: number) => (
+                    <div key={i} className="border-l-2 border-primary/30 pl-3 space-y-1">
+                      <div className="text-[13px] font-semibold text-foreground">{play.name}</div>
+                      {play.objective && <div className="text-[12px] text-muted-foreground">{play.objective}</div>}
+                      {play.why_now && <div className="text-[12px] text-foreground/80"><span className="font-medium">Why now: </span>{play.why_now}</div>}
+                      {play.what_it_looks_like && <div className="text-[12px] text-foreground/80"><span className="font-medium">Looks like: </span>{play.what_it_looks_like}</div>}
+                      {play.expected_impact && <div className="text-[12px] text-primary font-medium">{play.expected_impact}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : cards.length > 0 ? (
+            <div className="space-y-4">
+              {cards.map((card) => <DashboardCardUI key={card.id} card={card} />)}
+            </div>
+          ) : (
+            <div className="panel text-center py-8">
+              <Sparkles className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground mb-3">No strategy generated yet.</p>
+            </div>
+          )}
+        </TabsContent>
+          </div>
+          {cardsLoading ? (
+            <div className="flex items-center gap-2 py-4">
+              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+              <span className="ml-2 text-sm text-muted-foreground">Loading cards…</span>
+            </div>
+          ) : isInboundStrategyResponse ? (
+            <div className="space-y-3">
+              {inboundStrategyFields.map(({ label, key }) =>
+                inboundStrategyData?.[key] ? (
+                  <div key={key} className="panel p-4 rounded-lg">
+                    <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground mb-1">{label}</div>
+                    <p className="text-[13px] leading-relaxed text-foreground/90">{String(inboundStrategyData[key])}</p>
+                  </div>
+                ) : null
+              )}
+              {Array.isArray(inboundStrategyData?.strategic_plays) && (inboundStrategyData.strategic_plays as any[]).length > 0 && (
+                <div className="panel p-4 rounded-lg space-y-3">
+                  <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Strategic Plays</div>
+                  {(inboundStrategyData.strategic_plays as any[]).map((play: any, i: number) => (
+                    <div key={i} className="border-l-2 border-primary/30 pl-3 space-y-1">
+                      <div className="text-[13px] font-semibold text-foreground">{play.name}</div>
+                      {play.objective && <div className="text-[12px] text-muted-foreground">{play.objective}</div>}
+                      {play.why_now && <div className="text-[12px] text-foreground/80"><span className="font-medium">Why now: </span>{play.why_now}</div>}
+                      {play.what_it_looks_like && <div className="text-[12px] text-foreground/80"><span className="font-medium">Looks like: </span>{play.what_it_looks_like}</div>}
+                      {play.expected_impact && <div className="text-[12px] text-primary font-medium">{play.expected_impact}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : cards.length > 0 ? (
+            <div className="space-y-4">
+              {cards.map((card) => <DashboardCardUI key={card.id} card={card} />)}
+            </div>
+          ) : (
+            <div className="panel text-center py-8">
+              <Sparkles className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground mb-3">No dashboard cards generated yet.</p>
+            </div>
+          )}
+        </TabsContent>
+          </div>
 
           {cardsLoading ? (
             <div className="flex items-center justify-center py-10">
@@ -1287,13 +1388,29 @@ export default function CompanyDetail() {
           ) : isInboundStrategyResponse ? (
             <div className="space-y-3">
               {inboundStrategyFields.map(({ label, key }) =>
-                rawAccountJson[key] ? (
+                inboundStrategyData?.[key] ? (
                   <div key={key} className="panel p-4 rounded-lg">
                     <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground mb-1">{label}</div>
-                    <p className="text-[13px] leading-relaxed text-foreground/90">{String(rawAccountJson[key])}</p>
+                    <p className="text-[13px] leading-relaxed text-foreground/90">{String(inboundStrategyData[key])}</p>
                   </div>
                 ) : null
               )}
+              {/* Strategic Plays */}
+              {Array.isArray(inboundStrategyData?.strategic_plays) && (inboundStrategyData.strategic_plays as any[]).length > 0 && (
+                <div className="panel p-4 rounded-lg space-y-3">
+                  <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Strategic Plays</div>
+                  {(inboundStrategyData.strategic_plays as any[]).map((play: any, i: number) => (
+                    <div key={i} className="border-l-2 border-primary/30 pl-3 space-y-1">
+                      <div className="text-[13px] font-semibold text-foreground">{play.name}</div>
+                      {play.objective && <div className="text-[12px] text-muted-foreground">{play.objective}</div>}
+                      {play.why_now && <div className="text-[12px] text-foreground/80"><span className="font-medium">Why now: </span>{play.why_now}</div>}
+                      {play.what_it_looks_like && <div className="text-[12px] text-foreground/80"><span className="font-medium">Looks like: </span>{play.what_it_looks_like}</div>}
+                      {play.expected_impact && <div className="text-[12px] text-primary font-medium">{play.expected_impact}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             </div>
           ) : cards.length > 0 ? (
             <>
@@ -1316,8 +1433,14 @@ export default function CompanyDetail() {
         <TabsContent value="outreach" className="space-y-6 mt-6">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Outreach Assets</h3>
-          </div>
-
+            </div>
+          ) : (
+            <div className="panel text-center py-8">
+              <Sparkles className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground mb-3">No dashboard cards generated yet.</p>
+            </div>
+          )}
+        </TabsContent>
           {cardsLoading ? (
             <div className="flex items-center justify-center py-10">
               <Loader2 className="w-5 h-5 animate-spin text-primary" />
