@@ -578,18 +578,33 @@ function computeContactRank(cp: Record<string, any>): number {
   // Title relevance (0–40)
   score += titleScore(cp.jobtitle);
 
-  // HubSpot score (0–20, capped)
+  // ── iorad activity signals (0–40 total) — most important signals ──────────
+  // Tutorial creator: first_tutorial_create_date means they've built content
+  if (cp.first_tutorial_create_date) score += 20;
+  // Tutorial viewer: has ever learned via iorad
+  if (cp.first_tutorial_view_date || cp.first_tutorial_learn_date) score += 10;
+  // Active tutorial answerer this month — power user signal
+  const monthAnswers = parseInt(cp.answers_with_own_tutorial_month_count || "0", 10) || 0;
+  if (monthAnswers > 0) score += Math.min(10, monthAnswers * 2);
+  // Previous month activity — still valuable
+  const prevAnswers = parseInt(cp.answers_with_own_tutorial_previous_month_count || "0", 10) || 0;
+  if (prevAnswers > 0) score += Math.min(5, prevAnswers);
+  // Extension connected — active power user
+  const extConn = parseInt(cp.extension_connections || "0", 10) || 0;
+  if (extConn > 0) score += Math.min(5, extConn);
+
+  // HubSpot score (0–10, capped)
   const hsScore = parseFloat(cp.hubspot_score || "0") || 0;
-  score += Math.min(20, Math.round(hsScore / 5));
+  score += Math.min(10, Math.round(hsScore / 10));
 
-  // Number of times contacted (0–15)
+  // Number of times contacted (0–10)
   const contacted = parseInt(cp.num_contacted_notes || "0", 10) || 0;
-  score += Math.min(15, contacted * 3);
+  score += Math.min(10, contacted * 2);
 
-  // Email engagement: opens + clicks (0–15)
+  // Email engagement: opens + clicks (0–10)
   const opens = parseInt(cp.hs_email_open_count || "0", 10) || 0;
   const clicks = parseInt(cp.hs_email_click_count || "0", 10) || 0;
-  score += Math.min(15, opens + clicks * 2);
+  score += Math.min(10, opens + clicks * 2);
 
   // Recency of last contact (0–10)
   const lastContacted = cp.hs_last_contacted || cp.notes_last_contacted || cp.hs_sales_email_last_replied;
@@ -614,6 +629,10 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
     "hs_last_contacted", "num_contacted_notes", "hs_email_open_count",
     "hs_email_click_count", "hubspot_score", "notes_last_contacted",
     "hs_sales_email_last_replied",
+    // iorad-specific activity fields
+    "first_tutorial_create_date", "first_tutorial_view_date", "first_tutorial_learn_date",
+    "answers_with_own_tutorial_month_count", "answers_with_own_tutorial_previous_month_count",
+    "answers", "extension_connections", "first_embed_tutorial_base_domain_name",
   ];
 
   try {
@@ -689,6 +708,14 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
             hs_email_open_count: cp.hs_email_open_count || null,
             hs_email_click_count: cp.hs_email_click_count || null,
             hubspot_score: cp.hubspot_score || null,
+            // iorad activity
+            first_tutorial_create_date: cp.first_tutorial_create_date || null,
+            first_tutorial_view_date: cp.first_tutorial_view_date || null,
+            first_tutorial_learn_date: cp.first_tutorial_learn_date || null,
+            answers_with_own_tutorial_month_count: cp.answers_with_own_tutorial_month_count || null,
+            answers_with_own_tutorial_previous_month_count: cp.answers_with_own_tutorial_previous_month_count || null,
+            answers: cp.answers || null,
+            extension_connections: cp.extension_connections || null,
           },
         };
 
