@@ -82,7 +82,7 @@ export default function Dashboard() {
   const SortHeader = ({ label, field }: { label: string; field: SortKey }) => (
     <button
       onClick={() => toggleSort(field)}
-      className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors"
+      className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
     >
       {label}
       <ArrowUpDown className={`w-3 h-3 transition-colors ${sortKey === field ? "text-foreground" : "text-muted-foreground/40"}`} />
@@ -131,14 +131,14 @@ export default function Dashboard() {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-3 py-1 rounded text-xs font-medium capitalize transition-all ${
+              className={`px-3.5 py-1.5 rounded text-sm font-medium capitalize transition-all ${
                 activeTab === tab
                   ? "bg-card text-foreground shadow-sm shadow-black/[0.06]"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {tab}
-              <span className="ml-1.5 tabular-nums text-[10px] text-muted-foreground">
+              <span className="ml-1.5 tabular-nums text-xs text-muted-foreground">
                 {tab === "inbound" ? inbound.length : outbound.length}
               </span>
             </button>
@@ -192,24 +192,24 @@ export default function Dashboard() {
         <table className="w-full">
           <thead>
             <tr style={{ borderBottom: "1px solid hsl(215 10% 88% / 0.7)" }}>
-              <th className="text-left px-5 py-3">
+              <th className="text-left px-5 py-3.5">
                 <SortHeader label="Company" field="name" />
               </th>
               {search && (
-                <th className="text-left px-5 py-3 hidden sm:table-cell">
-                  <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Source</span>
+                <th className="text-left px-5 py-3.5 hidden sm:table-cell">
+                  <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Source</span>
                 </th>
               )}
-              <th className="text-left px-5 py-3 hidden md:table-cell">
-                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Partner</span>
+              <th className="text-left px-5 py-3.5 hidden md:table-cell">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Partner</span>
               </th>
-              <th className="text-left px-5 py-3 hidden lg:table-cell">
-                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Rep</span>
+              <th className="text-left px-5 py-3.5 hidden lg:table-cell">
+                <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Rep</span>
               </th>
-              <th className="text-left px-5 py-3 hidden lg:table-cell">
+              <th className="text-left px-5 py-3.5 hidden lg:table-cell">
                 <SortHeader label="Added" field="created_at" />
               </th>
-              <th className="px-5 py-3 w-28" />
+              <th className="px-5 py-3.5 w-28" />
             </tr>
           </thead>
           <tbody>
@@ -225,32 +225,32 @@ export default function Dashboard() {
                 onMouseLeave={e => (e.currentTarget.style.borderBottomColor = "hsl(215 10% 92% / 0.6)")}
                 onClick={() => navigate(`/company/${company.id}`)}
               >
-                <td className="px-5 py-3.5">
-                  <div className="font-medium text-sm text-foreground leading-snug">{company.name}</div>
+                <td className="px-5 py-4">
+                  <div className="font-semibold text-[15px] text-foreground leading-snug">{company.name}</div>
                   {company.domain && (
-                    <div className="text-xs text-muted-foreground mt-0.5">{company.domain}</div>
+                    <div className="text-[13px] text-muted-foreground mt-0.5">{company.domain}</div>
                   )}
                 </td>
                 {search && (
-                  <td className="px-5 py-3.5 hidden sm:table-cell">
+                  <td className="px-5 py-4 hidden sm:table-cell">
                     <SourcePill type={(company as any).source_type || "outbound"} />
                   </td>
                 )}
-                <td className="px-5 py-3.5 hidden md:table-cell">
-                  <span className="text-sm text-muted-foreground">{company.partner || "—"}</span>
+                <td className="px-5 py-4 hidden md:table-cell">
+                  <span className="text-[14px] text-muted-foreground">{company.partner || "—"}</span>
                 </td>
-                <td className="px-5 py-3.5 hidden lg:table-cell">
-                  <span className="text-sm text-muted-foreground">{company.partner_rep_name || "—"}</span>
+                <td className="px-5 py-4 hidden lg:table-cell">
+                  <span className="text-[14px] text-muted-foreground">{company.partner_rep_name || "—"}</span>
                   {company.partner_rep_email && (
-                    <div className="text-xs text-muted-foreground/60 mt-0.5">{company.partner_rep_email}</div>
+                    <div className="text-[13px] text-muted-foreground/60 mt-0.5">{company.partner_rep_email}</div>
                   )}
                 </td>
-                <td className="px-5 py-3.5 hidden lg:table-cell">
-                  <span className="text-sm text-muted-foreground">
+                <td className="px-5 py-4 hidden lg:table-cell">
+                  <span className="text-[14px] text-muted-foreground">
                     {new Date(company.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                   </span>
                 </td>
-                <td className="px-5 py-3.5 text-right">
+                <td className="px-5 py-4 text-right">
                   {company.snapshot_status === "Generated" && (
                     <Link
                       to={`/company/${company.id}`}
@@ -259,9 +259,9 @@ export default function Dashboard() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="gap-1.5 text-xs h-7 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="gap-1.5 text-[13px] h-8 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
                       >
-                        <ExternalLink className="w-3 h-3" />
+                        <ExternalLink className="w-3.5 h-3.5" />
                         View story
                       </Button>
                     </Link>
@@ -307,7 +307,7 @@ function KpiCard({
         <div className="text-[2rem] font-semibold tracking-tight leading-none text-foreground tabular-nums">
           {value}
         </div>
-        <div className="text-xs font-medium text-muted-foreground mt-1 leading-tight">{label}</div>
+        <div className="text-[13px] font-medium text-muted-foreground mt-1.5 leading-tight">{label}</div>
       </div>
     </div>
   );
