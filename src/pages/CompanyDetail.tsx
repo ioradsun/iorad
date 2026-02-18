@@ -234,10 +234,34 @@ export default function CompanyDetail() {
         }
       }
 
+      // Step 3: For inbound companies, extract contact profiles and generate company cards
+      if (companyAny?.source_type === "inbound") {
+        // Extract AI profiles from HubSpot data
+        toast.info("Extracting contact profiles…");
+        try {
+          const { data: profileData, error: profileErr } = await supabase.functions.invoke("extract-contact-profile", { body: { company_id: id } });
+          if (profileErr) console.warn("Profile extraction failed:", profileErr);
+          else if (profileData?.profiles_extracted > 0) toast.success(`Extracted ${profileData.profiles_extracted} AI profiles`);
+        } catch (pe: any) { console.warn("Profile extraction error:", pe.message); }
+
+        // Generate company intel cards
+        toast.info("Generating company intel…");
+        try {
+          const { data: cardData, error: cardErr } = await supabase.functions.invoke("generate-cards", { body: { company_id: id, tab: "company" } });
+          if (cardErr) throw cardErr;
+          if (cardData?.error) throw new Error(cardData.error);
+          toast.success("Company intel generated");
+        } catch (ce: any) {
+          console.error("Card generation failed:", ce);
+          toast.error("Card generation failed: " + (ce.message || "Unknown error"));
+        }
+      }
+
       queryClient.invalidateQueries({ queryKey: ["company", id] });
       queryClient.invalidateQueries({ queryKey: ["signals", id] });
       queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
       queryClient.invalidateQueries({ queryKey: ["contacts", id] });
+      queryClient.invalidateQueries({ queryKey: ["company_cards", id] });
       queryClient.invalidateQueries({ queryKey: ["companies"] });
     } catch (e: any) { toast.error(e.message || "Operation failed"); }
     finally { setRegenerating(false); }
