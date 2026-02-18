@@ -12,7 +12,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail, Plus, Sparkles, Eye, Building2, MapPin, Users, DollarSign, Globe, Video, BookOpen, ChevronRight, Search, PhoneCall, Clock, Brain } from "lucide-react";
+import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail, Plus, Sparkles, Eye, Building2, MapPin, Users, DollarSign, Globe, Video, BookOpen, ChevronRight, Search, PhoneCall, Clock, Brain, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -151,6 +152,8 @@ export default function CompanyDetail() {
   const updateCompany = useUpdateCompany();
   const queryClient = useQueryClient();
   const [regenerating, setRegenerating] = useState(false);
+  const [deleteContactId, setDeleteContactId] = useState<string | null>(null);
+  const [deletingContact, setDeletingContact] = useState(false);
   const [generatingCards, setGeneratingCards] = useState(false);
   const [generateStep, setGenerateStep] = useState<string | null>(null);
   const [selectedContactId, setSelectedContactId] = useState<string>("");
@@ -229,6 +232,18 @@ export default function CompanyDetail() {
       queryClient.invalidateQueries({ queryKey: ["contacts", id] });
     } catch (e: any) { toast.error(e.message || "Failed to add contact"); }
     finally { setSavingContact(false); }
+  };
+
+  const handleDeleteContact = async (contactId: string) => {
+    setDeletingContact(true);
+    try {
+      const { error } = await supabase.from("contacts").delete().eq("id", contactId);
+      if (error) throw error;
+      toast.success("Contact deleted");
+      setDeleteContactId(null);
+      queryClient.invalidateQueries({ queryKey: ["contacts", id] });
+    } catch (e: any) { toast.error(e.message || "Failed to delete contact"); }
+    finally { setDeletingContact(false); }
   };
 
   const regenerate = async (mode: string = "full") => {
@@ -872,6 +887,13 @@ export default function CompanyDetail() {
                         )}
                         {contact.email && <a href={`mailto:${contact.email}`} className="text-muted-foreground hover:text-primary" title={contact.email}><Mail className="w-4 h-4" /></a>}
                         {contact.linkedin && <a href={contact.linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary"><Linkedin className="w-4 h-4" /></a>}
+                        <button
+                          onClick={() => setDeleteContactId(contact.id)}
+                          className="text-muted-foreground hover:text-destructive transition-colors"
+                          title="Delete contact"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
                     {/* AI Profile — directly under name */}
@@ -977,6 +999,27 @@ export default function CompanyDetail() {
               </div>
             </div>
           </div>
+
+          {/* Delete Contact Confirmation */}
+          <AlertDialog open={!!deleteContactId} onOpenChange={(open) => !open && setDeleteContactId(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete contact?</AlertDialogTitle>
+                <AlertDialogDescription>This will permanently remove the contact. This action cannot be undone.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={() => deleteContactId && handleDeleteContact(deleteContactId)}
+                  disabled={deletingContact}
+                >
+                  {deletingContact ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           {/* Meetings (Fathom) */}
           <Card className="bg-secondary/30">
