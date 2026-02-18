@@ -154,7 +154,7 @@ export default function Dashboard() {
           />
         </div>
 
-        {partners.length > 0 && (
+        {activeTab === "outbound" && partners.length > 0 && (
           <Select value={partnerFilter} onValueChange={setPartnerFilter}>
             <SelectTrigger className="w-[160px] h-8 text-xs bg-secondary border-0 focus:ring-1 focus:ring-ring/30">
               <SelectValue placeholder="All partners" />
