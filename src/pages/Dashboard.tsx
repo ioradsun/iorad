@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { motion } from "framer-motion";
 
 type SortKey = "name" | "last_score_total" | "signals_count" | "updated_at" | "created_at";
+type SourceTab = "inbound" | "outbound";
 
 export default function Dashboard() {
   const { data: companies = [], isLoading } = useCompanies();
@@ -19,23 +20,19 @@ export default function Dashboard() {
   const [sortAsc, setSortAsc] = useState(false);
   const [search, setSearch] = useState("");
   const [partnerFilter, setPartnerFilter] = useState<string>("all");
-  const [sourceFilter, setSourceFilter] = useState<string>("all");
-
-  const lastJob = jobs[0];
+  const [activeTab, setActiveTab] = useState<SourceTab>("inbound");
 
   const companiesWithSignals = useMemo(() => {
     return companies.map(c => ({ ...c, signals_count: signalCounts[c.id] || 0 }));
   }, [companies, signalCounts]);
 
-  const filtered = useMemo(() => {
+  const sorted = useMemo(() => {
     let list = [...companiesWithSignals];
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(c => c.name.toLowerCase().includes(q) || (c.domain || "").toLowerCase().includes(q));
     }
     if (partnerFilter !== "all") list = list.filter(c => c.partner === partnerFilter);
-    if (sourceFilter !== "all") list = list.filter(c => (c as any).source_type === sourceFilter);
-
     list.sort((a, b) => {
       let av: any, bv: any;
       switch (sortKey) {
@@ -51,7 +48,11 @@ export default function Dashboard() {
       return 0;
     });
     return list;
-  }, [search, partnerFilter, sourceFilter, sortKey, sortAsc, companiesWithSignals]);
+  }, [search, partnerFilter, sortKey, sortAsc, companiesWithSignals]);
+
+  const inbound = useMemo(() => sorted.filter(c => (c as any).source_type === "inbound"), [sorted]);
+  const outbound = useMemo(() => sorted.filter(c => (c as any).source_type !== "inbound"), [sorted]);
+  const activeList = activeTab === "inbound" ? inbound : outbound;
 
   const partners = useMemo(() => {
     const set = new Set(companies.map(c => c.partner).filter(Boolean) as string[]);
@@ -123,7 +124,27 @@ export default function Dashboard() {
 
       {/* ── Toolbar ── */}
       <div className="flex flex-wrap items-center gap-2.5">
-        <div className="relative flex-1 min-w-[200px] max-w-xs">
+        {/* Source switcher */}
+        <div className="flex items-center bg-secondary rounded-md p-0.5 gap-0.5">
+          {(["inbound", "outbound"] as SourceTab[]).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-3 py-1 rounded text-xs font-medium capitalize transition-all ${
+                activeTab === tab
+                  ? "bg-card text-foreground shadow-sm shadow-black/[0.06]"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab}
+              <span className="ml-1.5 tabular-nums text-[10px] text-muted-foreground">
+                {tab === "inbound" ? inbound.length : outbound.length}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="relative flex-1 min-w-[180px] max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <Input
             placeholder="Search…"
@@ -132,16 +153,7 @@ export default function Dashboard() {
             className="pl-8 h-8 text-sm bg-secondary border-0 focus-visible:ring-1 focus-visible:ring-ring/30"
           />
         </div>
-        <Select value={sourceFilter} onValueChange={setSourceFilter}>
-          <SelectTrigger className="w-[140px] h-8 text-xs bg-secondary border-0 focus:ring-1 focus:ring-ring/30">
-            <SelectValue placeholder="All sources" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All sources</SelectItem>
-            <SelectItem value="inbound">Inbound</SelectItem>
-            <SelectItem value="outbound">Outbound</SelectItem>
-          </SelectContent>
-        </Select>
+
         {partners.length > 0 && (
           <Select value={partnerFilter} onValueChange={setPartnerFilter}>
             <SelectTrigger className="w-[160px] h-8 text-xs bg-secondary border-0 focus:ring-1 focus:ring-ring/30">
@@ -155,12 +167,8 @@ export default function Dashboard() {
             </SelectContent>
           </Select>
         )}
+
         <div className="ml-auto flex items-center gap-3">
-          {filtered.length !== companies.length && (
-            <span className="text-xs text-muted-foreground">
-              {filtered.length} of {companies.length}
-            </span>
-          )}
           <Link to="/upload">
             <Button
               size="sm"
@@ -186,9 +194,6 @@ export default function Dashboard() {
               <th className="text-left px-5 py-3">
                 <SortHeader label="Company" field="name" />
               </th>
-              <th className="text-left px-5 py-3 hidden sm:table-cell">
-                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Source</span>
-              </th>
               <th className="text-left px-5 py-3 hidden md:table-cell">
                 <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Partner</span>
               </th>
@@ -202,7 +207,7 @@ export default function Dashboard() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((company, i) => (
+            {activeList.map((company, i) => (
               <motion.tr
                 key={company.id}
                 initial={{ opacity: 0 }}
@@ -219,9 +224,6 @@ export default function Dashboard() {
                   {company.domain && (
                     <div className="text-xs text-muted-foreground mt-0.5">{company.domain}</div>
                   )}
-                </td>
-                <td className="px-5 py-3.5 hidden sm:table-cell">
-                  <SourcePill type={(company as any).source_type || "outbound"} />
                 </td>
                 <td className="px-5 py-3.5 hidden md:table-cell">
                   <span className="text-sm text-muted-foreground">{company.partner || "—"}</span>
@@ -256,12 +258,12 @@ export default function Dashboard() {
                 </td>
               </motion.tr>
             ))}
-            {filtered.length === 0 && (
+            {activeList.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-5 py-16 text-center text-sm text-muted-foreground">
+                <td colSpan={5} className="px-5 py-16 text-center text-sm text-muted-foreground">
                   {companies.length === 0
                     ? "No companies yet — upload a CSV to get started."
-                    : "No results match your filters."}
+                    : `No ${activeTab} companies match your filters.`}
                 </td>
               </tr>
             )}
@@ -287,10 +289,7 @@ function KpiCard({
 }) {
   return (
     <div className="bg-card shadow-sm shadow-black/[0.04] rounded-lg px-5 py-4 flex items-center gap-4">
-      <div
-        className="rounded-md p-2 shrink-0"
-        style={{ background: iconBg }}
-      >
+      <div className="rounded-md p-2 shrink-0" style={{ background: iconBg }}>
         {icon}
       </div>
       <div className="min-w-0">
@@ -300,25 +299,5 @@ function KpiCard({
         <div className="text-xs font-medium text-muted-foreground mt-1 leading-tight">{label}</div>
       </div>
     </div>
-  );
-}
-
-function SourcePill({ type }: { type: string }) {
-  const isInbound = type === "inbound";
-  return (
-    <span
-      className="inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded border"
-      style={isInbound ? {
-        background: "var(--source-inbound-bg)",
-        color: "var(--source-inbound-fg)",
-        borderColor: "var(--source-inbound-border)",
-      } : {
-        background: "var(--source-outbound-bg)",
-        color: "var(--source-outbound-fg)",
-        borderColor: "var(--source-outbound-border)",
-      }}
-    >
-      {type}
-    </span>
   );
 }
