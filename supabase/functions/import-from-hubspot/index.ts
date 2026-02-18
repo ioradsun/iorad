@@ -111,25 +111,51 @@ Deno.serve(async (req) => {
     let imported = 0;
     let skipped = 0;
     const errors: string[] = [];
-    const toProcess: string[] = []; // company IDs to auto-process
 
+    // Deduplicate company IDs — HubSpot may send multiple events for same company
+    const companyObjectIds = new Set<string>();
     for (const event of events) {
+      const subType: string = event.subscriptionType || "";
+      // Only handle company creation/update — skip contacts, associations, deletions
+      if (!subType.startsWith("company.creation") && !subType.startsWith("company.propertyChange") && subType !== "company.creation") {
+        if (subType && !subType.startsWith("company.")) {
+          console.log(`Skipping non-company event: ${subType}`);
+          skipped++;
+          continue;
+        }
+        // For company.associationChange or company.deletion — skip
+        if (subType === "company.associationChange" || subType === "company.deletion" || subType === "company.merge") {
+          console.log(`Skipping association/deletion event: ${subType}`);
+          skipped++;
+          continue;
+        }
+      }
+      const objectId = String(event.objectId || "").trim();
+      if (objectId) companyObjectIds.add(objectId);
+      else skipped++;
+    }
+
+    console.log(`Processing ${companyObjectIds.size} unique company IDs from ${events.length} events`);
+
+    for (const objectId of companyObjectIds) {
       try {
-        const objectId = event.objectId;
-        if (!objectId) { skipped++; continue; }
-
         const company = await fetchHubSpotCompany(objectId);
-        if (!company) { skipped++; continue; }
+        if (!company) {
+          console.warn(`fetchHubSpotCompany returned null for objectId: ${objectId}`);
+          skipped++;
+          continue;
+        }
 
-        const { companyId, isNew, hasStory } = await upsertCompany(supabase, company);
+        const { companyId } = await upsertCompany(supabase, company);
         await importContactsForCompany(supabase, objectId, companyId);
         imported++;
 
         // Score immediately after import (fire-and-forget)
         scoreCompanyAsync(companyId);
-        console.log(`Scored queued for: ${company.properties?.name || companyId}`);
+        console.log(`Imported & scoring queued: ${company.properties?.name || companyId}`);
       } catch (err: any) {
-        errors.push(`Event ${event.objectId || "unknown"}: ${err.message}`);
+        console.error(`Error processing company ${objectId}:`, err.message);
+        errors.push(`Company ${objectId}: ${err.message}`);
         skipped++;
       }
     }
@@ -137,7 +163,7 @@ Deno.serve(async (req) => {
     console.log(`HubSpot webhook: ${imported} imported, ${skipped} skipped`);
 
     return new Response(
-      JSON.stringify({ success: true, imported, skipped, queued: toProcess.length, errors: errors.slice(0, 10) }),
+      JSON.stringify({ success: true, imported, skipped, errors: errors.slice(0, 10) }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err: any) {
