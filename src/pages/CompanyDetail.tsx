@@ -1032,6 +1032,7 @@ export default function CompanyDetail() {
             <div className="px-4 pb-4">
               {contacts.length > 0 ? (() => {
                 const filtered = contacts.filter((c) => {
+                  if (c.email?.toLowerCase().includes("student")) return false;
                   if (!contactSearch) return true;
                   const q = contactSearch.toLowerCase();
                   return (c.name?.toLowerCase().includes(q) || c.title?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q));
