@@ -113,28 +113,12 @@ export default function Dashboard() {
           icon={<ArrowDownRight className="w-4 h-4" style={{ color: "var(--stat-inbound-fg)" }} />}
           iconBg="var(--stat-inbound-bg)"
         />
-        <div className="flex flex-col gap-2">
-          <KpiCard
-            value={stats.newOutbound}
-            label="New outbound (24h)"
-            icon={<ArrowUpRight className="w-4 h-4" style={{ color: "var(--stat-outbound-fg)" }} />}
-            iconBg="var(--stat-outbound-bg)"
-          />
-          <Link to="/upload" className="w-full">
-            <Button
-              size="sm"
-              className="w-full gap-1.5 font-medium"
-              style={{
-                background: "var(--btn-primary-bg)",
-                color: "var(--btn-primary-fg)",
-                borderRadius: "var(--btn-radius)",
-              }}
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add Company
-            </Button>
-          </Link>
-        </div>
+        <KpiCard
+          value={stats.newOutbound}
+          label="New outbound (24h)"
+          icon={<ArrowUpRight className="w-4 h-4" style={{ color: "var(--stat-outbound-fg)" }} />}
+          iconBg="var(--stat-outbound-bg)"
+        />
       </div>
 
       {/* ── Toolbar ── */}
@@ -171,11 +155,27 @@ export default function Dashboard() {
             </SelectContent>
           </Select>
         )}
-        {filtered.length !== companies.length && (
-          <span className="text-xs text-muted-foreground ml-auto">
-            {filtered.length} of {companies.length}
-          </span>
-        )}
+        <div className="ml-auto flex items-center gap-3">
+          {filtered.length !== companies.length && (
+            <span className="text-xs text-muted-foreground">
+              {filtered.length} of {companies.length}
+            </span>
+          )}
+          <Link to="/upload">
+            <Button
+              size="sm"
+              className="gap-1.5 font-medium"
+              style={{
+                background: "var(--btn-primary-bg)",
+                color: "var(--btn-primary-fg)",
+                borderRadius: "var(--btn-radius)",
+              }}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Company
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* ── Table ── */}
