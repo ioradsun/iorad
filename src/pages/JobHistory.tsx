@@ -204,6 +204,45 @@ function CompanyList({ companies, emptyMessage }: { companies: any[]; emptyMessa
 
 // ── HubSpot Sync components ───────────────────────────────────────────────────
 
+function useJobStats(job: any) {
+  return useQuery({
+    queryKey: ["job_stats", job?.id],
+    enabled: !!job,
+    queryFn: async () => {
+      if (!job) return { upserted: 0, withContacts: 0, scored: 0, failed: 0 };
+      const since = job.started_at;
+
+      // Companies upserted/updated since job started
+      const { count: upserted } = await supabase
+        .from("companies")
+        .select("id", { count: "exact", head: true })
+        .gte("updated_at", since);
+
+      // Of those, how many have at least one contact
+      const { data: companiesWithContacts } = await supabase
+        .from("contacts")
+        .select("company_id")
+        .gte("created_at", since);
+      const withContacts = new Set((companiesWithContacts || []).map((c: any) => c.company_id)).size;
+
+      // Of those, how many have a scout score recorded since job started
+      const { count: scored } = await supabase
+        .from("companies")
+        .select("id", { count: "exact", head: true })
+        .gte("scout_scored_at", since)
+        .not("scout_score", "is", null);
+
+      return {
+        upserted: upserted ?? 0,
+        withContacts,
+        scored: scored ?? 0,
+        failed: job.companies_failed ?? 0,
+      };
+    },
+    refetchInterval: 5_000,
+  });
+}
+
 function SyncJobSummary({ job }: { job: any }) {
   const snap = job.settings_snapshot as any || {};
   const isRunning = job.status === "running";
@@ -212,6 +251,35 @@ function SyncJobSummary({ job }: { job: any }) {
   const pct = job.total_companies_targeted > 0
     ? Math.round((job.companies_processed / job.total_companies_targeted) * 100)
     : null;
+
+  const { data: stats } = useJobStats(job);
+
+  const statCells = [
+    {
+      label: "Upserted",
+      value: stats?.upserted ?? job.companies_processed ?? 0,
+      icon: <Download className="w-3 h-3" />,
+      description: "Company records created or updated",
+    },
+    {
+      label: "Contacts Imported",
+      value: stats?.withContacts ?? 0,
+      icon: <User className="w-3 h-3" />,
+      description: "Companies that now have ≥1 contact",
+    },
+    {
+      label: "Scout Scored",
+      value: stats?.scored ?? 0,
+      icon: <Zap className="w-3 h-3" />,
+      description: "Companies with a fresh Scout Score",
+    },
+    {
+      label: "Errors",
+      value: stats?.failed ?? 0,
+      icon: <AlertCircle className="w-3 h-3" />,
+      warn: (stats?.failed ?? 0) > 0,
+    },
+  ];
 
   return (
     <div className="rounded-lg border border-border bg-card/50 p-4 space-y-3">
@@ -238,7 +306,7 @@ function SyncJobSummary({ job }: { job: any }) {
         </div>
         <span className="text-xs text-muted-foreground tabular-nums">
           {fmt(job.started_at)}
-          {job.finished_at && ` → ${elapsed(job.started_at)} total`}
+          {job.finished_at && ` · ${elapsed(job.started_at)} total`}
           {isRunning && ` · ${elapsed(job.started_at)} elapsed`}
         </span>
       </div>
@@ -262,16 +330,17 @@ function SyncJobSummary({ job }: { job: any }) {
         </div>
       )}
 
-      {/* Stats grid */}
-      <div className="grid grid-cols-3 gap-2 pt-1">
-        {[
-          { label: "Imported / Updated", value: `${job.companies_succeeded ?? 0}` },
-          { label: "Failed", value: `${job.companies_failed ?? 0}`, warn: job.companies_failed > 0 },
-          { label: "Processed", value: `${job.companies_processed ?? 0}` },
-        ].map(({ label, value, warn }) => (
+      {/* Stats grid — 4 meaningful counters */}
+      <div className="grid grid-cols-4 gap-2 pt-1">
+        {statCells.map(({ label, value, icon, warn }) => (
           <div key={label} className="rounded-md bg-muted/40 px-3 py-2 text-center">
-            <div className={`text-base font-bold tabular-nums ${warn ? "text-destructive" : "text-foreground"}`}>{value}</div>
-            <div className="text-[10px] text-muted-foreground mt-0.5">{label}</div>
+            <div className={`flex justify-center mb-1 ${warn ? "text-destructive" : "text-muted-foreground"}`}>
+              {icon}
+            </div>
+            <div className={`text-base font-bold tabular-nums ${warn && value > 0 ? "text-destructive" : "text-foreground"}`}>
+              {value}
+            </div>
+            <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{label}</div>
           </div>
         ))}
       </div>
