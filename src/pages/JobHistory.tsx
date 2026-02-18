@@ -1,19 +1,16 @@
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/useAuth";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  Loader2, CheckCircle2, Clock, XCircle, Inbox, Play, Pause, Trash2,
-  Download, RefreshCw, AlertCircle, User, Building2, Zap, ChevronDown,
-  ChevronRight, Circle, CheckCheck, SkipForward,
+  Loader2, CheckCircle2, XCircle, Inbox,
+  Download, AlertCircle, User, Zap, ChevronDown,
+  ChevronRight, Circle, CheckCheck,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { toast } from "sonner";
 import { formatDistanceToNow, format } from "date-fns";
 
-const NEW_THRESHOLD_HOURS = 48;
+
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -46,7 +43,6 @@ function useCompanyQueueData() {
         .order("finished_at", { ascending: false });
 
       const cardIds = new Set((cards || []).map((c: any) => c.company_id));
-      const cutoff = new Date(Date.now() - NEW_THRESHOLD_HOURS * 60 * 60 * 1000);
       const failedMap = new Map<string, any>();
       for (const item of failedItems || []) {
         if (!failedMap.has(item.company_id)) failedMap.set(item.company_id, item);
@@ -54,51 +50,14 @@ function useCompanyQueueData() {
 
       const noStory = (companies || []).filter((c) => !cardIds.has(c.id));
       const completed = (companies || []).filter((c) => cardIds.has(c.id));
-      const waiting = noStory.filter((c) => new Date(c.created_at) >= cutoff && c.snapshot_status == null);
-      const notStarted = noStory.filter((c) => new Date(c.created_at) < cutoff && c.snapshot_status !== "cleared");
 
-      return { completed, waiting, notStarted, failed: Array.from(failedMap.values()) };
+      return { completed, notStarted: noStory, failed: Array.from(failedMap.values()) };
     },
     refetchInterval: 10_000,
   });
 }
 
-function useActiveRunningJob() {
-  return useQuery({
-    queryKey: ["active_running_job"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("processing_jobs")
-        .select("*")
-        .eq("status", "running")
-        .order("started_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      return data;
-    },
-    refetchInterval: (q) => (q.state.data ? 5_000 : 10_000),
-  });
-}
 
-function useCurrentlyProcessingCompany(jobId: string | undefined) {
-  return useQuery({
-    queryKey: ["currently_processing_company", jobId],
-    enabled: !!jobId,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("processing_job_items")
-        .select("*, companies(name)")
-        .eq("job_id", jobId!)
-        .order("started_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      return data;
-    },
-    refetchInterval: 3_000,
-  });
-}
-
-// ── HubSpot Sync hooks ────────────────────────────────────────────────────────
 
 function useHubspotJobs() {
   return useQuery({
@@ -558,212 +517,60 @@ function HubSpotSyncTab() {
 // ── Story Generation tab ──────────────────────────────────────────────────────
 
 function StoryGenerationTab() {
-  const qc = useQueryClient();
-  const { user } = useAuth();
-  const [actionLoading, setActionLoading] = useState(false);
-
-  const { data: queueData, isLoading: loadingQueue } = useCompanyQueueData();
-  const { data: activeJob, isLoading: loadingActive } = useActiveRunningJob();
-  const { data: currentItem } = useCurrentlyProcessingCompany(activeJob?.id);
-
-  const isLoading = loadingQueue || loadingActive;
-  const isRunning = !!activeJob;
-  const currentCompany =
-    (currentItem?.companies as any)?.name ??
-    (activeJob?.settings_snapshot as any)?.current_company ??
-    null;
-  const triggeredBy = (activeJob as any)?.triggered_by ?? null;
+  const { data: queueData, isLoading } = useCompanyQueueData();
 
   const completed  = queueData?.completed  ?? [];
-  const waiting    = queueData?.waiting    ?? [];
   const notStarted = queueData?.notStarted ?? [];
   const failed     = queueData?.failed     ?? [];
 
-  const handleStart = async () => {
-    setActionLoading(true);
-    try {
-      const { error } = await supabase.functions.invoke("run-signals", {
-        body: {
-          offset: 0,
-          triggered_by: user?.email ?? user?.user_metadata?.full_name ?? "Unknown",
-        },
-      });
-      if (error) throw error;
-      await qc.invalidateQueries({ queryKey: ["active_running_job"] });
-      await qc.invalidateQueries({ queryKey: ["company_queue_data"] });
-      toast.success("Processing started — new imports will be generated first.");
-    } catch (err: any) {
-      toast.error(`Failed to start: ${err?.message || "Unknown error"}`);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handlePause = async () => {
-    if (!activeJob) return;
-    setActionLoading(true);
-    try {
-      const { error } = await supabase
-        .from("processing_jobs")
-        .update({ status: "canceled", finished_at: new Date().toISOString() })
-        .eq("id", activeJob.id);
-      if (error) throw error;
-      await qc.invalidateQueries({ queryKey: ["active_running_job"] });
-      await qc.invalidateQueries({ queryKey: ["active_job"] });
-      toast.success("Paused — current company will finish, then the queue stops.");
-    } catch (err: any) {
-      toast.error(`Failed to pause: ${err?.message || "Unknown error"}`);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleClearJob = async () => {
-    setActionLoading(true);
-    try {
-      if (activeJob) {
-        await supabase
-          .from("processing_jobs")
-          .update({ status: "canceled", finished_at: new Date().toISOString() })
-          .eq("id", activeJob.id);
-        await supabase
-          .from("processing_job_items")
-          .update({ status: "failed", finished_at: new Date().toISOString(), error_message: "Cleared by user" })
-          .eq("job_id", activeJob.id)
-          .in("status", ["running", "queued"]);
-      }
-      const { data: cardsData } = await supabase.from("company_cards").select("company_id");
-      const cardIds = (cardsData || []).map((c: any) => c.company_id);
-      const { data: toClear } = await supabase.from("companies").select("id").is("snapshot_status", null);
-      const noCardIds = (toClear || []).map((c: any) => c.id).filter((id: string) => !new Set(cardIds).has(id));
-      if (noCardIds.length > 0) {
-        const BATCH = 500;
-        for (let i = 0; i < noCardIds.length; i += BATCH) {
-          await supabase.from("companies").update({ snapshot_status: "cleared" }).in("id", noCardIds.slice(i, i + BATCH));
-        }
-      }
-      await qc.invalidateQueries({ queryKey: ["active_running_job"] });
-      await qc.invalidateQueries({ queryKey: ["active_job"] });
-      await qc.invalidateQueries({ queryKey: ["company_queue_data"] });
-      await qc.invalidateQueries({ queryKey: ["banner_waiting_count"] });
-      toast.success(`Queue cleared — ${noCardIds.length} companies removed.${activeJob ? " Running job canceled." : ""}`);
-    } catch (err: any) {
-      toast.error(`Failed to clear: ${err?.message || "Unknown error"}`);
-    } finally {
-      setActionLoading(false);
-    }
-  };
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
-      {/* Controls */}
-      {!isLoading && (
-        <div className="flex items-center gap-2">
-          {isRunning ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
-              onClick={handlePause}
-              disabled={actionLoading}
-            >
-              {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pause className="w-4 h-4" />}
-              Pause
-            </Button>
-          ) : (
-            <Button size="sm" className="gap-2" onClick={handleStart} disabled={actionLoading || waiting.length === 0}>
-              {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-              Start{waiting.length > 0 ? ` (${waiting.length})` : ""}
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-2 text-muted-foreground hover:text-destructive"
-            onClick={handleClearJob}
-            disabled={actionLoading || (waiting.length === 0 && notStarted.length === 0 && !isRunning)}
-          >
-            <Trash2 className="w-4 h-4" />
-            Clear Queue
-          </Button>
-        </div>
-      )}
+      <div className="rounded-lg border border-border bg-card/50 px-4 py-3 flex items-center gap-2 text-sm text-muted-foreground">
+        <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
+        Stories are generated per-company from the company detail page. No bulk generation.
+      </div>
 
-      {/* Running indicator */}
-      {isRunning && (
-        <div className="panel flex items-center gap-3">
-          <Loader2 className="w-4 h-4 animate-spin text-primary flex-shrink-0" />
-          <div className="min-w-0 flex-1 flex items-center justify-between gap-4 flex-wrap">
-            <div className="min-w-0">
-              <div className="text-xs text-muted-foreground">Currently processing</div>
-              <div className="text-sm font-medium truncate">{currentCompany ?? "Starting…"}</div>
-            </div>
-            {(triggeredBy || activeJob?.started_at) && (
-              <div className="text-right shrink-0">
-                {triggeredBy && (
-                  <div className="text-xs font-medium text-foreground flex items-center gap-1 justify-end">
-                    <User className="w-3 h-3 text-muted-foreground" />
-                    {triggeredBy}
-                  </div>
-                )}
-                {activeJob?.started_at && (
-                  <div className="text-[11px] text-muted-foreground">
-                    Started {fmt(activeJob.started_at)}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-        </div>
-      ) : (
-        <Tabs defaultValue="waiting">
-          <TabsList className="w-full grid grid-cols-4">
-            <TabsTrigger value="waiting" className="gap-1.5 text-xs">
-              <Clock className="w-3.5 h-3.5 shrink-0" />Waiting
-              <span className="tabular-nums opacity-70">({waiting.length})</span>
-            </TabsTrigger>
-            <TabsTrigger value="not_started" className="gap-1.5 text-xs">
-              <Inbox className="w-3.5 h-3.5 shrink-0" />Not Started
-              <span className="tabular-nums opacity-70">({notStarted.length})</span>
-            </TabsTrigger>
-            <TabsTrigger value="completed" className="gap-1.5 text-xs">
-              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />Done
-              <span className="tabular-nums opacity-70">({completed.length})</span>
-            </TabsTrigger>
-            <TabsTrigger value="failed" className="gap-1.5 text-xs">
-              <XCircle className="w-3.5 h-3.5 shrink-0" />Failed
-              {failed.length > 0
-                ? <span className="tabular-nums text-destructive">({failed.length})</span>
-                : <span className="tabular-nums opacity-70">(0)</span>}
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="waiting" className="mt-4 panel max-h-[60vh] overflow-y-auto">
-            <CompanyList companies={waiting} emptyMessage="No new imports waiting for generation." />
-          </TabsContent>
-          <TabsContent value="not_started" className="mt-4 panel max-h-[60vh] overflow-y-auto">
-            <p className="text-xs text-muted-foreground mb-3 pb-3 border-b border-border/50">
-              Older records without a story. These won't be auto-generated — open the company to generate manually.
-            </p>
-            <CompanyList companies={notStarted} emptyMessage="All older records have stories." />
-          </TabsContent>
-          <TabsContent value="completed" className="mt-4 panel max-h-[60vh] overflow-y-auto">
-            <CompanyList companies={completed} emptyMessage="No completed stories yet." />
-          </TabsContent>
-          <TabsContent value="failed" className="mt-4 panel max-h-[60vh] overflow-y-auto">
-            <CompanyList companies={failed} emptyMessage="No failed items — great!" />
-          </TabsContent>
-        </Tabs>
-      )}
+      <Tabs defaultValue="not_started">
+        <TabsList className="w-full grid grid-cols-3">
+          <TabsTrigger value="not_started" className="gap-1.5 text-xs">
+            <Inbox className="w-3.5 h-3.5 shrink-0" />No Story
+            <span className="tabular-nums opacity-70">({notStarted.length})</span>
+          </TabsTrigger>
+          <TabsTrigger value="completed" className="gap-1.5 text-xs">
+            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />Done
+            <span className="tabular-nums opacity-70">({completed.length})</span>
+          </TabsTrigger>
+          <TabsTrigger value="failed" className="gap-1.5 text-xs">
+            <XCircle className="w-3.5 h-3.5 shrink-0" />Failed
+            {failed.length > 0
+              ? <span className="tabular-nums text-destructive">({failed.length})</span>
+              : <span className="tabular-nums opacity-70">(0)</span>}
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="not_started" className="mt-4 panel max-h-[60vh] overflow-y-auto">
+          <p className="text-xs text-muted-foreground mb-3 pb-3 border-b border-border/50">
+            Companies without a story yet. Open a company page to generate manually.
+          </p>
+          <CompanyList companies={notStarted} emptyMessage="All companies have stories." />
+        </TabsContent>
+        <TabsContent value="completed" className="mt-4 panel max-h-[60vh] overflow-y-auto">
+          <CompanyList companies={completed} emptyMessage="No completed stories yet." />
+        </TabsContent>
+        <TabsContent value="failed" className="mt-4 panel max-h-[60vh] overflow-y-auto">
+          <CompanyList companies={failed} emptyMessage="No failed items — great!" />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
-
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function JobHistory() {

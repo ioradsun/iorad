@@ -305,92 +305,24 @@ Deno.serve(async (req) => {
     let body: any = {};
     try { body = await req.json(); } catch { /* ok */ }
 
-    const offset = body.offset || 0;
-    const jobId = body.job_id || null;
     const singleCompanyId = body.company_id || null;
     const mode = body.mode || "full"; // "full" | "signals_only" | "score_only" | "snapshot_only"
 
-    let company: CompanyRow;
-
-    if (singleCompanyId) {
-      // Single company mode
-      const { data, error: compErr } = await supabase
-        .from("companies")
-        .select("id, name, domain, industry, partner, persona, source_type")
-        .eq("id", singleCompanyId)
-        .maybeSingle();
-      if (compErr) throw compErr;
-      if (!data) throw new Error("Company not found");
-      company = data;
-    } else {
-      // Batch mode — only process companies WITHOUT an existing story.
-      // Existing companies with stories are updated only when triggered explicitly
-      // (e.g. from Company Detail page) or when they come in fresh from HubSpot.
-      const { data: companies, error: compErr } = await supabase
-        .from("companies")
-        .select("id, name, domain, industry, partner, persona, source_type")
-        .or("snapshot_status.is.null,snapshot_status.neq.Generated")
-        .order("last_processed_at", { ascending: true, nullsFirst: true })
-        .range(offset, offset);
-
-      if (compErr) throw compErr;
-      if (!companies || companies.length === 0) {
-        // No more companies — mark job complete and stop self-chaining
-        const finishId = jobId || activeJobId;
-        if (finishId) {
-          await supabase.from("processing_jobs")
-            .update({ status: "completed", finished_at: new Date().toISOString() })
-            .eq("id", finishId);
-          console.log(`Job ${finishId} completed — all companies processed`);
-        }
-        return new Response(JSON.stringify({ done: true, job_id: finishId }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      company = companies[0];
+    // Batch mode is disabled — only single-company calls are allowed
+    if (!singleCompanyId) {
+      return new Response(
+        JSON.stringify({ error: "company_id is required. Bulk mode is disabled." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    // Create job on first call
-    let activeJobId = jobId;
-    if (!activeJobId) {
-      const { count } = await supabase
-        .from("companies")
-        .select("id", { count: "exact", head: true });
-
-      const { data: job, error: jobErr } = await supabase
-        .from("processing_jobs")
-        .insert({
-          trigger: "manual",
-          status: "running",
-          total_companies_targeted: count || 0,
-          settings_snapshot: {},
-          triggered_by: body?.triggered_by ?? null,
-        })
-        .select()
-        .single();
-
-      if (jobErr) throw jobErr;
-      activeJobId = job.id;
-    } else {
-      // Guard: if the job was cancelled externally, stop the chain immediately
-      const { data: jobCheck } = await supabase
-        .from("processing_jobs")
-        .select("status")
-        .eq("id", activeJobId)
-        .maybeSingle();
-
-      if (!jobCheck || jobCheck.status !== "running") {
-        console.log(`Job ${activeJobId} is no longer running (status: ${jobCheck?.status ?? "not found"}) — stopping chain.`);
-        return new Response(JSON.stringify({ done: true, job_id: activeJobId, reason: "job_stopped" }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-    }
-
-    // Write current company name into the job so polling clients can display it
-    await supabase.from("processing_jobs").update({
-      settings_snapshot: { current_company: company.name },
-    }).eq("id", activeJobId);
+    const { data: company, error: compErr } = await supabase
+      .from("companies")
+      .select("id, name, domain, industry, partner, persona, source_type")
+      .eq("id", singleCompanyId)
+      .maybeSingle();
+    if (compErr) throw compErr;
+    if (!company) throw new Error("Company not found");
 
     let status = "succeeded";
     let signalsCount = 0;
@@ -483,70 +415,34 @@ Deno.serve(async (req) => {
 
         console.log(`Inbound: ${company.name} — Score: ${inboundResult.best_score} (Tier ${inboundResult.best_tier}: ${inboundResult.best_tier_label})`);
 
-        // Save job item and return early (no Firecrawl, no Clay push for inbound)
-        await supabase.from("processing_job_items").insert({
-          job_id: activeJobId,
-          company_id: company.id,
-          status: "succeeded",
-          started_at: new Date().toISOString(),
-          finished_at: new Date().toISOString(),
-          signals_found_count: signalsCount,
-          snapshot_status: snapshotStatus,
-          error_message: null,
-        });
-
-        const { data: jd } = await supabase
-          .from("processing_jobs")
-          .select("companies_processed, companies_succeeded, companies_failed")
-          .eq("id", activeJobId)
-          .single();
-
-        await supabase.from("processing_jobs").update({
-          companies_processed: (jd?.companies_processed || 0) + 1,
-          companies_succeeded: (jd?.companies_succeeded || 0) + 1,
-        }).eq("id", activeJobId);
-
         return new Response(
           JSON.stringify({
-            job_id: activeJobId,
             company: company.name,
             status: "succeeded",
             signals_found: signalsCount,
             snapshot_status: snapshotStatus,
             inbound_tier: inboundResult.best_tier,
             inbound_tier_label: inboundResult.best_tier_label,
-            next_offset: offset + 1,
-            done: false,
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // ── OUTBOUND PATH (original logic below) ────────────────────────────────
+      // ── OUTBOUND PATH ────────────────────────────────────────────────────────
 
       // Step 0: Check HubSpot for an existing customer record by domain
       if (company.domain) {
         try {
           const hubspotKey = Deno.env.get("HUBSPOT_API_KEY");
           if (hubspotKey) {
-            const hsSearchBody = {
-              filterGroups: [
-                {
-                  filters: [
-                    { propertyName: "domain", operator: "EQ", value: company.domain },
-                  ],
-                },
-              ],
-              properties: ["name", "domain", "hs_object_id", "lifecyclestage", "customer"],
-              limit: 1,
-            };
             const hsRes = await fetch("https://api.hubapi.com/crm/v3/objects/companies/search", {
               method: "POST",
-              headers: {
-                Authorization: `Bearer ${hubspotKey}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(hsSearchBody),
+              headers: { Authorization: `Bearer ${hubspotKey}`, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                filterGroups: [{ filters: [{ propertyName: "domain", operator: "EQ", value: company.domain }] }],
+                properties: ["name", "domain", "hs_object_id", "lifecyclestage", "customer"],
+                limit: 1,
+              }),
             });
             if (hsRes.ok) {
               const hsData = await hsRes.json();
@@ -555,15 +451,11 @@ Deno.serve(async (req) => {
                 const lifecycle = (hsCompany.properties?.lifecyclestage || "").toLowerCase();
                 const isCustomer = lifecycle === "customer" || lifecycle === "evangelist";
                 if (isCustomer) {
-                  await supabase.from("companies")
-                    .update({ is_existing_customer: true })
-                    .eq("id", company.id);
+                  await supabase.from("companies").update({ is_existing_customer: true }).eq("id", company.id);
                   console.log(`HubSpot: ${company.name} flagged as existing customer (lifecycle: ${lifecycle})`);
                 } else {
                   console.log(`HubSpot: ${company.name} found in HubSpot (lifecycle: ${lifecycle}) — not a customer`);
                 }
-              } else {
-                console.log(`HubSpot: no record found for domain ${company.domain}`);
               }
             } else {
               const errText = await hsRes.text();
@@ -577,22 +469,13 @@ Deno.serve(async (req) => {
 
       let signals: { title: string; url: string; type: string; excerpt: string }[] = [];
 
-      // Step 1: Search signals (unless score_only or snapshot_only)
+      // Step 1: Search signals
       if (mode === "full" || mode === "signals_only") {
         signals = await searchSignals(company, firecrawlKey);
         signalsCount = signals.length;
-
         for (const sig of signals) {
           await supabase.from("signals").upsert(
-            {
-              company_id: company.id,
-              title: sig.title,
-              url: sig.url,
-              type: sig.type,
-              raw_excerpt: sig.excerpt,
-              evidence_snippets: [],
-              last_seen_at: new Date().toISOString(),
-            },
+            { company_id: company.id, title: sig.title, url: sig.url, type: sig.type, raw_excerpt: sig.excerpt, evidence_snippets: [], last_seen_at: new Date().toISOString() },
             { onConflict: "company_id,url" }
           );
         }
@@ -600,20 +483,12 @@ Deno.serve(async (req) => {
 
       // For score/snapshot modes, load existing signals from DB
       if (mode === "score_only" || mode === "snapshot_only") {
-        const { data: dbSignals } = await supabase
-          .from("signals")
-          .select("title, url, type, raw_excerpt")
-          .eq("company_id", company.id);
-        signals = (dbSignals || []).map(s => ({
-          title: s.title,
-          url: s.url,
-          type: s.type,
-          excerpt: s.raw_excerpt || "",
-        }));
+        const { data: dbSignals } = await supabase.from("signals").select("title, url, type, raw_excerpt").eq("company_id", company.id);
+        signals = (dbSignals || []).map(s => ({ title: s.title, url: s.url, type: s.type, excerpt: s.raw_excerpt || "" }));
         signalsCount = signals.length;
       }
 
-      // Step 2: Score + Snapshot (unless signals_only)
+      // Step 2: Score + Snapshot
       if (mode !== "signals_only") {
         const result = await scoreSignals(company, signals, lovableKey, aiConfig, compellingEvents, libraryLinks);
         snapshotStatus = result.snapshot_status;
@@ -638,31 +513,21 @@ Deno.serve(async (req) => {
         const autoPersona = PARTNER_PERSONA_MAP[partnerKey];
         if (autoPersona) {
           try {
-            console.log(`Auto-enriching contacts for ${company.name} (${partnerKey} → ${autoPersona})`);
-            const fnUrl = `${supabaseUrl}/functions/v1/find-contacts`;
-            const contactResp = await fetch(fnUrl, {
+            const contactResp = await fetch(`${supabaseUrl}/functions/v1/find-contacts`, {
               method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${serviceRoleKey}`,
-              },
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceRoleKey}` },
               body: JSON.stringify({ company_id: company.id, persona: autoPersona }),
             });
             if (contactResp.ok) {
               const contactResult = await contactResp.json();
               console.log(`Auto-enriched ${contactResult.contacts_found || 0} contacts for ${company.name}`);
-            } else {
-              console.warn(`Contact enrichment failed for ${company.name}: ${contactResp.status}`);
             }
           } catch (contactErr: any) {
             console.warn(`Contact enrichment error for ${company.name}: ${contactErr.message}`);
           }
         }
       } else {
-        // signals_only — just update last_processed_at
-        await supabase.from("companies").update({
-          last_processed_at: new Date().toISOString(),
-        }).eq("id", company.id);
+        await supabase.from("companies").update({ last_processed_at: new Date().toISOString() }).eq("id", company.id);
       }
 
       console.log(`Done: ${company.name} — ${signalsCount} signals, status: ${snapshotStatus}`);
@@ -672,60 +537,8 @@ Deno.serve(async (req) => {
       console.error(`Failed: ${company.name} — ${e.message}`);
     }
 
-    // Save job item
-    await supabase.from("processing_job_items").insert({
-      job_id: activeJobId,
-      company_id: company.id,
-      status,
-      started_at: new Date().toISOString(),
-      finished_at: new Date().toISOString(),
-      signals_found_count: signalsCount,
-      snapshot_status: snapshotStatus,
-      error_message: errorMsg,
-    });
-
-    // Update job counts
-    const { data: jd } = await supabase
-      .from("processing_jobs")
-      .select("companies_processed, companies_succeeded, companies_failed")
-      .eq("id", activeJobId)
-      .single();
-
-    const updates: Record<string, number> = {
-      companies_processed: (jd?.companies_processed || 0) + 1,
-    };
-    if (status === "succeeded") {
-      updates.companies_succeeded = (jd?.companies_succeeded || 0) + 1;
-    } else {
-      updates.companies_failed = (jd?.companies_failed || 0) + 1;
-    }
-    await supabase.from("processing_jobs").update(updates).eq("id", activeJobId);
-
-    // ── Self-chain: fire next offset in background so browser can close ────────
-    if (!singleCompanyId) {
-      const nextOffset = offset + 1;
-      const selfUrl = `${supabaseUrl}/functions/v1/run-signals`;
-      // Fire-and-forget — we don't await this so the response returns immediately
-      fetch(selfUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${serviceRoleKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ offset: nextOffset, job_id: activeJobId }),
-      }).catch((e) => console.warn("Self-chain trigger failed:", e.message));
-    }
-
     return new Response(
-      JSON.stringify({
-        job_id: activeJobId,
-        company: company.name,
-        status,
-        signals_found: signalsCount,
-        snapshot_status: snapshotStatus,
-        next_offset: offset + 1,
-        done: false,
-      }),
+      JSON.stringify({ company: company.name, status, signals_found: signalsCount, snapshot_status: snapshotStatus, error: errorMsg }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
