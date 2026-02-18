@@ -1,11 +1,14 @@
 import { useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Building2, ArrowDownRight, ArrowUpRight, Search, Loader2, Plus, ArrowUpDown, ExternalLink } from "lucide-react";
+import { Building2, ArrowDownRight, ArrowUpRight, Search, Loader2, Plus, ArrowUpDown, ExternalLink, RefreshCw } from "lucide-react";
 import { useCompanies, useSignalCounts, useProcessingJobs } from "@/hooks/useSupabase";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 
 type SortKey = "name" | "last_score_total" | "signals_count" | "updated_at" | "created_at";
 type SourceTab = "inbound" | "outbound";
@@ -15,12 +18,30 @@ export default function Dashboard() {
   const { data: signalCounts = {} } = useSignalCounts();
   const { data: jobs = [] } = useProcessingJobs();
   const navigate = useNavigate();
+  const qc = useQueryClient();
+  const [syncingHubspot, setSyncingHubspot] = useState(false);
 
   const [sortKey, setSortKey] = useState<SortKey>("created_at");
   const [sortAsc, setSortAsc] = useState(false);
   const [search, setSearch] = useState("");
   const [partnerFilter, setPartnerFilter] = useState<string>("all");
   const [activeTab, setActiveTab] = useState<SourceTab>("inbound");
+
+  const handleHubspotSync = async () => {
+    setSyncingHubspot(true);
+    try {
+      const { error } = await supabase.functions.invoke("import-from-hubspot", {
+        body: { source: "manual_refresh" },
+      });
+      if (error) throw error;
+      await qc.invalidateQueries({ queryKey: ["companies"] });
+      toast.success("HubSpot sync complete — inbound companies updated.");
+    } catch (err: any) {
+      toast.error(`HubSpot sync failed: ${err?.message || "Unknown error"}`);
+    } finally {
+      setSyncingHubspot(false);
+    }
+  };
 
   const companiesWithSignals = useMemo(() => {
     return companies.map(c => ({ ...c, signals_count: signalCounts[c.id] || 0 }));
@@ -121,6 +142,8 @@ export default function Dashboard() {
           subtitle={stats.lastInboundDate
             ? `Last: ${stats.lastInboundDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })} ${stats.lastInboundDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}`
             : undefined}
+          onRefresh={handleHubspotSync}
+          refreshing={syncingHubspot}
         />
         <KpiCard
           value={stats.newOutbound}
@@ -300,19 +323,23 @@ function KpiCard({
   icon,
   iconBg,
   subtitle,
+  onRefresh,
+  refreshing,
 }: {
   value: number;
   label: string;
   icon: React.ReactNode;
   iconBg: string;
   subtitle?: string;
+  onRefresh?: () => void;
+  refreshing?: boolean;
 }) {
   return (
     <div className="bg-card shadow-sm shadow-black/[0.04] rounded-lg px-5 py-4 flex items-center gap-4">
       <div className="rounded-md p-2 shrink-0" style={{ background: iconBg }}>
         {icon}
       </div>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="text-[2rem] font-semibold tracking-tight leading-none text-foreground tabular-nums">
           {value}
         </div>
@@ -321,6 +348,16 @@ function KpiCard({
           <div className="text-[11px] text-muted-foreground/60 mt-1 leading-tight">{subtitle}</div>
         )}
       </div>
+      {onRefresh && (
+        <button
+          onClick={onRefresh}
+          disabled={refreshing}
+          title="Sync from HubSpot"
+          className="shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-40"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
+        </button>
+      )}
     </div>
   );
 }
