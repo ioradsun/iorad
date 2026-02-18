@@ -260,7 +260,7 @@ Deno.serve(async (req) => {
       const { data: job, error: jobErr } = await supabase
         .from("processing_jobs")
         .insert({
-          trigger: "hubspot_backfill",
+          trigger: "manual",
           status: "running",
           settings_snapshot: { type: "backfill", started: new Date().toISOString() },
           total_companies_targeted: 0,
