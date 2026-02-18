@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, LogOut, Shield, Loader2 } from "lucide-react";
+import { LayoutDashboard, LogOut, Shield, Loader2, CheckCircle2, Download } from "lucide-react";
 import ioradLogoDark from "@/assets/iorad-logo-new.png";
 import ioradLogoLight from "@/assets/iorad-logo-light.png";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,6 +9,7 @@ import { useActiveJob } from "@/hooks/useSupabase";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { formatDistanceToNow } from "date-fns";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,8 +22,35 @@ const menuItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
 ];
 
+function useLastHubspotSync() {
+  return useQuery({
+    queryKey: ["last_hubspot_sync"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("processing_jobs")
+        .select("id, status, started_at, finished_at, companies_processed, companies_succeeded, settings_snapshot, trigger")
+        .order("started_at", { ascending: false })
+        .limit(50);
+      // Find the most recent job that represents a HubSpot sync
+      const syncs = (data || []).filter((j: any) => {
+        const snap = (j.settings_snapshot as any) || {};
+        return (
+          j.trigger === "bulk_import" ||
+          j.trigger === "hubspot_sync" ||
+          j.trigger === "hubspot_backfill" ||
+          snap.action === "bulk_import" ||
+          (j.trigger === "manual" && snap.current_company != null)
+        );
+      });
+      return syncs[0] ?? null;
+    },
+    refetchInterval: 15_000,
+  });
+}
+
 function ActiveJobBanner() {
   const { data: job } = useActiveJob();
+  const { data: lastSync } = useLastHubspotSync();
   const location = useLocation();
   const navigate = useNavigate();
   const isOnJobsPage = location.pathname === "/jobs";
@@ -43,40 +71,83 @@ function ActiveJobBanner() {
     refetchInterval: 3_000,
   });
 
-  if (!job) return null;
-
   const currentCompany =
     (currentItem?.companies as any)?.name ??
-    (job.settings_snapshot as any)?.current_company ??
+    (job?.settings_snapshot as any)?.current_company ??
     null;
 
+  const handleClick = () => isOnJobsPage ? navigate(-1) : navigate("/jobs");
+
+  if (job) {
+    // Active job — spinning banner
+    return (
+      <div
+        className="w-full px-6 py-2 flex items-center gap-3 text-xs font-medium cursor-pointer"
+        style={{
+          background: "hsl(var(--primary) / 0.08)",
+          borderBottom: "1px solid hsl(var(--primary) / 0.15)",
+          color: "hsl(var(--primary))",
+        }}
+        onClick={handleClick}
+      >
+        <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
+        <span>
+          {(job.trigger === "bulk_import" || (job.settings_snapshot as any)?.action === "bulk_import")
+            ? <>
+                Syncing with HubSpot
+                {job.companies_processed > 0
+                  ? ` — ${job.companies_processed}${job.total_companies_targeted > 0 ? `/${job.total_companies_targeted}` : ""} companies`
+                  : "…"}
+              </>
+            : <>Syncing HubSpot{currentCompany ? ` — ${currentCompany}` : "…"}</>}
+        </span>
+        <span className="ml-auto underline underline-offset-2 opacity-70 hover:opacity-100 transition-opacity">
+          {isOnJobsPage ? "Close" : "View status"}
+        </span>
+      </div>
+    );
+  }
+
+  // Idle — always show last sync info so user can always navigate to jobs
+  const lastSyncSnap = (lastSync?.settings_snapshot as any) || {};
+  const lastSyncLabel = lastSyncSnap.current_company
+    ? lastSyncSnap.current_company
+    : lastSyncSnap.action === "bulk_import"
+    ? "all companies"
+    : lastSync?.trigger === "hubspot_backfill"
+    ? "full backfill"
+    : null;
+
+  const lastSyncAgo = lastSync?.finished_at
+    ? formatDistanceToNow(new Date(lastSync.finished_at), { addSuffix: true })
+    : lastSync?.started_at
+    ? formatDistanceToNow(new Date(lastSync.started_at), { addSuffix: true })
+    : null;
+
   return (
-    <div
-      className="w-full px-6 py-2 flex items-center gap-3 text-xs font-medium"
+    <button
+      onClick={handleClick}
+      className="w-full px-6 py-1.5 flex items-center gap-2 text-xs transition-colors hover:bg-muted/30"
       style={{
-        background: "hsl(var(--primary) / 0.08)",
-        borderBottom: "1px solid hsl(var(--primary) / 0.15)",
-        color: "hsl(var(--primary))",
+        borderBottom: "1px solid hsl(var(--border) / 0.6)",
+        color: "hsl(var(--muted-foreground))",
       }}
     >
-      <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
-      <span>
-        {(job.trigger === "bulk_import" || (job.settings_snapshot as any)?.action === "bulk_import")
+      <Download className="w-3 h-3 flex-shrink-0" />
+      <span className="flex items-center gap-1.5">
+        <span className="font-medium" style={{ color: "hsl(var(--foreground))" }}>HubSpot</span>
+        {lastSyncAgo
           ? <>
-              Syncing with HubSpot
-              {job.companies_processed > 0
-                ? ` — ${job.companies_processed}${job.total_companies_targeted > 0 ? `/${job.total_companies_targeted}` : ""} companies`
-                : "…"}
+              <span>·</span>
+              <CheckCircle2 className="w-3 h-3" style={{ color: "hsl(var(--success, 142 71% 45%))" }} />
+              <span>Last sync {lastSyncAgo}{lastSyncLabel ? ` · ${lastSyncLabel}` : ""}</span>
             </>
-          : <>Generating story{currentCompany ? ` — ${currentCompany}` : "…"}</>}
+          : <span>· No syncs recorded</span>}
       </span>
-      <button
-        onClick={() => isOnJobsPage ? navigate(-1) : navigate("/jobs")}
-        className="ml-auto underline underline-offset-2 opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
-      >
-        {isOnJobsPage ? "Close Status" : "View status"}
-      </button>
-    </div>
+      <span className="ml-auto underline underline-offset-2 opacity-60 hover:opacity-100 transition-opacity">
+        View activity
+      </span>
+    </button>
   );
 }
 
