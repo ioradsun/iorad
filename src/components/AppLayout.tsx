@@ -85,7 +85,7 @@ function ActiveJobBanner() {
       {job && <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />}
       <span>
         {job
-          ? job.trigger === "bulk_import"
+          ? (job.trigger === "bulk_import" || (job.settings_snapshot as any)?.action === "bulk_import")
             ? <>
                 Syncing with HubSpot
                 {job.companies_processed > 0
