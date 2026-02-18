@@ -304,25 +304,56 @@ const EDU_INDUSTRIES = new Set([
   "PRIMARY_SECONDARY_EDUCATION",
   "E_LEARNING",
   "EDUCATION",
+  "ELEARNING",
+  "PROFESSIONAL_TRAINING_COACHING",
 ]);
 
+// Domain patterns — order matters (most specific first)
 const EDU_DOMAIN_PATTERNS = [
-  /\.edu($|\.)/,
-  /\.ac\.[a-z]{2}$/,
-  /\.school\./,
-  /\.k12\./,
-  /\.edu\.[a-z]{2}$/,
+  /\.edu($|\/|\.)/,       // .edu  .edu.au  .edu.ec  silkwood.qld.edu.au
+  /\.ac\.[a-z]{2}/,       // .ac.uk  .ac.nz  .ac.jp
+  /\.k12\./,              // .k12.in.us
+  /\.school\./,           // gilberthorpe.school.nz
+  /\.[a-z]+\.edu\./,      // mybce.catholic.edu.au  (catches multi-part edu domains)
+  /\.edu\.[a-z]{2,}/,     // explicit .edu.xx TLDs
 ];
+
+// Name-based keywords that strongly indicate a school (case-insensitive)
+const EDU_NAME_KEYWORDS = [
+  /\bschool\b/i,
+  /\buniversity\b/i,
+  /\buniversit[yé]\b/i,
+  /\bcollege\b/i,
+  /\bacademy\b/i,
+  /\binstitute\b/i,
+  /\bdistrict\b/i,       // school district
+  /\bseminary\b/i,
+  /\bpolytechnic\b/i,
+];
+
+function isEduDomain(domain: string): boolean {
+  if (!domain) return false;
+  const d = domain.toLowerCase();
+  return EDU_DOMAIN_PATTERNS.some(rx => rx.test(d));
+}
+
+function isEduName(name: string): boolean {
+  if (!name) return false;
+  return EDU_NAME_KEYWORDS.some(rx => rx.test(name));
+}
 
 function deriveCategory(props: Record<string, any>, existingPartner?: string | null): "school" | "business" | "partner" {
   // Partner: already flagged (outbound partner company)
   if (existingPartner) return "partner";
 
-  const industry = (props.industry || "").toUpperCase();
+  const industry = (props.industry || "").toUpperCase().replace(/[\s-]/g, "_");
   if (EDU_INDUSTRIES.has(industry)) return "school";
 
   const domain = (props.domain || "").toLowerCase();
-  if (EDU_DOMAIN_PATTERNS.some(rx => rx.test(domain))) return "school";
+  if (isEduDomain(domain)) return "school";
+
+  const name = props.name || "";
+  if (isEduName(name)) return "school";
 
   return "business";
 }
@@ -706,7 +737,7 @@ async function syncSingleCompany(supabase: any, domain: string | undefined, comp
         ...(props.numberofemployees ? { headcount: parseInt(String(props.numberofemployees), 10) || undefined } : {}),
       };
       await supabase.from("companies").update(updates).eq("id", companyId);
-      console.log(`sync_company: updated ${domain} (customer: ${isCustomer}, lifecycle: ${lifecycle})`);
+      console.log(`sync_company: updated ${domain} (category: ${category}, stage: ${stage}, customer: ${isCustomer})`);
 
       // Import associated contacts
       let contactsImported = 0;
@@ -737,11 +768,9 @@ async function syncSingleCompany(supabase: any, domain: string | undefined, comp
       );
     }
 
-    const category = deriveCategory(props, null);
-    const stage = deriveStage(props);
-    const isCustomer2 = stage === "customer" || stage === "expansion";
+    // No companyId — just return derived values
     return new Response(
-      JSON.stringify({ success: true, found: true, category, stage, is_existing_customer: isCustomer2, lifecycle_stage: props.lifecyclestage || null }),
+      JSON.stringify({ success: true, found: true, category, stage, is_existing_customer: isCustomer, lifecycle_stage: props.lifecyclestage || null }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err: any) {
