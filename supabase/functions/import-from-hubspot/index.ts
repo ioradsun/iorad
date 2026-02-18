@@ -559,106 +559,113 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
   if (!apiKey) return;
 
   try {
-    // Get associated contacts from HubSpot
-    const res = await fetch(
-      `https://api.hubapi.com/crm/v3/objects/companies/${hubspotCompanyId}/associations/contacts`,
-      { headers: { Authorization: `Bearer ${apiKey}` } }
-    );
-
-    if (!res.ok) {
-      const text = await res.text();
-      console.warn(`Failed to fetch contacts for company ${hubspotCompanyId}: ${text}`);
-      return;
-    }
-
-    const data = await res.json();
-    const contactIds = (data.results || []).map((r: any) => r.toObjectId || r.id).filter(Boolean);
+    // Paginate through ALL associated contacts (HubSpot returns max 500 per page)
+    const contactIds: string[] = [];
+    let after: string | null = null;
+    do {
+      const url = `https://api.hubapi.com/crm/v3/objects/companies/${hubspotCompanyId}/associations/contacts?limit=500${after ? `&after=${after}` : ""}`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
+      if (!res.ok) {
+        const text = await res.text();
+        console.warn(`Failed to fetch contacts for company ${hubspotCompanyId}: ${text}`);
+        break;
+      }
+      const data = await res.json();
+      const ids = (data.results || []).map((r: any) => String(r.toObjectId || r.id)).filter(Boolean);
+      contactIds.push(...ids);
+      after = data.paging?.next?.after || null;
+    } while (after);
 
     if (contactIds.length === 0) return;
+    console.log(`HubSpot: found ${contactIds.length} associated contacts for company ${hubspotCompanyId}`);
 
-    // Fetch contact details via batch read API (avoids 414 URL-too-long errors)
+    // Fetch contact details via HubSpot batch read API (max 100 per batch)
     const allContactProps = await getAllContactPropertyNames(apiKey);
-    const batchIds = contactIds.slice(0, 10);
-    
-    // Use HubSpot batch read API (POST) to fetch all properties
-    const batchBody = {
-      inputs: batchIds.map((cid: string) => ({ id: String(cid) })),
-      properties: allContactProps.length > 0 ? allContactProps : ["firstname", "lastname", "email", "jobtitle", "hs_linkedin_url"],
-    };
-    
-    let batchContacts: any[] = [];
-    try {
-      const batchRes = await fetch("https://api.hubapi.com/crm/v3/objects/contacts/batch/read", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify(batchBody),
-      });
-      if (!batchRes.ok) {
-        const errText = await batchRes.text();
-        console.warn(`Batch contact read failed [${batchRes.status}]: ${errText.slice(0, 300)}`);
-      } else {
+    const propsToFetch = allContactProps.length > 0
+      ? allContactProps
+      : ["firstname", "lastname", "email", "jobtitle", "hs_linkedin_url"];
+
+    const BATCH_SIZE = 100;
+    for (let i = 0; i < contactIds.length; i += BATCH_SIZE) {
+      const batchIds = contactIds.slice(i, i + BATCH_SIZE);
+      let batchContacts: any[] = [];
+      try {
+        const batchRes = await fetch("https://api.hubapi.com/crm/v3/objects/contacts/batch/read", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            inputs: batchIds.map((cid) => ({ id: cid })),
+            properties: propsToFetch,
+          }),
+        });
+        if (!batchRes.ok) {
+          const errText = await batchRes.text();
+          console.warn(`Batch contact read failed [${batchRes.status}]: ${errText.slice(0, 300)}`);
+          continue;
+        }
         const batchData = await batchRes.json();
         batchContacts = batchData.results || [];
+      } catch (err: any) {
+        console.warn(`Batch contact read error (batch ${i}): ${err.message}`);
+        continue;
       }
-    } catch (err: any) {
-      console.warn(`Batch contact read error: ${err.message}`);
-    }
 
-    for (const contact of batchContacts) {
-      const contactId = contact.id;
-      try {
-        const cp = contact.properties || {};
-        const contactName = [cp.firstname, cp.lastname].filter(Boolean).join(" ").trim();
-        if (!contactName) continue;
+      for (const contact of batchContacts) {
+        const contactId = contact.id;
+        try {
+          const cp = contact.properties || {};
+          const contactName = [cp.firstname, cp.lastname].filter(Boolean).join(" ").trim();
+          if (!contactName) continue;
 
-        let savedContactId: string | null = null;
+          let savedContactId: string | null = null;
 
-        // Check if contact already exists for this company by email
-        if (cp.email) {
-          const { data: existing } = await supabase
-            .from("contacts")
-            .select("id")
-            .eq("company_id", companyId)
-            .eq("email", cp.email)
-            .maybeSingle();
+          // Check if contact already exists for this company by email
+          if (cp.email) {
+            const { data: existing } = await supabase
+              .from("contacts")
+              .select("id")
+              .eq("company_id", companyId)
+              .eq("email", cp.email)
+              .maybeSingle();
 
-          if (existing) {
-            // Update existing contact
-            await supabase.from("contacts").update({
+            if (existing) {
+              await supabase.from("contacts").update({
+                name: contactName,
+                title: cp.jobtitle || null,
+                linkedin: cp.hs_linkedin_url || null,
+                hubspot_properties: cp,
+              }).eq("id", existing.id);
+              savedContactId = existing.id;
+            }
+          }
+
+          if (!savedContactId) {
+            const { data: inserted } = await supabase.from("contacts").insert({
+              company_id: companyId,
               name: contactName,
+              email: cp.email || null,
               title: cp.jobtitle || null,
               linkedin: cp.hs_linkedin_url || null,
+              source: "hubspot",
+              confidence: "high",
               hubspot_properties: cp,
-            }).eq("id", existing.id);
-            savedContactId = existing.id;
+            }).select("id").single();
+            savedContactId = inserted?.id || null;
           }
-        }
 
-        if (!savedContactId) {
-          // Insert new contact
-          const { data: inserted } = await supabase.from("contacts").insert({
-            company_id: companyId,
-            name: contactName,
-            email: cp.email || null,
-            title: cp.jobtitle || null,
-            linkedin: cp.hs_linkedin_url || null,
-            source: "hubspot",
-            confidence: "high",
-            hubspot_properties: cp,
-          }).select("id").single();
-          savedContactId = inserted?.id || null;
+          // Pull engagement timeline for this contact
+          await importContactActivity(supabase, contactId, companyId, savedContactId, apiKey);
+        } catch (err: any) {
+          console.warn(`Failed to import contact ${contactId}: ${err.message}`);
         }
-
-        // Pull engagement timeline for this contact
-        await importContactActivity(supabase, contactId, companyId, savedContactId, apiKey);
-      } catch (err: any) {
-        console.warn(`Failed to import contact ${contactId}: ${err.message}`);
       }
     }
+    console.log(`HubSpot: finished importing contacts for company ${companyId}`);
   } catch (err: any) {
     console.warn(`Contact import error for company ${companyId}: ${err.message}`);
   }
 }
+
 
 // Fetch engagement/activity timeline for a HubSpot contact
 async function importContactActivity(
