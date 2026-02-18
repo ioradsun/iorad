@@ -30,11 +30,11 @@ function useWaitingCount() {
       const cutoff = new Date(Date.now() - NEW_THRESHOLD_HOURS * 60 * 60 * 1000).toISOString();
       const [{ data: cards }, { data: newCompanies }] = await Promise.all([
         supabase.from("company_cards").select("company_id"),
-        // Only count recent imports (no story + created within threshold)
-        supabase.from("companies").select("id, snapshot_status").gte("created_at", cutoff),
+        // Only count recent imports with no snapshot status (truly unprocessed)
+        supabase.from("companies").select("id").gte("created_at", cutoff).is("snapshot_status", null),
       ]);
       const cardIds = new Set((cards || []).map((c: any) => c.company_id));
-      const waiting = (newCompanies || []).filter((c: any) => !cardIds.has(c.id) && c.snapshot_status !== "cleared");
+      const waiting = (newCompanies || []).filter((c: any) => !cardIds.has(c.id));
       return waiting.length;
     },
     refetchInterval: 15_000,

@@ -44,7 +44,7 @@ function useCompanyQueueData() {
       const completed = (companies || []).filter((c) => cardIds.has(c.id));
 
       // "Waiting" = no story + imported within threshold + not manually cleared
-      const waiting = noStory.filter((c) => new Date(c.created_at) >= cutoff && c.snapshot_status !== "cleared");
+      const waiting = noStory.filter((c) => new Date(c.created_at) >= cutoff && c.snapshot_status == null);
       // "Not Started" = no story + older than threshold (pre-existing records)
       const notStarted = noStory.filter((c) => new Date(c.created_at) < cutoff);
 
