@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Building2, Search, Loader2, Plus, ArrowUpDown, ExternalLink, RefreshCw } from "lucide-react";
+import { Building2, Search, Loader2, ArrowUpDown, ExternalLink, RefreshCw } from "lucide-react";
 import { useCompanies, useSignalCounts, useProcessingJobs } from "@/hooks/useSupabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import HubSpotPickerModal from "@/components/HubSpotPickerModal";
 
 type SortKey = "name" | "last_score_total" | "signals_count" | "updated_at" | "created_at";
 type CategoryTab = "school" | "business" | "partner";
@@ -42,6 +43,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [syncingHubspot, setSyncingHubspot] = useState(false);
+  const [hubspotPickerOpen, setHubspotPickerOpen] = useState(false);
 
   const [sortKey, setSortKey] = useState<SortKey>("created_at");
   const [sortAsc, setSortAsc] = useState(false);
@@ -239,20 +241,18 @@ export default function Dashboard() {
         )}
 
         <div className="ml-auto flex items-center gap-3">
-          <Link to="/upload">
-            <Button
-              size="sm"
-              className="gap-1.5 font-medium"
-              style={{
-                background: "var(--btn-primary-bg)",
-                color: "var(--btn-primary-fg)",
-                borderRadius: "var(--btn-radius)",
-              }}
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add Company
-            </Button>
-          </Link>
+          <Button
+            size="sm"
+            className="gap-1.5 font-medium"
+            style={{
+              background: "var(--btn-primary-bg)",
+              color: "var(--btn-primary-fg)",
+              borderRadius: "var(--btn-radius)",
+            }}
+            onClick={() => setHubspotPickerOpen(true)}
+          >
+            Import from HubSpot
+          </Button>
         </div>
       </div>
 
@@ -388,6 +388,8 @@ export default function Dashboard() {
           </tbody>
         </table>
       </div>
+
+      <HubSpotPickerModal open={hubspotPickerOpen} onClose={() => setHubspotPickerOpen(false)} />
     </div>
   );
 }
