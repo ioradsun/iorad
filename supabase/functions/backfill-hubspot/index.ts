@@ -57,6 +57,96 @@ async function getAllPropertyNames(apiKey: string): Promise<string[]> {
   }
 }
 
+// ── Import contacts for a company from HubSpot ───────────────────────────────
+const CONTACT_PROPS = [
+  "firstname", "lastname", "email", "jobtitle", "hs_linkedin_url",
+  "hs_last_contacted", "num_contacted_notes", "hs_email_open_count",
+  "hs_email_click_count", "hubspot_score",
+  // iorad-specific activity fields
+  "first_tutorial_create_date", "first_tutorial_view_date", "first_tutorial_learn_date",
+  "answers_with_own_tutorial_month_count", "answers_with_own_tutorial_previous_month_count",
+  "answers", "extension_connections",
+];
+
+async function importContactsForCompany(supabase: any, hubspotCompanyId: string | number, companyId: string, apiKey: string) {
+  try {
+    // Fetch associated contact IDs
+    const assocRes = await fetch(
+      `https://api.hubapi.com/crm/v3/objects/companies/${hubspotCompanyId}/associations/contacts?limit=500`,
+      { headers: { Authorization: `Bearer ${apiKey}` } }
+    );
+    if (!assocRes.ok) return;
+    const assocData = await assocRes.json();
+    const contactIds: string[] = (assocData.results || []).map((r: any) => String(r.toObjectId || r.id)).filter(Boolean);
+    if (contactIds.length === 0) return;
+
+    console.log(`backfill: found ${contactIds.length} contacts for company ${hubspotCompanyId}`);
+
+    // Batch-read contact details (100 per call)
+    for (let i = 0; i < contactIds.length; i += 100) {
+      const batch = contactIds.slice(i, i + 100);
+      const batchRes = await fetch("https://api.hubapi.com/crm/v3/objects/contacts/batch/read", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ inputs: batch.map(id => ({ id })), properties: CONTACT_PROPS }),
+      });
+      if (!batchRes.ok) continue;
+      const batchData = await batchRes.json();
+      const contacts = batchData.results || [];
+
+      const toInsert: any[] = [];
+      for (const contact of contacts) {
+        const cp = contact.properties || {};
+        const name = [cp.firstname, cp.lastname].filter(Boolean).join(" ").trim();
+        if (!name) continue;
+
+        // Skip if already exists for this company+email
+        if (cp.email) {
+          const { data: existing } = await supabase
+            .from("contacts")
+            .select("id")
+            .eq("company_id", companyId)
+            .eq("email", cp.email)
+            .maybeSingle();
+          if (existing) continue;
+        }
+
+        toInsert.push({
+          company_id: companyId,
+          name,
+          email: cp.email || null,
+          title: cp.jobtitle || null,
+          linkedin: cp.hs_linkedin_url || null,
+          source: "hubspot",
+          confidence: "high",
+          hubspot_properties: {
+            hs_last_contacted: cp.hs_last_contacted || null,
+            num_contacted_notes: cp.num_contacted_notes || null,
+            hs_email_open_count: cp.hs_email_open_count || null,
+            hs_email_click_count: cp.hs_email_click_count || null,
+            hubspot_score: cp.hubspot_score || null,
+            first_tutorial_create_date: cp.first_tutorial_create_date || null,
+            first_tutorial_view_date: cp.first_tutorial_view_date || null,
+            first_tutorial_learn_date: cp.first_tutorial_learn_date || null,
+            answers_with_own_tutorial_month_count: cp.answers_with_own_tutorial_month_count || null,
+            answers_with_own_tutorial_previous_month_count: cp.answers_with_own_tutorial_previous_month_count || null,
+            answers: cp.answers || null,
+            extension_connections: cp.extension_connections || null,
+          },
+        });
+      }
+
+      if (toInsert.length > 0) {
+        const { error } = await supabase.from("contacts").insert(toInsert);
+        if (error) console.warn(`Contact insert error for company ${companyId}: ${error.message}`);
+        else console.log(`backfill: inserted ${toInsert.length} contacts for company ${companyId}`);
+      }
+    }
+  } catch (err: any) {
+    console.warn(`importContactsForCompany error for ${hubspotCompanyId}: ${err.message}`);
+  }
+}
+
 async function listHubSpotPage(apiKey: string, after: string | null, properties: string): Promise<{ companies: any[]; nextAfter: string | null }> {
   const url = new URL("https://api.hubapi.com/crm/v3/objects/companies");
   url.searchParams.set("limit", String(BATCH_SIZE));
@@ -195,8 +285,13 @@ Deno.serve(async (req) => {
     for (const hs of companies) {
       try {
         const { companyId, isNew } = await upsertCompany(supabase, hs);
+        // Always import contacts — even for existing companies, contacts may be new
+        await importContactsForCompany(supabase, hs.id, companyId, apiKey);
         imported++;
         if (isNew) {
+          scoreCompanyAsync(companyId);
+        } else {
+          // Re-score existing companies now that contacts may have been added
           scoreCompanyAsync(companyId);
         }
       } catch (err: any) {
