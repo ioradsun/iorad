@@ -97,39 +97,10 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-1 space-y-8">
-
-      {/* ── Header ── */}
-      <div className="flex items-end justify-between pt-2">
-        <div>
-          <h1 className="text-[1.875rem] font-semibold tracking-tight text-foreground">
-            Scout
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {companies.length} companies
-            {lastJob && (
-              <> · Last run {new Date(lastJob.started_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</>
-            )}
-          </p>
-        </div>
-        <Link to="/upload">
-          <Button
-            size="sm"
-            className="gap-1.5 font-medium"
-            style={{
-              background: "var(--btn-primary-bg)",
-              color: "var(--btn-primary-fg)",
-              borderRadius: "var(--btn-radius)",
-            }}
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add Company
-          </Button>
-        </Link>
-      </div>
+    <div className="max-w-6xl mx-auto px-1 space-y-6">
 
       {/* ── KPI strip ── */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-3 pt-1">
         <KpiCard
           value={stats.total}
           label="Total tracked"
@@ -142,12 +113,28 @@ export default function Dashboard() {
           icon={<ArrowDownRight className="w-4 h-4" style={{ color: "var(--stat-inbound-fg)" }} />}
           iconBg="var(--stat-inbound-bg)"
         />
-        <KpiCard
-          value={stats.newOutbound}
-          label="New outbound (24h)"
-          icon={<ArrowUpRight className="w-4 h-4" style={{ color: "var(--stat-outbound-fg)" }} />}
-          iconBg="var(--stat-outbound-bg)"
-        />
+        <div className="flex flex-col gap-2">
+          <KpiCard
+            value={stats.newOutbound}
+            label="New outbound (24h)"
+            icon={<ArrowUpRight className="w-4 h-4" style={{ color: "var(--stat-outbound-fg)" }} />}
+            iconBg="var(--stat-outbound-bg)"
+          />
+          <Link to="/upload" className="w-full">
+            <Button
+              size="sm"
+              className="w-full gap-1.5 font-medium"
+              style={{
+                background: "var(--btn-primary-bg)",
+                color: "var(--btn-primary-fg)",
+                borderRadius: "var(--btn-radius)",
+              }}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Company
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* ── Toolbar ── */}
