@@ -98,25 +98,25 @@ function HubSpotSyncButton({
           </div>
 
           <button
-            onClick={() => { onManual(); setOpen(false); }}
-            disabled={isLoading}
+            onClick={() => { onAuto(); setOpen(false); }}
             className="w-full flex items-start gap-3 px-3 py-2.5 text-left hover:bg-muted transition-colors disabled:opacity-50"
           >
-            <Download className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary" />
+            <RefreshCcw className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary" />
             <div>
               <p className="text-xs font-medium text-foreground">Manual</p>
-              <p className="text-[11px] text-muted-foreground leading-snug">Pull all companies now</p>
+              <p className="text-[11px] text-muted-foreground leading-snug">Pick a specific HubSpot company</p>
             </div>
           </button>
 
           <button
-            onClick={() => { onAuto(); setOpen(false); }}
-            className="w-full flex items-start gap-3 px-3 py-2.5 text-left hover:bg-muted transition-colors border-t border-border"
+            onClick={() => { onManual(); setOpen(false); }}
+            disabled={isLoading}
+            className="w-full flex items-start gap-3 px-3 py-2.5 text-left hover:bg-muted transition-colors border-t border-border disabled:opacity-50"
           >
-            <RefreshCcw className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary" />
+            <Download className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary" />
             <div>
               <p className="text-xs font-medium text-foreground">Auto</p>
-              <p className="text-[11px] text-muted-foreground leading-snug">Pick a HubSpot company to watch</p>
+              <p className="text-[11px] text-muted-foreground leading-snug">Sync all companies from HubSpot</p>
             </div>
           </button>
         </div>
