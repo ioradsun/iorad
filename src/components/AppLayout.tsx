@@ -21,29 +21,8 @@ const menuItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
 ];
 
-const NEW_THRESHOLD_HOURS = 48;
-
-function useWaitingCount() {
-  return useQuery({
-    queryKey: ["banner_waiting_count"],
-    queryFn: async () => {
-      const cutoff = new Date(Date.now() - NEW_THRESHOLD_HOURS * 60 * 60 * 1000).toISOString();
-      const [{ data: cards }, { data: newCompanies }] = await Promise.all([
-        supabase.from("company_cards").select("company_id"),
-        // Only count recent imports with no snapshot status (truly unprocessed)
-        supabase.from("companies").select("id").gte("created_at", cutoff).is("snapshot_status", null),
-      ]);
-      const cardIds = new Set((cards || []).map((c: any) => c.company_id));
-      const waiting = (newCompanies || []).filter((c: any) => !cardIds.has(c.id));
-      return waiting.length;
-    },
-    refetchInterval: 15_000,
-  });
-}
-
 function ActiveJobBanner() {
   const { data: job } = useActiveJob();
-  const { data: waitingCount } = useWaitingCount();
   const location = useLocation();
   const navigate = useNavigate();
   const isOnJobsPage = location.pathname === "/jobs";
@@ -64,14 +43,12 @@ function ActiveJobBanner() {
     refetchInterval: 3_000,
   });
 
-  if (!job && (waitingCount === undefined || waitingCount === 0)) return null;
+  if (!job) return null;
 
   const currentCompany =
-    job
-      ? ((currentItem?.companies as any)?.name ??
-         (job.settings_snapshot as any)?.current_company ??
-         null)
-      : null;
+    (currentItem?.companies as any)?.name ??
+    (job.settings_snapshot as any)?.current_company ??
+    null;
 
   return (
     <div
@@ -82,23 +59,16 @@ function ActiveJobBanner() {
         color: "hsl(var(--primary))",
       }}
     >
-      {job && <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />}
+      <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
       <span>
-        {job
-          ? (job.trigger === "bulk_import" || (job.settings_snapshot as any)?.action === "bulk_import")
-            ? <>
-                Syncing with HubSpot
-                {job.companies_processed > 0
-                  ? ` — ${job.companies_processed}${job.total_companies_targeted > 0 ? `/${job.total_companies_targeted}` : ""} companies`
-                  : "…"}
-              </>
-            : <>Generating stories{currentCompany ? ` — ${currentCompany}` : ""}</>
-          : null}
-        {waitingCount !== undefined && waitingCount > 0 && (
-          <span className={job ? "ml-3 opacity-70" : ""}>
-            {waitingCount} waiting
-          </span>
-        )}
+        {(job.trigger === "bulk_import" || (job.settings_snapshot as any)?.action === "bulk_import")
+          ? <>
+              Syncing with HubSpot
+              {job.companies_processed > 0
+                ? ` — ${job.companies_processed}${job.total_companies_targeted > 0 ? `/${job.total_companies_targeted}` : ""} companies`
+                : "…"}
+            </>
+          : <>Generating story{currentCompany ? ` — ${currentCompany}` : "…"}</>}
       </span>
       <button
         onClick={() => isOnJobsPage ? navigate(-1) : navigate("/jobs")}
