@@ -333,7 +333,7 @@ export function useScoreCompanies() {
   });
 }
 
-// ---- Bulk Import from HubSpot (12 months) ----
+// ---- Bulk Import from HubSpot (all companies) ----
 export function useBulkImport() {
   const qc = useQueryClient();
   return useMutation({

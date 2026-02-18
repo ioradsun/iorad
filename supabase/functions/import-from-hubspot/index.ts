@@ -1078,7 +1078,7 @@ async function listHubSpotCompanies(search: string, after: string | null) {
   );
 }
 
-// ── Bulk Import: all HubSpot companies created in the last 12 months ────────
+// ── Bulk Import: all HubSpot companies (no date filter) ─────────────────────
 // Self-chaining: processes 50 companies per invocation to stay under timeout
 async function bulkImportCompanies(
   supabase: any,
