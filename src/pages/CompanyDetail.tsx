@@ -152,6 +152,7 @@ export default function CompanyDetail() {
   const queryClient = useQueryClient();
   const [regenerating, setRegenerating] = useState(false);
   const [generatingCards, setGeneratingCards] = useState(false);
+  const [generateStep, setGenerateStep] = useState<string | null>(null);
   const [selectedContactId, setSelectedContactId] = useState<string>("");
   const [activeTab, setActiveTab] = useState("company");
   const [addContactOpen, setAddContactOpen] = useState(false);
@@ -374,21 +375,29 @@ export default function CompanyDetail() {
     }
   };
 
-  // Profile extraction is now handled automatically inside generate-cards pipeline
+  // Unified generation: runs strategy → outreach → story in sequence using first contact only
   const generateCards = async () => {
     if (!id) return;
     setGeneratingCards(true);
+    // Always use the first contact for generation
+    const firstContactId = contacts[0]?.id || null;
+    const tabs = ["strategy", "outreach", "story"];
+    const labels: Record<string, string> = { strategy: "Strategy", outreach: "Outreach", story: "Story" };
     try {
-      const body: Record<string, string> = { company_id: id, tab: activeTab };
-      const cId = effectiveContactId;
-      if (cId) body.contact_id = cId;
-      const { data, error } = await supabase.functions.invoke("generate-cards", { body });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      toast.success(`Cards generated — ${data?.cards_count || 0} cards`);
-      queryClient.invalidateQueries({ queryKey: ["company_cards", id, cId || "default"] });
-    } catch (e: any) { toast.error(e.message || "Failed to generate cards"); }
-    finally { setGeneratingCards(false); }
+      for (const tab of tabs) {
+        setGenerateStep(labels[tab]);
+        toast.info(`Generating ${labels[tab]}…`);
+        const body: Record<string, string> = { company_id: id, tab };
+        if (firstContactId) body.contact_id = firstContactId;
+        const { data, error } = await supabase.functions.invoke("generate-cards", { body });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+      }
+      toast.success("All tabs generated successfully");
+      queryClient.invalidateQueries({ queryKey: ["company_cards", id] });
+      queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
+    } catch (e: any) { toast.error(e.message || "Failed to generate"); }
+    finally { setGeneratingCards(false); setGenerateStep(null); }
   };
 
   const selectedContact = contacts.find((c: any) => c.id === selectedContactId) || contacts[0] || null;
@@ -488,13 +497,25 @@ export default function CompanyDetail() {
       </div>
 
       <Tabs defaultValue="company" className="w-full" onValueChange={setActiveTab}>
-        <TabsList className="w-full justify-start">
-          <TabsTrigger value="company" className="text-sm">Company</TabsTrigger>
-          <TabsTrigger value="strategy" className="text-sm">Strategy</TabsTrigger>
-          <TabsTrigger value="outreach" className="text-sm">Outreach</TabsTrigger>
-          <TabsTrigger value="story" className="text-sm">Story</TabsTrigger>
-          <TabsTrigger value="onboarding" className="text-sm">Onboarding</TabsTrigger>
-        </TabsList>
+        <div className="flex items-center justify-between gap-3 mb-1">
+          <TabsList className="justify-start">
+            <TabsTrigger value="company" className="text-sm">Company</TabsTrigger>
+            <TabsTrigger value="strategy" className="text-sm">Strategy</TabsTrigger>
+            <TabsTrigger value="outreach" className="text-sm">Outreach</TabsTrigger>
+            <TabsTrigger value="story" className="text-sm">Story</TabsTrigger>
+            <TabsTrigger value="onboarding" className="text-sm">Onboarding</TabsTrigger>
+          </TabsList>
+
+          {/* Unified generate button — only for inbound companies on the AI-driven tabs */}
+          {companyAny?.source_type === "inbound" && activeTab !== "company" && activeTab !== "onboarding" && (
+            <Button size="sm" className="gap-1.5 text-[13px]" onClick={generateCards} disabled={generatingCards}>
+              {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+              {generatingCards
+                ? generateStep ? `Generating ${generateStep}…` : "Generating…"
+                : (isInboundStoryResponse || cards.length > 0 || assets.email_sequence) ? "Regenerate All" : "Generate All"}
+            </Button>
+          )}
+        </div>
 
         {/* ============ TAB 1: COMPANY ============ */}
         <TabsContent value="company" className="space-y-6 mt-6">
@@ -1175,14 +1196,7 @@ export default function CompanyDetail() {
         {/* ============ TAB 2: STRATEGY ============ */}
         <TabsContent value="strategy" className="space-y-6 mt-6">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
             <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Strategy & Cards</h3>
-              {contactSelector}
-            </div>
-            <Button size="sm" className="gap-1.5 text-[13px]" onClick={generateCards} disabled={generatingCards}>
-              {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-              {generatingCards ? "Generating…" : cards.length > 0 ? "Regenerate" : "Generate"}
-            </Button>
           </div>
 
           {cardsLoading ? (
@@ -1221,14 +1235,7 @@ export default function CompanyDetail() {
         {/* ============ TAB 3: OUTREACH ============ */}
         <TabsContent value="outreach" className="space-y-6 mt-6">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Outreach Assets</h3>
-              {contactSelector}
-            </div>
-            <Button size="sm" className="gap-1.5 text-[13px]" onClick={generateCards} disabled={generatingCards}>
-              {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-              {generatingCards ? "Generating…" : (assets.email_sequence || assets.linkedin_sequence) ? "Regenerate" : "Generate"}
-            </Button>
+            <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Outreach Assets</h3>
           </div>
 
           {cardsLoading ? (
@@ -1282,23 +1289,14 @@ export default function CompanyDetail() {
         {/* ============ TAB 4: STORY ============ */}
         <TabsContent value="story" className="space-y-6 mt-6">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Story Configuration</h3>
-              {contactSelector}
-            </div>
-            <div className="flex items-center gap-2">
-              {storyBaseUrl && (
-                <a href={storyBaseUrl} target="_blank" rel="noopener noreferrer">
-                  <Button size="sm" className="gap-1.5 text-[13px]">
-                    <Eye className="w-3.5 h-3.5" /> View Story
-                  </Button>
-                </a>
-              )}
-              <Button size="sm" className="gap-1.5 text-[13px]" onClick={generateCards} disabled={generatingCards}>
-                {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                {generatingCards ? "Generating…" : (isInboundStoryResponse || assets.story_assets ? "Regenerate" : "Generate")}
-              </Button>
-            </div>
+            <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Story Configuration</h3>
+            {storyBaseUrl && (
+              <a href={storyBaseUrl} target="_blank" rel="noopener noreferrer">
+                <Button size="sm" variant="outline" className="gap-1.5 text-[13px]">
+                  <Eye className="w-3.5 h-3.5" /> View Story
+                </Button>
+              </a>
+            )}
           </div>
 
           {/* Inbound Story — AI-Generated Institutional Brief */}
