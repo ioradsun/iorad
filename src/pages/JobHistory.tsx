@@ -43,8 +43,8 @@ function useCompanyQueueData() {
       const noStory = (companies || []).filter((c) => !cardIds.has(c.id));
       const completed = (companies || []).filter((c) => cardIds.has(c.id));
 
-      // "Waiting" = no story + imported within threshold (new HubSpot imports)
-      const waiting = noStory.filter((c) => new Date(c.created_at) >= cutoff);
+      // "Waiting" = no story + imported within threshold + not manually cleared
+      const waiting = noStory.filter((c) => new Date(c.created_at) >= cutoff && c.snapshot_status !== "cleared");
       // "Not Started" = no story + older than threshold (pre-existing records)
       const notStarted = noStory.filter((c) => new Date(c.created_at) < cutoff);
 
@@ -181,26 +181,34 @@ export default function JobHistory() {
   };
 
   const handleClearJob = async () => {
-    if (!activeJob) return;
     setActionLoading(true);
     try {
-      const { error } = await supabase
-        .from("processing_jobs")
-        .update({ status: "canceled", finished_at: new Date().toISOString() })
-        .eq("id", activeJob.id);
-      if (error) throw error;
-      // Also mark any in-progress items as failed so they don't stay stuck
-      await supabase
-        .from("processing_job_items")
-        .update({ status: "failed", finished_at: new Date().toISOString(), error_message: "Cleared by user" })
-        .eq("job_id", activeJob.id)
-        .in("status", ["running", "queued"]);
+      // Cancel any running job
+      if (activeJob) {
+        await supabase
+          .from("processing_jobs")
+          .update({ status: "canceled", finished_at: new Date().toISOString() })
+          .eq("id", activeJob.id);
+        await supabase
+          .from("processing_job_items")
+          .update({ status: "failed", finished_at: new Date().toISOString(), error_message: "Cleared by user" })
+          .eq("job_id", activeJob.id)
+          .in("status", ["running", "queued"]);
+      }
+      // Clear all waiting companies (mark as skipped so they leave the 48h queue)
+      const waitingIds = waiting.map((c: any) => c.id).filter(Boolean);
+      if (waitingIds.length > 0) {
+        await supabase
+          .from("companies")
+          .update({ snapshot_status: "cleared" })
+          .in("id", waitingIds);
+      }
       await qc.invalidateQueries({ queryKey: ["active_running_job"] });
       await qc.invalidateQueries({ queryKey: ["active_job"] });
       await qc.invalidateQueries({ queryKey: ["company_queue_data"] });
-      toast.success("Job cleared.");
+      toast.success(`Queue cleared — ${waitingIds.length} waiting companies removed.`);
     } catch (err: any) {
-      toast.error(`Failed to clear job: ${err?.message || "Unknown error"}`);
+      toast.error(`Failed to clear: ${err?.message || "Unknown error"}`);
     } finally {
       setActionLoading(false);
     }
@@ -215,8 +223,8 @@ export default function JobHistory() {
           <p className="text-sm text-muted-foreground mt-1">Story generation queue</p>
         </div>
         {!isLoading && (
-          isRunning ? (
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            {isRunning ? (
               <Button
                 variant="outline"
                 size="sm"
@@ -227,29 +235,29 @@ export default function JobHistory() {
                 {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pause className="w-4 h-4" />}
                 Pause
               </Button>
+            ) : (
               <Button
-                variant="ghost"
                 size="sm"
-                className="gap-2 text-muted-foreground hover:text-destructive"
-                onClick={handleClearJob}
-                disabled={actionLoading}
-                title="Force-cancel the job and mark all queued items as failed"
+                className="gap-2"
+                onClick={handleStart}
+                disabled={actionLoading || waiting.length === 0}
               >
-                <Trash2 className="w-4 h-4" />
-                Clear Job
+                {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                Start{waiting.length > 0 ? ` (${waiting.length})` : ""}
               </Button>
-            </div>
-          ) : (
+            )}
             <Button
+              variant="ghost"
               size="sm"
-              className="gap-2"
-              onClick={handleStart}
-              disabled={actionLoading || waiting.length === 0}
+              className="gap-2 text-muted-foreground hover:text-destructive"
+              onClick={handleClearJob}
+              disabled={actionLoading || (waiting.length === 0 && !isRunning)}
+              title="Cancel running job and clear all waiting companies from the queue"
             >
-              {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-              Start{waiting.length > 0 ? ` (${waiting.length})` : ""}
+              <Trash2 className="w-4 h-4" />
+              Clear Queue
             </Button>
-          )
+          </div>
         )}
       </div>
 
