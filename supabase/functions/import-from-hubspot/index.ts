@@ -130,45 +130,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`HubSpot webhook: ${imported} imported, ${skipped} skipped, ${toProcess.length} queued for processing`);
-
-    // Fire background processing — respond to HubSpot immediately, then process sequentially
-    if (toProcess.length > 0) {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-      const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-      const runSequential = async () => {
-        for (const companyId of toProcess) {
-          try {
-            console.log(`Auto-processing inbound company: ${companyId}`);
-            const res = await fetch(`${supabaseUrl}/functions/v1/run-signals`, {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${serviceRoleKey}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ company_id: companyId, mode: "full" }),
-            });
-            const result = await res.json();
-            console.log(`Auto-processing done for ${companyId}:`, result?.status || result?.error || "ok");
-          } catch (err: any) {
-            console.error(`Auto-processing failed for ${companyId}:`, err.message);
-          }
-          // 1-minute gap between companies if there are multiple
-          if (toProcess.indexOf(companyId) < toProcess.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 60_000));
-          }
-        }
-      };
-
-      // @ts-ignore - EdgeRuntime available in Supabase edge functions
-      if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) {
-        // @ts-ignore
-        EdgeRuntime.waitUntil(runSequential());
-      } else {
-        runSequential().catch(console.error);
-      }
-    }
+    console.log(`HubSpot webhook: ${imported} imported, ${skipped} skipped`);
 
     return new Response(
       JSON.stringify({ success: true, imported, skipped, queued: toProcess.length, errors: errors.slice(0, 10) }),
@@ -296,22 +258,7 @@ async function syncRecentCompanies(supabase: any) {
       await importContactsForCompany(supabase, company.id, companyId);
       imported++;
 
-      // Auto-generate story only for brand-new records without a story
-      if (isNew && !hasStory) {
-        autoQueued++;
-        const idx = results.indexOf(company);
-        // Stagger requests by 10s per company to avoid overwhelming the AI gateway
-        setTimeout(() => {
-          fetch(`${supabaseUrl2}/functions/v1/run-signals`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${serviceRoleKey2}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ company_id: companyId, mode: "full" }),
-          }).catch(err => console.error(`Auto run-signals error for ${companyId}:`, err.message));
-        }, idx * 10_000);
-      }
+      if (isNew) autoQueued++;
     } catch (err: any) {
       errors.push(`${company.properties?.name || company.id}: ${err.message}`);
       skipped++;
@@ -1261,28 +1208,13 @@ async function syncByHubSpotId(supabase: any, hubspotId: string) {
   // Update scout_synced_at
   await supabase.from("companies").update({ scout_synced_at: new Date().toISOString() }).eq("id", companyId);
 
-  // Auto-generate story only for new companies without an existing story
-  if (isNew && !hasStory) {
-    console.log(`Auto-triggering run-signals for new company: ${company.properties?.name}`);
-    fetch(`${supabaseUrl}/functions/v1/run-signals`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${serviceRoleKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ company_id: companyId, mode: "full" }),
-    }).catch(err => console.error("Auto run-signals error:", err.message));
-  } else {
-    console.log(`Skipping auto-generation for ${company.properties?.name} (isNew=${isNew}, hasStory=${hasStory})`);
-  }
-
   return new Response(
     JSON.stringify({
       success: true,
       company_id: companyId,
       is_new: isNew,
       has_story: hasStory,
-      auto_generating: isNew && !hasStory,
+      auto_generating: false,
       name: company.properties?.name,
     }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
