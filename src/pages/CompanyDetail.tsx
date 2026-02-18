@@ -395,14 +395,27 @@ export default function CompanyDetail() {
 
   const contactSelector = contacts.length > 0 ? (
     <Select value={selectedContactId || contacts[0]?.id || ""} onValueChange={setSelectedContactId}>
-      <SelectTrigger className="w-[220px] h-8 text-xs bg-background">
-        <SelectValue placeholder="Select contact" />
+      <SelectTrigger className="h-auto min-w-[200px] max-w-[320px] py-1.5 px-3 text-xs bg-background">
+        <SelectValue placeholder="Select contact">
+          {(() => {
+            const c = contacts.find((c: any) => c.id === (selectedContactId || contacts[0]?.id));
+            if (!c) return null;
+            return (
+              <div className="flex flex-col items-start text-left">
+                <span className="font-medium text-[13px] leading-tight">{c.name}</span>
+                {c.title && <span className="text-muted-foreground text-[11px] leading-tight">{c.title}</span>}
+              </div>
+            );
+          })()}
+        </SelectValue>
       </SelectTrigger>
-      <SelectContent className="bg-background z-50">
+      <SelectContent className="bg-background z-50 min-w-[280px]">
         {contacts.map((c: any) => (
-          <SelectItem key={c.id} value={c.id} className="text-xs">
-            <span className="font-medium">{c.name}</span>
-            {c.title && <span className="text-muted-foreground ml-1">· {c.title}</span>}
+          <SelectItem key={c.id} value={c.id} className="py-2">
+            <div className="flex flex-col items-start">
+              <span className="font-medium text-[13px] leading-tight">{c.name}</span>
+              {c.title && <span className="text-muted-foreground text-[11px] leading-tight">{c.title}</span>}
+            </div>
           </SelectItem>
         ))}
       </SelectContent>
