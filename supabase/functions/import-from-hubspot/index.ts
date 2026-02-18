@@ -552,14 +552,69 @@ async function upsertCompany(supabase: any, hubspotCompany: any): Promise<{ comp
   return { companyId: inserted.id, isNew: true, hasStory: false };
 }
 
+// ── Contact ranking ───────────────────────────────────────────────────────────
 
-// Fetch contacts associated with a HubSpot company and save them
+// Target persona keywords — title relevance score
+const TITLE_TIER_1 = [
+  /\blearning\b/i, /\benablement\b/i, /\btraining\b/i, /\bl&d\b/i,
+  /\bcurriculum\b/i, /\binstructional\b/i, /\be.?learning\b/i,
+];
+const TITLE_TIER_2 = [
+  /\bprincipal\b/i, /\bsuperintendent\b/i, /\bdirector\b/i, /\badministrat/i,
+  /\bchief\b/i, /\bvp\b/i, /\bvice president\b/i, /\bit\b/i, /\btechnology\b/i,
+  /\boperations\b/i, /\bchief.*officer\b/i,
+];
+
+function titleScore(title: string | null | undefined): number {
+  if (!title) return 0;
+  if (TITLE_TIER_1.some(rx => rx.test(title))) return 40;
+  if (TITLE_TIER_2.some(rx => rx.test(title))) return 20;
+  return 5;
+}
+
+function computeContactRank(cp: Record<string, any>): number {
+  let score = 0;
+
+  // Title relevance (0–40)
+  score += titleScore(cp.jobtitle);
+
+  // HubSpot score (0–20, capped)
+  const hsScore = parseFloat(cp.hubspot_score || "0") || 0;
+  score += Math.min(20, Math.round(hsScore / 5));
+
+  // Number of times contacted (0–15)
+  const contacted = parseInt(cp.num_contacted_notes || "0", 10) || 0;
+  score += Math.min(15, contacted * 3);
+
+  // Email engagement: opens + clicks (0–15)
+  const opens = parseInt(cp.hs_email_open_count || "0", 10) || 0;
+  const clicks = parseInt(cp.hs_email_click_count || "0", 10) || 0;
+  score += Math.min(15, opens + clicks * 2);
+
+  // Recency of last contact (0–10)
+  const lastContacted = cp.hs_last_contacted || cp.notes_last_contacted || cp.hs_sales_email_last_replied;
+  if (lastContacted) {
+    const daysSince = (Date.now() - new Date(lastContacted).getTime()) / (1000 * 60 * 60 * 24);
+    if (daysSince < 30) score += 10;
+    else if (daysSince < 90) score += 5;
+    else if (daysSince < 365) score += 2;
+  }
+
+  return score;
+}
+
+
 async function importContactsForCompany(supabase: any, hubspotCompanyId: string | number, companyId: string) {
   const apiKey = Deno.env.get("HUBSPOT_API_KEY");
   if (!apiKey) return;
 
-  // Only fetch the fields we actually store — avoids massive payloads for large companies
-  const CONTACT_PROPS = ["firstname", "lastname", "email", "jobtitle", "hs_linkedin_url"];
+  // Fetch the fields we store — includes engagement signals for ranking
+  const CONTACT_PROPS = [
+    "firstname", "lastname", "email", "jobtitle", "hs_linkedin_url",
+    "hs_last_contacted", "num_contacted_notes", "hs_email_open_count",
+    "hs_email_click_count", "hubspot_score", "notes_last_contacted",
+    "hs_sales_email_last_replied",
+  ];
 
   try {
     // Paginate through ALL associated contacts (HubSpot returns max 500 per page)
@@ -617,6 +672,8 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
         const contactName = [cp.firstname, cp.lastname].filter(Boolean).join(" ").trim();
         if (!contactName) continue;
 
+        const rank = computeContactRank(cp);
+
         const row = {
           company_id: companyId,
           name: contactName,
@@ -625,6 +682,14 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
           linkedin: cp.hs_linkedin_url || null,
           source: "hubspot",
           confidence: "high",
+          hubspot_properties: {
+            rank,
+            hs_last_contacted: cp.hs_last_contacted || null,
+            num_contacted_notes: cp.num_contacted_notes || null,
+            hs_email_open_count: cp.hs_email_open_count || null,
+            hs_email_click_count: cp.hs_email_click_count || null,
+            hubspot_score: cp.hubspot_score || null,
+          },
         };
 
         // Check for existing only if we have an email (unique identifier)
@@ -636,7 +701,15 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
             .eq("email", cp.email)
             .maybeSingle();
           if (existing) {
-            rowsToUpdate.push({ id: existing.id, data: { name: contactName, title: row.title, linkedin: row.linkedin } });
+            rowsToUpdate.push({
+              id: existing.id,
+              data: {
+                name: contactName,
+                title: row.title,
+                linkedin: row.linkedin,
+                hubspot_properties: row.hubspot_properties,
+              },
+            });
             continue;
           }
         }
