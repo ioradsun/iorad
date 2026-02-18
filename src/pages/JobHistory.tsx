@@ -32,12 +32,32 @@ function useActiveRunningJob() {
   });
 }
 
+function useCurrentlyProcessingCompany(jobId: string | undefined) {
+  return useQuery({
+    queryKey: ["currently_processing_company", jobId],
+    enabled: !!jobId,
+    queryFn: async () => {
+      // Find the most recently started item that is still pending/processing
+      const { data } = await supabase
+        .from("processing_job_items")
+        .select("*, companies(name)")
+        .eq("job_id", jobId!)
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    refetchInterval: 3_000,
+  });
+}
+
 export default function JobHistory() {
   const { data: missingCount, isLoading: loadingCount } = useMissingStoriesCount();
   const { data: activeJob, isLoading: loadingActive } = useActiveRunningJob();
+  const { data: currentItem } = useCurrentlyProcessingCompany(activeJob?.id);
 
   const isLoading = loadingCount || loadingActive;
-  const currentCompany = (activeJob?.settings_snapshot as any)?.current_company ?? null;
+  const currentCompany = (currentItem?.companies as any)?.name ?? (activeJob?.settings_snapshot as any)?.current_company ?? null;
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">

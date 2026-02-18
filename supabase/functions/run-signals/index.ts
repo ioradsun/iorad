@@ -366,6 +366,11 @@ Deno.serve(async (req) => {
       activeJobId = job.id;
     }
 
+    // Write current company name into the job so polling clients can display it
+    await supabase.from("processing_jobs").update({
+      settings_snapshot: { current_company: company.name },
+    }).eq("id", activeJobId);
+
     let status = "succeeded";
     let signalsCount = 0;
     let snapshotStatus = "Low Signal";
