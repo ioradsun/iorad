@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  Loader2, CheckCircle2, XCircle, Inbox,
+  Loader2, CheckCircle2, XCircle,
   Download, AlertCircle, User, Zap, ChevronDown,
   ChevronRight, Circle, CheckCheck,
 } from "lucide-react";
@@ -25,35 +25,81 @@ function fmt(ts: string | null | undefined) {
 
 // ── Story Generation hooks ────────────────────────────────────────────────────
 
-function useCompanyQueueData() {
+function useStoryGenerationData() {
   return useQuery({
-    queryKey: ["company_queue_data"],
+    queryKey: ["story_generation_data"],
     queryFn: async () => {
-      const { data: companies } = await supabase
-        .from("companies")
-        .select("id, name, domain, source_type, created_at, snapshot_status")
-        .order("created_at", { ascending: false });
+      // Active single-company story job
+      const { data: activeJobs } = await supabase
+        .from("processing_jobs")
+        .select("*")
+        .eq("status", "running")
+        .eq("trigger", "manual")
+        .order("started_at", { ascending: false })
+        .limit(1);
 
-      const { data: cards } = await supabase.from("company_cards").select("company_id");
+      const activeJob = activeJobs?.[0] ?? null;
 
+      // Get company name for the active job if present
+      let activeCompany: { name: string; id: string } | null = null;
+      if (activeJob) {
+        const snap = activeJob.settings_snapshot as any;
+        const companyId = snap?.company_id;
+        if (companyId) {
+          const { data: item } = await supabase
+            .from("processing_job_items")
+            .select("company_id, companies(name, id)")
+            .eq("job_id", activeJob.id)
+            .limit(1)
+            .maybeSingle();
+          if (item?.companies) {
+            activeCompany = { name: (item.companies as any).name, id: (item.companies as any).id };
+          }
+        }
+      }
+
+      // Companies with stories (cards)
+      const { data: cards } = await supabase
+        .from("company_cards")
+        .select("company_id, created_at")
+        .order("created_at", { ascending: false })
+        .limit(200);
+
+      const cardCompanyIds = (cards || []).map((c: any) => c.company_id);
+      let completedCompanies: any[] = [];
+      if (cardCompanyIds.length > 0) {
+        const { data: companies } = await supabase
+          .from("companies")
+          .select("id, name, domain")
+          .in("id", cardCompanyIds);
+        const cardMap = new Map((cards || []).map((c: any) => [c.company_id, c.created_at]));
+        completedCompanies = (companies || []).map((c: any) => ({
+          ...c,
+          story_created_at: cardMap.get(c.id),
+        }));
+      }
+
+      // Failed items
       const { data: failedItems } = await supabase
         .from("processing_job_items")
-        .select("company_id, error_message, finished_at, companies(name)")
+        .select("company_id, error_message, finished_at, companies(name, id)")
         .eq("status", "failed")
-        .order("finished_at", { ascending: false });
+        .order("finished_at", { ascending: false })
+        .limit(50);
 
-      const cardIds = new Set((cards || []).map((c: any) => c.company_id));
       const failedMap = new Map<string, any>();
       for (const item of failedItems || []) {
         if (!failedMap.has(item.company_id)) failedMap.set(item.company_id, item);
       }
 
-      const noStory = (companies || []).filter((c) => !cardIds.has(c.id));
-      const completed = (companies || []).filter((c) => cardIds.has(c.id));
-
-      return { completed, notStarted: noStory, failed: Array.from(failedMap.values()) };
+      return {
+        activeJob,
+        activeCompany,
+        completed: completedCompanies,
+        failed: Array.from(failedMap.values()),
+      };
     },
-    refetchInterval: 10_000,
+    refetchInterval: 5_000,
   });
 }
 
@@ -517,11 +563,12 @@ function HubSpotSyncTab() {
 // ── Story Generation tab ──────────────────────────────────────────────────────
 
 function StoryGenerationTab() {
-  const { data: queueData, isLoading } = useCompanyQueueData();
+  const { data, isLoading } = useStoryGenerationData();
 
-  const completed  = queueData?.completed  ?? [];
-  const notStarted = queueData?.notStarted ?? [];
-  const failed     = queueData?.failed     ?? [];
+  const activeJob   = data?.activeJob   ?? null;
+  const activeCompany = data?.activeCompany ?? null;
+  const completed   = data?.completed   ?? [];
+  const failed      = data?.failed      ?? [];
 
   if (isLoading) {
     return (
@@ -533,17 +580,45 @@ function StoryGenerationTab() {
 
   return (
     <div className="space-y-5">
+      {/* Info banner */}
       <div className="rounded-lg border border-border bg-card/50 px-4 py-3 flex items-center gap-2 text-sm text-muted-foreground">
         <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
         Stories are generated per-company from the company detail page. No bulk generation.
       </div>
 
-      <Tabs defaultValue="not_started">
-        <TabsList className="w-full grid grid-cols-3">
-          <TabsTrigger value="not_started" className="gap-1.5 text-xs">
-            <Inbox className="w-3.5 h-3.5 shrink-0" />No Story
-            <span className="tabular-nums opacity-70">({notStarted.length})</span>
-          </TabsTrigger>
+      {/* Waiting — only shown when a job is actively running */}
+      {activeJob && (
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Waiting</h3>
+          <div className="rounded-lg border border-border bg-card/50 p-4 flex items-center gap-3">
+            <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
+            <div className="flex-1 min-w-0">
+              {activeCompany ? (
+                <Link
+                  to={`/company/${activeCompany.id}`}
+                  className="text-sm font-medium hover:underline underline-offset-2"
+                >
+                  {activeCompany.name}
+                </Link>
+              ) : (
+                <span className="text-sm font-medium text-muted-foreground">Generating story…</span>
+              )}
+              <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+                {activeJob.triggered_by && (
+                  <span className="flex items-center gap-1">
+                    <User className="w-3 h-3" />
+                    {activeJob.triggered_by}
+                  </span>
+                )}
+                <span>Started {formatDistanceToNow(new Date(activeJob.started_at), { addSuffix: true, includeSeconds: true })}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Tabs defaultValue="completed">
+        <TabsList className="w-full grid grid-cols-2">
           <TabsTrigger value="completed" className="gap-1.5 text-xs">
             <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />Done
             <span className="tabular-nums opacity-70">({completed.length})</span>
@@ -555,16 +630,10 @@ function StoryGenerationTab() {
               : <span className="tabular-nums opacity-70">(0)</span>}
           </TabsTrigger>
         </TabsList>
-        <TabsContent value="not_started" className="mt-4 panel max-h-[60vh] overflow-y-auto">
-          <p className="text-xs text-muted-foreground mb-3 pb-3 border-b border-border/50">
-            Companies without a story yet. Open a company page to generate manually.
-          </p>
-          <CompanyList companies={notStarted} emptyMessage="All companies have stories." />
-        </TabsContent>
-        <TabsContent value="completed" className="mt-4 panel max-h-[60vh] overflow-y-auto">
+        <TabsContent value="completed" className="mt-4 max-h-[60vh] overflow-y-auto">
           <CompanyList companies={completed} emptyMessage="No completed stories yet." />
         </TabsContent>
-        <TabsContent value="failed" className="mt-4 panel max-h-[60vh] overflow-y-auto">
+        <TabsContent value="failed" className="mt-4 max-h-[60vh] overflow-y-auto">
           <CompanyList companies={failed} emptyMessage="No failed items — great!" />
         </TabsContent>
       </Tabs>
