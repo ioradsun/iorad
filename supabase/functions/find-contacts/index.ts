@@ -9,25 +9,31 @@ const corsHeaders = {
 const APOLLO_BASE = "https://api.apollo.io/api/v1";
 
 const TITLE_KEYWORDS = [
-  "enablement",
   "learning",
-  "L&D",
-  "training",
-  "customer education",
-  "partner enablement",
-  "readiness",
-  "sales enablement",
-  "revenue enablement",
-  "change management",
+  "learning & development",
+  "l&d",
+  "enablement",
+  "education",
+  "customer ed",
+  "gtm",
+  "go to market",
+  "go-to-market",
 ];
+
+// Used to strictly filter returned contacts by title
+function titleMatchesKeywords(title: string | null): boolean {
+  if (!title) return false;
+  const lower = title.toLowerCase();
+  return TITLE_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase()));
+}
 
 // Persona-specific title keywords for targeted searches
 const PERSONA_TITLES: Record<string, string[]> = {
-  "Learning & Development": ["learning", "L&D", "training", "instructional design", "talent development", "organizational development", "learning experience"],
-  "Sales Enablement": ["sales enablement", "revenue enablement", "sales readiness", "sales training", "sales operations", "go-to-market"],
-  "Revenue Enablement": ["revenue enablement", "revenue operations", "RevOps", "sales enablement", "go-to-market enablement", "GTM"],
-  "Customer Education": ["customer education", "customer training", "customer success", "customer enablement", "customer onboarding", "academy"],
-  "Partner Enablement": ["partner enablement", "channel enablement", "partner training", "partner success", "channel sales", "alliances"],
+  "Learning & Development": ["learning", "L&D", "learning & development", "instructional design", "talent development", "learning experience"],
+  "Sales Enablement": ["sales enablement", "revenue enablement", "enablement", "go-to-market", "GTM"],
+  "Revenue Enablement": ["revenue enablement", "enablement", "GTM", "go-to-market"],
+  "Customer Education": ["customer education", "customer ed", "education", "enablement", "customer onboarding", "academy"],
+  "Partner Enablement": ["partner enablement", "channel enablement", "enablement", "partner success"],
 };
 
 Deno.serve(async (req) => {
@@ -185,11 +191,13 @@ Deno.serve(async (req) => {
       console.warn(`Apollo bulk enrichment failed: ${bulkResp.status}, using search results only`);
     }
 
-    // Step 3: Upsert contacts
+    // Step 3: Upsert contacts — strict title filter applied here
+    const filteredPeople = enrichedPeople.filter((p: any) => titleMatchesKeywords(p.title));
+    console.log(`Strict title filter: ${enrichedPeople.length} → ${filteredPeople.length} contacts pass`);
     let added = 0;
     const contactsOut: Record<string, unknown>[] = [];
 
-    for (const p of enrichedPeople) {
+    for (const p of filteredPeople) {
       const name = p.name || `${p.first_name || ""} ${p.last_name || ""}`.trim();
       if (!name) continue;
 
@@ -243,8 +251,8 @@ Deno.serve(async (req) => {
       contactsOut.push({ name, title, email, linkedin, confidence: contactData.confidence });
     }
 
-    // Update legacy buyer fields with top contact
-    const top = enrichedPeople[0];
+    // Update legacy buyer fields with top filtered contact
+    const top = filteredPeople[0];
     if (top) {
       const topName = top.name || `${top.first_name || ""} ${top.last_name || ""}`.trim();
       await supabase
