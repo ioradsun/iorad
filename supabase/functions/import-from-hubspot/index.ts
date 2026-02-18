@@ -272,7 +272,7 @@ async function syncRecentCompanies(supabase: any) {
 
   for (const company of results) {
     try {
-      const companyId = await upsertCompany(supabase, company);
+      const { companyId } = await upsertCompany(supabase, company);
       // Fetch and save associated contacts
       await importContactsForCompany(supabase, company.id, companyId);
       imported++;
@@ -294,6 +294,50 @@ async function syncRecentCompanies(supabase: any) {
     }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
+}
+
+// ── Category & Stage derivation from HubSpot properties ─────────────────────
+
+const EDU_INDUSTRIES = new Set([
+  "EDUCATION_MANAGEMENT",
+  "HIGHER_EDUCATION",
+  "PRIMARY_SECONDARY_EDUCATION",
+  "E_LEARNING",
+  "EDUCATION",
+]);
+
+const EDU_DOMAIN_PATTERNS = [
+  /\.edu($|\.)/,
+  /\.ac\.[a-z]{2}$/,
+  /\.school\./,
+  /\.k12\./,
+  /\.edu\.[a-z]{2}$/,
+];
+
+function deriveCategory(props: Record<string, any>, existingPartner?: string | null): "school" | "business" | "partner" {
+  // Partner: already flagged (outbound partner company)
+  if (existingPartner) return "partner";
+
+  const industry = (props.industry || "").toUpperCase();
+  if (EDU_INDUSTRIES.has(industry)) return "school";
+
+  const domain = (props.domain || "").toLowerCase();
+  if (EDU_DOMAIN_PATTERNS.some(rx => rx.test(domain))) return "school";
+
+  return "business";
+}
+
+function deriveStage(props: Record<string, any>): "prospect" | "active_opp" | "customer" | "expansion" {
+  const lifecycle = (props.lifecyclestage || "").toLowerCase();
+
+  if (lifecycle === "customer" || lifecycle === "evangelist") return "customer";
+  if (lifecycle === "opportunity" || lifecycle === "salesqualifiedlead") return "active_opp";
+
+  // Check HubSpot date-entered fields as a secondary signal
+  if (props.hs_date_entered_customer) return "customer";
+  if (props.hs_date_entered_opportunity) return "active_opp";
+
+  return "prospect";
 }
 
 // Upsert a HubSpot company into our companies table
@@ -320,19 +364,43 @@ async function upsertCompany(supabase: any, hubspotCompany: any): Promise<{ comp
   if (domain) {
     const { data: existing } = await supabase
       .from("companies")
-      .select("id, snapshot_status")
+      .select("id, snapshot_status, partner, category")
       .eq("domain", domain)
       .maybeSingle();
 
     if (existing) {
-      await supabase.from("companies").update(companyData).eq("id", existing.id);
+      // Derive category & stage — respect existing partner flag
+      const category = existing.partner ? "partner" : deriveCategory(props, existing.partner);
+      const stage = deriveStage(props);
+      const isCustomer = stage === "customer" || stage === "expansion";
+
+      await supabase.from("companies").update({
+        ...companyData,
+        category,
+        stage,
+        ...(isCustomer ? { is_existing_customer: true } : {}),
+      }).eq("id", existing.id);
+
       const hasStory = existing.snapshot_status === "Generated";
       return { companyId: existing.id, isNew: false, hasStory };
     }
   }
 
-  // Insert new company
-  const { data: inserted, error } = await supabase.from("companies").insert(companyData).select("id, snapshot_status").single();
+  // Insert new company — derive category & stage from HubSpot data
+  const category = deriveCategory(props, null);
+  const stage = deriveStage(props);
+  const isCustomer = stage === "customer" || stage === "expansion";
+
+  const { data: inserted, error } = await supabase
+    .from("companies")
+    .insert({
+      ...companyData,
+      category,
+      stage,
+      ...(isCustomer ? { is_existing_customer: true } : {}),
+    })
+    .select("id, snapshot_status")
+    .single();
   if (error) throw error;
   return { companyId: inserted.id, isNew: true, hasStory: false };
 }
@@ -615,13 +683,24 @@ async function syncSingleCompany(supabase: any, domain: string | undefined, comp
     }
 
     const props = hsCompany.properties || {};
-    const lifecycle = (props.lifecyclestage || "").toLowerCase();
-    const isCustomer = lifecycle === "customer" || lifecycle === "evangelist";
+
+    // Fetch existing company to get partner flag before deriving category
+    let existingPartner: string | null = null;
+    if (companyId) {
+      const { data: cur } = await supabase.from("companies").select("partner").eq("id", companyId).maybeSingle();
+      existingPartner = cur?.partner || null;
+    }
+
+    const category = deriveCategory(props, existingPartner);
+    const stage = deriveStage(props);
+    const isCustomer = stage === "customer" || stage === "expansion";
 
     // Update company record
     if (companyId) {
       const updates: Record<string, any> = {
         hubspot_properties: props,
+        category,
+        stage,
         ...(isCustomer ? { is_existing_customer: true } : {}),
         ...(props.industry ? { industry: props.industry } : {}),
         ...(props.numberofemployees ? { headcount: parseInt(String(props.numberofemployees), 10) || undefined } : {}),
@@ -647,8 +726,10 @@ async function syncSingleCompany(supabase: any, domain: string | undefined, comp
         JSON.stringify({
           success: true,
           found: true,
+          category,
+          stage,
           is_existing_customer: isCustomer,
-          lifecycle_stage: lifecycle,
+          lifecycle_stage: props.lifecyclestage || null,
           contacts_imported: contactsImported,
           hubspot_id: hsCompany.id,
         }),
@@ -656,8 +737,11 @@ async function syncSingleCompany(supabase: any, domain: string | undefined, comp
       );
     }
 
+    const category = deriveCategory(props, null);
+    const stage = deriveStage(props);
+    const isCustomer2 = stage === "customer" || stage === "expansion";
     return new Response(
-      JSON.stringify({ success: true, found: true, is_existing_customer: isCustomer, lifecycle_stage: lifecycle }),
+      JSON.stringify({ success: true, found: true, category, stage, is_existing_customer: isCustomer2, lifecycle_stage: props.lifecyclestage || null }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err: any) {
