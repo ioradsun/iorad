@@ -188,7 +188,7 @@ export default function CompanyDetail() {
   const handleAddContact = async () => {
     if (!id || !newContact.name.trim()) return;
     setSavingContact(true);
-    const missingContactInfo = !newContact.email.trim() && !newContact.linkedin.trim();
+    const missingContactInfo = !newContact.email.trim() || !newContact.linkedin.trim();
     try {
       // First insert the contact manually
       const { data: inserted, error } = await supabase.from("contacts").insert({
