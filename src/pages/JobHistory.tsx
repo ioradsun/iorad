@@ -114,15 +114,21 @@ function useHubspotJobs() {
         .select("*")
         .order("started_at", { ascending: false })
         .limit(30);
-      // Include all HubSpot-related jobs: bulk import, sync, backfill
-      return (data || []).filter((j: any) =>
-        j.trigger === "bulk_import" ||
-        j.trigger === "hubspot_sync" ||
-        j.trigger === "hubspot_backfill" ||
-        (j.settings_snapshot as any)?.action === "bulk_import" ||
-        (j.settings_snapshot as any)?.action === "sync" ||
-        (j.settings_snapshot as any)?.type === "backfill"
-      );
+      // Include all HubSpot-related jobs: bulk import, sync, backfill, and
+      // manual per-company syncs (trigger="manual" with current_company in snapshot)
+      return (data || []).filter((j: any) => {
+        const snap = (j.settings_snapshot as any) || {};
+        return (
+          j.trigger === "bulk_import" ||
+          j.trigger === "hubspot_sync" ||
+          j.trigger === "hubspot_backfill" ||
+          snap.action === "bulk_import" ||
+          snap.action === "sync" ||
+          snap.type === "backfill" ||
+          // Manual single-company syncs store the company name in current_company
+          (j.trigger === "manual" && snap.current_company != null)
+        );
+      });
     },
     refetchInterval: 5_000,
   });
@@ -222,6 +228,8 @@ function SyncJobSummary({ job }: { job: any }) {
               ? "Full backfill"
               : snap.action === "bulk_import"
               ? "All companies"
+              : snap.current_company
+              ? snap.current_company
               : snap.action ?? "HubSpot sync"}
           </span>
         </div>
