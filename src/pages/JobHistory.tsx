@@ -490,7 +490,15 @@ function HubSpotSyncTab() {
                 <div key={job.id} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded-md hover:bg-muted/40">
                   {icon}
                   <span className="text-muted-foreground">{fmt(job.started_at)}</span>
-                  <span className="text-foreground">{snap.action ?? job.trigger}</span>
+                  <span className="text-foreground">
+                    {snap.current_company
+                      ? snap.current_company
+                      : snap.action === "bulk_import"
+                      ? "All companies"
+                      : job.trigger === "hubspot_backfill"
+                      ? "Full backfill"
+                      : snap.action ?? job.trigger}
+                  </span>
                   <span className="ml-auto text-muted-foreground tabular-nums">
                     {job.companies_processed} processed · {job.companies_succeeded} ok · {job.companies_failed} err
                   </span>
