@@ -323,10 +323,13 @@ Deno.serve(async (req) => {
       if (!data) throw new Error("Company not found");
       company = data;
     } else {
-      // Batch mode — get 1 company at the given offset
+      // Batch mode — only process companies WITHOUT an existing story.
+      // Existing companies with stories are updated only when triggered explicitly
+      // (e.g. from Company Detail page) or when they come in fresh from HubSpot.
       const { data: companies, error: compErr } = await supabase
         .from("companies")
         .select("id, name, domain, industry, partner, persona, source_type")
+        .or("snapshot_status.is.null,snapshot_status.neq.Generated")
         .order("last_processed_at", { ascending: true, nullsFirst: true })
         .range(offset, offset);
 
