@@ -171,6 +171,7 @@ export default function CompanyDetail() {
   const [analyzingMeeting, setAnalyzingMeeting] = useState<string | null>(null);
   const [contactSearch, setContactSearch] = useState("");
   const [syncingHubspot, setSyncingHubspot] = useState(false);
+  const [generatingContactId, setGeneratingContactId] = useState<string | null>(null);
   // extractingProfiles state removed — extraction is now part of the generate pipeline
 
   const effectiveContactId = selectedContactId || contacts[0]?.id || "";
@@ -643,6 +644,37 @@ export default function CompanyDetail() {
     finally { setSyncingHubspot(false); }
   };
 
+  const generateForContact = async (contactId: string) => {
+    if (!id) return;
+    setGeneratingContactId(contactId);
+    try {
+      // Step 1: Extract profile for this contact
+      toast.info("Extracting contact profile…");
+      try {
+        await supabase.functions.invoke("extract-contact-profile", { body: { company_id: id, contact_id: contactId } });
+        queryClient.invalidateQueries({ queryKey: ["contacts", id] });
+      } catch (pe: any) { console.warn("Profile extraction non-fatal:", pe.message); }
+
+      // Step 2: Generate all card tabs for this contact
+      const tabs = ["company", "strategy", "outreach", "story"];
+      const labels: Record<string, string> = { company: "Company Intel", strategy: "Strategy", outreach: "Outreach", story: "Story" };
+      for (const tab of tabs) {
+        toast.info(`Generating ${labels[tab]}…`);
+        const { data, error } = await supabase.functions.invoke("generate-cards", {
+          body: { company_id: id, tab, contact_id: contactId },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+      }
+      toast.success("Content generated for contact");
+      queryClient.invalidateQueries({ queryKey: ["company_cards", id] });
+      queryClient.invalidateQueries({ queryKey: ["contacts", id] });
+      // Switch to this contact
+      setSelectedContactId(contactId);
+    } catch (e: any) { toast.error(e.message || "Generation failed"); }
+    finally { setGeneratingContactId(null); }
+  };
+
   const contactSelector = contacts.length > 0 ? (
     <Select value={selectedContactId || contacts[0]?.id || ""} onValueChange={setSelectedContactId}>
       <SelectTrigger className="h-auto min-w-[200px] max-w-[320px] py-1.5 px-3 text-xs bg-background">
@@ -987,7 +1019,7 @@ export default function CompanyDetail() {
               ))}
             </div>
             )}
-            {contacts.length > 3 && (
+            {contacts.length > 0 && (
               <div className="px-4 pb-3">
                 <Input
                   placeholder="Search contacts…"
@@ -998,127 +1030,107 @@ export default function CompanyDetail() {
               </div>
             )}
             <div className="px-4 pb-4">
-              <div className="overflow-y-auto" style={{ maxHeight: "276px" }}>
-              <div className="space-y-2 pr-2 pb-1">
-              {contacts.length > 0 ? contacts.filter((c) => {
-                if (!contactSearch) return true;
-                const q = contactSearch.toLowerCase();
-                return (c.name?.toLowerCase().includes(q) || c.title?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q));
-              }).map((contact) => {
-                const firstName = contact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "");
-                const storyUrl = company.partner
-                  ? `/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories/${firstName}`
-                  : null;
+              {contacts.length > 0 ? (() => {
+                const filtered = contacts.filter((c) => {
+                  if (!contactSearch) return true;
+                  const q = contactSearch.toLowerCase();
+                  return (c.name?.toLowerCase().includes(q) || c.title?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q));
+                });
                 return (
-                  <div key={contact.id} className="p-2 rounded-md hover:bg-secondary/30 transition-colors space-y-1.5">
-                    <div className="flex items-center gap-4">
-                      <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <UserSearch className="w-4 h-4 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0 space-y-0.5">
-                        <div className="text-[14px] font-medium truncate">{contact.name}</div>
-                        {contact.title && <div className="text-[13px] text-muted-foreground leading-snug">{contact.title}</div>}
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {storyUrl && snap && (
-                          <a href={storyUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" title="View personalized story"><ExternalLink className="w-4 h-4" /></a>
-                        )}
-                        {contact.email && <a href={`mailto:${contact.email}`} className="text-muted-foreground hover:text-primary" title={contact.email}><Mail className="w-4 h-4" /></a>}
-                        {contact.linkedin && <a href={contact.linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary"><Linkedin className="w-4 h-4" /></a>}
-                        <button
-                          onClick={() => setDeleteContactId(contact.id)}
-                          className="text-muted-foreground hover:text-destructive transition-colors"
-                          title="Delete contact"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                    {/* AI Profile — directly under name */}
-                    {(() => {
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                    {filtered.map((contact) => {
+                      const firstName = contact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "");
+                      const storyUrl = company.partner
+                        ? `/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories/${firstName}`
+                        : null;
+                      const initials = contact.name.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase();
                       const profile = (contact as any).contact_profile;
-                      if (!profile) return null;
+                      const isGenerating = generatingContactId === contact.id;
                       return (
-                        <div className="ml-[52px] space-y-1.5">
-                          {/* Tier badges */}
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            {profile.engagement_tier && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded border border-primary/20 bg-primary/10 text-primary font-medium">
-                                {profile.engagement_tier.replace(/_/g, " ")}
-                              </span>
+                        <div key={contact.id} className="border border-border/50 rounded-lg bg-secondary/20 hover:bg-secondary/30 transition-colors flex flex-col">
+                          {/* Card top */}
+                          <div className="p-3 flex flex-col gap-2 flex-1">
+                            {/* Avatar + delete row */}
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 text-[13px] font-semibold text-primary">
+                                {initials}
+                              </div>
+                              <button
+                                onClick={() => setDeleteContactId(contact.id)}
+                                className="text-muted-foreground hover:text-destructive transition-colors mt-0.5"
+                                title="Delete contact"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            {/* Name + title */}
+                            <div className="space-y-0.5">
+                              <div className="text-[14px] font-semibold leading-tight line-clamp-1">{contact.name}</div>
+                              {contact.title && (
+                                <div className="text-[12px] text-muted-foreground leading-snug line-clamp-2">{contact.title}</div>
+                              )}
+                            </div>
+                            {/* Email */}
+                            {contact.email && (
+                              <a
+                                href={`mailto:${contact.email}`}
+                                className="text-[11px] text-muted-foreground hover:text-primary flex items-center gap-1 truncate"
+                                title={contact.email}
+                              >
+                                <Mail className="w-3 h-3 flex-shrink-0" />
+                                <span className="truncate">{contact.email}</span>
+                              </a>
                             )}
-                            {profile.adoption_stage && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded border border-border/50 bg-secondary/30 text-foreground font-medium">
-                                {profile.adoption_stage.replace(/_/g, " ")}
-                              </span>
-                            )}
-                            {profile.key_metrics?.plan && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded border border-accent bg-accent/50 text-accent-foreground font-medium">
-                                {profile.key_metrics.plan}
-                              </span>
-                            )}
-                            {profile.key_metrics?.days_since_last_active != null && (
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${profile.key_metrics.days_since_last_active > 30 ? "border-destructive/30 bg-destructive/10 text-destructive" : "border-border/50 bg-secondary/30 text-muted-foreground"}`}>
-                                {profile.key_metrics.days_since_last_active}d ago
-                              </span>
+                            {/* Source + profile badges */}
+                            {(contact.source || profile?.engagement_tier) && (
+                              <div className="flex flex-wrap gap-1">
+                                {contact.source && (
+                                  <span className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-muted-foreground">{contact.source}</span>
+                                )}
+                                {profile?.engagement_tier && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded border border-primary/20 bg-primary/10 text-primary font-medium">
+                                    {profile.engagement_tier.replace(/_/g, " ")}
+                                  </span>
+                                )}
+                                {profile?.adoption_stage && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded border border-border/50 bg-secondary/30 text-foreground font-medium">
+                                    {profile.adoption_stage.replace(/_/g, " ")}
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </div>
-                          {/* Use case + narrative */}
-                          {profile.primary_use_case && (
-                            <div className="text-xs text-foreground/80">{profile.primary_use_case}</div>
-                          )}
-                          {profile.account_narrative && (
-                            <div className="text-xs text-foreground/60 italic leading-relaxed">{profile.account_narrative}</div>
-                          )}
-                          {/* Expansion & risk signals inline */}
-                          {(profile.expansion_signals?.length > 0 || profile.risk_signals?.length > 0) && (
-                            <div className="space-y-0.5">
-                              {profile.expansion_signals?.map((s: string, i: number) => (
-                                <div key={`exp-${i}`} className="text-[11px] text-foreground/70 flex items-start gap-1.5">
-                                  <TrendingUp className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
-                                  <span>{s}</span>
-                                </div>
-                              ))}
-                              {profile.risk_signals?.map((s: string, i: number) => (
-                                <div key={`risk-${i}`} className="text-[11px] text-foreground/70 flex items-start gap-1.5">
-                                  <AlertCircle className="w-3 h-3 text-destructive mt-0.5 flex-shrink-0" />
-                                  <span>{s}</span>
-                                </div>
-                              ))}
+                          {/* Card footer */}
+                          <div className="px-3 pb-3 pt-1 flex items-center gap-1.5">
+                            <Button
+                              size="sm"
+                              className="flex-1 h-7 text-[12px] gap-1"
+                              onClick={() => generateForContact(contact.id)}
+                              disabled={isGenerating || !!generatingContactId}
+                            >
+                              {isGenerating
+                                ? <><Loader2 className="w-3 h-3 animate-spin" />Generating…</>
+                                : <><Sparkles className="w-3 h-3" />Generate</>}
+                            </Button>
+                            <div className="flex items-center gap-1">
+                              {contact.linkedin && (
+                                <a href={contact.linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" title="LinkedIn">
+                                  <Linkedin className="w-4 h-4" />
+                                </a>
+                              )}
+                              {storyUrl && snap && (
+                                <a href={storyUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" title="View story">
+                                  <ExternalLink className="w-4 h-4" />
+                                </a>
+                              )}
                             </div>
-                          )}
+                          </div>
                         </div>
                       );
-                    })()}
-                    {/* Bottom row: source tag + key metric tags */}
-                    {(() => {
-                      const profile = (contact as any).contact_profile;
-                      const tags: { label: string; value: string }[] = [];
-                      if (profile?.key_metrics) {
-                        const km = profile.key_metrics;
-                        if (km.tutorials_created > 0) tags.push({ label: "Created", value: String(km.tutorials_created) });
-                        if (km.tutorials_viewed > 0) tags.push({ label: "Views", value: String(km.tutorials_viewed) });
-                        if (km.libraries_owned > 0) tags.push({ label: "Libraries", value: String(km.libraries_owned) });
-                        if (km.sessions > 0) tags.push({ label: "Sessions", value: String(km.sessions) });
-                      }
-                      if (profile?.tools_documented?.length > 0) tags.push({ label: "Docs", value: profile.tools_documented.join(", ") });
-                      if (profile?.deployment_channels?.length > 0) tags.push({ label: "Deploy", value: profile.deployment_channels.join(", ") });
-
-                      return (
-                        <div className="ml-[52px] flex flex-wrap gap-1.5">
-                          {contact.source && <span className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-muted-foreground">{contact.source}</span>}
-                          {tags.map(t => (
-                            <span key={t.label} className="text-[10px] px-1.5 py-0.5 rounded border border-border/30 bg-muted/30 text-muted-foreground">
-                              <span className="font-mono uppercase tracking-wider">{t.label}:</span>{" "}
-                              <span className="text-foreground">{t.value}</span>
-                            </span>
-                          ))}
-                        </div>
-                      );
-                    })()}
+                    })}
                   </div>
                 );
-              }) : companyAny?.buyer_name ? (
+              })() : companyAny?.buyer_name ? (
                 <div className="flex items-center gap-4 p-2 rounded-md hover:bg-secondary/30 transition-colors">
                   <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center"><UserSearch className="w-4 h-4 text-primary" /></div>
                   <div className="flex-1 min-w-0 space-y-0.5">
@@ -1133,8 +1145,6 @@ export default function CompanyDetail() {
               ) : (
                 <p className="text-[14px] text-muted-foreground">No contacts yet. Add one manually or run enrichment.</p>
               )}
-              </div>
-              </div>
             </div>
           </div>
 
