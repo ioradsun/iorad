@@ -62,15 +62,12 @@ function HubSpotSyncButton({
     <div ref={ref} className="relative">
       {/* Main button + chevron split */}
       <div className="flex items-stretch rounded-md overflow-hidden border border-border">
-        {/* Primary action: Manual */}
+        {/* Primary action: Manual (pick a specific company) */}
         <button
-          onClick={() => { onManual(); setOpen(false); }}
-          disabled={isLoading}
-          className="flex items-center gap-1.5 px-3 h-8 text-xs font-medium bg-card text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+          onClick={() => { onAuto(); setOpen(false); }}
+          className="flex items-center gap-1.5 px-3 h-8 text-xs font-medium bg-card text-foreground hover:bg-muted transition-colors"
         >
-          {isLoading
-            ? <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
-            : <Repeat2 className="w-3.5 h-3.5 text-primary" />}
+          <Repeat2 className="w-3.5 h-3.5 text-primary" />
           HubSpot Sync
         </button>
 
