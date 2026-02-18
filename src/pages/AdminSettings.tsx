@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAppSettings, useUpdateSettings, DbAppSettings } from "@/hooks/useSupabase";
@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Save, Loader2, Plus, Trash2, GripVertical, Sun, Moon, Shield, User, Download, Upload, RotateCcw } from "lucide-react";
+import { Save, Loader2, Plus, Trash2, GripVertical, Sun, Moon, Shield, User, Download, RotateCcw, ClipboardPaste } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme, applyCustomVars, clearCustomVars } from "@/hooks/useTheme";
 
@@ -236,7 +236,6 @@ function StylesheetCard({
   tokens,
   storageKey,
   exportFilename,
-  exportLabel,
 }: {
   title: string;
   description: React.ReactNode;
@@ -247,38 +246,28 @@ function StylesheetCard({
 }) {
   const { theme } = useTheme();
   const themeLabel = theme === "light" ? "Clean Light" : "iorad Dark";
-  const importRef = useRef<HTMLInputElement>(null);
   const [hasOverride, setHasOverride] = useState(!!localStorage.getItem(storageKey));
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteValue, setPasteValue] = useState("");
 
   const handleExport = () => {
     downloadCSS(buildCSS(tokens, themeLabel, title), exportFilename);
     toast.success(`${title} exported`);
   };
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const cssText = ev.target?.result as string;
-        const vars = parseCSSVars(cssText);
-        const count = Object.keys(vars).length;
-        if (count === 0) {
-          toast.error("No CSS custom properties found in file.");
-          return;
-        }
-        applyCustomVars(vars);
-        localStorage.setItem(storageKey, JSON.stringify(vars));
-        setHasOverride(true);
-        toast.success(`Imported ${count} CSS variables from ${file.name}`);
-      } catch {
-        toast.error("Failed to parse CSS file.");
-      }
-    };
-    reader.readAsText(file);
-    // Reset so same file can be re-imported
-    e.target.value = "";
+  const handleApplyPaste = () => {
+    const vars = parseCSSVars(pasteValue);
+    const count = Object.keys(vars).length;
+    if (count === 0) {
+      toast.error("No CSS custom properties found. Make sure you paste valid CSS with --variable: value; declarations.");
+      return;
+    }
+    applyCustomVars(vars);
+    localStorage.setItem(storageKey, JSON.stringify(vars));
+    setHasOverride(true);
+    setPasteOpen(false);
+    setPasteValue("");
+    toast.success(`Applied ${count} CSS variables`);
   };
 
   const handleReset = () => {
@@ -288,7 +277,9 @@ function StylesheetCard({
     } catch {}
     localStorage.removeItem(storageKey);
     setHasOverride(false);
-    toast.success(`${title} overrides cleared — reload to restore defaults`);
+    setPasteOpen(false);
+    setPasteValue("");
+    toast.success(`${title} overrides cleared`);
   };
 
   return (
@@ -312,11 +303,11 @@ function StylesheetCard({
         <Button
           variant="outline"
           size="sm"
-          className="gap-1.5"
-          onClick={() => importRef.current?.click()}
+          className={`gap-1.5 ${pasteOpen ? "border-primary text-primary" : ""}`}
+          onClick={() => setPasteOpen((o) => !o)}
         >
-          <Upload className="w-3.5 h-3.5" />
-          Import
+          <ClipboardPaste className="w-3.5 h-3.5" />
+          Paste CSS
         </Button>
         <Button
           variant="outline"
@@ -330,17 +321,25 @@ function StylesheetCard({
           Reset
         </Button>
       </div>
-      <input
-        ref={importRef}
-        type="file"
-        accept=".css,text/css"
-        className="hidden"
-        onChange={handleImport}
-      />
-      {hasOverride && (
-        <p className="text-[11px] text-muted-foreground">
-          Custom overrides active. Reload the page to re-apply after a theme switch.
-        </p>
+
+      {pasteOpen && (
+        <div className="space-y-2">
+          <Textarea
+            className="font-mono text-xs min-h-[160px] resize-y"
+            placeholder={`:root {\n  --story-accent: #ff00d6;\n  --story-bg: #ffffff;\n  /* ... */\n}`}
+            value={pasteValue}
+            onChange={(e) => setPasteValue(e.target.value)}
+            autoFocus
+          />
+          <div className="flex gap-2 justify-end">
+            <Button variant="ghost" size="sm" onClick={() => { setPasteOpen(false); setPasteValue(""); }}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleApplyPaste} disabled={!pasteValue.trim()}>
+              Apply
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   );
