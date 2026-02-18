@@ -276,29 +276,51 @@ async function syncRecentCompanies(supabase: any) {
   const data = await res.json();
   const results = data.results || [];
 
+  const supabaseUrl2 = Deno.env.get("SUPABASE_URL")!;
+  const serviceRoleKey2 = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
   let imported = 0;
   let skipped = 0;
+  let autoQueued = 0;
   const errors: string[] = [];
 
   for (const company of results) {
     try {
-      const { companyId } = await upsertCompany(supabase, company);
+      const { companyId, isNew, hasStory } = await upsertCompany(supabase, company);
       // Fetch and save associated contacts
       await importContactsForCompany(supabase, company.id, companyId);
       imported++;
+
+      // Auto-generate story only for brand-new records without a story
+      if (isNew && !hasStory) {
+        autoQueued++;
+        const idx = results.indexOf(company);
+        // Stagger requests by 10s per company to avoid overwhelming the AI gateway
+        setTimeout(() => {
+          fetch(`${supabaseUrl2}/functions/v1/run-signals`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${serviceRoleKey2}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ company_id: companyId, mode: "full" }),
+          }).catch(err => console.error(`Auto run-signals error for ${companyId}:`, err.message));
+        }, idx * 10_000);
+      }
     } catch (err: any) {
       errors.push(`${company.properties?.name || company.id}: ${err.message}`);
       skipped++;
     }
   }
 
-  console.log(`HubSpot sync: ${imported} imported, ${skipped} skipped out of ${results.length}`);
+  console.log(`HubSpot sync: ${imported} imported, ${skipped} skipped, ${autoQueued} queued for story generation`);
 
   return new Response(
     JSON.stringify({
       success: true,
       imported,
       skipped,
+      auto_queued: autoQueued,
       total: results.length,
       errors: errors.slice(0, 10),
     }),
@@ -950,6 +972,9 @@ async function listHubSpotCompanies(search: string, after: string | null) {
 
 // ── Sync a single HubSpot company by HubSpot ID ───────────────────────────────
 async function syncByHubSpotId(supabase: any, hubspotId: string) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
   const company = await fetchHubSpotCompany(hubspotId);
   if (!company) {
     return new Response(JSON.stringify({ error: "Company not found in HubSpot" }), {
@@ -958,11 +983,34 @@ async function syncByHubSpotId(supabase: any, hubspotId: string) {
     });
   }
 
-  const { companyId, isNew } = await upsertCompany(supabase, company);
+  const { companyId, isNew, hasStory } = await upsertCompany(supabase, company);
   await importContactsForCompany(supabase, hubspotId, companyId);
 
+  // Auto-generate story only for new companies without an existing story
+  if (isNew && !hasStory) {
+    console.log(`Auto-triggering run-signals for new company: ${company.properties?.name}`);
+    // Fire and forget — don't block the picker modal response
+    fetch(`${supabaseUrl}/functions/v1/run-signals`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ company_id: companyId, mode: "full" }),
+    }).catch(err => console.error("Auto run-signals error:", err.message));
+  } else {
+    console.log(`Skipping auto-generation for ${company.properties?.name} (isNew=${isNew}, hasStory=${hasStory})`);
+  }
+
   return new Response(
-    JSON.stringify({ success: true, company_id: companyId, is_new: isNew, name: company.properties?.name }),
+    JSON.stringify({
+      success: true,
+      company_id: companyId,
+      is_new: isNew,
+      has_story: hasStory,
+      auto_generating: isNew && !hasStory,
+      name: company.properties?.name,
+    }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 }
