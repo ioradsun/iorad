@@ -1031,12 +1031,27 @@ export default function CompanyDetail() {
             )}
             <div className="px-4 pb-4">
               {contacts.filter((c: any) => !c.email?.toLowerCase().includes("student")).length > 0 ? (() => {
-                const filtered = contacts.filter((c) => {
-                  if (c.email?.toLowerCase().includes("student")) return false;
-                  if (!contactSearch) return true;
-                  const q = contactSearch.toLowerCase();
-                  return (c.name?.toLowerCase().includes(q) || c.title?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q));
-                });
+                const filtered = contacts
+                  .filter((c) => {
+                    if (c.email?.toLowerCase().includes("student")) return false;
+                    if (!contactSearch) return true;
+                    const q = contactSearch.toLowerCase();
+                    return (c.name?.toLowerCase().includes(q) || c.title?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q));
+                  })
+                  .sort((a: any, b: any) => {
+                    const rankA = (a.hubspot_properties as any)?.rank ?? 0;
+                    const rankB = (b.hubspot_properties as any)?.rank ?? 0;
+                    return rankB - rankA;
+                  });
+
+                const getRankBadge = (contact: any) => {
+                  const rank = (contact.hubspot_properties as any)?.rank ?? 0;
+                  if (rank >= 50) return { label: "Top", cls: "bg-primary/15 text-primary border-primary/30" };
+                  if (rank >= 25) return { label: "Mid", cls: "bg-warning/15 text-warning border-warning/30" };
+                  if (rank > 0)  return { label: "Low", cls: "bg-muted text-muted-foreground border-border/40" };
+                  return null;
+                };
+
                 return (
                   <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollSnapType: "x mandatory" }}>
                     {filtered.map((contact) => {
@@ -1047,14 +1062,22 @@ export default function CompanyDetail() {
                       const initials = contact.name.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase();
                       const profile = (contact as any).contact_profile;
                       const isGenerating = generatingContactId === contact.id;
+                      const rankBadge = getRankBadge(contact);
                       return (
                         <div key={contact.id} className="border border-border/50 rounded-lg bg-secondary/20 hover:bg-secondary/30 transition-colors flex flex-col flex-shrink-0 w-48" style={{ scrollSnapAlign: "start" }}>
                           {/* Card top */}
                           <div className="p-3 flex flex-col gap-2 flex-1">
-                            {/* Avatar + delete row */}
+                             {/* Avatar + rank badge + delete row */}
                             <div className="flex items-start justify-between gap-2">
-                              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 text-[13px] font-semibold text-primary">
-                                {initials}
+                              <div className="flex items-center gap-2">
+                                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 text-[13px] font-semibold text-primary">
+                                  {initials}
+                                </div>
+                                {rankBadge && (
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold ${rankBadge.cls}`}>
+                                    {rankBadge.label}
+                                  </span>
+                                )}
                               </div>
                               <button
                                 onClick={() => setDeleteContactId(contact.id)}
