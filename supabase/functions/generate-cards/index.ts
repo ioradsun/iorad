@@ -213,10 +213,23 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
       throw new Error("AI returned invalid JSON");
     }
 
-    // Extract the three pieces
-    const cards_json = parsed.cards || [];
-    const assets_json = parsed.assets || {};
-    const account_json = parsed.account || {};
+    // Extract the three pieces.
+    // For inbound strategy responses the AI returns a flat object (not cards[]),
+    // so we detect that case and wrap it into the account_json for the frontend.
+    let cards_json = parsed.cards || [];
+    let assets_json = parsed.assets || {};
+    let account_json = parsed.account || {};
+
+    // Inbound strategy prompt returns a flat object with keys like observed_behavior, inferred_initiative, etc.
+    // Detect this and store it as account_json so the frontend can render it.
+    if (
+      cards_json.length === 0 &&
+      Object.keys(assets_json).length === 0 &&
+      Object.keys(account_json).length === 0 &&
+      (parsed.observed_behavior || parsed.inferred_initiative || parsed.execution_gap)
+    ) {
+      account_json = parsed; // store the full flat inbound response
+    }
 
     // Upsert into company_cards — use onConflict to handle the unique constraint safely
     const upsertRow: Record<string, unknown> = {
