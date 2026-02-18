@@ -195,7 +195,7 @@ export default function Dashboard() {
       <div className="rounded-lg bg-card overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-border/20">
+            <tr style={{ borderBottom: "1px solid hsl(215 10% 88% / 0.7)" }}>
               <th className="text-left px-5 py-3">
                 <SortHeader label="Company" field="name" />
               </th>
@@ -214,14 +214,17 @@ export default function Dashboard() {
               <th className="px-5 py-3 w-28" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-border/15">
+          <tbody>
             {filtered.map((company, i) => (
               <motion.tr
                 key={company.id}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: Math.min(i * 0.015, 0.4) }}
-                className="group hover:bg-secondary/40 transition-colors cursor-pointer"
+                className="group relative cursor-pointer transition-colors hover:bg-secondary/50"
+                style={{ borderBottom: "1px solid hsl(215 10% 92% / 0.6)" }}
+                onMouseEnter={e => (e.currentTarget.style.borderBottomColor = "hsl(215 10% 70% / 0.5)")}
+                onMouseLeave={e => (e.currentTarget.style.borderBottomColor = "hsl(215 10% 92% / 0.6)")}
                 onClick={() => navigate(`/company/${company.id}`)}
               >
                 <td className="px-5 py-3.5">
