@@ -789,7 +789,7 @@ function AIConfigTab() {
   const inboundSections = [
     { key: "inbound_strategy", label: "Strategy Tab", description: "Qualification, discovery, and conversion strategy for warm leads.", value: inboundStrategyPrompt, setter: setInboundStrategyPrompt },
     { key: "inbound_outreach", label: "Outreach Tab", description: "Nurture sequences, demo follow-ups, and onboarding-oriented messaging.", value: inboundOutreachPrompt, setter: setInboundOutreachPrompt },
-    { key: "inbound_story", label: "Custom Loom & iorad", description: "Personalized welcome Loom scripts and getting-started iorad tutorials.", value: inboundStoryPrompt, setter: setInboundStoryPrompt },
+    { key: "inbound_story", label: "Story Mega Prompt", description: "Behavioral Momentum → Institutionalization Engine. Generates the personalized institutional brief on the Story tab for inbound companies.", value: inboundStoryPrompt, setter: setInboundStoryPrompt },
     { key: "inbound_transcript", label: "Transcript Analysis", description: "Analyze inbound demo/onboarding call transcripts — extract adoption signals and expansion opportunities.", value: inboundTranscriptPrompt, setter: setInboundTranscriptPrompt },
   ];
 
