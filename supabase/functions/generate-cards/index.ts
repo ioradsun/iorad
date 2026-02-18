@@ -213,75 +213,106 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
       throw new Error("AI returned invalid JSON");
     }
 
-    // Extract the three pieces.
-    // Inbound prompts return flat objects at the root level instead of nested under cards/assets/account.
-    // We detect each format and normalize accordingly.
-    let cards_json = parsed.cards || [];
-    let assets_json = parsed.assets || {};
-    let account_json = parsed.account || {};
-
-    // Inbound STRATEGY response: flat object with keys like observed_behavior, inferred_initiative, etc.
-    if (
-      cards_json.length === 0 &&
-      Object.keys(assets_json).length === 0 &&
-      Object.keys(account_json).length === 0 &&
-      (parsed.observed_behavior || parsed.inferred_initiative || parsed.execution_gap)
-    ) {
-      account_json = parsed; // store the full flat inbound strategy response
-    }
-
-    // Inbound OUTREACH response: flat object with email_sequence/linkedin_sequence at root
-    // plus metadata fields (intent_tier, behavior_acknowledged, etc.)
-    if (
-      cards_json.length === 0 &&
-      Object.keys(assets_json).length === 0 &&
-      Object.keys(account_json).length === 0 &&
-      (parsed.email_sequence || parsed.linkedin_sequence)
-    ) {
-      // Lift sequences into assets_json so existing outreach rendering works
-      assets_json = {
-        email_sequence: parsed.email_sequence || null,
-        linkedin_sequence: parsed.linkedin_sequence || null,
-      };
-      // Store inbound metadata in account_json for rendering
-      account_json = {
-        intent_tier: parsed.intent_tier || null,
-        behavior_acknowledged: parsed.behavior_acknowledged || null,
-        momentum_frame: parsed.momentum_frame || null,
-        expansion_opportunity: parsed.expansion_opportunity || null,
-        risk_if_stalled: parsed.risk_if_stalled || null,
-        upside_if_executed: parsed.upside_if_executed || null,
-      };
-    }
-
-    // Inbound STORY response: flat object with behavior_acknowledged, momentum_observed, etc.
-    let isInboundStory = false;
-    if (
-      cards_json.length === 0 &&
-      Object.keys(assets_json).length === 0 &&
-      Object.keys(account_json).length === 0 &&
-      (parsed.behavior_acknowledged || parsed.momentum_observed || parsed.initiative_translation)
-    ) {
-      account_json = { ...parsed, _type: "inbound_story" };
-      isInboundStory = true;
-    }
-
-    // Upsert into company_cards — use onConflict to handle the unique constraint safely
-    const upsertRow: Record<string, unknown> = {
-      company_id,
-      cards_json,
-      assets_json,
-      account_json,
-      model_version: model,
-      contact_id: contact_id || null,
-    };
-
-    const { error: upsertErr } = await sb
+    // Fetch existing row so we can MERGE per-tab data instead of overwriting all fields
+    const { data: existingRow } = await sb
       .from("company_cards")
-      .upsert(upsertRow, {
-        onConflict: "company_id",
-        ignoreDuplicates: false,
-      });
+      .select("id, cards_json, assets_json, account_json")
+      .eq("company_id", company_id)
+      .maybeSingle();
+
+    // Start from existing values so tabs don't wipe each other out
+    let cards_json: any = existingRow?.cards_json ?? [];
+    let assets_json: any = existingRow?.assets_json ?? {};
+    let account_json: any = existingRow?.account_json ?? {};
+
+    // --- Parse per-tab output and merge into the correct field only ---
+
+    if (activeTab === "company") {
+      // Company tab: store its data in account_json, preserving other tab data
+      const companyData = parsed.account || parsed;
+      // Keep strategy/story keys if already present, add/overwrite company key
+      account_json = { ...account_json, _company: companyData };
+    } else if (activeTab === "strategy") {
+      // Outbound: cards array. Inbound: flat object (observed_behavior etc.)
+      const isInboundStrategy =
+        !parsed.cards &&
+        (parsed.observed_behavior || parsed.inferred_initiative || parsed.execution_gap ||
+         parsed.momentum_observed || parsed.initiative_translation);
+      if (isInboundStrategy) {
+        // Store inbound strategy fields at root of account_json WITH _type marker
+        // Preserve story data (_type: inbound_story) if already present
+        const preservedStoryData = account_json._type === "inbound_story" ? account_json : {};
+        account_json = { ...preservedStoryData, ...parsed, _type: "inbound_strategy", _company: account_json._company };
+      } else {
+        cards_json = parsed.cards || parsed || [];
+      }
+    } else if (activeTab === "outreach") {
+      if (parsed.email_sequence || parsed.linkedin_sequence) {
+        // Inbound outreach: merge sequences into assets_json
+        assets_json = {
+          ...assets_json,
+          email_sequence: parsed.email_sequence || null,
+          linkedin_sequence: parsed.linkedin_sequence || null,
+        };
+        // Store outreach metadata separately
+        account_json = {
+          ...account_json,
+          outreach_meta: {
+            intent_tier: parsed.intent_tier || null,
+            behavior_acknowledged: parsed.behavior_acknowledged || null,
+            momentum_frame: parsed.momentum_frame || null,
+            expansion_opportunity: parsed.expansion_opportunity || null,
+            risk_if_stalled: parsed.risk_if_stalled || null,
+            upside_if_executed: parsed.upside_if_executed || null,
+          },
+        };
+      } else {
+        // Outbound outreach: assets structure
+        assets_json = { ...assets_json, ...(parsed.assets || parsed) };
+      }
+    } else if (activeTab === "story") {
+      if (parsed.behavior_acknowledged || parsed.momentum_observed || parsed.initiative_translation) {
+        // Inbound story: merge at root, preserve strategy fields and company data
+        const preserved = { _company: account_json._company };
+        account_json = { ...preserved, ...parsed, _type: "inbound_story" };
+      } else {
+        // Outbound story: assets structure
+        assets_json = { ...assets_json, ...(parsed.assets || {}) };
+        account_json = { ...account_json, ...(parsed.account || {}) };
+      }
+    }
+
+    const isInboundStory =
+      activeTab === "story" &&
+      (parsed.behavior_acknowledged || parsed.momentum_observed || parsed.initiative_translation);
+
+    // Upsert or insert — merge into existing row if it exists
+    let upsertErr: any = null;
+    if (existingRow?.id) {
+      const { error } = await sb
+        .from("company_cards")
+        .update({
+          cards_json,
+          assets_json,
+          account_json,
+          model_version: model,
+          contact_id: contact_id || null,
+        })
+        .eq("id", existingRow.id);
+      upsertErr = error;
+    } else {
+      const { error } = await sb
+        .from("company_cards")
+        .insert({
+          company_id,
+          cards_json,
+          assets_json,
+          account_json,
+          model_version: model,
+          contact_id: contact_id || null,
+        });
+      upsertErr = error;
+    }
 
     if (upsertErr) {
       console.error("Upsert error:", upsertErr);
