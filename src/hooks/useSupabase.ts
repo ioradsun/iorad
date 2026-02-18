@@ -189,38 +189,27 @@ export function useJobItems(jobId: string | undefined) {
   });
 }
 
-// ---- Run Signals (one company per call, loops on frontend) ----
+// ---- Run Signals (fires first call only — edge function self-chains in background) ----
 export function useRunSignals() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (onProgress?: (processed: number, total: number, companyName: string) => void) => {
-      let offset = 0;
-      let jobId: string | null = null;
-      let totalProcessed = 0;
-
       const { count } = await supabase
         .from("companies")
         .select("id", { count: "exact", head: true });
       const total = count || 0;
 
-      while (true) {
-        const { data, error } = await supabase.functions.invoke("run-signals", {
-          body: { offset, job_id: jobId },
-        });
+      // Fire the first call only — the edge function self-chains for all subsequent companies
+      const { data, error } = await supabase.functions.invoke("run-signals", {
+        body: { offset: 0 },
+      });
 
-        if (error) throw error;
-        if (data.error) throw new Error(data.error);
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-        jobId = data.job_id || jobId;
-        totalProcessed++;
+      if (onProgress) onProgress(1, total, data?.company || "");
 
-        if (onProgress) onProgress(totalProcessed, total, data.company || "");
-
-        if (data.done) break;
-        offset = data.next_offset ?? offset + 1;
-      }
-
-      return { job_id: jobId, total_processed: totalProcessed };
+      return { job_id: data?.job_id, total_processed: total };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["companies"] });

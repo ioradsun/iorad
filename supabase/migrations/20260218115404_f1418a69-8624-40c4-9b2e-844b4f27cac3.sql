@@ -1,0 +1,4 @@
+
+-- Enable pg_cron and pg_net extensions for background job scheduling
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+CREATE EXTENSION IF NOT EXISTS pg_net;

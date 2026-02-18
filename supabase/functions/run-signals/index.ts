@@ -332,12 +332,15 @@ Deno.serve(async (req) => {
 
       if (compErr) throw compErr;
       if (!companies || companies.length === 0) {
-        if (jobId) {
+        // No more companies — mark job complete and stop self-chaining
+        const finishId = jobId || activeJobId;
+        if (finishId) {
           await supabase.from("processing_jobs")
             .update({ status: "completed", finished_at: new Date().toISOString() })
-            .eq("id", jobId);
+            .eq("id", finishId);
+          console.log(`Job ${finishId} completed — all companies processed`);
         }
-        return new Response(JSON.stringify({ done: true, job_id: jobId }), {
+        return new Response(JSON.stringify({ done: true, job_id: finishId }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -627,6 +630,21 @@ Deno.serve(async (req) => {
       updates.companies_failed = (jd?.companies_failed || 0) + 1;
     }
     await supabase.from("processing_jobs").update(updates).eq("id", activeJobId);
+
+    // ── Self-chain: fire next offset in background so browser can close ────────
+    if (!singleCompanyId) {
+      const nextOffset = offset + 1;
+      const selfUrl = `${supabaseUrl}/functions/v1/run-signals`;
+      // Fire-and-forget — we don't await this so the response returns immediately
+      fetch(selfUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${serviceRoleKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ offset: nextOffset, job_id: activeJobId }),
+      }).catch((e) => console.warn("Self-chain trigger failed:", e.message));
+    }
 
     return new Response(
       JSON.stringify({
