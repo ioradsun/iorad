@@ -370,6 +370,20 @@ Deno.serve(async (req) => {
 
       if (jobErr) throw jobErr;
       activeJobId = job.id;
+    } else {
+      // Guard: if the job was cancelled externally, stop the chain immediately
+      const { data: jobCheck } = await supabase
+        .from("processing_jobs")
+        .select("status")
+        .eq("id", activeJobId)
+        .maybeSingle();
+
+      if (!jobCheck || jobCheck.status !== "running") {
+        console.log(`Job ${activeJobId} is no longer running (status: ${jobCheck?.status ?? "not found"}) — stopping chain.`);
+        return new Response(JSON.stringify({ done: true, job_id: activeJobId, reason: "job_stopped" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     // Write current company name into the job so polling clients can display it
