@@ -232,7 +232,7 @@ function AIConfigTab() {
   const [inboundStoryPrompt, setInboundStoryPrompt] = useState("");
   const [inboundTranscriptPrompt, setInboundTranscriptPrompt] = useState("");
   const [model, setModel] = useState("");
-  const [promptMode, setPromptMode] = useState<"outbound" | "inbound">("outbound");
+  
 
   useEffect(() => {
     if (data) {
@@ -381,27 +381,42 @@ function AIConfigTab() {
         />
       </div>
 
-      <div className="panel-header text-lg">Tab-Specific Prompts</div>
-      <p className="text-xs text-muted-foreground -mt-4">Each tab uses its own prompt. Switch between Outbound (cold outreach) and Inbound (warm leads from HubSpot) below.</p>
-
-      <div className="flex gap-2">
-        <Button
-          variant={promptMode === "outbound" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setPromptMode("outbound")}
-        >
-          Outbound Prompts
-        </Button>
-        <Button
-          variant={promptMode === "inbound" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setPromptMode("inbound")}
-        >
-          Inbound Prompts
-        </Button>
+      {/* ── INBOUND PROMPTS (top — require per-customer customization) ── */}
+      <div className="flex items-center gap-3">
+        <div className="panel-header text-lg flex-1">Inbound Prompts</div>
+        <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+          Warm Leads · HubSpot
+        </span>
       </div>
+      <p className="text-xs text-muted-foreground -mt-4">
+        Prompts for inbound leads. Each requires customization — these run first and take priority.
+      </p>
 
-      {(promptMode === "outbound" ? outboundPromptSections : inboundPromptSections).map(({ key, label, description, value, setter }) => (
+      {inboundPromptSections.map(({ key, label, description, value, setter }) => (
+        <div key={key} className="panel space-y-4 border-l-2 border-primary/30">
+          <div className="panel-header">{label}</div>
+          <p className="text-xs text-muted-foreground">{description}</p>
+          <Textarea
+            value={value}
+            onChange={e => setter(e.target.value)}
+            className="bg-secondary font-mono text-xs min-h-[300px]"
+            placeholder={`Enter the ${label.toLowerCase()} here…`}
+          />
+        </div>
+      ))}
+
+      {/* ── OUTBOUND PROMPTS (below — cold outreach defaults) ── */}
+      <div className="flex items-center gap-3 pt-4">
+        <div className="panel-header text-lg flex-1">Outbound Prompts</div>
+        <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
+          Cold Outreach · Default
+        </span>
+      </div>
+      <p className="text-xs text-muted-foreground -mt-4">
+        Default prompts for outbound prospecting. Used when no inbound override exists.
+      </p>
+
+      {outboundPromptSections.map(({ key, label, description, value, setter }) => (
         <div key={key} className="panel space-y-4">
           <div className="panel-header">{label}</div>
           <p className="text-xs text-muted-foreground">{description}</p>
