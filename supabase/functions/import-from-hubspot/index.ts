@@ -1090,7 +1090,7 @@ async function bulkImportCompanies(
   // ── Fetch ALL companies from HubSpot using the list endpoint (no date filter)
   // Using GET /crm/v3/objects/companies with pagination cursor
   const params = new URLSearchParams({
-    limit: "100",
+    limit: "10",
     properties: "name,domain,industry,country,numberofemployees,lifecyclestage,createdate,hs_lastmodifieddate,hubspot_owner_id",
     archived: "false",
   });
