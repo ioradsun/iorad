@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, CheckCircle2, Clock, XCircle, Inbox, Play, Pause } from "lucide-react";
+import { Loader2, CheckCircle2, Clock, XCircle, Inbox, Play, Pause, Trash2 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
@@ -180,6 +180,32 @@ export default function JobHistory() {
     }
   };
 
+  const handleClearJob = async () => {
+    if (!activeJob) return;
+    setActionLoading(true);
+    try {
+      const { error } = await supabase
+        .from("processing_jobs")
+        .update({ status: "canceled", finished_at: new Date().toISOString() })
+        .eq("id", activeJob.id);
+      if (error) throw error;
+      // Also mark any in-progress items as failed so they don't stay stuck
+      await supabase
+        .from("processing_job_items")
+        .update({ status: "failed", finished_at: new Date().toISOString(), error_message: "Cleared by user" })
+        .eq("job_id", activeJob.id)
+        .in("status", ["running", "queued"]);
+      await qc.invalidateQueries({ queryKey: ["active_running_job"] });
+      await qc.invalidateQueries({ queryKey: ["active_job"] });
+      await qc.invalidateQueries({ queryKey: ["company_queue_data"] });
+      toast.success("Job cleared.");
+    } catch (err: any) {
+      toast.error(`Failed to clear job: ${err?.message || "Unknown error"}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       {/* ── Header + Start/Pause ── */}
@@ -190,16 +216,29 @@ export default function JobHistory() {
         </div>
         {!isLoading && (
           isRunning ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
-              onClick={handlePause}
-              disabled={actionLoading}
-            >
-              {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pause className="w-4 h-4" />}
-              Pause
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={handlePause}
+                disabled={actionLoading}
+              >
+                {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pause className="w-4 h-4" />}
+                Pause
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-2 text-muted-foreground hover:text-destructive"
+                onClick={handleClearJob}
+                disabled={actionLoading}
+                title="Force-cancel the job and mark all queued items as failed"
+              >
+                <Trash2 className="w-4 h-4" />
+                Clear Job
+              </Button>
+            </div>
           ) : (
             <Button
               size="sm"
