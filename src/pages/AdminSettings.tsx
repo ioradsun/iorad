@@ -248,6 +248,23 @@ const TOKEN_GROUPS: { label: string; key: string; tokens: string[] }[] = [
       "--pill-radius", "--pill-font-size",
     ],
   },
+  {
+    label: "Stat Card Icons",
+    key: "stat-icons",
+    tokens: [
+      "--stat-total-bg", "--stat-total-fg",
+      "--stat-inbound-bg", "--stat-inbound-fg",
+      "--stat-outbound-bg", "--stat-outbound-fg",
+    ],
+  },
+  {
+    label: "Source Type Pills",
+    key: "source-pills",
+    tokens: [
+      "--source-inbound-bg", "--source-inbound-fg", "--source-inbound-border",
+      "--source-outbound-bg", "--source-outbound-fg", "--source-outbound-border",
+    ],
+  },
 ];
 
 const STORY_TOKEN_GROUPS: { label: string; key: string; tokens: string[] }[] = [

@@ -127,21 +127,27 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-3 gap-4">
         <div className="panel flex items-center gap-3 px-4 py-3">
-          <div className="rounded-lg bg-primary/10 p-2"><Building2 className="w-5 h-5 text-primary" /></div>
+          <div className="rounded-lg p-2" style={{ background: "var(--stat-total-bg)" }}>
+            <Building2 className="w-5 h-5" style={{ color: "var(--stat-total-fg)" }} />
+          </div>
           <div>
             <div className="text-2xl font-bold tracking-tight">{stats.total}</div>
             <div className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">Total Records</div>
           </div>
         </div>
         <div className="panel flex items-center gap-3 px-4 py-3">
-          <div className="rounded-lg bg-emerald-500/10 p-2"><ArrowDownRight className="w-5 h-5 text-emerald-400" /></div>
+          <div className="rounded-lg p-2" style={{ background: "var(--stat-inbound-bg)" }}>
+            <ArrowDownRight className="w-5 h-5" style={{ color: "var(--stat-inbound-fg)" }} />
+          </div>
           <div>
             <div className="text-2xl font-bold tracking-tight">{stats.newInbound}</div>
             <div className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">New Inbound <span className="normal-case text-muted-foreground/60">(24h)</span></div>
           </div>
         </div>
         <div className="panel flex items-center gap-3 px-4 py-3">
-          <div className="rounded-lg bg-blue-500/10 p-2"><ArrowUpRight className="w-5 h-5 text-blue-400" /></div>
+          <div className="rounded-lg p-2" style={{ background: "var(--stat-outbound-bg)" }}>
+            <ArrowUpRight className="w-5 h-5" style={{ color: "var(--stat-outbound-fg)" }} />
+          </div>
           <div>
             <div className="text-2xl font-bold tracking-tight">{stats.newOutbound}</div>
             <div className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">New Outbound <span className="normal-case text-muted-foreground/60">(24h)</span></div>
@@ -207,11 +213,18 @@ export default function Dashboard() {
                     <div className="text-xs text-muted-foreground">{company.domain || "—"}</div>
                   </td>
                   <td className="px-4 py-3 hidden md:table-cell">
-                    <span className={`text-[11px] font-mono font-medium uppercase tracking-wider px-2 py-0.5 rounded-full border ${
-                      (company as any).source_type === "inbound"
-                        ? "border-emerald-500/40 text-emerald-400 bg-emerald-500/10"
-                        : "border-blue-500/40 text-blue-400 bg-blue-500/10"
-                    }`}>
+                    <span
+                      className="text-[11px] font-mono font-medium uppercase tracking-wider px-2 py-0.5 rounded-full border"
+                      style={(company as any).source_type === "inbound" ? {
+                        background: "var(--source-inbound-bg)",
+                        color: "var(--source-inbound-fg)",
+                        borderColor: "var(--source-inbound-border)",
+                      } : {
+                        background: "var(--source-outbound-bg)",
+                        color: "var(--source-outbound-fg)",
+                        borderColor: "var(--source-outbound-border)",
+                      }}
+                    >
                       {(company as any).source_type || "outbound"}
                     </span>
                   </td>
