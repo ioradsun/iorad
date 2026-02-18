@@ -676,13 +676,13 @@ function StoryGenerationTab() {
         </div>
       )}
 
-      {/* Running indicator */}
-      {isRunning && (
+      {/* Running indicator — only show when we have a company name */}
+      {isRunning && currentCompany && (
         <div className="panel flex items-center gap-3">
           <Loader2 className="w-4 h-4 animate-spin text-primary flex-shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="text-xs text-muted-foreground">Currently processing</div>
-            <div className="text-sm font-medium truncate">{currentCompany ?? "—"}</div>
+            <div className="text-sm font-medium truncate">{currentCompany}</div>
           </div>
         </div>
       )}
@@ -714,9 +714,6 @@ function StoryGenerationTab() {
             </TabsTrigger>
           </TabsList>
           <TabsContent value="waiting" className="mt-4 panel max-h-[60vh] overflow-y-auto">
-            <p className="text-xs text-muted-foreground mb-3 pb-3 border-b border-border/50">
-              New HubSpot imports from the last {NEW_THRESHOLD_HOURS}h — stories are queued for auto-generation.
-            </p>
             <CompanyList companies={waiting} emptyMessage="No new imports waiting for generation." />
           </TabsContent>
           <TabsContent value="not_started" className="mt-4 panel max-h-[60vh] overflow-y-auto">
