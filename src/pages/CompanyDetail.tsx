@@ -170,6 +170,7 @@ export default function CompanyDetail() {
   const [fixingDomain, setFixingDomain] = useState(false);
   const [analyzingMeeting, setAnalyzingMeeting] = useState<string | null>(null);
   const [contactSearch, setContactSearch] = useState("");
+  const [syncingHubspot, setSyncingHubspot] = useState(false);
   // extractingProfiles state removed — extraction is now part of the generate pipeline
 
   const effectiveContactId = selectedContactId || contacts[0]?.id || "";
@@ -631,7 +632,26 @@ export default function CompanyDetail() {
     finally { setRegeneratingSection(null); }
   };
 
-
+  const syncHubspot = async () => {
+    if (!id) return;
+    setSyncingHubspot(true);
+    try {
+      toast.info("Syncing HubSpot data…");
+      const { data, error } = await supabase.functions.invoke("import-from-hubspot", {
+        body: { action: "sync_company", domain: (company as any)?.domain, company_id: id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success(
+        data?.is_existing_customer
+          ? "HubSpot synced — flagged as existing customer"
+          : `HubSpot synced — ${data?.contacts_imported ?? 0} contact(s) updated`
+      );
+      queryClient.invalidateQueries({ queryKey: ["company", id] });
+      queryClient.invalidateQueries({ queryKey: ["contacts", id] });
+    } catch (e: any) { toast.error(e.message || "HubSpot sync failed"); }
+    finally { setSyncingHubspot(false); }
+  };
 
   const contactSelector = contacts.length > 0 ? (
     <Select value={selectedContactId || contacts[0]?.id || ""} onValueChange={setSelectedContactId}>
@@ -801,6 +821,17 @@ export default function CompanyDetail() {
           <div className="flex items-center justify-between">
             <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Company Intel</h3>
             <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2.5 text-xs gap-1.5"
+                onClick={syncHubspot}
+                disabled={syncingHubspot}
+                title="Sync contacts and customer status from HubSpot"
+              >
+                {syncingHubspot ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                HubSpot Sync
+              </Button>
               {companyAny?.source_type !== "inbound" && <RegenerateBtn section="signals" label="Signals" />}
               <RegenerateBtn section="company" label="Company Intel" />
             </div>
