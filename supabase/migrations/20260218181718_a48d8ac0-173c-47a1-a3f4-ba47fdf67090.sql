@@ -1,0 +1,1 @@
+ALTER TABLE public.processing_jobs ADD COLUMN IF NOT EXISTS triggered_by text NULL;

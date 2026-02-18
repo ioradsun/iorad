@@ -616,6 +616,7 @@ export type Database = {
           status: string
           total_companies_targeted: number
           trigger: string
+          triggered_by: string | null
         }
         Insert: {
           companies_failed?: number
@@ -629,6 +630,7 @@ export type Database = {
           status?: string
           total_companies_targeted?: number
           trigger?: string
+          triggered_by?: string | null
         }
         Update: {
           companies_failed?: number
@@ -642,6 +644,7 @@ export type Database = {
           status?: string
           total_companies_targeted?: number
           trigger?: string
+          triggered_by?: string | null
         }
         Relationships: []
       }

@@ -364,6 +364,7 @@ Deno.serve(async (req) => {
           status: "running",
           total_companies_targeted: count || 0,
           settings_snapshot: {},
+          triggered_by: body?.triggered_by ?? null,
         })
         .select()
         .single();
