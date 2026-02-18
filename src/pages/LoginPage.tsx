@@ -1,10 +1,15 @@
 import { lovable } from "@/integrations/lovable/index";
 import { useAuth } from "@/hooks/useAuth";
+import { useTheme } from "@/hooks/useTheme";
 import { Navigate } from "react-router-dom";
-import ioradLogo from "@/assets/iorad-logo-new.png";
+import ioradLogoDark from "@/assets/iorad-logo-new.png";
+import ioradLogoLight from "@/assets/iorad-logo-light.png";
 
 export default function LoginPage() {
   const { user, loading } = useAuth();
+  const { theme } = useTheme();
+  const ioradLogo = theme === "light" ? ioradLogoLight : ioradLogoDark;
+
 
   if (loading) {
     return (
