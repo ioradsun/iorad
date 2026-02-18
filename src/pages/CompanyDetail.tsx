@@ -188,14 +188,42 @@ export default function CompanyDetail() {
   const handleAddContact = async () => {
     if (!id || !newContact.name.trim()) return;
     setSavingContact(true);
+    const missingContactInfo = !newContact.email.trim() && !newContact.linkedin.trim();
     try {
-      const { error } = await supabase.from("contacts").insert({
+      // First insert the contact manually
+      const { data: inserted, error } = await supabase.from("contacts").insert({
         company_id: id, name: newContact.name.trim(),
         title: newContact.title.trim() || null, email: newContact.email.trim() || null,
         linkedin: newContact.linkedin.trim() || null, source: "manual",
-      });
+      }).select("id").single();
       if (error) throw error;
-      toast.success("Contact added");
+
+      // If email and linkedin are both blank, call Apollo to enrich
+      if (missingContactInfo) {
+        toast.info("Looking up contact details via Apollo…");
+        try {
+          const { data: apolloData, error: fnErr } = await supabase.functions.invoke("find-contacts", {
+            body: { company_id: id, name_hint: newContact.name.trim() },
+          });
+          if (fnErr) throw fnErr;
+          // Apollo may have saved a contact — check if it enriched the one we just inserted
+          const { data: enriched } = await supabase
+            .from("contacts")
+            .select("email, linkedin")
+            .eq("id", inserted.id)
+            .maybeSingle();
+          if (enriched?.email || enriched?.linkedin) {
+            toast.success("Contact added and enriched via Apollo");
+          } else {
+            toast.success(`Contact added — Apollo found ${apolloData?.contacts_found ?? 0} related contacts`);
+          }
+        } catch {
+          toast.success("Contact added (Apollo enrichment unavailable)");
+        }
+      } else {
+        toast.success("Contact added");
+      }
+
       setNewContact({ name: "", title: "", email: "", linkedin: "" });
       setAddContactOpen(false);
       queryClient.invalidateQueries({ queryKey: ["contacts", id] });
@@ -780,7 +808,7 @@ export default function CompanyDetail() {
                     <div><Label>Email</Label><Input type="email" value={newContact.email} onChange={e => setNewContact(p => ({ ...p, email: e.target.value }))} placeholder="jane@company.com" /></div>
                     <div><Label>LinkedIn</Label><Input value={newContact.linkedin} onChange={e => setNewContact(p => ({ ...p, linkedin: e.target.value }))} placeholder="https://linkedin.com/in/..." /></div>
                     <Button onClick={handleAddContact} disabled={!newContact.name.trim() || savingContact} className="w-full">
-                      {savingContact ? <Loader2 className="w-4 h-4 animate-spin" /> : "Add Contact"}
+                      {savingContact ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Looking up…</> : (!newContact.email.trim() && !newContact.linkedin.trim()) ? "Add & Enrich via Apollo" : "Add Contact"}
                     </Button>
                   </div>
                 </DialogContent>
