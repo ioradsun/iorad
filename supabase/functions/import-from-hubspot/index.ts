@@ -358,13 +358,94 @@ function deriveCategory(props: Record<string, any>, existingPartner?: string | n
   return "business";
 }
 
-function deriveStage(props: Record<string, any>): "prospect" | "active_opp" | "customer" | "expansion" {
-  const lifecycle = (props.lifecyclestage || "").toLowerCase();
+// ── Deal-aware stage derivation ───────────────────────────────────────────────
 
+// HubSpot deal stage IDs that indicate a closed-won / active customer deal.
+// These are common defaults; custom pipelines may differ but closed-won is nearly universal.
+const DEAL_CLOSED_WON_PATTERNS = [
+  /closed.?won/i,
+  /closedwon/i,
+  /won/i,
+];
+
+const DEAL_ACTIVE_PATTERNS = [
+  /appointment/i,
+  /demo/i,
+  /proposal/i,
+  /contract/i,
+  /negotiat/i,
+  /qualified/i,
+  /presentat/i,
+];
+
+async function fetchDealsForCompany(hubspotCompanyId: string | number, apiKey: string): Promise<{
+  hasClosedWon: boolean;
+  hasOpenDeal: boolean;
+  dealCount: number;
+}> {
+  try {
+    // Get associated deal IDs
+    const assocRes = await fetch(
+      `https://api.hubapi.com/crm/v3/objects/companies/${hubspotCompanyId}/associations/deals`,
+      { headers: { Authorization: `Bearer ${apiKey}` } }
+    );
+    if (!assocRes.ok) return { hasClosedWon: false, hasOpenDeal: false, dealCount: 0 };
+
+    const assocData = await assocRes.json();
+    const dealIds: string[] = (assocData.results || []).map((r: any) => String(r.toObjectId || r.id)).filter(Boolean);
+    if (dealIds.length === 0) return { hasClosedWon: false, hasOpenDeal: false, dealCount: 0 };
+
+    // Batch-read deal details
+    const batchRes = await fetch("https://api.hubapi.com/crm/v3/objects/deals/batch/read", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        inputs: dealIds.slice(0, 20).map(id => ({ id })),
+        properties: ["dealstage", "dealname", "closedate", "hs_deal_stage_probability", "hs_is_closed_won", "hs_is_closed"],
+      }),
+    });
+
+    if (!batchRes.ok) return { hasClosedWon: false, hasOpenDeal: false, dealCount: dealIds.length };
+
+    const batchData = await batchRes.json();
+    const deals = batchData.results || [];
+
+    let hasClosedWon = false;
+    let hasOpenDeal = false;
+
+    for (const deal of deals) {
+      const dp = deal.properties || {};
+      const stageId = (dp.dealstage || "").toLowerCase();
+      const isClosedWon = dp.hs_is_closed_won === "true" || DEAL_CLOSED_WON_PATTERNS.some(rx => rx.test(stageId));
+      const isClosed = dp.hs_is_closed === "true";
+
+      if (isClosedWon) { hasClosedWon = true; }
+      if (!isClosed && !isClosedWon) { hasOpenDeal = true; }
+    }
+
+    console.log(`Deals for company ${hubspotCompanyId}: total=${dealIds.length} closedWon=${hasClosedWon} openDeal=${hasOpenDeal}`);
+    return { hasClosedWon, hasOpenDeal, dealCount: dealIds.length };
+  } catch (err: any) {
+    console.warn(`fetchDealsForCompany error for ${hubspotCompanyId}: ${err.message}`);
+    return { hasClosedWon: false, hasOpenDeal: false, dealCount: 0 };
+  }
+}
+
+function deriveStage(
+  props: Record<string, any>,
+  deals?: { hasClosedWon: boolean; hasOpenDeal: boolean; dealCount: number }
+): "prospect" | "active_opp" | "customer" | "expansion" {
+  // Deal-based signals take priority over company lifecycle (more reliable)
+  if (deals?.hasClosedWon) {
+    // If they also have an open deal after closing, treat as expansion
+    return deals.hasOpenDeal ? "expansion" : "customer";
+  }
+  if (deals?.hasOpenDeal) return "active_opp";
+
+  // Fall back to company-level lifecycle stage
+  const lifecycle = (props.lifecyclestage || "").toLowerCase();
   if (lifecycle === "customer" || lifecycle === "evangelist") return "customer";
   if (lifecycle === "opportunity" || lifecycle === "salesqualifiedlead") return "active_opp";
-
-  // Check HubSpot date-entered fields as a secondary signal
   if (props.hs_date_entered_customer) return "customer";
   if (props.hs_date_entered_opportunity) return "active_opp";
 
@@ -374,12 +455,16 @@ function deriveStage(props: Record<string, any>): "prospect" | "active_opp" | "c
 // Upsert a HubSpot company into our companies table
 // Returns { companyId, isNew, hasStory } so caller can decide whether to auto-process
 async function upsertCompany(supabase: any, hubspotCompany: any): Promise<{ companyId: string; isNew: boolean; hasStory: boolean }> {
+  const apiKey = Deno.env.get("HUBSPOT_API_KEY")!;
   const props = hubspotCompany.properties || {};
   const domain = props.domain
     ? props.domain.toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "")
     : null;
   const name = (props.name || "").trim() || domain || "";
   if (!name) throw new Error("No company name or domain");
+
+  // Fetch associated deals for accurate stage derivation
+  const deals = await fetchDealsForCompany(hubspotCompany.id, apiKey);
 
   const companyData: Record<string, any> = {
     name,
@@ -400,9 +485,8 @@ async function upsertCompany(supabase: any, hubspotCompany: any): Promise<{ comp
       .maybeSingle();
 
     if (existing) {
-      // Derive category & stage — respect existing partner flag
       const category = existing.partner ? "partner" : deriveCategory(props, existing.partner);
-      const stage = deriveStage(props);
+      const stage = deriveStage(props, deals);
       const isCustomer = stage === "customer" || stage === "expansion";
 
       await supabase.from("companies").update({
@@ -417,9 +501,9 @@ async function upsertCompany(supabase: any, hubspotCompany: any): Promise<{ comp
     }
   }
 
-  // Insert new company — derive category & stage from HubSpot data
+  // Insert new company — derive category & stage from HubSpot data + deals
   const category = deriveCategory(props, null);
-  const stage = deriveStage(props);
+  const stage = deriveStage(props, deals);
   const isCustomer = stage === "customer" || stage === "expansion";
 
   const { data: inserted, error } = await supabase
@@ -435,6 +519,7 @@ async function upsertCompany(supabase: any, hubspotCompany: any): Promise<{ comp
   if (error) throw error;
   return { companyId: inserted.id, isNew: true, hasStory: false };
 }
+
 
 // Fetch contacts associated with a HubSpot company and save them
 async function importContactsForCompany(supabase: any, hubspotCompanyId: string | number, companyId: string) {
@@ -722,8 +807,11 @@ async function syncSingleCompany(supabase: any, domain: string | undefined, comp
       existingPartner = cur?.partner || null;
     }
 
+    // Fetch associated deals for accurate stage derivation
+    const deals = await fetchDealsForCompany(hsCompany.id, apiKey);
+
     const category = deriveCategory(props, existingPartner);
-    const stage = deriveStage(props);
+    const stage = deriveStage(props, deals);
     const isCustomer = stage === "customer" || stage === "expansion";
 
     // Update company record
@@ -737,7 +825,7 @@ async function syncSingleCompany(supabase: any, domain: string | undefined, comp
         ...(props.numberofemployees ? { headcount: parseInt(String(props.numberofemployees), 10) || undefined } : {}),
       };
       await supabase.from("companies").update(updates).eq("id", companyId);
-      console.log(`sync_company: updated ${domain} (category: ${category}, stage: ${stage}, customer: ${isCustomer})`);
+      console.log(`sync_company: updated ${domain} (category: ${category}, stage: ${stage}, deals: closed_won=${deals.hasClosedWon} open=${deals.hasOpenDeal})`);
 
       // Import associated contacts
       let contactsImported = 0;
@@ -761,6 +849,7 @@ async function syncSingleCompany(supabase: any, domain: string | undefined, comp
           stage,
           is_existing_customer: isCustomer,
           lifecycle_stage: props.lifecyclestage || null,
+          deals: { closed_won: deals.hasClosedWon, open: deals.hasOpenDeal, total: deals.dealCount },
           contacts_imported: contactsImported,
           hubspot_id: hsCompany.id,
         }),
@@ -770,7 +859,12 @@ async function syncSingleCompany(supabase: any, domain: string | undefined, comp
 
     // No companyId — just return derived values
     return new Response(
-      JSON.stringify({ success: true, found: true, category, stage, is_existing_customer: isCustomer, lifecycle_stage: props.lifecyclestage || null }),
+      JSON.stringify({
+        success: true, found: true, category, stage,
+        is_existing_customer: isCustomer,
+        lifecycle_stage: props.lifecyclestage || null,
+        deals: { closed_won: deals.hasClosedWon, open: deals.hasOpenDeal, total: deals.dealCount },
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err: any) {
