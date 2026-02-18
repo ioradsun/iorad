@@ -102,7 +102,7 @@ serve(async (req) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            from: "iorad Intelligence <notifications@iorad.com>",
+            from: "iorad Intelligence <notifications@iorad.info>",
             to: [admin.email],
             subject: subject || "Bulk Story Generation Complete",
             html: htmlBody,
