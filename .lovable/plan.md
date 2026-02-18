@@ -1,176 +1,184 @@
 
-# Restructure: Company Categories & Stages
+# Bulk HubSpot Import (Last 12 Months) + Auto-Sync + Scout Score
 
-## What's Changing
+## What We're Building
 
-The current binary `inbound / outbound` classification is replaced with a **3-category × 4-stage** model:
-
-- **Categories**: `school` (EDU), `business` (corporate/B2B), `partner` (LMS resellers: Seismic, Docebo, etc.)
-- **Stages**: `prospect` → `active_opp` → `customer` → `expansion`
-
-Each category has its own AI prompt set. Stage is injected as a context variable into the prompt at generation time.
+A complete pipeline that:
+1. **Bulk imports all HubSpot companies created in the last 12 months** — runs as a self-chaining edge function so it doesn't time out on 1000s of companies
+2. **Auto-syncs every 12 hours** — only re-imports companies where HubSpot data has changed
+3. **Calculates a Scout Score (0–100)** for every company — deterministic math on contact activity data, no AI needed for the number itself
+4. **Generates an AI activity summary** per company — Gemini reads the contacts' iorad activity fields and writes a 2-3 sentence narrative
+5. **Displays Scout Score in the Dashboard** — sortable, colored tier badges (Hot / Warm / Lukewarm / Cold)
+6. **Scout tab in Admin Settings** — editable scoring prompt + manual trigger buttons
 
 ---
 
-## Data Migration
+## Current State
 
-Existing companies are automatically migrated using this mapping:
+- **497 companies** in DB (all imported Feb 12–18, so most are from the current week, not 12 months)
+- **1,665 contacts** — 186 have tutorial create dates, 414 have tutorial view dates, 16 have extension connections (all stored in `contacts.hubspot_properties` as JSON)
+- **No `scout_score` columns** exist yet — needs migration
+- **No `scout_scoring_prompt` column** on `ai_config` yet
+- The existing `import-from-hubspot` function has `sync` (7 days), `sync_company`, `sync_hubspot_id`, `list_companies` actions — we add `bulk_import` and `auto_sync`
+- `config.toml` already has `[functions.import-from-hubspot] verify_jwt = false` — no change needed there
+
+---
+
+## Database Changes (Migration)
+
+Add to `companies` table:
+- `scout_score` (integer, nullable) — 0–100
+- `scout_score_breakdown` (jsonb, default `{}`) — `{ tutorial: 45, commercial: 15, recency: 7, intent: 5 }`
+- `scout_scored_at` (timestamptz, nullable) — when score was last calculated
+- `scout_summary` (text, nullable) — AI-generated activity narrative
+- `scout_synced_at` (timestamptz, nullable) — last time this company was synced from HubSpot for change detection
+
+Add to `ai_config` table:
+- `scout_scoring_prompt` (text, NOT NULL, default = the full Master Prompt text from the user)
+
+---
+
+## Architecture
 
 ```text
-source_type = "inbound"               → category = "business", stage = "prospect"
-source_type = "outbound" + partner    → category = "partner",  stage = "prospect"
-source_type = "outbound", no partner  → category = "business", stage = "prospect"
+TRIGGER: Dashboard "Bulk Import" button  OR  pg_cron every 12h
+         ↓
+import-from-hubspot  action:"bulk_import"
+  • HubSpot search: createdate >= 12 months ago
+  • Pages 100 companies at a time
+  • For each: upsertCompany + importContactsForCompany (existing fns)
+  • Sets scout_synced_at on each company
+  • Self-chains via fetch to handle 1000s without timeout
+  • After all companies imported → calls score-companies action:"score_all"
+         ↓
+score-companies  (NEW edge function)
+  action:"score_all"  → scores every company in DB
+  action:"score_one"  → scores a single company (called after individual syncs)
+  action:"auto_sync"  → pg_cron target: re-imports only changed companies, then scores
+  • Reads contacts.hubspot_properties for iorad activity
+  • Runs deterministic formula (no AI)
+  • If score changed ≥5 pts or first score → runs Gemini for scout_summary
+  • Writes scout_score, scout_score_breakdown, scout_summary, scout_scored_at
 ```
-
-The `source_type` column is kept in the database for now (backward-compatible), but all new code will use `category` and `stage`.
 
 ---
 
-## Implementation Plan
+## Scout Score Formula (Deterministic)
 
-### 1. Database Migration (schema)
+**Tutorial Activity — max 60 pts** (most important signal)
+- Any contact with `first_tutorial_create_date` set: +20
+- That date is within last 14 days: additional +15 (so +35 total for recent creation)
+- Count of contacts with `first_tutorial_create_date` > 1 (multi-user): +5 per extra creator, max +20
+- Any contact with `first_tutorial_view_date` within last 30 days: +8
+- Any contact with `answers_with_own_tutorial_month_count` > 0: +7
+- Any contact with `extension_connections` > 0: +5
 
-Add two new columns to the `companies` table:
+**Commercial Motion — max 20 pts**
+- `stage === 'expansion'`: +20
+- `stage === 'customer'`: +15
+- `stage === 'active_opp'`: +10
+- `stage === 'prospect'` with `is_existing_customer: true`: +5
 
-```sql
-ALTER TABLE companies
-  ADD COLUMN category text NOT NULL DEFAULT 'business',
-  ADD COLUMN stage    text NOT NULL DEFAULT 'prospect';
-```
+**Recency — max 10 pts**
+- Any contact `hs_last_contacted` within 7 days: +10
+- Within 30 days: +7
+- Within 90 days: +3
 
-Run the auto-migration logic in the same migration:
+**HubSpot Intent — max 10 pts**
+- Any contact `hubspot_score` > 70: +10
+- Any contact `hubspot_score` > 40: +5
+- Any contact email opens + clicks > 10: +3
+- Any contact `first_embed_tutorial_base_domain_name` set: +2
 
-```sql
--- outbound with partner → partner/prospect
-UPDATE companies
-  SET category = 'partner', stage = 'prospect'
-  WHERE source_type = 'outbound' AND partner IS NOT NULL;
-
--- outbound without partner → business/prospect
-UPDATE companies
-  SET category = 'business', stage = 'prospect'
-  WHERE source_type = 'outbound' AND (partner IS NULL OR partner = '');
-
--- inbound → business/prospect
-UPDATE companies
-  SET category = 'business', stage = 'prospect'
-  WHERE source_type = 'inbound';
-```
-
-### 2. Database Migration (ai_config prompts)
-
-Add three new prompt columns to `ai_config` — one system prompt per category:
-
-```sql
-ALTER TABLE ai_config
-  ADD COLUMN school_system_prompt   text NOT NULL DEFAULT '',
-  ADD COLUMN school_prompt_template text NOT NULL DEFAULT '',
-  ADD COLUMN business_system_prompt   text NOT NULL DEFAULT '',
-  ADD COLUMN business_prompt_template text NOT NULL DEFAULT '',
-  ADD COLUMN partner_system_prompt   text NOT NULL DEFAULT '',
-  ADD COLUMN partner_prompt_template text NOT NULL DEFAULT '';
-```
-
-Pre-populate each with the existing relevant prompt so teams have a starting point:
-- `partner_*` ← current `system_prompt` + `prompt_template` (outbound)
-- `business_*` ← current `inbound_system_prompt` + `inbound_story_prompt`
-- `school_*` ← blank (new vertical)
-
-### 3. Dashboard (`src/pages/Dashboard.tsx`)
-
-**Replace** the `inbound / outbound` tab switcher with a **3-tab category filter**: `School | Business | Partner`.
-
-Each tab shows a count badge. The KPI strip changes:
-- "Total tracked" stays
-- "New inbound (24h)" → "New this week" (counts across all categories)
-- "New outbound (24h)" → removed, replaced with a stage breakdown mini-bar
-
-A **stage filter** (pill group: All / Prospect / Active Opp / Customer / Expansion) sits below the category tabs so users can slice within a category.
-
-The `SourcePill` component becomes a `StagePill` showing the stage (e.g. `Prospect`, `Customer`).
-
-### 4. Upload / Add Company Form (`src/pages/Upload.tsx`)
-
-**Replace** the `inbound / outbound` switcher with a **category selector**: School / Business / Partner.
-
-Add a **stage selector**: Prospect / Active Opp / Customer / Expansion (defaults to Prospect).
-
-Partner field is only shown when category = `partner` (same logic as today's outbound-only partner field).
-
-CSV column mapping adds `category` and `stage` as recognised headers alongside a backward-compat fallback that maps `source_type = inbound` → `business`.
-
-### 5. Company Detail Page (`src/pages/CompanyDetail.tsx`)
-
-**Header metadata row**: replace the source type badge with editable `Category` and `Stage` fields (inline `Select` dropdowns), so reps can move a company between stages directly.
-
-**Regeneration logic**: the `isInbound` check that gates Apollo contact lookup and profile extraction is replaced by `category === "partner"` check (only partner companies get HubSpot-sourced contacts; school and business still get Apollo enrichment).
-
-**Story URL**: the `source_type === "inbound"` guard for story URL construction changes to `category !== "partner"` (school and business use `company_cards.id` story URLs; partner still uses the `/:partner/:customer/stories/:contact` slug).
-
-### 6. AI Generation (`supabase/functions/generate-cards/index.ts`)
-
-The `isInbound` flag is replaced by `company.category`:
-
-```typescript
-const categoryPromptMap: Record<string, string> = {
-  school:   aiConfig?.school_system_prompt   || "",
-  business: aiConfig?.business_system_prompt || "",
-  partner:  aiConfig?.partner_system_prompt  || "",
-};
-const systemPrompt = categoryPromptMap[company.category] || "";
-```
-
-The `stage` is injected into the user-facing context object so the AI can tailor its output:
-
-```typescript
-const context = {
-  ...
-  category: company.category,   // "school" | "business" | "partner"
-  stage:    company.stage,       // "prospect" | "active_opp" | "customer" | "expansion"
-  ...
-};
-```
-
-### 7. Run-Signals (`supabase/functions/run-signals/index.ts`)
-
-Replace the `source_type` reference with `company.category`. The `PARTNER_PERSONA_MAP` stays as-is since it's keyed by `partner` name, not `source_type`.
-
-### 8. Admin Settings (`src/pages/AdminSettings.tsx`)
-
-**AI & Prompts tab**: replace the `Inbound Prompt / Outbound Prompt / AI` sub-tabs with **`School | Business | Partner | AI`**.
-
-Each category sub-tab contains:
-- System Prompt textarea
-- Prompt Template textarea (the "mega prompt" / story template)
-- Plus the individual section prompts (Strategy, Outreach, Story, Transcript) inherited from today's structure
-
-The export `.md` filename and section labels update accordingly.
-
-### 9. Partner Story (`src/pages/CustomerStory.tsx` & `src/data/partnerMeta.ts`)
-
-No structural change needed. The story URL routing already uses `partner` field. The `partnerMeta` inbound → `school` rename update: the fallback key `"inbound"` becomes `"business"` to match the new neutral category key for business/school. School companies will get the same neutral (no-partner-logo) hero treatment.
+Score clamped to 0–100. Tiers: Hot (75+), Warm (50–74), Lukewarm (25–49), Cold (0–24).
 
 ---
 
-## Files Changed
+## AI Activity Summary
 
-| File | Change |
-|---|---|
-| `supabase/migrations/...` | Add `category` + `stage` columns, migrate data, add prompt columns to `ai_config` |
-| `src/pages/Dashboard.tsx` | 3-tab category filter, stage pill filter, updated KPIs |
-| `src/pages/Upload.tsx` | Category + Stage selectors in manual form; CSV mapping |
-| `src/types/index.ts` | Update `CSVRow` type with `category` + `stage` |
-| `src/pages/CompanyDetail.tsx` | Category/stage editable badges, updated `isInbound` logic |
-| `supabase/functions/generate-cards/index.ts` | Category-based prompt selection + stage context |
-| `supabase/functions/run-signals/index.ts` | Replace `source_type` checks with `category` |
-| `src/pages/AdminSettings.tsx` | 4-tab AI prompt panel (School / Business / Partner / AI) |
-| `src/data/partnerMeta.ts` | Rename `inbound` key to `business` for fallback |
-| `src/pages/CustomerStory.tsx` | Update fallback key reference |
+After scoring, if the score changed by ≥5 points or `scout_scored_at` is null:
+- Calls Gemini 2.5 Flash via `LOVABLE_API_KEY`
+- System prompt: the `scout_scoring_prompt` from `ai_config`
+- User input: list of contacts with their iorad activity fields (tutorial dates, counts, extension data)
+- Output: 2–3 sentence plain-text narrative stored in `scout_summary`
+- Example output: *"2 team members are actively creating iorad tutorials, with the most recent content built 6 days ago. One power user created 8 tutorials this month. The account is a prospect with strong tutorial creation intent."*
 
 ---
 
-## Notes
+## Files to Create / Modify
 
-- `source_type` column is preserved in the database (not dropped) for safety — old code referencing it won't break immediately.
-- The `is_existing_customer` flag is retained; the HubSpot lifecycle check in `generate-cards` continues to set it, but now the Customer/Expansion _stage_ is the primary UX signal for that status.
-- No changes to routing, auth, or the public story microsite beyond the partner-meta key rename.
+| File | Action | What Changes |
+|---|---|---|
+| `supabase/migrations/TIMESTAMP.sql` | Create | Add 5 new columns to `companies`, 1 to `ai_config` |
+| `supabase/functions/score-companies/index.ts` | **Create** | New edge function: score_all, score_one, auto_sync actions |
+| `supabase/config.toml` | Edit | Add `[functions.score-companies] verify_jwt = false` |
+| `supabase/functions/import-from-hubspot/index.ts` | Edit | Add `bulk_import` and `auto_sync` actions; update `scout_synced_at` after each upsert; call `score-companies` after bulk finishes |
+| `src/pages/Dashboard.tsx` | Edit | Add Scout Score column + sort option + "Bulk Import" button in toolbar |
+| `src/pages/AdminSettings.tsx` | Edit | Add new "Scout" tab (7th tab, grid-cols-7) with prompt editor + buttons |
+| `src/pages/CompanyDetail.tsx` | Edit | Show Scout Score badge + `scout_summary` in company header area |
+| `src/hooks/useSupabase.ts` | Edit | Add `useScoreCompanies` mutation |
+
+---
+
+## Bulk Import Action Details
+
+The new `bulk_import` action in `import-from-hubspot`:
+
+1. Accepts `{ action: "bulk_import", offset: 0, job_id?: string }`
+2. HubSpot search: `createdate >= 12 months ago`, sorted by `createdate DESC`, 100 per page using `after` cursor pagination
+3. For each company: calls existing `upsertCompany` + `importContactsForCompany`, then sets `scout_synced_at = now()`
+4. After processing 100 companies, self-chains: calls itself with the next `after` cursor
+5. When no more pages, calls `score-companies` with `action: "score_all"`
+6. Tracks progress via `processing_jobs` table (same pattern as `run-signals`)
+
+**Important**: Does NOT auto-trigger `run-signals` story generation — the queue clear is in effect. The import only refreshes HubSpot data and calculates Scout Scores.
+
+---
+
+## Auto-Sync Action (every 12 hours)
+
+The `auto_sync` action in `score-companies`:
+
+1. Fetches HubSpot companies where `hs_lastmodifieddate >= 12 hours ago`
+2. For each: calls `import-from-hubspot` with `sync_hubspot_id` to refresh contacts
+3. Then re-scores that company with `score_one`
+4. Designed to be called by pg_cron — the Admin Settings "Scout" tab will show the SQL to set this up
+
+---
+
+## Dashboard UI Changes
+
+- New **Scout Score column** in the company table: shows colored badge (🔴 Hot / 🟡 Warm / 🟢 Lukewarm / ⚪ Cold) + number
+- New `scout_score` sort option added to `SortKey` type
+- Default sort changed to `scout_score DESC` (hottest leads first)
+- "Import from HubSpot" button replaced with two options: keep picker modal + add new **"Bulk Import (12mo)"** button that triggers the new action with a progress toast
+- Small "Last synced" indicator showing `scout_synced_at` age
+
+---
+
+## Admin Settings: New "Scout" Tab
+
+7th tab added to the existing 6-tab layout (`grid-cols-7`):
+
+Contents:
+1. **Scout Scoring Prompt** — editable textarea pre-filled with the Master Prompt, saved to `ai_config.scout_scoring_prompt`
+2. **"Run Scoring Now"** button — calls `score-companies` with `action: "score_all"`, shows count of companies scored
+3. **"Bulk Import from HubSpot (12 months)"** button — triggers the full import pipeline with progress feedback
+4. **Score breakdown legend** — visual table showing what each component contributes (read-only reference)
+5. **Auto-sync setup** — shows the pg_cron SQL snippet with a copy button, so the team can enable 12-hour scheduled syncs
+
+---
+
+## Key Design Decisions
+
+1. **No story auto-generation during bulk import** — respects the cleared queue. The import only refreshes contact data and calculates Scout Scores.
+
+2. **Self-chaining bulk import** — same pattern as `run-signals`, handles 500+ companies without timeouts. Each chain processes 100 companies then calls itself.
+
+3. **Deterministic scoring** — no AI needed for the number. Fast, cheap, explainable to reps. AI only runs for the text summary, and only when the score changes materially.
+
+4. **Change detection** — `bulk_import` sets `scout_synced_at` on each company. The `auto_sync` action uses `hs_lastmodifieddate` from HubSpot to only re-fetch companies that actually changed.
+
+5. **Contact activity stored in `hubspot_properties` JSONB** — the scoring formula reads `hubspot_properties->>'first_tutorial_create_date'` etc., since that's how the existing import stores contact data.
+
+6. **12-month filter uses HubSpot `createdate`** — matches the user's requirement exactly. HubSpot's `createdate` is the company creation date in HubSpot, which is close to when they first became a lead/contact.
