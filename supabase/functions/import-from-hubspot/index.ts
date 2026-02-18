@@ -558,6 +558,9 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
   const apiKey = Deno.env.get("HUBSPOT_API_KEY");
   if (!apiKey) return;
 
+  // Only fetch the fields we actually store — avoids massive payloads for large companies
+  const CONTACT_PROPS = ["firstname", "lastname", "email", "jobtitle", "hs_linkedin_url"];
+
   try {
     // Paginate through ALL associated contacts (HubSpot returns max 500 per page)
     const contactIds: string[] = [];
@@ -579,12 +582,7 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
     if (contactIds.length === 0) return;
     console.log(`HubSpot: found ${contactIds.length} associated contacts for company ${hubspotCompanyId}`);
 
-    // Fetch contact details via HubSpot batch read API (max 100 per batch)
-    const allContactProps = await getAllContactPropertyNames(apiKey);
-    const propsToFetch = allContactProps.length > 0
-      ? allContactProps
-      : ["firstname", "lastname", "email", "jobtitle", "hs_linkedin_url"];
-
+    // Fetch contact details in batches of 100 (HubSpot batch read limit)
     const BATCH_SIZE = 100;
     for (let i = 0; i < contactIds.length; i += BATCH_SIZE) {
       const batchIds = contactIds.slice(i, i + BATCH_SIZE);
@@ -595,7 +593,7 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
           headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify({
             inputs: batchIds.map((cid) => ({ id: cid })),
-            properties: propsToFetch,
+            properties: CONTACT_PROPS,
           }),
         });
         if (!batchRes.ok) {
@@ -610,54 +608,50 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
         continue;
       }
 
+      // Build rows to upsert
+      const rowsToInsert: any[] = [];
+      const rowsToUpdate: { id: string; data: any }[] = [];
+
       for (const contact of batchContacts) {
-        const contactId = contact.id;
-        try {
-          const cp = contact.properties || {};
-          const contactName = [cp.firstname, cp.lastname].filter(Boolean).join(" ").trim();
-          if (!contactName) continue;
+        const cp = contact.properties || {};
+        const contactName = [cp.firstname, cp.lastname].filter(Boolean).join(" ").trim();
+        if (!contactName) continue;
 
-          let savedContactId: string | null = null;
+        const row = {
+          company_id: companyId,
+          name: contactName,
+          email: cp.email || null,
+          title: cp.jobtitle || null,
+          linkedin: cp.hs_linkedin_url || null,
+          source: "hubspot",
+          confidence: "high",
+        };
 
-          // Check if contact already exists for this company by email
-          if (cp.email) {
-            const { data: existing } = await supabase
-              .from("contacts")
-              .select("id")
-              .eq("company_id", companyId)
-              .eq("email", cp.email)
-              .maybeSingle();
-
-            if (existing) {
-              await supabase.from("contacts").update({
-                name: contactName,
-                title: cp.jobtitle || null,
-                linkedin: cp.hs_linkedin_url || null,
-                hubspot_properties: cp,
-              }).eq("id", existing.id);
-              savedContactId = existing.id;
-            }
+        // Check for existing only if we have an email (unique identifier)
+        if (cp.email) {
+          const { data: existing } = await supabase
+            .from("contacts")
+            .select("id")
+            .eq("company_id", companyId)
+            .eq("email", cp.email)
+            .maybeSingle();
+          if (existing) {
+            rowsToUpdate.push({ id: existing.id, data: { name: contactName, title: row.title, linkedin: row.linkedin } });
+            continue;
           }
-
-          if (!savedContactId) {
-            const { data: inserted } = await supabase.from("contacts").insert({
-              company_id: companyId,
-              name: contactName,
-              email: cp.email || null,
-              title: cp.jobtitle || null,
-              linkedin: cp.hs_linkedin_url || null,
-              source: "hubspot",
-              confidence: "high",
-              hubspot_properties: cp,
-            }).select("id").single();
-            savedContactId = inserted?.id || null;
-          }
-
-          // Pull engagement timeline for this contact
-          await importContactActivity(supabase, contactId, companyId, savedContactId, apiKey);
-        } catch (err: any) {
-          console.warn(`Failed to import contact ${contactId}: ${err.message}`);
         }
+        rowsToInsert.push(row);
+      }
+
+      // Bulk insert new contacts
+      if (rowsToInsert.length > 0) {
+        const { error } = await supabase.from("contacts").insert(rowsToInsert);
+        if (error) console.warn(`Bulk insert error (batch ${i}): ${error.message}`);
+      }
+
+      // Update existing contacts individually (rare case)
+      for (const { id, data } of rowsToUpdate) {
+        await supabase.from("contacts").update(data).eq("id", id);
       }
     }
     console.log(`HubSpot: finished importing contacts for company ${companyId}`);
@@ -665,6 +659,8 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
     console.warn(`Contact import error for company ${companyId}: ${err.message}`);
   }
 }
+
+
 
 
 // Fetch engagement/activity timeline for a HubSpot contact
