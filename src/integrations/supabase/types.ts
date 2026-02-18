@@ -33,6 +33,7 @@ export type Database = {
           prompt_template: string
           school_prompt_template: string
           school_system_prompt: string
+          scout_scoring_prompt: string
           story_prompt: string
           strategy_prompt: string
           system_prompt: string
@@ -57,6 +58,7 @@ export type Database = {
           prompt_template?: string
           school_prompt_template?: string
           school_system_prompt?: string
+          scout_scoring_prompt?: string
           story_prompt?: string
           strategy_prompt?: string
           system_prompt?: string
@@ -81,6 +83,7 @@ export type Database = {
           prompt_template?: string
           school_prompt_template?: string
           school_system_prompt?: string
+          scout_scoring_prompt?: string
           story_prompt?: string
           strategy_prompt?: string
           system_prompt?: string
@@ -168,6 +171,11 @@ export type Database = {
           partner_rep_email: string | null
           partner_rep_name: string | null
           persona: string | null
+          scout_score: number | null
+          scout_score_breakdown: Json | null
+          scout_scored_at: string | null
+          scout_summary: string | null
+          scout_synced_at: string | null
           snapshot_status: string | null
           source_type: string
           stage: string
@@ -197,6 +205,11 @@ export type Database = {
           partner_rep_email?: string | null
           partner_rep_name?: string | null
           persona?: string | null
+          scout_score?: number | null
+          scout_score_breakdown?: Json | null
+          scout_scored_at?: string | null
+          scout_summary?: string | null
+          scout_synced_at?: string | null
           snapshot_status?: string | null
           source_type?: string
           stage?: string
@@ -226,6 +239,11 @@ export type Database = {
           partner_rep_email?: string | null
           partner_rep_name?: string | null
           persona?: string | null
+          scout_score?: number | null
+          scout_score_breakdown?: Json | null
+          scout_scored_at?: string | null
+          scout_summary?: string | null
+          scout_synced_at?: string | null
           snapshot_status?: string | null
           source_type?: string
           stage?: string
