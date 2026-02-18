@@ -37,8 +37,8 @@
     --destructive-foreground: 0 0% 100%;
 
     /* ── Borders: extremely subtle ── */
-    --border: 215 14% 89%;
-    --input: 215 14% 89%;
+    --border: 215 10% 92%;
+    --input: 215 10% 92%;
     --ring: 222 40% 50%;
 
     /* ── Pink accent (kept for story/brand use) ── */
