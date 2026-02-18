@@ -620,8 +620,8 @@ export default function CompanyDetail() {
                 />
               </div>
             )}
-            <ScrollArea className="h-[180px]">
-              <div className="space-y-3 pr-3">
+            <div className="px-4 pb-4">
+              <div className="space-y-2">
               {contacts.length > 0 ? contacts.filter((c) => {
                 if (!contactSearch) return true;
                 const q = contactSearch.toLowerCase();
@@ -639,7 +639,7 @@ export default function CompanyDetail() {
                       </div>
                       <div className="flex-1 min-w-0 space-y-0.5">
                         <div className="text-[14px] font-medium truncate">{contact.name}</div>
-                        {contact.title && <div className="text-[13px] text-muted-foreground truncate">{contact.title}</div>}
+                        {contact.title && <div className="text-[13px] text-muted-foreground leading-snug">{contact.title}</div>}
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {storyUrl && snap && (
@@ -749,7 +749,7 @@ export default function CompanyDetail() {
                 <p className="text-[14px] text-muted-foreground">No contacts yet. Add one manually or run enrichment.</p>
               )}
               </div>
-            </ScrollArea>
+            </div>
           </div>
 
           {/* Meetings (Fathom) */}
@@ -1223,6 +1223,26 @@ export default function CompanyDetail() {
             </div>
           ) : (assets.email_sequence || assets.linkedin_sequence) ? (
             <div className="space-y-6">
+              {/* Inbound outreach metadata fields */}
+              {rawAccountJson && (rawAccountJson.intent_tier || rawAccountJson.behavior_acknowledged || rawAccountJson.momentum_frame) && (
+                <div className="space-y-3">
+                  {[
+                    { label: "Intent Tier", key: "intent_tier" },
+                    { label: "Behavior Acknowledged", key: "behavior_acknowledged" },
+                    { label: "Momentum Frame", key: "momentum_frame" },
+                    { label: "Expansion Opportunity", key: "expansion_opportunity" },
+                    { label: "Risk If Stalled", key: "risk_if_stalled" },
+                    { label: "Upside If Executed", key: "upside_if_executed" },
+                  ].map(({ label, key }) =>
+                    rawAccountJson[key] ? (
+                      <div key={key} className="panel p-4 rounded-lg">
+                        <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground mb-1">{label}</div>
+                        <p className="text-[13px] leading-relaxed text-foreground/90">{String(rawAccountJson[key])}</p>
+                      </div>
+                    ) : null
+                  )}
+                </div>
+              )}
               {assets.email_sequence && (
                 <div className="space-y-2">
                   <h4 className="text-sm font-medium flex items-center gap-2"><Mail className="w-4 h-4 text-primary" /> Email Sequence</h4>
