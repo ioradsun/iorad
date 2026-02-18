@@ -817,6 +817,7 @@ export default function CompanyDetail() {
               </div>
             )}
             <div className="px-4 pb-4">
+              <ScrollArea className="max-h-[312px] pr-2">
               <div className="space-y-2">
               {contacts.length > 0 ? contacts.filter((c) => {
                 if (!contactSearch) return true;
@@ -945,6 +946,7 @@ export default function CompanyDetail() {
                 <p className="text-[14px] text-muted-foreground">No contacts yet. Add one manually or run enrichment.</p>
               )}
               </div>
+              </ScrollArea>
             </div>
           </div>
 
