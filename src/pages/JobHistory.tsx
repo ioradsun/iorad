@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Loader2, CheckCircle2, Clock, XCircle, Inbox, Play, Pause, Trash2,
@@ -553,6 +554,7 @@ function HubSpotSyncTab() {
 
 function StoryGenerationTab() {
   const qc = useQueryClient();
+  const { user } = useAuth();
   const [actionLoading, setActionLoading] = useState(false);
 
   const { data: queueData, isLoading: loadingQueue } = useCompanyQueueData();
@@ -565,6 +567,7 @@ function StoryGenerationTab() {
     (currentItem?.companies as any)?.name ??
     (activeJob?.settings_snapshot as any)?.current_company ??
     null;
+  const triggeredBy = (activeJob as any)?.triggered_by ?? null;
 
   const completed  = queueData?.completed  ?? [];
   const waiting    = queueData?.waiting    ?? [];
@@ -574,7 +577,12 @@ function StoryGenerationTab() {
   const handleStart = async () => {
     setActionLoading(true);
     try {
-      const { error } = await supabase.functions.invoke("run-signals", { body: { offset: 0 } });
+      const { error } = await supabase.functions.invoke("run-signals", {
+        body: {
+          offset: 0,
+          triggered_by: user?.email ?? user?.user_metadata?.full_name ?? "Unknown",
+        },
+      });
       if (error) throw error;
       await qc.invalidateQueries({ queryKey: ["active_running_job"] });
       await qc.invalidateQueries({ queryKey: ["company_queue_data"] });
@@ -676,13 +684,30 @@ function StoryGenerationTab() {
         </div>
       )}
 
-      {/* Running indicator — only show when we have a company name */}
-      {isRunning && currentCompany && (
+      {/* Running indicator */}
+      {isRunning && (
         <div className="panel flex items-center gap-3">
           <Loader2 className="w-4 h-4 animate-spin text-primary flex-shrink-0" />
-          <div className="min-w-0 flex-1">
-            <div className="text-xs text-muted-foreground">Currently processing</div>
-            <div className="text-sm font-medium truncate">{currentCompany}</div>
+          <div className="min-w-0 flex-1 flex items-center justify-between gap-4 flex-wrap">
+            <div className="min-w-0">
+              <div className="text-xs text-muted-foreground">Currently processing</div>
+              <div className="text-sm font-medium truncate">{currentCompany ?? "Starting…"}</div>
+            </div>
+            {(triggeredBy || activeJob?.started_at) && (
+              <div className="text-right shrink-0">
+                {triggeredBy && (
+                  <div className="text-xs font-medium text-foreground flex items-center gap-1 justify-end">
+                    <User className="w-3 h-3 text-muted-foreground" />
+                    {triggeredBy}
+                  </div>
+                )}
+                {activeJob?.started_at && (
+                  <div className="text-[11px] text-muted-foreground">
+                    Started {fmt(activeJob.started_at)}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
