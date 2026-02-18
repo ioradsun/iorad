@@ -551,9 +551,13 @@ export default function CompanyDetail() {
   const ioradEmbedUrl = toIoradEmbedUrl(effectiveIoradUrl);
 
   const firstContact = contacts[0] || (companyAny?.buyer_name ? { name: companyAny.buyer_name } : null);
-  const storyBaseUrl = firstContact && company.partner
-    ? `/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories/${firstContact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "")}`
-    : null;
+  // For partner-based (outbound) stories: /:partner/:customer/stories/:contactFirstName
+  // For inbound stories (no partner): /stories/:snapshotId
+  const storyBaseUrl = companyAny?.source_type === "inbound" && latestSnapshot
+    ? `/stories/${latestSnapshot.id}`
+    : firstContact && company.partner
+      ? `/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories/${firstContact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "")}`
+      : null;
 
   return (
     <div className="space-y-6">
