@@ -575,7 +575,63 @@ export default function CompanyDetail() {
     finally { setGeneratingCards(false); setGenerateStep(null); setAnalyzingMeeting(null); }
   };
 
-  const selectedContact = contacts.find((c: any) => c.id === selectedContactId) || contacts[0] || null;
+  // ---- Per-section regeneration ----
+  const [regeneratingSection, setRegeneratingSection] = useState<string | null>(null);
+
+  const regenerateSection = async (section: "signals" | "contacts" | "company" | "strategy" | "outreach" | "story" | "profiles") => {
+    if (!id) return;
+    setRegeneratingSection(section);
+    const firstContactId = contacts[0]?.id || null;
+    try {
+      switch (section) {
+        case "signals": {
+          toast.info("Running signal search…");
+          const { data, error } = await supabase.functions.invoke("run-signals", { body: { company_id: id, mode: "full" } });
+          if (error) throw error;
+          if (data?.error) throw new Error(data.error);
+          toast.success(`Signals complete — ${data?.signals_found ?? 0} found`);
+          queryClient.invalidateQueries({ queryKey: ["signals", id] });
+          queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
+          break;
+        }
+        case "contacts": {
+          toast.info("Finding contacts via Apollo…");
+          const { data, error } = await supabase.functions.invoke("find-contacts", { body: { company_id: id } });
+          if (error) throw error;
+          if (data?.error) throw new Error(data.error);
+          toast.success(data?.contacts_found > 0 ? `Found ${data.contacts_found} contacts` : "No new contacts found");
+          queryClient.invalidateQueries({ queryKey: ["contacts", id] });
+          break;
+        }
+        case "profiles": {
+          toast.info("Extracting contact profiles…");
+          const { data, error } = await supabase.functions.invoke("extract-contact-profile", { body: { company_id: id } });
+          if (error) throw error;
+          toast.success(`Extracted ${data?.profiles_extracted ?? 0} AI profiles`);
+          queryClient.invalidateQueries({ queryKey: ["contacts", id] });
+          break;
+        }
+        case "company":
+        case "strategy":
+        case "outreach":
+        case "story": {
+          const labels: Record<string, string> = { company: "Company Intel", strategy: "Strategy", outreach: "Outreach", story: "Story" };
+          toast.info(`Regenerating ${labels[section]}…`);
+          const body: Record<string, string> = { company_id: id, tab: section };
+          if (firstContactId) body.contact_id = firstContactId;
+          const { data, error } = await supabase.functions.invoke("generate-cards", { body });
+          if (error) throw error;
+          if (data?.error) throw new Error(data.error);
+          toast.success(`${labels[section]} regenerated`);
+          queryClient.invalidateQueries({ queryKey: ["company_cards", id] });
+          break;
+        }
+      }
+    } catch (e: any) { toast.error(e.message || "Regeneration failed"); }
+    finally { setRegeneratingSection(null); }
+  };
+
+
 
   const contactSelector = contacts.length > 0 ? (
     <Select value={selectedContactId || contacts[0]?.id || ""} onValueChange={setSelectedContactId}>
@@ -681,6 +737,22 @@ export default function CompanyDetail() {
       ? `/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories/${firstContact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "")}`
       : null;
 
+  // Small ghost regen button for individual sections
+  const RegenerateBtn = ({ section, label }: { section: Parameters<typeof regenerateSection>[0]; label: string }) => (
+    <Button
+      size="sm"
+      variant="ghost"
+      className="h-6 gap-1 text-[11px] text-muted-foreground hover:text-foreground px-2"
+      disabled={regeneratingSection === section || generatingCards}
+      onClick={() => regenerateSection(section)}
+    >
+      {regeneratingSection === section
+        ? <Loader2 className="w-3 h-3 animate-spin" />
+        : <RefreshCw className="w-3 h-3" />}
+      {label}
+    </Button>
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -728,6 +800,10 @@ export default function CompanyDetail() {
         <TabsContent value="company" className="space-y-6 mt-6">
           <div className="flex items-center justify-between">
             <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Company Intel</h3>
+            <div className="flex items-center gap-1">
+              {companyAny?.source_type !== "inbound" && <RegenerateBtn section="signals" label="Signals" />}
+              <RegenerateBtn section="company" label="Company Intel" />
+            </div>
           </div>
 
           {/* Company Profile */}
@@ -811,6 +887,9 @@ export default function CompanyDetail() {
                 )}
               </div>
               <div className="flex items-center gap-1">
+              {companyAny?.source_type !== "inbound" && (
+                <RegenerateBtn section="contacts" label="Find Contacts" />
+              )}
               <Dialog open={addContactOpen} onOpenChange={setAddContactOpen}>
                 <DialogTrigger asChild>
                   <Button size="sm" variant="ghost" className="gap-1 text-xs h-7"><Plus className="w-3.5 h-3.5" /> Add</Button>
@@ -1430,6 +1509,7 @@ export default function CompanyDetail() {
         <TabsContent value="strategy" className="space-y-6 mt-6">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Strategy & Cards</h3>
+            <RegenerateBtn section="strategy" label="Strategy" />
           </div>
           {cardsLoading ? (
             <div className="flex items-center gap-2 py-4">
@@ -1477,6 +1557,7 @@ export default function CompanyDetail() {
         <TabsContent value="outreach" className="space-y-6 mt-6">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Outreach Assets</h3>
+            <RegenerateBtn section="outreach" label="Outreach" />
           </div>
           {cardsLoading ? (
             <div className="flex items-center justify-center py-10">
@@ -1535,13 +1616,16 @@ export default function CompanyDetail() {
         <TabsContent value="story" className="space-y-6 mt-6">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Story Configuration</h3>
-            {storyBaseUrl && (
-              <a href={storyBaseUrl} target="_blank" rel="noopener noreferrer">
-                <Button size="sm" variant="outline" className="gap-1.5 text-[13px]">
-                  <Eye className="w-3.5 h-3.5" /> View Story
-                </Button>
-              </a>
-            )}
+            <div className="flex items-center gap-2">
+              <RegenerateBtn section="story" label="Story" />
+              {storyBaseUrl && (
+                <a href={storyBaseUrl} target="_blank" rel="noopener noreferrer">
+                  <Button size="sm" variant="outline" className="gap-1.5 text-[13px]">
+                    <Eye className="w-3.5 h-3.5" /> View Story
+                  </Button>
+                </a>
+              )}
+            </div>
           </div>
 
           {/* Inbound Story — AI-Generated Institutional Brief */}
