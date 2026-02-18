@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAppSettings, useUpdateSettings, DbAppSettings } from "@/hooks/useSupabase";
@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Save, Loader2, Plus, Trash2, GripVertical, Sun, Moon, Shield, User, Download, RotateCcw, ClipboardPaste, ChevronDown, ChevronRight, Pencil } from "lucide-react";
+import { Save, Loader2, Plus, Trash2, GripVertical, Sun, Moon, Shield, User, Download, RotateCcw, ClipboardPaste, ChevronDown, ChevronRight, Pencil, Play, Square, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme, applyCustomVars, clearCustomVars } from "@/hooks/useTheme";
 
@@ -1115,6 +1115,186 @@ function PartnersTab() {
   );
 }
 
+// ─── BULK GENERATE PANEL ───
+interface BulkCompany { id: string; name: string; source_type: string }
+interface BulkResult { id: string; name: string; status: "done" | "error" | "skipped"; message?: string }
+
+function BulkGeneratePanel() {
+  const [running, setRunning] = useState(false);
+  const [companies, setCompanies] = useState<BulkCompany[]>([]);
+  const [results, setResults] = useState<BulkResult[]>([]);
+  const [current, setCurrent] = useState<string | null>(null);
+  const [currentStep, setCurrentStep] = useState<string | null>(null);
+  const [loadingList, setLoadingList] = useState(false);
+  const abortRef = useRef(false);
+
+  const loadMissingStories = async () => {
+    setLoadingList(true);
+    try {
+      // Get all company IDs that already have a company_cards row
+      const { data: cardsRows } = await supabase
+        .from("company_cards")
+        .select("company_id");
+      const existingIds = new Set((cardsRows || []).map((r: any) => r.company_id));
+
+      // Get all companies
+      const { data: allCompanies } = await supabase
+        .from("companies")
+        .select("id, name, source_type")
+        .order("name");
+
+      const missing = (allCompanies || []).filter((c: any) => !existingIds.has(c.id));
+      setCompanies(missing);
+      setResults([]);
+    } catch (e: any) {
+      toast.error("Failed to load companies: " + e.message);
+    } finally {
+      setLoadingList(false);
+    }
+  };
+
+  const runAll = async () => {
+    if (companies.length === 0) return;
+    abortRef.current = false;
+    setRunning(true);
+    setResults([]);
+
+    for (const company of companies) {
+      if (abortRef.current) break;
+      setCurrent(company.name);
+
+      try {
+        const isInbound = company.source_type === "inbound";
+
+        // Step 1: Signals (outbound only)
+        if (!isInbound) {
+          setCurrentStep("Signals");
+          const { data: sigData, error: sigErr } = await supabase.functions.invoke("run-signals", {
+            body: { company_id: company.id, mode: "full" },
+          });
+          if (sigErr) throw sigErr;
+          if (sigData?.error) throw new Error(sigData.error);
+        }
+
+        // Step 2: Contacts via Apollo (outbound only)
+        if (!isInbound) {
+          setCurrentStep("Contacts");
+          await supabase.functions.invoke("find-contacts", { body: { company_id: company.id } });
+        }
+
+        // Step 3: Contact profiles (inbound)
+        if (isInbound) {
+          setCurrentStep("Profiles");
+          await supabase.functions.invoke("extract-contact-profile", { body: { company_id: company.id } });
+        }
+
+        // Step 4: Generate all content tabs
+        const tabs = ["company", "strategy", "outreach", "story"];
+        for (const tab of tabs) {
+          if (abortRef.current) break;
+          setCurrentStep(`${tab.charAt(0).toUpperCase() + tab.slice(1)}`);
+          const { data, error } = await supabase.functions.invoke("generate-cards", {
+            body: { company_id: company.id, tab },
+          });
+          if (error) throw error;
+          if (data?.error) throw new Error(data.error);
+        }
+
+        setResults(prev => [...prev, { id: company.id, name: company.name, status: "done" }]);
+      } catch (e: any) {
+        setResults(prev => [...prev, { id: company.id, name: company.name, status: "error", message: e.message }]);
+      }
+    }
+
+    setCurrent(null);
+    setCurrentStep(null);
+    setRunning(false);
+
+    // Reload list to show what's still missing
+    await loadMissingStories();
+  };
+
+  const stop = () => { abortRef.current = true; };
+
+  const done = results.filter(r => r.status === "done").length;
+  const errors = results.filter(r => r.status === "error").length;
+  const total = companies.length;
+
+  return (
+    <div className="panel space-y-4">
+      <div className="panel-header flex items-center justify-between">
+        <span>Generate All Missing Stories</span>
+        <span className="text-[11px] font-normal text-muted-foreground font-mono">Runs inbound + outbound</span>
+      </div>
+      <p className="text-xs text-muted-foreground leading-relaxed">
+        Finds every company with no story generated yet and runs the full pipeline (Signals → Contacts → Company Intel → Strategy → Outreach → Story) one at a time.
+      </p>
+
+      {/* Load / action buttons */}
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant="outline" onClick={loadMissingStories} disabled={loadingList || running} className="gap-1.5">
+          {loadingList ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <AlertCircle className="w-3.5 h-3.5" />}
+          {companies.length > 0 ? `${companies.length} companies need stories` : "Check Missing Stories"}
+        </Button>
+        {companies.length > 0 && !running && (
+          <Button size="sm" onClick={runAll} className="gap-1.5">
+            <Play className="w-3.5 h-3.5" /> Run {companies.length} Companies
+          </Button>
+        )}
+        {running && (
+          <Button size="sm" variant="destructive" onClick={stop} className="gap-1.5">
+            <Square className="w-3.5 h-3.5" /> Stop
+          </Button>
+        )}
+      </div>
+
+      {/* Progress */}
+      {(running || results.length > 0) && (
+        <div className="space-y-2">
+          {/* Summary bar */}
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <span className="text-foreground font-medium">{done + errors} / {total}</span>
+            {done > 0 && <span className="text-primary flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" />{done} done</span>}
+            {errors > 0 && <span className="text-destructive flex items-center gap-1"><XCircle className="w-3.5 h-3.5" />{errors} failed</span>}
+          </div>
+
+          {/* Progress bar */}
+          <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary rounded-full transition-all duration-300"
+              style={{ width: `${total > 0 ? ((done + errors) / total) * 100 : 0}%` }}
+            />
+          </div>
+
+          {/* Current company */}
+          {current && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-primary flex-shrink-0" />
+              <span className="truncate"><span className="text-foreground font-medium">{current}</span>{currentStep && <span> — {currentStep}…</span>}</span>
+            </div>
+          )}
+
+          {/* Results log (scroll after 5) */}
+          {results.length > 0 && (
+            <div className="max-h-[200px] overflow-y-auto space-y-1 mt-1 pr-1">
+              {[...results].reverse().map(r => (
+                <div key={r.id} className="flex items-start gap-2 text-[12px]">
+                  {r.status === "done"
+                    ? <CheckCircle2 className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
+                    : <XCircle className="w-3.5 h-3.5 text-destructive mt-0.5 flex-shrink-0" />}
+                  <span className={r.status === "error" ? "text-destructive" : "text-foreground"}>
+                    {r.name}{r.message && <span className="text-muted-foreground"> — {r.message}</span>}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── PROCESSING TAB (existing settings) ───
 function ProcessingTab() {
   const { data: dbSettings, isLoading } = useAppSettings();
@@ -1230,6 +1410,8 @@ function ProcessingTab() {
           </div>
         </div>
       </div>
+
+      <BulkGeneratePanel />
 
       <Button onClick={handleSave} disabled={updateMutation.isPending} className="w-full gap-2">
         {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
