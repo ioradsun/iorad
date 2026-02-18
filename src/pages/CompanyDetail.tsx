@@ -274,8 +274,8 @@ export default function CompanyDetail() {
         }
       }
 
-      // Step 3: Find contacts via Apollo (skip for inbound companies — contacts come from HubSpot)
-      if (companyAny?.source_type !== "inbound") {
+      // Step 3: Find contacts via Apollo (skip for partner companies — contacts come from HubSpot)
+      if (companyAny?.category === "partner" || (!companyAny?.category && companyAny?.source_type !== "inbound")) {
         toast.info("Step 3/3 — Finding contacts via Apollo…");
         setFindingContacts(true);
         try {
@@ -295,8 +295,8 @@ export default function CompanyDetail() {
         }
       }
 
-      // Step 3: For inbound companies, extract contact profiles and generate company cards
-      if (companyAny?.source_type === "inbound") {
+      // Step 3: For non-partner companies, extract contact profiles and generate company cards
+      if (companyAny?.category !== "partner") {
         // Extract AI profiles from HubSpot data
         toast.info("Extracting contact profiles…");
         try {
@@ -441,8 +441,8 @@ export default function CompanyDetail() {
     setGeneratingCards(true);
     const firstContactId = contacts[0]?.id || null;
     try {
-      // Outbound-only: Step 0a — Run signals (Firecrawl)
-      if (companyAny?.source_type !== "inbound") {
+      // Non-partner: Step 0a — Run signals (Firecrawl)
+      if (isPartnerCategory) {
         setGenerateStep("Signals");
         toast.info("Running signal search…");
         const { data: sigData, error: sigErr } = await supabase.functions.invoke("run-signals", { body: { company_id: id, mode: "full" } });
@@ -453,7 +453,7 @@ export default function CompanyDetail() {
         queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
       }
 
-      // Step 1: Sync Fathom meetings (both source types)
+      // Step 1: Sync Fathom meetings (all categories)
       if (companyAny?.domain) {
         setGenerateStep("Fathom Sync");
         toast.info("Syncing Fathom meetings…");
@@ -470,8 +470,8 @@ export default function CompanyDetail() {
         }
       }
 
-      // Outbound-only: Step 0b — Find contacts via Apollo
-      if (companyAny?.source_type !== "inbound") {
+      // Partner-only: Step 0b — Find contacts via Apollo
+      if (isPartnerCategory) {
         setGenerateStep("Contacts");
         toast.info("Finding contacts via Apollo…");
         setFindingContacts(true);
@@ -531,27 +531,17 @@ export default function CompanyDetail() {
         }
       }
 
-      // Step 4: Extract contact profiles from HubSpot data (inbound only)
-      if (companyAny?.source_type === "inbound") {
+      // Step 4: Extract contact profiles (for school/business categories with HubSpot data)
+      if (!isPartnerCategory) {
         setGenerateStep("Contact Profiles");
         toast.info("Extracting contact profiles…");
         try {
-          await supabase.functions.invoke("extract-contact-profile", { body: { company_id: id } });
+          const { data: profileData } = await supabase.functions.invoke("extract-contact-profile", { body: { company_id: id } });
+          if (profileData?.profiles_extracted > 0) toast.info(`Extracted ${profileData.profiles_extracted} AI profiles`);
           queryClient.invalidateQueries({ queryKey: ["contacts", id] });
         } catch (pe: any) {
           console.warn("Profile extraction non-fatal:", pe.message);
         }
-      }
-
-      try {
-        const { data: profileData } = await supabase.functions.invoke("extract-contact-profile", {
-          body: { company_id: id },
-        });
-        if (profileData?.profiles_extracted > 0) {
-          toast.info(`Extracted ${profileData.profiles_extracted} AI profiles`);
-        }
-      } catch (pe: any) {
-        console.warn("Profile extraction non-fatal:", pe.message);
       }
 
       // Step 5: Strategy → Outreach → Story
@@ -749,9 +739,11 @@ export default function CompanyDetail() {
   const ioradEmbedUrl = toIoradEmbedUrl(effectiveIoradUrl);
 
   const firstContact = contacts[0] || (companyAny?.buyer_name ? { name: companyAny.buyer_name } : null);
-  // For inbound: use company_cards.id as the story ID (available as soon as any tab is generated)
-  // For outbound (partner-based): /:partner/:customer/stories/:contactFirstName
-  const storyBaseUrl = companyAny?.source_type === "inbound" && companyCards?.id
+  // category determines story URL type: non-partner (school/business) uses company_cards.id; partner uses slug
+  const companyCategory = companyAny?.category || (companyAny?.source_type === "inbound" ? "business" : companyAny?.partner ? "partner" : "business");
+  const companyStage = companyAny?.stage || "prospect";
+  const isPartnerCategory = companyCategory === "partner";
+  const storyBaseUrl = !isPartnerCategory && companyCards?.id
     ? `/stories/${companyCards.id}`
     : firstContact && company.partner
       ? `/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories/${firstContact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "")}`
@@ -783,6 +775,42 @@ export default function CompanyDetail() {
             <h1 className="text-[1.75rem] font-bold tracking-tight leading-tight">{company.name}</h1>
             <p className="text-[13px] text-muted-foreground font-mono mt-0.5">{company.domain || "no domain"}</p>
           </div>
+        </div>
+        {/* Category + Stage inline selectors */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Select
+            value={companyCategory}
+            onValueChange={async (val) => {
+              await updateCompany.mutateAsync({ id: id!, updates: { category: val } as any });
+              queryClient.invalidateQueries({ queryKey: ["company", id] });
+            }}
+          >
+            <SelectTrigger className="h-7 text-xs w-[130px] bg-secondary border-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="school">School (EDU)</SelectItem>
+              <SelectItem value="business">Business (B2B)</SelectItem>
+              <SelectItem value="partner">Partner</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select
+            value={companyStage}
+            onValueChange={async (val) => {
+              await updateCompany.mutateAsync({ id: id!, updates: { stage: val } as any });
+              queryClient.invalidateQueries({ queryKey: ["company", id] });
+            }}
+          >
+            <SelectTrigger className="h-7 text-xs w-[130px] bg-secondary border-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="prospect">Prospect</SelectItem>
+              <SelectItem value="active_opp">Active Opp</SelectItem>
+              <SelectItem value="customer">Customer</SelectItem>
+              <SelectItem value="expansion">Expansion</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -918,7 +946,7 @@ export default function CompanyDetail() {
                 )}
               </div>
               <div className="flex items-center gap-1">
-              {companyAny?.source_type !== "inbound" && (
+              {isPartnerCategory && (
                 <RegenerateBtn section="contacts" label="Find Contacts" />
               )}
               <Dialog open={addContactOpen} onOpenChange={setAddContactOpen}>

@@ -33,6 +33,10 @@ const COLUMN_MAP: Record<string, keyof CSVRow> = {
   "existing customer": "is_existing_customer",
   "is_existing_customer": "is_existing_customer",
   "persona": "persona",
+  "category": "category",
+  "stage": "stage",
+  // backward compat: map source_type values via post-processing
+  "source_type": "category",
 };
 
 function guessDomain(name: string): string | null {
@@ -105,11 +109,20 @@ export default function UploadPage() {
           const existingRaw = (mappedRow.is_existing_customer as any || "").toString().toLowerCase();
           const isExisting = existingRaw === "true" || existingRaw === "yes" || existingRaw === "1";
 
+          // Backward compat: map source_type="inbound" → category="business"
+          let category = (mappedRow.category as any) || null;
+          if (!category) category = "business";
+          if (category === "inbound") category = "business";
+          if (category === "outbound") category = (mappedRow.partner as any) ? "partner" : "business";
+
+          const stage = (mappedRow.stage as any) || "prospect";
+
           valid.push({
             company_name: name, domain: domain || null, partner: (mappedRow.partner as any) || null,
             partner_rep_email: (mappedRow.partner_rep_email as any) || null, partner_rep_name: (mappedRow.partner_rep_name as any) || null,
             hq_country: (mappedRow.hq_country as any) || null, industry: (mappedRow.industry as any) || null,
             headcount, is_existing_customer: isExisting, persona: (mappedRow.persona as any) || null,
+            category, stage,
           });
         });
 
@@ -144,6 +157,8 @@ export default function UploadPage() {
         headcount: r.headcount,
         is_existing_customer: r.is_existing_customer,
         persona: r.persona,
+        category: r.category || "business",
+        stage: r.stage || "prospect",
       }));
       await insertCompanies.mutateAsync(dbRows);
       toast.success(`Imported ${validCount} companies into the database`);
@@ -314,12 +329,17 @@ export default function UploadPage() {
 
 const PARTNERS = ["seismic", "workramp", "360learning", "docebo", "gainsight"];
 
-const PERSONAS = [
-  "Learning & Development",
-  "Sales Enablement",
-  "Revenue Enablement",
-  "Customer Education",
-  "Partner Enablement",
+const CATEGORIES = [
+  { value: "school", label: "School (EDU)" },
+  { value: "business", label: "Business (B2B)" },
+  { value: "partner", label: "Partner (LMS Reseller)" },
+];
+
+const STAGES = [
+  { value: "prospect", label: "Prospect" },
+  { value: "active_opp", label: "Active Opp" },
+  { value: "customer", label: "Customer" },
+  { value: "expansion", label: "Expansion" },
 ];
 
 function ManualAddForm() {
@@ -329,7 +349,8 @@ function ManualAddForm() {
     name: "",
     domain: "",
     partner: "",
-    source_type: "outbound" as "inbound" | "outbound",
+    category: "business",
+    stage: "prospect",
   });
   const [saving, setSaving] = useState(false);
 
@@ -348,9 +369,11 @@ function ManualAddForm() {
       await insertCompanies.mutateAsync([{
         name,
         domain,
-        partner: form.source_type === "outbound" ? (form.partner || null) : null,
+        partner: form.category === "partner" ? (form.partner || null) : null,
         is_existing_customer: false,
-        source_type: form.source_type,
+        category: form.category,
+        stage: form.stage,
+        source_type: form.category === "partner" ? "outbound" : "inbound",
       } as any]);
       toast.success(`Added ${name}`);
       navigate("/");
@@ -365,22 +388,48 @@ function ManualAddForm() {
     <form onSubmit={handleSubmit} className="panel space-y-5">
       <div className="panel-header">Add a Company</div>
 
-      {/* Source type switcher */}
+      {/* Category selector */}
       <div className="space-y-2">
-        <Label className="text-xs">Source Type</Label>
+        <Label className="text-xs">Category</Label>
         <div className="flex items-center bg-secondary rounded-md p-0.5 gap-0.5 w-fit">
-          {(["inbound", "outbound"] as const).map(tab => (
+          {CATEGORIES.map(cat => (
             <button
-              key={tab}
+              key={cat.value}
               type="button"
-              onClick={() => update("source_type", tab)}
-              className={`px-4 py-1.5 rounded text-xs font-medium capitalize transition-all ${
-                form.source_type === tab
+              onClick={() => { update("category", cat.value); if (cat.value !== "partner") update("partner", ""); }}
+              className={`px-4 py-1.5 rounded text-xs font-medium transition-all ${
+                form.category === cat.value
                   ? "bg-card text-foreground shadow-sm shadow-black/[0.06]"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {tab}
+              {cat.value === "school" ? "School" : cat.value === "business" ? "Business" : "Partner"}
+            </button>
+          ))}
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          {form.category === "school" && "EDU institution or university"}
+          {form.category === "business" && "Corporate / B2B prospect or customer"}
+          {form.category === "partner" && "LMS reseller (Seismic, Docebo, etc.)"}
+        </p>
+      </div>
+
+      {/* Stage selector */}
+      <div className="space-y-2">
+        <Label className="text-xs">Stage</Label>
+        <div className="flex items-center bg-secondary rounded-md p-0.5 gap-0.5 w-fit">
+          {STAGES.map(s => (
+            <button
+              key={s.value}
+              type="button"
+              onClick={() => update("stage", s.value)}
+              className={`px-3.5 py-1.5 rounded text-xs font-medium transition-all ${
+                form.stage === s.value
+                  ? "bg-card text-foreground shadow-sm shadow-black/[0.06]"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {s.label}
             </button>
           ))}
         </div>
@@ -408,7 +457,7 @@ function ManualAddForm() {
             maxLength={255}
           />
         </div>
-        {form.source_type === "outbound" && (
+        {form.category === "partner" && (
           <div className="space-y-2 col-span-2">
             <Label className="text-xs">Partner</Label>
             <Select value={form.partner} onValueChange={v => update("partner", v)}>
