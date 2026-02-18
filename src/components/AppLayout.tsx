@@ -1,10 +1,11 @@
 import { Link } from "react-router-dom";
-import { LayoutDashboard, LogOut, Shield } from "lucide-react";
+import { LayoutDashboard, LogOut, Shield, Loader2 } from "lucide-react";
 import ioradLogoDark from "@/assets/iorad-logo-new.png";
 import ioradLogoLight from "@/assets/iorad-logo-light.png";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useActiveJob } from "@/hooks/useSupabase";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -17,6 +18,41 @@ import {
 const menuItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
 ];
+
+function ActiveJobBanner() {
+  const { data: job } = useActiveJob();
+  if (!job) return null;
+
+  const processed = job.companies_processed ?? 0;
+  const total = job.total_companies_targeted ?? 0;
+  const pct = total > 0 ? Math.round((processed / total) * 100) : 0;
+
+  return (
+    <div
+      className="w-full px-6 py-2 flex items-center gap-3 text-xs font-medium"
+      style={{
+        background: "hsl(var(--primary) / 0.08)",
+        borderBottom: "1px solid hsl(var(--primary) / 0.15)",
+        color: "hsl(var(--primary))",
+      }}
+    >
+      <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
+      <span>
+        Batch processing running — {processed} / {total} companies
+        {pct > 0 && ` (${pct}%)`}
+        &nbsp;·&nbsp;
+        {job.companies_succeeded} done
+        {job.companies_failed > 0 && `, ${job.companies_failed} failed`}
+      </span>
+      <Link
+        to="/jobs"
+        className="ml-auto underline underline-offset-2 opacity-70 hover:opacity-100 transition-opacity"
+      >
+        View details
+      </Link>
+    </div>
+  );
+}
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuth();
@@ -97,6 +133,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </DropdownMenu>
           )}
         </div>
+        <ActiveJobBanner />
       </header>
       <main className="max-w-[1600px] mx-auto px-6 py-6">
         {children}
