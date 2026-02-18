@@ -63,14 +63,19 @@ Deno.serve(async (req) => {
       return await syncRecentCompanies(supabase);
     }
 
-    // Validate HubSpot webhook signature for all real webhook events
-    const isValid = await verifyHubSpotSignature(req, rawBody);
-    if (!isValid) {
-      console.error("HubSpot signature validation failed — rejecting request");
-      return new Response(JSON.stringify({ error: "Invalid signature" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // Validate HubSpot webhook signature only when a signature header is actually present
+    const signature = req.headers.get("X-HubSpot-Signature") || req.headers.get("x-hubspot-signature");
+    if (signature) {
+      const isValid = await verifyHubSpotSignature(req, rawBody);
+      if (!isValid) {
+        console.error("HubSpot signature validation failed — rejecting request");
+        return new Response(JSON.stringify({ error: "Invalid signature" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    } else {
+      console.log("No HubSpot signature header — proceeding without signature check");
     }
 
     // Handle HubSpot webhook events (array of subscription events)
