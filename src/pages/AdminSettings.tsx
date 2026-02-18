@@ -1153,11 +1153,26 @@ function BulkGeneratePanel() {
     }
   };
 
+  // Helper: invoke with 1 auto-retry on transient network errors
+  const invokeWithRetry = async (fn: string, body: object, retries = 1): Promise<{ data: any; error: any }> => {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      const result = await supabase.functions.invoke(fn, { body });
+      const isNetworkErr = result.error?.message?.includes("Failed to send a request");
+      if (!isNetworkErr || attempt === retries) return result;
+      // Wait 2s before retrying
+      await new Promise(r => setTimeout(r, 2000));
+    }
+    return { data: null, error: new Error("Max retries exceeded") };
+  };
+
   const runAll = async () => {
     if (companies.length === 0) return;
     abortRef.current = false;
     setRunning(true);
     setResults([]);
+
+    // Use a local accumulator so we can pass accurate results to the notification
+    const localResults: BulkResult[] = [];
 
     for (const company of companies) {
       if (abortRef.current) break;
@@ -1169,23 +1184,21 @@ function BulkGeneratePanel() {
         // Step 1: Signals (outbound only)
         if (!isInbound) {
           setCurrentStep("Signals");
-          const { data: sigData, error: sigErr } = await supabase.functions.invoke("run-signals", {
-            body: { company_id: company.id, mode: "full" },
-          });
-          if (sigErr) throw sigErr;
+          const { data: sigData, error: sigErr } = await invokeWithRetry("run-signals", { company_id: company.id, mode: "full" });
+          if (sigErr) throw new Error(sigErr.message || "Signals step failed");
           if (sigData?.error) throw new Error(sigData.error);
         }
 
         // Step 2: Contacts via Apollo (outbound only)
         if (!isInbound) {
           setCurrentStep("Contacts");
-          await supabase.functions.invoke("find-contacts", { body: { company_id: company.id } });
+          await invokeWithRetry("find-contacts", { company_id: company.id });
         }
 
         // Step 3: Contact profiles (inbound)
         if (isInbound) {
           setCurrentStep("Profiles");
-          await supabase.functions.invoke("extract-contact-profile", { body: { company_id: company.id } });
+          await invokeWithRetry("extract-contact-profile", { company_id: company.id });
         }
 
         // Step 4: Generate all content tabs
@@ -1193,16 +1206,18 @@ function BulkGeneratePanel() {
         for (const tab of tabs) {
           if (abortRef.current) break;
           setCurrentStep(`${tab.charAt(0).toUpperCase() + tab.slice(1)}`);
-          const { data, error } = await supabase.functions.invoke("generate-cards", {
-            body: { company_id: company.id, tab },
-          });
-          if (error) throw error;
+          const { data, error } = await invokeWithRetry("generate-cards", { company_id: company.id, tab });
+          if (error) throw new Error(error.message || `${tab} generation failed`);
           if (data?.error) throw new Error(data.error);
         }
 
-        setResults(prev => [...prev, { id: company.id, name: company.name, status: "done" }]);
+        const result: BulkResult = { id: company.id, name: company.name, status: "done" };
+        localResults.push(result);
+        setResults(prev => [...prev, result]);
       } catch (e: any) {
-        setResults(prev => [...prev, { id: company.id, name: company.name, status: "error", message: e.message }]);
+        const result: BulkResult = { id: company.id, name: company.name, status: "error", message: e.message };
+        localResults.push(result);
+        setResults(prev => [...prev, result]);
       }
     }
 
@@ -1210,14 +1225,14 @@ function BulkGeneratePanel() {
     setCurrentStep(null);
     setRunning(false);
 
-    // Send email notification to admins
-    const finalResults = results; // capture before state updates
+    // Send email notification to admins using accurate local results
+    const doneCount = localResults.filter(r => r.status === "done").length;
+    const errorCount = localResults.filter(r => r.status === "error").length;
     try {
-      const { data: { session } } = await supabase.auth.getSession();
       await supabase.functions.invoke("send-notification", {
         body: {
-          subject: `Bulk Story Generation Complete — ${done} succeeded, ${errors} failed`,
-          results: finalResults,
+          subject: `Bulk Story Generation Complete — ${doneCount} succeeded, ${errorCount} failed`,
+          results: localResults,
         },
       });
       console.log("Admin notification sent");
