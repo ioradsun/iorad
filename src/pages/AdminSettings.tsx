@@ -221,7 +221,31 @@ const TOKEN_GROUPS: { label: string; key: string; tokens: string[] }[] = [
     key: "typography",
     tokens: [
       "--font-display", "--font-body",
+      "--font-size-title", "--font-size-sub",
+      "--font-size-body", "--font-size-sm", "--font-size-xs",
       "--radius",
+    ],
+  },
+  {
+    label: "Buttons",
+    key: "buttons",
+    tokens: [
+      "--btn-primary-bg", "--btn-primary-fg", "--btn-primary-hover",
+      "--btn-secondary-bg", "--btn-secondary-fg",
+      "--btn-destructive-bg", "--btn-destructive-fg",
+      "--btn-radius", "--btn-font-size",
+    ],
+  },
+  {
+    label: "Pills & Badges",
+    key: "pills",
+    tokens: [
+      "--pill-success-bg", "--pill-success-fg",
+      "--pill-warning-bg", "--pill-warning-fg",
+      "--pill-error-bg", "--pill-error-fg",
+      "--pill-info-bg", "--pill-info-fg",
+      "--pill-neutral-bg", "--pill-neutral-fg",
+      "--pill-radius", "--pill-font-size",
     ],
   },
 ];
