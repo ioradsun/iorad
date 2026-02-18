@@ -21,16 +21,21 @@ const menuItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
 ];
 
+const NEW_THRESHOLD_HOURS = 48;
+
 function useWaitingCount() {
   return useQuery({
     queryKey: ["banner_waiting_count"],
     queryFn: async () => {
-      const [{ data: cards }, { count }] = await Promise.all([
+      const cutoff = new Date(Date.now() - NEW_THRESHOLD_HOURS * 60 * 60 * 1000).toISOString();
+      const [{ data: cards }, { data: newCompanies }] = await Promise.all([
         supabase.from("company_cards").select("company_id"),
-        supabase.from("companies").select("id", { count: "exact", head: true }),
+        // Only count recent imports (no story + created within threshold)
+        supabase.from("companies").select("id").gte("created_at", cutoff),
       ]);
       const cardIds = new Set((cards || []).map((c: any) => c.company_id));
-      return (count ?? 0) - cardIds.size;
+      const waiting = (newCompanies || []).filter((c: any) => !cardIds.has(c.id));
+      return waiting.length;
     },
     refetchInterval: 15_000,
   });
