@@ -969,7 +969,7 @@ export default function CompanyDetail() {
           <div className="panel">
             <div className="panel-header flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <span>Contacts ({contacts.length || (companyAny?.buyer_name ? 1 : 0)})</span>
+                <span>Contacts ({contacts.filter((c: any) => !c.email?.toLowerCase().includes("student")).length || (companyAny?.buyer_name ? 1 : 0)})</span>
                 {findingContacts && (
                   <span className="text-[11px] text-muted-foreground font-normal flex items-center gap-1">
                     <Loader2 className="w-3 h-3 animate-spin" />
@@ -1019,7 +1019,7 @@ export default function CompanyDetail() {
               ))}
             </div>
             )}
-            {contacts.length > 0 && (
+            {contacts.filter((c: any) => !c.email?.toLowerCase().includes("student")).length > 0 && (
               <div className="px-4 pb-3">
                 <Input
                   placeholder="Search contacts…"
@@ -1030,7 +1030,7 @@ export default function CompanyDetail() {
               </div>
             )}
             <div className="px-4 pb-4">
-              {contacts.length > 0 ? (() => {
+              {contacts.filter((c: any) => !c.email?.toLowerCase().includes("student")).length > 0 ? (() => {
                 const filtered = contacts.filter((c) => {
                   if (c.email?.toLowerCase().includes("student")) return false;
                   if (!contactSearch) return true;
