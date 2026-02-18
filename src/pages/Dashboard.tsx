@@ -52,7 +52,8 @@ export default function Dashboard() {
 
   const inbound = useMemo(() => sorted.filter(c => (c as any).source_type === "inbound"), [sorted]);
   const outbound = useMemo(() => sorted.filter(c => (c as any).source_type !== "inbound"), [sorted]);
-  const activeList = activeTab === "inbound" ? inbound : outbound;
+  // When searching, show all results regardless of active tab
+  const activeList = search ? sorted : (activeTab === "inbound" ? inbound : outbound);
 
   const partners = useMemo(() => {
     const set = new Set(companies.map(c => c.partner).filter(Boolean) as string[]);
@@ -194,6 +195,11 @@ export default function Dashboard() {
               <th className="text-left px-5 py-3">
                 <SortHeader label="Company" field="name" />
               </th>
+              {search && (
+                <th className="text-left px-5 py-3 hidden sm:table-cell">
+                  <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Source</span>
+                </th>
+              )}
               <th className="text-left px-5 py-3 hidden md:table-cell">
                 <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Partner</span>
               </th>
@@ -225,6 +231,11 @@ export default function Dashboard() {
                     <div className="text-xs text-muted-foreground mt-0.5">{company.domain}</div>
                   )}
                 </td>
+                {search && (
+                  <td className="px-5 py-3.5 hidden sm:table-cell">
+                    <SourcePill type={(company as any).source_type || "outbound"} />
+                  </td>
+                )}
                 <td className="px-5 py-3.5 hidden md:table-cell">
                   <span className="text-sm text-muted-foreground">{company.partner || "—"}</span>
                 </td>
@@ -299,5 +310,25 @@ function KpiCard({
         <div className="text-xs font-medium text-muted-foreground mt-1 leading-tight">{label}</div>
       </div>
     </div>
+  );
+}
+
+function SourcePill({ type }: { type: string }) {
+  const isInbound = type === "inbound";
+  return (
+    <span
+      className="inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded border"
+      style={isInbound ? {
+        background: "var(--source-inbound-bg)",
+        color: "var(--source-inbound-fg)",
+        borderColor: "var(--source-inbound-border)",
+      } : {
+        background: "var(--source-outbound-bg)",
+        color: "var(--source-outbound-fg)",
+        borderColor: "var(--source-outbound-border)",
+      }}
+    >
+      {type}
+    </span>
   );
 }
