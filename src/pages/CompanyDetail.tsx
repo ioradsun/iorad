@@ -473,7 +473,7 @@ export default function CompanyDetail() {
         <TabsContent value="company" className="space-y-6 mt-6">
           <div className="flex items-center justify-between">
           <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Company Intel</h3>
-            <Button size="sm" variant="outline" className="gap-1.5 text-[13px]" onClick={() => regenerate("full")} disabled={regenerating}>
+            <Button size="sm" className="gap-1.5 text-[13px]" onClick={() => regenerate("full")} disabled={regenerating}>
               {regenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
               {regenerating ? "Generating…" : signals.length > 0 ? "Regenerate" : "Generate"}
             </Button>
@@ -1152,7 +1152,7 @@ export default function CompanyDetail() {
             <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Strategy & Cards</h3>
               {contactSelector}
             </div>
-            <Button size="sm" variant="outline" className="gap-1.5 text-[13px]" onClick={generateCards} disabled={generatingCards}>
+            <Button size="sm" className="gap-1.5 text-[13px]" onClick={generateCards} disabled={generatingCards}>
               {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
               {generatingCards ? "Generating…" : cards.length > 0 ? "Regenerate" : "Generate"}
             </Button>
@@ -1179,7 +1179,7 @@ export default function CompanyDetail() {
             <div className="panel text-center py-8">
               <Sparkles className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
               <p className="text-sm text-muted-foreground mb-3">No dashboard cards generated yet.</p>
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={generateCards} disabled={generatingCards}>
+              <Button size="sm" className="gap-1.5 text-xs" onClick={generateCards} disabled={generatingCards}>
                 {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                 Generate Cards
               </Button>
@@ -1194,7 +1194,7 @@ export default function CompanyDetail() {
               <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Outreach Assets</h3>
               {contactSelector}
             </div>
-            <Button size="sm" variant="outline" className="gap-1.5 text-[13px]" onClick={generateCards} disabled={generatingCards}>
+            <Button size="sm" className="gap-1.5 text-[13px]" onClick={generateCards} disabled={generatingCards}>
               {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
               {generatingCards ? "Generating…" : (assets.email_sequence || assets.linkedin_sequence) ? "Regenerate" : "Generate"}
             </Button>
@@ -1224,7 +1224,7 @@ export default function CompanyDetail() {
             <div className="panel text-center py-8">
               <Mail className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
               <p className="text-sm text-muted-foreground mb-3">No outreach assets generated yet.</p>
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={generateCards} disabled={generatingCards}>
+              <Button size="sm" className="gap-1.5 text-xs" onClick={generateCards} disabled={generatingCards}>
                 {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                 Generate Cards
               </Button>
@@ -1247,7 +1247,7 @@ export default function CompanyDetail() {
                   </Button>
                 </a>
               )}
-              <Button size="sm" variant="outline" className="gap-1.5 text-[13px]" onClick={generateCards} disabled={generatingCards}>
+              <Button size="sm" className="gap-1.5 text-[13px]" onClick={generateCards} disabled={generatingCards}>
                 {generatingCards ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                 {generatingCards ? "Generating…" : (assets.story_assets ? "Regenerate" : "Generate")}
               </Button>
