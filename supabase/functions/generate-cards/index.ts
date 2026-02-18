@@ -214,21 +214,44 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
     }
 
     // Extract the three pieces.
-    // For inbound strategy responses the AI returns a flat object (not cards[]),
-    // so we detect that case and wrap it into the account_json for the frontend.
+    // Inbound prompts return flat objects at the root level instead of nested under cards/assets/account.
+    // We detect each format and normalize accordingly.
     let cards_json = parsed.cards || [];
     let assets_json = parsed.assets || {};
     let account_json = parsed.account || {};
 
-    // Inbound strategy prompt returns a flat object with keys like observed_behavior, inferred_initiative, etc.
-    // Detect this and store it as account_json so the frontend can render it.
+    // Inbound STRATEGY response: flat object with keys like observed_behavior, inferred_initiative, etc.
     if (
       cards_json.length === 0 &&
       Object.keys(assets_json).length === 0 &&
       Object.keys(account_json).length === 0 &&
       (parsed.observed_behavior || parsed.inferred_initiative || parsed.execution_gap)
     ) {
-      account_json = parsed; // store the full flat inbound response
+      account_json = parsed; // store the full flat inbound strategy response
+    }
+
+    // Inbound OUTREACH response: flat object with email_sequence/linkedin_sequence at root
+    // plus metadata fields (intent_tier, behavior_acknowledged, etc.)
+    if (
+      cards_json.length === 0 &&
+      Object.keys(assets_json).length === 0 &&
+      Object.keys(account_json).length === 0 &&
+      (parsed.email_sequence || parsed.linkedin_sequence)
+    ) {
+      // Lift sequences into assets_json so existing outreach rendering works
+      assets_json = {
+        email_sequence: parsed.email_sequence || null,
+        linkedin_sequence: parsed.linkedin_sequence || null,
+      };
+      // Store inbound metadata in account_json for rendering
+      account_json = {
+        intent_tier: parsed.intent_tier || null,
+        behavior_acknowledged: parsed.behavior_acknowledged || null,
+        momentum_frame: parsed.momentum_frame || null,
+        expansion_opportunity: parsed.expansion_opportunity || null,
+        risk_if_stalled: parsed.risk_if_stalled || null,
+        upside_if_executed: parsed.upside_if_executed || null,
+      };
     }
 
     // Upsert into company_cards — use onConflict to handle the unique constraint safely
