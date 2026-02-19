@@ -157,12 +157,14 @@ export default function Dashboard() {
   };
 
   const handleBulkImport = async () => {
-    toast.info("Starting bulk HubSpot import (all companies)… this runs in the background.", { duration: 6000 });
+    toast.info("Starting full HubSpot sync (companies → contacts → scoring)…", { duration: 6000 });
     try {
-      const result = await bulkImport.mutateAsync();
-      toast.success(`Bulk import started — ${result.imported ?? 0} new, ${result.updated ?? 0} updated. Scout scoring will run automatically.`);
+      const { data, error } = await supabase.functions.invoke("hubspot-pipeline", { body: {} });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success("Pipeline started — check Job History for live progress.");
     } catch (err: any) {
-      toast.error(`Bulk import failed: ${err?.message || "Unknown error"}`);
+      toast.error(`Pipeline failed: ${err?.message || "Unknown error"}`);
     }
   };
 

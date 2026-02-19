@@ -120,6 +120,7 @@ function useHubspotJobs() {
       return (data || []).filter((j: any) => {
         const snap = (j.settings_snapshot as any) || {};
         return (
+          j.trigger === "hubspot_pipeline" ||
           j.trigger === "bulk_import" ||
           j.trigger === "hubspot_sync" ||
           j.trigger === "hubspot_backfill" ||
@@ -248,40 +249,52 @@ function SyncJobSummary({ job, onCancel }: { job: any; onCancel?: () => void }) 
   const isRunning = job.status === "running";
   const isCompleted = job.status === "completed";
   const isCanceled = job.status === "canceled" || job.status === "failed";
+  const isPipeline = job.trigger === "hubspot_pipeline";
 
-  // Detect stall: running for >30 min but companies_processed hasn't changed in a while
+  // Detect stall: running for >30 min
   const minutesRunning = (Date.now() - new Date(job.started_at).getTime()) / 60_000;
   const isStalled = isRunning && minutesRunning > 30;
-  const pct = job.total_companies_targeted > 0
-    ? Math.round((job.companies_processed / job.total_companies_targeted) * 100)
-    : null;
 
   const { data: stats } = useJobStats(job);
+
+  // Phase info for pipeline jobs
+  const phase: number | string = snap.phase ?? 0;
+  const PHASE_LABELS: Record<string | number, { label: string; detail: string }> = {
+    1: { label: "Phase 1 — Companies", detail: `Upserting companies from HubSpot (${snap.phase1_processed ?? 0} so far)` },
+    2: { label: "Phase 2 — Contacts",  detail: `Fetching contacts for companies with none (${snap.phase2_contacts_imported ?? 0} imported)` },
+    3: { label: "Phase 3 — Scoring",   detail: `Scoring touched companies (${snap.phase3_scored ?? 0}/${(snap.touched_ids ?? []).length})` },
+    done: { label: "Complete", detail: "All 3 phases finished successfully" },
+  };
+  const phaseInfo = PHASE_LABELS[phase] ?? null;
+
+  // Phase progress bar for pipeline
+  const phaseNum = typeof phase === "number" ? phase : 3;
+  const phasePct = isPipeline ? Math.round(((phaseNum - 1) / 3) * 100) : null;
 
   const statCells = [
     {
       label: "Upserted",
-      value: stats?.upserted ?? job.companies_processed ?? 0,
+      value: isPipeline ? (snap.phase1_processed ?? 0) : (stats?.upserted ?? job.companies_processed ?? 0),
       icon: <Download className="w-3 h-3" />,
       description: "Company records created or updated",
     },
     {
       label: "Contacts Imported",
-      value: stats?.withContacts ?? 0,
+      value: isPipeline ? (snap.phase2_contacts_imported ?? 0) : (stats?.withContacts ?? 0),
       icon: <User className="w-3 h-3" />,
-      description: "Companies that now have ≥1 contact",
+      description: "Contacts fetched from HubSpot",
     },
     {
       label: "Scout Scored",
-      value: stats?.scored ?? 0,
+      value: isPipeline ? (snap.phase3_scored ?? 0) : (stats?.scored ?? 0),
       icon: <Zap className="w-3 h-3" />,
       description: "Companies with a fresh Scout Score",
     },
     {
       label: "Errors",
-      value: stats?.failed ?? 0,
+      value: job.companies_failed ?? 0,
       icon: <AlertCircle className="w-3 h-3" />,
-      warn: (stats?.failed ?? 0) > 0,
+      warn: (job.companies_failed ?? 0) > 0,
     },
   ];
 
@@ -305,6 +318,20 @@ function SyncJobSummary({ job, onCancel }: { job: any; onCancel?: () => void }) 
         </div>
       )}
 
+      {/* Phase progress strip for pipeline jobs */}
+      {isPipeline && isRunning && phaseInfo && (
+        <div className="rounded-md bg-primary/5 border border-primary/15 px-3 py-2">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs font-semibold text-primary">{phaseInfo.label}</span>
+            <span className="text-xs text-muted-foreground">Phase {phaseNum} of 3</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-muted overflow-hidden mb-1">
+            <div className="h-full rounded-full bg-primary transition-all duration-700" style={{ width: `${phasePct}%` }} />
+          </div>
+          <p className="text-[11px] text-muted-foreground">{phaseInfo.detail}</p>
+        </div>
+      )}
+
       {/* Status row */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
@@ -312,10 +339,12 @@ function SyncJobSummary({ job, onCancel }: { job: any; onCancel?: () => void }) 
           {isCompleted && <CheckCircle2 className="w-4 h-4 text-success" />}
           {isCanceled && <XCircle className="w-4 h-4 text-destructive" />}
           <span className="text-sm font-semibold capitalize">
-            {isStalled ? "Stalled" : isRunning ? "Syncing…" : job.status}
+            {isStalled ? "Stalled" : isRunning ? (isPipeline ? "Pipeline running…" : "Syncing…") : job.status}
           </span>
           <span className="text-xs text-muted-foreground">
-            {job.trigger === "hubspot_backfill"
+            {job.trigger === "hubspot_pipeline"
+              ? "Full 3-phase sync"
+              : job.trigger === "hubspot_backfill"
               ? "Full backfill"
               : snap.action === "fix_missing_contacts"
               ? "Fix missing contacts"
@@ -344,23 +373,26 @@ function SyncJobSummary({ job, onCancel }: { job: any; onCancel?: () => void }) 
       </div>
 
       {/* Progress bar */}
-      {job.total_companies_targeted > 0 && (
-        <div className="space-y-1">
-          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-700"
-              style={{
-                width: `${pct ?? 0}%`,
-                background: isCompleted ? "hsl(var(--success))" : "hsl(var(--primary))",
-              }}
-            />
+      {job.total_companies_targeted > 0 && (() => {
+        const barPct = Math.round((job.companies_processed / job.total_companies_targeted) * 100);
+        return (
+          <div className="space-y-1">
+            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{
+                  width: `${barPct ?? 0}%`,
+                  background: isCompleted ? "hsl(var(--success))" : "hsl(var(--primary))",
+                }}
+              />
+            </div>
+            <div className="flex justify-between text-[11px] text-muted-foreground tabular-nums">
+              <span>{job.companies_processed} / {job.total_companies_targeted} companies</span>
+              <span>{barPct}%</span>
+            </div>
           </div>
-          <div className="flex justify-between text-[11px] text-muted-foreground tabular-nums">
-            <span>{job.companies_processed} / {job.total_companies_targeted} companies</span>
-            <span>{pct}%</span>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Stats grid — 4 meaningful counters */}
       <div className="grid grid-cols-4 gap-2 pt-1">
@@ -539,39 +571,22 @@ function HubSpotSyncTab() {
   const { data: jobs = [], isLoading: loadingJobs } = useHubspotJobs();
   const { data: companies = [], isLoading: loadingCompanies } = useRecentlyImported();
 
-  const triggerSync = useMutation({
+  // ── Single pipeline trigger (replaces old bulk_import + fix_missing_contacts) ─
+  const runPipeline = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("import-from-hubspot", {
-        body: { action: "bulk_import" },
+      const { data, error } = await supabase.functions.invoke("hubspot-pipeline", {
+        body: {},
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       return data;
     },
     onSuccess: () => {
-      toast.success("Bulk HubSpot sync started — running in background.");
+      toast.success("Full HubSpot sync started — companies → contacts → scoring. Running in background.");
       qc.invalidateQueries({ queryKey: ["hubspot_jobs"] });
     },
     onError: (err: any) => {
-      toast.error(`Sync failed: ${err?.message || "Unknown error"}`);
-    },
-  });
-
-  const fixContacts = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("import-from-hubspot", {
-        body: { action: "fix_missing_contacts" },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      return data;
-    },
-    onSuccess: () => {
-      toast.success("Fixing missing contacts — running in background. This may take a while.");
-      qc.invalidateQueries({ queryKey: ["hubspot_jobs"] });
-    },
-    onError: (err: any) => {
-      toast.error(`Fix contacts failed: ${err?.message || "Unknown error"}`);
+      toast.error(`Pipeline failed to start: ${err?.message || "Unknown error"}`);
     },
   });
 
@@ -579,7 +594,7 @@ function HubSpotSyncTab() {
     mutationFn: async (jobId: string) => {
       const { error } = await supabase
         .from("processing_jobs")
-        .update({ status: "canceled", finished_at: new Date().toISOString(), error_summary: "Manually canceled by user — job appeared stalled." })
+        .update({ status: "canceled", finished_at: new Date().toISOString(), error_summary: "Manually canceled by user." })
         .eq("id", jobId);
       if (error) throw error;
     },
@@ -597,7 +612,6 @@ function HubSpotSyncTab() {
 
   // Categorise companies
   const scored = companies.filter((c: any) => c.scout_score != null);
-  const withContacts = companies.filter((c: any) => c.contact_count > 0);
   const noContacts = companies.filter((c: any) => c.contact_count === 0);
 
   const [companyTab, setCompanyTab] = useState<"all" | "scored" | "no_contacts">("all");
@@ -617,36 +631,26 @@ function HubSpotSyncTab() {
 
   return (
     <div className="space-y-5">
-      {/* Header row with buttons */}
+      {/* Header row — single pipeline button */}
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">HubSpot Sync</h2>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => fixContacts.mutate()}
-            disabled={fixContacts.isPending || !!activeJob}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-border bg-card text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            title="Fetch contacts from HubSpot for all companies that currently have none"
-          >
-            {fixContacts.isPending ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <User className="w-3.5 h-3.5" />
-            )}
-            Fix Missing Contacts
-          </button>
-          <button
-            onClick={() => triggerSync.mutate()}
-            disabled={triggerSync.isPending || !!activeJob}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {triggerSync.isPending ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Download className="w-3.5 h-3.5" />
-            )}
-            {activeJob ? "Sync running…" : "Sync All Companies"}
-          </button>
+        <div>
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">HubSpot Sync</h2>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            Runs sequentially: Phase 1 companies → Phase 2 contacts → Phase 3 scoring
+          </p>
         </div>
+        <button
+          onClick={() => runPipeline.mutate()}
+          disabled={runPipeline.isPending || !!activeJob}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {runPipeline.isPending || activeJob ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <Download className="w-3.5 h-3.5" />
+          )}
+          {activeJob ? "Sync running…" : "Run Full Sync"}
+        </button>
       </div>
 
       {/* Active job card */}
@@ -680,7 +684,9 @@ function HubSpotSyncTab() {
                   {icon}
                   <span className="text-muted-foreground">{fmt(job.started_at)}</span>
                   <span className="text-foreground">
-                    {snap.current_company
+                    {job.trigger === "hubspot_pipeline"
+                      ? "Full pipeline (3 phases)"
+                      : snap.current_company
                       ? snap.current_company
                       : snap.action === "bulk_import"
                       ? "All companies"
@@ -707,7 +713,7 @@ function HubSpotSyncTab() {
           <div className="grid grid-cols-4 gap-2">
             {[
               { label: "Total imported", value: companies.length, icon: <Download className="w-3.5 h-3.5" /> },
-              { label: "With contacts", value: withContacts.length, icon: <User className="w-3.5 h-3.5" /> },
+              { label: "With contacts", value: companies.filter((c: any) => c.contact_count > 0).length, icon: <User className="w-3.5 h-3.5" /> },
               { label: "Scout scored", value: scored.length, icon: <Zap className="w-3.5 h-3.5" /> },
               { label: "Missing contacts", value: noContacts.length, icon: <AlertCircle className="w-3.5 h-3.5" />, warn: noContacts.length > 0 },
             ].map(({ label, value, icon, warn }) => (
