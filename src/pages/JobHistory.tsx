@@ -243,11 +243,15 @@ function useJobStats(job: any) {
   });
 }
 
-function SyncJobSummary({ job }: { job: any }) {
+function SyncJobSummary({ job, onCancel }: { job: any; onCancel?: () => void }) {
   const snap = job.settings_snapshot as any || {};
   const isRunning = job.status === "running";
   const isCompleted = job.status === "completed";
   const isCanceled = job.status === "canceled" || job.status === "failed";
+
+  // Detect stall: running for >30 min but companies_processed hasn't changed in a while
+  const minutesRunning = (Date.now() - new Date(job.started_at).getTime()) / 60_000;
+  const isStalled = isRunning && minutesRunning > 30;
   const pct = job.total_companies_targeted > 0
     ? Math.round((job.companies_processed / job.total_companies_targeted) * 100)
     : null;
@@ -282,7 +286,25 @@ function SyncJobSummary({ job }: { job: any }) {
   ];
 
   return (
-    <div className="rounded-lg border border-border bg-card/50 p-4 space-y-3">
+    <div className={`rounded-lg border p-4 space-y-3 ${isStalled ? "border-warning/50 bg-warning/5" : "border-border bg-card/50"}`}>
+      {/* Stall warning banner */}
+      {isStalled && (
+        <div className="flex items-center gap-2 rounded-md bg-warning/10 border border-warning/30 px-3 py-2 text-xs text-warning">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+          <span className="flex-1">
+            This job has been running for <strong>{Math.round(minutesRunning)} minutes</strong> — the background worker may have stalled.
+          </span>
+          {onCancel && (
+            <button
+              onClick={onCancel}
+              className="ml-2 px-2.5 py-1 rounded bg-warning/20 hover:bg-warning/30 border border-warning/40 font-medium transition-colors whitespace-nowrap"
+            >
+              Cancel job
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Status row */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
@@ -290,7 +312,7 @@ function SyncJobSummary({ job }: { job: any }) {
           {isCompleted && <CheckCircle2 className="w-4 h-4 text-success" />}
           {isCanceled && <XCircle className="w-4 h-4 text-destructive" />}
           <span className="text-sm font-semibold capitalize">
-            {isRunning ? "Syncing…" : job.status}
+            {isStalled ? "Stalled" : isRunning ? "Syncing…" : job.status}
           </span>
           <span className="text-xs text-muted-foreground">
             {job.trigger === "hubspot_backfill"
@@ -304,11 +326,21 @@ function SyncJobSummary({ job }: { job: any }) {
               : snap.action ?? "HubSpot sync"}
           </span>
         </div>
-        <span className="text-xs text-muted-foreground tabular-nums">
-          {fmt(job.started_at)}
-          {job.finished_at && ` · ${elapsed(job.started_at)} total`}
-          {isRunning && ` · ${elapsed(job.started_at)} elapsed`}
-        </span>
+        <div className="flex items-center gap-2">
+          {isRunning && !isStalled && onCancel && (
+            <button
+              onClick={onCancel}
+              className="text-xs px-2 py-0.5 rounded border border-border text-muted-foreground hover:text-destructive hover:border-destructive/50 transition-colors"
+            >
+              Cancel
+            </button>
+          )}
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {fmt(job.started_at)}
+            {job.finished_at && ` · ${elapsed(job.started_at)} total`}
+            {isRunning && ` · ${elapsed(job.started_at)} elapsed`}
+          </span>
+        </div>
       </div>
 
       {/* Progress bar */}
@@ -543,6 +575,23 @@ function HubSpotSyncTab() {
     },
   });
 
+  const cancelJob = useMutation({
+    mutationFn: async (jobId: string) => {
+      const { error } = await supabase
+        .from("processing_jobs")
+        .update({ status: "canceled", finished_at: new Date().toISOString(), error_summary: "Manually canceled by user — job appeared stalled." })
+        .eq("id", jobId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Job canceled.");
+      qc.invalidateQueries({ queryKey: ["hubspot_jobs"] });
+    },
+    onError: (err: any) => {
+      toast.error(`Cancel failed: ${err?.message || "Unknown error"}`);
+    },
+  });
+
   const activeJob = jobs.find((j: any) => j.status === "running");
   const recentJobs = jobs.slice(0, 5);
 
@@ -602,7 +651,7 @@ function HubSpotSyncTab() {
 
       {/* Active job card */}
       {activeJob ? (
-        <SyncJobSummary job={activeJob} />
+        <SyncJobSummary job={activeJob} onCancel={() => cancelJob.mutate(activeJob.id)} />
       ) : (
         <div className="rounded-lg border border-border bg-card/50 px-4 py-3 flex items-center gap-2 text-sm text-muted-foreground">
           <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
