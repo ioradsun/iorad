@@ -30,3 +30,6 @@ verify_jwt = false
 [functions.backfill-hubspot]
 verify_jwt = false
 
+[functions.hubspot-pipeline]
+verify_jwt = false
+
