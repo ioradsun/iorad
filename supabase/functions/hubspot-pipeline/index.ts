@@ -509,6 +509,23 @@ Deno.serve(async (req) => {
 
     console.log(`pipeline: job=${jobId} phase=${phase}`);
 
+    // ── Canceled check: re-read job status from DB before every chained batch ──
+    // This is what actually stops the pipeline when the user hits "Cancel".
+    if (jobId) {
+      const { data: jobRow } = await supabase
+        .from("processing_jobs")
+        .select("status")
+        .eq("id", jobId)
+        .single();
+      if (jobRow?.status === "canceled" || jobRow?.status === "failed") {
+        console.log(`pipeline: job ${jobId} is ${jobRow.status} — stopping chain.`);
+        return new Response(
+          JSON.stringify({ status: "stopped", reason: jobRow.status, job_id: jobId }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     if (phase === 1)             await runPhase1(supabase, apiKey, jobId, snap);
     else if (phase === 2)        await runPhase2(supabase, apiKey, jobId, snap);
     else if (phase === 3)        await runPhase3(supabase, jobId, snap);
