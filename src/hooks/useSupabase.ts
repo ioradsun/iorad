@@ -14,12 +14,22 @@ export function useCompanies() {
   return useQuery({
     queryKey: ["companies"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("companies")
-        .select("*")
-        .order("last_score_total", { ascending: false, nullsFirst: false });
-      if (error) throw error;
-      return data as DbCompany[];
+      // Fetch all companies — paginate past the default 1000-row limit
+      const PAGE = 1000;
+      let allData: DbCompany[] = [];
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from("companies")
+          .select("*")
+          .order("last_score_total", { ascending: false, nullsFirst: false })
+          .range(from, from + PAGE - 1);
+        if (error) throw error;
+        allData = allData.concat(data as DbCompany[]);
+        if (!data || data.length < PAGE) break;
+        from += PAGE;
+      }
+      return allData;
     },
   });
 }
