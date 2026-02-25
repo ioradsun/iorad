@@ -232,35 +232,16 @@ export function useRunSignals() {
 // ---- Company Cards ----
 export function useCompanyCards(companyId: string | undefined, contactId?: string) {
   return useQuery({
-    queryKey: ["company_cards", companyId, contactId || "default"],
+    queryKey: ["company_cards", companyId],
     enabled: !!companyId,
     queryFn: async () => {
-      let query = supabase
+      // company_cards has a unique constraint on company_id — one row per company
+      const { data, error } = await supabase
         .from("company_cards")
         .select("*")
-        .eq("company_id", companyId!);
-      if (contactId) {
-        query = query.eq("contact_id", contactId);
-      } else {
-        query = query.is("contact_id", null);
-      }
-      const { data, error } = await query
-        .order("created_at", { ascending: false })
-        .limit(1)
+        .eq("company_id", companyId!)
         .maybeSingle();
       if (error) throw error;
-      // Fallback: if no exact match, try any row for this company (supports story link)
-      if (!data) {
-        const { data: fallback, error: fbErr } = await supabase
-          .from("company_cards")
-          .select("*")
-          .eq("company_id", companyId!)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (fbErr) throw fbErr;
-        return fallback;
-      }
       return data;
     },
   });
