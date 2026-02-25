@@ -60,8 +60,8 @@ export default function InternalSignals() {
                 {initials}
               </AvatarFallback>
             </Avatar>
-            <span className="text-muted-foreground text-sm flex-1">
-              What's on your mind, {displayName.split(" ")[0]}?
+      <span className="text-muted-foreground text-sm flex-1">
+              What's your idea or problem with Scout?
             </span>
           </button>
         ) : (
@@ -114,19 +114,25 @@ export default function InternalSignals() {
         )}
       </div>
 
-      {/* Tab pills */}
-      <div className="flex items-center gap-2 mb-5">
-        {(["open", "closed"] as const).map((t) => (
+      {/* Subtle underline tabs */}
+      <div className="flex items-center border-b mb-5">
+        {([
+          { key: "open" as const, label: "Recent" },
+          { key: "closed" as const, label: "Resolved" },
+        ]).map((t) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              tab === t
-                ? "bg-foreground text-background"
-                : "bg-muted text-muted-foreground hover:bg-muted/80"
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`px-4 py-2.5 text-sm font-semibold transition-colors relative ${
+              tab === t.key
+                ? "text-foreground"
+                : "text-muted-foreground hover:text-foreground/70"
             }`}
           >
-            {t === "open" ? "Open" : "Closed"}
+            {t.label}
+            {tab === t.key && (
+              <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-foreground rounded-full" />
+            )}
           </button>
         ))}
       </div>

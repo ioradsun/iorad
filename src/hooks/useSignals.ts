@@ -11,6 +11,7 @@ export interface Signal {
   title: string;
   description: string;
   status: "open" | "closed";
+  resolution: string | null;
   reactions: Record<string, string[]>;
   created_at: string;
   updated_at: string;
@@ -197,11 +198,17 @@ export function useToggleSignalStatus() {
   const qc = useQueryClient();
   const { user } = useAuth();
   return useMutation({
-    mutationFn: async ({ signalId, currentStatus, signalAuthorId }: { signalId: string; currentStatus: string; signalAuthorId: string }) => {
+    mutationFn: async ({ signalId, currentStatus, signalAuthorId, resolution }: { signalId: string; currentStatus: string; signalAuthorId: string; resolution?: string }) => {
       const newStatus = currentStatus === "open" ? "closed" : "open";
+      const updatePayload: Record<string, any> = { status: newStatus, updated_at: new Date().toISOString() };
+      if (newStatus === "closed" && resolution) {
+        updatePayload.resolution = resolution;
+      } else if (newStatus === "open") {
+        updatePayload.resolution = null;
+      }
       const { error } = await supabase
         .from("internal_signals")
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .update(updatePayload)
         .eq("id", signalId);
       if (error) throw error;
 

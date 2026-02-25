@@ -1,0 +1,1 @@
+ALTER TABLE public.internal_signals ADD COLUMN resolution text;
