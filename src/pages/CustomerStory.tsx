@@ -70,6 +70,41 @@ function useDbStory(partner?: string, customerSlug?: string) {
   });
 }
 
+// Inbound stories by company name slug (+ optional contact slug)
+function useInboundStoryBySlug(companySlug?: string, contactSlug?: string) {
+  return useQuery({
+    queryKey: ["inbound-story-slug", companySlug, contactSlug],
+    enabled: !!companySlug,
+    queryFn: async () => {
+      // Find company by name slug
+      const namePattern = slugToName(companySlug!).replace(/ /g, "%");
+      const { data: companies, error: compError } = await supabase
+        .from("companies")
+        .select("*")
+        .ilike("name", namePattern);
+      if (compError) throw compError;
+
+      const company = companies?.find(
+        (c) => c.name.toLowerCase().replace(/\s+/g, "-") === companySlug!.toLowerCase()
+      ) || companies?.[0];
+      if (!company) return null;
+
+      // Find company_cards for this company
+      const { data: card, error: cardError } = await supabase
+        .from("company_cards")
+        .select("*")
+        .eq("company_id", company.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (cardError) throw cardError;
+      if (!card) return null;
+
+      return { card, company };
+    },
+  });
+}
+
 // Inbound stories: look up by company_cards.id and build story from account_json
 function useInboundStory(cardsId?: string) {
   return useQuery({
@@ -340,17 +375,35 @@ function getPartnerMeta(partnerKey: string, dbConfig: any): PartnerMeta {
 }
 
 export default function CustomerStory() {
-  const { id, partner, customer: customerParam, contactName } = useParams<{ id: string; partner: string; customer: string; contactName: string }>();
+  const { id, partner, customer: customerParam, contactName, companySlug, contactSlug } = useParams<{ id: string; partner: string; customer: string; contactName: string; companySlug: string; contactSlug: string }>();
 
+  const isUuid = id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
   const legacyCustomer = id ? customers.find((c) => c.id === id) : null;
+
   // Outbound: partner + customer slug path
   const { data: dbData, isLoading: dbLoading } = useDbStory(partner, customerParam);
-  // Inbound: /stories/:id where id is a company_cards.id (no partner/customer in URL)
-  const isInboundRoute = !!id && !partner && !legacyCustomer;
-  const { data: inboundData, isLoading: inboundLoading } = useInboundStory(isInboundRoute ? id : undefined);
 
-  const formattedContactName = contactName
-    ? contactName.charAt(0).toUpperCase() + contactName.slice(1).toLowerCase()
+  // Inbound by UUID: /stories/:uuid
+  const isInboundUuidRoute = !!isUuid && !partner && !legacyCustomer;
+  const { data: inboundData, isLoading: inboundLoading } = useInboundStory(isInboundUuidRoute ? id : undefined);
+
+  // Inbound by slug: /stories/:companySlug/:contactSlug
+  const isSlugRoute = !!companySlug;
+  const { data: slugData, isLoading: slugLoading } = useInboundStoryBySlug(
+    isSlugRoute ? companySlug : undefined,
+    isSlugRoute ? contactSlug : undefined
+  );
+
+  // Also handle /stories/:id where id is a non-UUID slug (single segment)
+  const isSingleSlugRoute = !!id && !isUuid && !partner && !legacyCustomer;
+  const { data: singleSlugData, isLoading: singleSlugLoading } = useInboundStoryBySlug(
+    isSingleSlugRoute ? id : undefined,
+    undefined
+  );
+
+  const effectiveContactName = contactSlug || contactName;
+  const formattedContactName = effectiveContactName
+    ? effectiveContactName.charAt(0).toUpperCase() + effectiveContactName.slice(1).toLowerCase()
     : undefined;
 
   if (legacyCustomer) {
@@ -358,8 +411,32 @@ export default function CustomerStory() {
     return <StoryPage customer={legacyCustomer} pm={pm} snapshotId={undefined} />;
   }
 
-  // --- Inbound route: /stories/:company_cards_id ---
-  if (isInboundRoute) {
+  // --- Slug route: /stories/:companySlug/:contactSlug ---
+  const resolvedSlugData = isSlugRoute ? slugData : isSingleSlugRoute ? singleSlugData : null;
+  const resolvedSlugLoading = isSlugRoute ? slugLoading : isSingleSlugRoute ? singleSlugLoading : false;
+
+  if (isSlugRoute || isSingleSlugRoute) {
+    if (resolvedSlugLoading) {
+      return (
+        <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      );
+    }
+    if (!resolvedSlugData?.card || !resolvedSlugData?.company) {
+      return <NotFoundStory />;
+    }
+    const accountJson = (resolvedSlugData.card.account_json as Record<string, any>) || {};
+    const assetsJson = (resolvedSlugData.card.assets_json as Record<string, any>) || {};
+    const syntheticSnapshot = { id: resolvedSlugData.card.id, snapshot_json: inboundAccountJsonToSnapshotJson(accountJson, assetsJson) };
+    const customer = snapshotToCustomer(resolvedSlugData.company, syntheticSnapshot);
+    customer.contactName = formattedContactName;
+    const pm = staticPartnerMeta.inbound;
+    return <StoryPage customer={customer} pm={pm} snapshotId={resolvedSlugData.card.id} snapshotMeta={syntheticSnapshot} companyId={resolvedSlugData.company.id} loomUrl={resolvedSlugData.company.loom_url} ioradUrl={resolvedSlugData.company.iorad_url} saveTarget="company_cards" />;
+  }
+
+  // --- Inbound UUID route: /stories/:uuid (backward compat) ---
+  if (isInboundUuidRoute) {
     if (inboundLoading) {
       return (
         <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
@@ -375,7 +452,7 @@ export default function CustomerStory() {
     const syntheticSnapshot = { id: inboundData.card.id, snapshot_json: inboundAccountJsonToSnapshotJson(accountJson, assetsJson) };
     const customer = snapshotToCustomer(inboundData.company, syntheticSnapshot);
     customer.contactName = formattedContactName;
-    const pm = staticPartnerMeta.inbound; // neutral — no partner branding for inbound leads
+    const pm = staticPartnerMeta.inbound;
     return <StoryPage customer={customer} pm={pm} snapshotId={inboundData.card.id} snapshotMeta={syntheticSnapshot} companyId={inboundData.company.id} loomUrl={inboundData.company.loom_url} ioradUrl={inboundData.company.iorad_url} saveTarget="company_cards" />;
   }
 

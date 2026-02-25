@@ -32,6 +32,7 @@ const App = () => (
               {/* Public routes */}
               <Route path="/login" element={<LoginPage />} />
               <Route path="/stories" element={<CustomerList />} />
+              <Route path="/stories/:companySlug/:contactSlug" element={<CustomerStory />} />
               <Route path="/stories/:id" element={<CustomerStory />} />
               <Route path="/:partner/:customer/stories/:contactName" element={<CustomerStory />} />
               <Route path="/:partner/:customer/stories" element={<CustomerStory />} />
