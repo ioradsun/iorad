@@ -151,9 +151,12 @@ export default function SignalCard({ signal, onOpenComments }: SignalCardProps) 
         <div className="flex-1" />
         <button
           onClick={() => onOpenComments(signal)}
-          className="h-9 w-9 flex items-center justify-center rounded-full hover:bg-muted transition-colors text-muted-foreground"
+          className="h-9 flex items-center gap-1 px-2 rounded-full hover:bg-muted transition-colors text-muted-foreground"
         >
           <MessageCircle className="w-5 h-5" />
+          {(signal.comment_count ?? 0) > 0 && (
+            <span className="text-xs font-medium">{signal.comment_count}</span>
+          )}
         </button>
       </div>
 
