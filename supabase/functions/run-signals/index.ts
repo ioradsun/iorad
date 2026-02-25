@@ -175,7 +175,7 @@ async function searchSignals(
       });
     }
   } catch (err) {
-    console.error(`Firecrawl error for "${company.name}":`, err.message);
+    console.error(`Firecrawl error for "${company.name}":`, (err as Error).message);
   }
 
   return signals;
@@ -533,8 +533,8 @@ Deno.serve(async (req) => {
       console.log(`Done: ${company.name} — ${signalsCount} signals, status: ${snapshotStatus}`);
     } catch (e) {
       status = "failed";
-      errorMsg = e.message;
-      console.error(`Failed: ${company.name} — ${e.message}`);
+      errorMsg = (e as Error).message;
+      console.error(`Failed: ${company.name} — ${(e as Error).message}`);
     }
 
     return new Response(
@@ -543,7 +543,7 @@ Deno.serve(async (req) => {
     );
   } catch (err) {
     console.error("run-signals error:", err);
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: (err as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

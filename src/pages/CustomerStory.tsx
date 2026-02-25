@@ -395,12 +395,12 @@ export default function CustomerStory() {
 }
 
 function StoryPage({ customer, pm, snapshotId, snapshotMeta, companyId, loomUrl, ioradUrl }: { customer: Customer; pm: PartnerMeta; snapshotId?: string; snapshotMeta?: any; companyId?: string; loomUrl?: string | null; ioradUrl?: string | null }) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [searchParams] = useSearchParams();
   const showInternal = user && searchParams.get("internal") === "true";
   const queryClient = useQueryClient();
 
-  const isIoradUser = user?.email?.endsWith("@iorad.com");
+  const isIoradUser = !authLoading && !!user?.email?.endsWith("@iorad.com");
 
   // Fetch raw signals for debug panel
   const { data: rawSignals } = useQuery({
