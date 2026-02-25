@@ -428,7 +428,16 @@ export default function CustomerStory() {
     }
     const accountJson = (resolvedSlugData.card.account_json as Record<string, any>) || {};
     const assetsJson = (resolvedSlugData.card.assets_json as Record<string, any>) || {};
-    const syntheticSnapshot = { id: resolvedSlugData.card.id, snapshot_json: inboundAccountJsonToSnapshotJson(accountJson, assetsJson) };
+    const convertedJson = inboundAccountJsonToSnapshotJson(accountJson, assetsJson);
+    const syntheticSnapshot = {
+      id: resolvedSlugData.card.id,
+      snapshot_json: convertedJson,
+      score_total: accountJson._score_total ?? 0,
+      score_breakdown: accountJson._score_breakdown ?? {},
+      model_version: resolvedSlugData.card.model_version ?? null,
+      prompt_version: null,
+      created_at: resolvedSlugData.card.created_at,
+    };
     const customer = snapshotToCustomer(resolvedSlugData.company, syntheticSnapshot);
     customer.contactName = formattedContactName;
     const pm = staticPartnerMeta.inbound;
@@ -449,7 +458,16 @@ export default function CustomerStory() {
     }
     const accountJson = (inboundData.card.account_json as Record<string, any>) || {};
     const assetsJson = (inboundData.card.assets_json as Record<string, any>) || {};
-    const syntheticSnapshot = { id: inboundData.card.id, snapshot_json: inboundAccountJsonToSnapshotJson(accountJson, assetsJson) };
+    const convertedJson = inboundAccountJsonToSnapshotJson(accountJson, assetsJson);
+    const syntheticSnapshot = {
+      id: inboundData.card.id,
+      snapshot_json: convertedJson,
+      score_total: accountJson._score_total ?? 0,
+      score_breakdown: accountJson._score_breakdown ?? {},
+      model_version: inboundData.card.model_version ?? null,
+      prompt_version: null,
+      created_at: inboundData.card.created_at,
+    };
     const customer = snapshotToCustomer(inboundData.company, syntheticSnapshot);
     customer.contactName = formattedContactName;
     const pm = staticPartnerMeta.inbound;
