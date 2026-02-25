@@ -96,19 +96,24 @@ Deno.serve(async (req) => {
       return await fixMissingContacts(supabase, body.offset || 0, body.job_id || null, body.total_processed || 0);
     }
 
-    // Validate HubSpot webhook signature only when a signature header is actually present
+    // Webhook requests must always include a valid HubSpot signature.
+    // (action-based calls above are explicit internal/manual invocations.)
     const signature = req.headers.get("X-HubSpot-Signature") || req.headers.get("x-hubspot-signature");
-    if (signature) {
-      const isValid = await verifyHubSpotSignature(req, rawBody);
-      if (!isValid) {
-        console.error("HubSpot signature validation failed — rejecting request");
-        return new Response(JSON.stringify({ error: "Invalid signature" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-    } else {
-      console.log("No HubSpot signature header — proceeding without signature check");
+    if (!signature) {
+      console.error("Missing HubSpot signature header on webhook request — rejecting");
+      return new Response(JSON.stringify({ error: "Missing signature" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const isValid = await verifyHubSpotSignature(req, rawBody);
+    if (!isValid) {
+      console.error("HubSpot signature validation failed — rejecting request");
+      return new Response(JSON.stringify({ error: "Invalid signature" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Handle HubSpot webhook events (array of subscription events)
@@ -472,6 +477,7 @@ function deriveStage(
 async function upsertCompany(supabase: any, hubspotCompany: any): Promise<{ companyId: string; isNew: boolean; hasStory: boolean }> {
   const apiKey = Deno.env.get("HUBSPOT_API_KEY")!;
   const props = hubspotCompany.properties || {};
+  const hubspotObjectId = String(hubspotCompany.id || props.hs_object_id || "").trim();
   const domain = props.domain
     ? props.domain.toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "")
     : null;
@@ -488,10 +494,36 @@ async function upsertCompany(supabase: any, hubspotCompany: any): Promise<{ comp
     hq_country: props.country || null,
     headcount: props.numberofemployees ? parseInt(String(props.numberofemployees), 10) || null : null,
     source_type: "inbound",
+    hubspot_object_id: hubspotObjectId || null,
     hubspot_properties: props,
   };
 
-  // Try to find existing by domain first
+  // Prefer exact HubSpot object-ID match
+  if (hubspotObjectId) {
+    const { data: existingByHubspotId } = await supabase
+      .from("companies")
+      .select("id, snapshot_status, partner, category")
+      .eq("hubspot_object_id", hubspotObjectId)
+      .maybeSingle();
+
+    if (existingByHubspotId) {
+      const category = existingByHubspotId.partner ? "partner" : deriveCategory(props, existingByHubspotId.partner);
+      const stage = deriveStage(props, deals);
+      const isCustomer = stage === "customer" || stage === "expansion";
+
+      await supabase.from("companies").update({
+        ...companyData,
+        category,
+        stage,
+        ...(isCustomer ? { is_existing_customer: true } : {}),
+      }).eq("id", existingByHubspotId.id);
+
+      const hasStory = existingByHubspotId.snapshot_status === "Generated";
+      return { companyId: existingByHubspotId.id, isNew: false, hasStory };
+    }
+  }
+
+  // Fallback: find existing by domain
   if (domain) {
     const { data: existing } = await supabase
       .from("companies")
@@ -684,6 +716,7 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
           linkedin: cp.hs_linkedin_url || null,
           source: "hubspot",
           confidence: "high",
+          hubspot_object_id: String(contact.id || cp.hs_object_id || "").trim() || null,
           hubspot_properties: {
             rank,
             hs_last_contacted: cp.hs_last_contacted || null,
@@ -702,7 +735,32 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
           },
         };
 
-        // Check for existing only if we have an email (unique identifier)
+        // Prefer exact HubSpot contact object ID match
+        const hubspotContactId = String(contact.id || cp.hs_object_id || "").trim();
+        if (hubspotContactId) {
+          const { data: existingByHubspotId } = await supabase
+            .from("contacts")
+            .select("id")
+            .eq("company_id", companyId)
+            .eq("hubspot_object_id", hubspotContactId)
+            .maybeSingle();
+          if (existingByHubspotId) {
+            rowsToUpdate.push({
+              id: existingByHubspotId.id,
+              data: {
+                name: contactName,
+                email: row.email,
+                title: row.title,
+                linkedin: row.linkedin,
+                hubspot_object_id: row.hubspot_object_id,
+                hubspot_properties: row.hubspot_properties,
+              },
+            });
+            continue;
+          }
+        }
+
+        // Fallback: match by email if present
         if (cp.email) {
           const { data: existing } = await supabase
             .from("contacts")
@@ -717,6 +775,8 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
                 name: contactName,
                 title: row.title,
                 linkedin: row.linkedin,
+                email: row.email,
+                hubspot_object_id: row.hubspot_object_id,
                 hubspot_properties: row.hubspot_properties,
               },
             });
