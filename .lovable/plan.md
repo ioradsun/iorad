@@ -1,116 +1,40 @@
 
 
-# Internal Signals Feed
+# Refine Product Signals UX
 
-A new top-level page at `/signals` for capturing and discussing product ideas internally, styled as an Instagram-like feed.
+## Changes
 
----
+### 1. Tabs: "Recent" and "Resolved" (subtle, underline-style)
+Replace the pill-style "Open" / "Closed" toggles with subtle text tabs -- like Instagram's "Posts" / "Reels" row -- using a simple underline on the active tab. Labels become **Recent** (maps to `open`) and **Resolved** (maps to `closed`).
 
-## Database Schema
+### 2. Compose prompt text
+Change `"What's on your mind, {name}?"` to `"What's your idea or problem with Scout?"`.
 
-Three new tables:
+### 3. Remove status badge from cards
+Remove the `Open` / `Closed` badge from the signal card header since the tabs already separate them.
 
-### `signals`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK, default gen_random_uuid() |
-| author_id | uuid | references auth user, NOT NULL |
-| author_name | text | denormalized for display |
-| author_avatar | text | nullable |
-| title | text | NOT NULL |
-| description | text | NOT NULL |
-| status | text | 'open' or 'closed', default 'open' |
-| reactions | jsonb | default '{}', e.g. {"thumbsup": ["user-id-1"], "heart": ["user-id-2"]} |
-| created_at | timestamptz | default now() |
-| updated_at | timestamptz | default now() |
+### 4. Admin-only close actions with resolution tags
+The three-dot menu on each card becomes **admin-only** (using the existing `useIsAdmin` hook). Admin gets two close options:
+- **Close as Complete** -- sets status to `closed`, adds a `resolution: "complete"` field
+- **Close as Ignored** -- sets status to `closed`, adds a `resolution: "ignored"` field
+- If already closed: **Reopen** option
 
-### `signal_comments`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK |
-| signal_id | uuid | FK to signals, NOT NULL |
-| author_id | uuid | NOT NULL |
-| author_name | text | denormalized |
-| author_avatar | text | nullable |
-| body | text | NOT NULL |
-| parent_id | uuid | nullable, FK to self for replies |
-| created_at | timestamptz | default now() |
+A small subtle label ("Completed" or "Ignored") will show on cards in the Resolved tab so admins/users can see why it was closed.
 
-### `signal_notifications`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK |
-| user_id | uuid | recipient, NOT NULL |
-| signal_id | uuid | FK to signals |
-| type | text | 'comment', 'reply', 'status_change' |
-| actor_name | text | who triggered it |
-| read | boolean | default false |
-| created_at | timestamptz | default now() |
+### Technical Details
 
-RLS: All three tables -- authenticated users can SELECT, INSERT, UPDATE. Notifications: users can only SELECT/UPDATE their own rows.
+**Files to modify:**
 
-Realtime enabled on `signal_notifications` for live badge updates.
+| File | Change |
+|------|--------|
+| `src/pages/InternalSignals.tsx` | Replace tab pills with underline-style tabs; update compose placeholder text |
+| `src/components/signals/SignalCard.tsx` | Remove status Badge; conditionally render three-dot menu for admins only; show resolution label on closed cards |
+| `src/hooks/useSignals.ts` | Update `useToggleSignalStatus` to accept a `resolution` parameter (`"complete"` or `"ignored"`) |
+| Migration | Add `resolution` text column (nullable) to `internal_signals` table |
 
----
+**Database migration:**
+```sql
+ALTER TABLE public.internal_signals ADD COLUMN resolution text;
+```
 
-## Frontend Components
-
-### 1. Route and Navigation
-- Add `/signals` route in `App.tsx` (protected)
-- Add "Signals" nav item with a `MessageSquare` icon to the AppLayout header menu items array
-- Show unread notification count badge on the nav item
-
-### 2. `src/pages/InternalSignals.tsx` -- Main Page
-- **Header**: Title "Internal Signals", unread notification bell icon, "+ New Signal" button
-- **Tabs**: "Open" | "Closed" (pill-style, matching existing category tabs pattern)
-- **Search bar**: Filters by title, description, author_name (client-side for simplicity)
-- **Feed**: Vertical list of `SignalCard` components
-
-### 3. `src/components/signals/SignalCard.tsx`
-- Avatar + author name + relative timestamp (top row)
-- Bold title + description text
-- Bottom row: emoji reaction buttons (thumbsup, heart, fire, eyes) with counts, comment icon + count, status badge (Open/Closed)
-- Clicking the card or comment icon opens the comment panel
-
-### 4. `src/components/signals/NewSignalDialog.tsx`
-- Dialog with title + description fields
-- On submit: inserts into `signals` table with current user info
-
-### 5. `src/components/signals/CommentPanel.tsx`
-- Right-side sliding `Sheet` panel (using existing vaul/sheet component)
-- Shows the signal details at top, then threaded comments below
-- Text input at bottom to add a comment
-- On comment: inserts into `signal_comments`, creates notification for signal author
-
-### 6. `src/components/signals/NotificationBell.tsx`
-- Bell icon with unread count badge
-- Dropdown showing recent notifications
-- Click marks as read and navigates to the signal
-
----
-
-## Notification Logic
-
-Handled client-side on insert:
-- **Comment on signal**: Insert notification for `signals.author_id` (type: 'comment')
-- **Reply to comment**: Insert notification for parent comment's `author_id` (type: 'reply')
-- **Status change**: Insert notification for `signals.author_id` (type: 'status_change')
-
-No edge function needed -- notifications are created as simple DB inserts alongside the action.
-
----
-
-## Files to Create/Modify
-
-| Action | File |
-|--------|------|
-| Migration | New migration for 3 tables + RLS + realtime |
-| Create | `src/pages/InternalSignals.tsx` |
-| Create | `src/components/signals/SignalCard.tsx` |
-| Create | `src/components/signals/NewSignalDialog.tsx` |
-| Create | `src/components/signals/CommentPanel.tsx` |
-| Create | `src/components/signals/NotificationBell.tsx` |
-| Create | `src/hooks/useSignals.ts` |
-| Edit | `src/App.tsx` -- add `/signals` route |
-| Edit | `src/components/AppLayout.tsx` -- add Signals nav link + notification badge |
-
+No new dependencies needed. The `useIsAdmin` hook already exists and will be imported into `SignalCard`.
