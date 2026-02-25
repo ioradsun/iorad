@@ -436,6 +436,45 @@ export type Database = {
           },
         ]
       }
+      internal_signals: {
+        Row: {
+          author_avatar: string | null
+          author_id: string
+          author_name: string
+          created_at: string
+          description: string
+          id: string
+          reactions: Json
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          author_avatar?: string | null
+          author_id: string
+          author_name: string
+          created_at?: string
+          description: string
+          id?: string
+          reactions?: Json
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          author_avatar?: string | null
+          author_id?: string
+          author_name?: string
+          created_at?: string
+          description?: string
+          id?: string
+          reactions?: Json
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       iorad_libraries: {
         Row: {
           created_at: string
@@ -647,6 +686,92 @@ export type Database = {
           triggered_by?: string | null
         }
         Relationships: []
+      }
+      signal_comments: {
+        Row: {
+          author_avatar: string | null
+          author_id: string
+          author_name: string
+          body: string
+          created_at: string
+          id: string
+          parent_id: string | null
+          signal_id: string
+        }
+        Insert: {
+          author_avatar?: string | null
+          author_id: string
+          author_name: string
+          body: string
+          created_at?: string
+          id?: string
+          parent_id?: string | null
+          signal_id: string
+        }
+        Update: {
+          author_avatar?: string | null
+          author_id?: string
+          author_name?: string
+          body?: string
+          created_at?: string
+          id?: string
+          parent_id?: string | null
+          signal_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signal_comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "signal_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signal_comments_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "internal_signals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signal_notifications: {
+        Row: {
+          actor_name: string
+          created_at: string
+          id: string
+          read: boolean
+          signal_id: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          actor_name: string
+          created_at?: string
+          id?: string
+          read?: boolean
+          signal_id: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          actor_name?: string
+          created_at?: string
+          id?: string
+          read?: boolean
+          signal_id?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signal_notifications_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "internal_signals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       signals: {
         Row: {

@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, LogOut, Shield, Loader2, CheckCircle2, Download } from "lucide-react";
+import { LayoutDashboard, LogOut, Shield, Loader2, CheckCircle2, Download, MessageSquare } from "lucide-react";
 import ioradLogoDark from "@/assets/iorad-logo-new.png";
 import ioradLogoLight from "@/assets/iorad-logo-light.png";
 import { useAuth } from "@/hooks/useAuth";
@@ -20,6 +20,7 @@ import {
 
 const menuItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/signals", label: "Signals", icon: MessageSquare },
 ];
 
 function useLastHubspotSync() {
