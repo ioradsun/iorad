@@ -801,10 +801,12 @@ export default function CompanyDetail() {
   const companyCategory = companyAny?.category || (companyAny?.source_type === "inbound" ? "business" : companyAny?.partner ? "partner" : "business");
   const companyStage = companyAny?.stage || "prospect";
   const isPartnerCategory = companyCategory === "partner";
-  const storyBaseUrl = !isPartnerCategory && companyCards?.id
-    ? `/stories/${companyCards.id}`
+  const companyNameSlug = company.name.toLowerCase().replace(/\s+/g, "-");
+  const contactSlug = firstContact ? firstContact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "") : null;
+  const storyBaseUrl = !isPartnerCategory
+    ? contactSlug ? `/stories/${companyNameSlug}/${contactSlug}` : `/stories/${companyNameSlug}`
     : firstContact && company.partner
-      ? `/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories/${firstContact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "")}`
+      ? `/${company.partner}/${companyNameSlug}/stories/${firstContact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "")}`
       : null;
 
   // Small ghost regen button for individual sections
@@ -1100,9 +1102,9 @@ export default function CompanyDetail() {
                   <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollSnapType: "x mandatory" }}>
                     {filtered.map((contact) => {
                       const firstName = contact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "");
-                      const storyUrl = company.partner
-                        ? `/${company.partner}/${company.name.toLowerCase().replace(/\s+/g, "-")}/stories/${firstName}`
-                        : null;
+                      const storyUrl = isPartnerCategory && company.partner
+                        ? `/${company.partner}/${companyNameSlug}/stories/${firstName}`
+                        : `/stories/${companyNameSlug}/${firstName}`;
                       
                       const profile = (contact as any).contact_profile as any;
                       const isGenerating = generatingContactId === contact.id;
