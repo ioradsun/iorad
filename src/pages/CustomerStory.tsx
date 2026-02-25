@@ -367,11 +367,11 @@ export default function CustomerStory() {
     }
     const accountJson = (inboundData.card.account_json as Record<string, any>) || {};
     const assetsJson = (inboundData.card.assets_json as Record<string, any>) || {};
-    const syntheticSnapshot = { snapshot_json: inboundAccountJsonToSnapshotJson(accountJson, assetsJson) };
+    const syntheticSnapshot = { id: inboundData.card.id, snapshot_json: inboundAccountJsonToSnapshotJson(accountJson, assetsJson) };
     const customer = snapshotToCustomer(inboundData.company, syntheticSnapshot);
     customer.contactName = formattedContactName;
     const pm = staticPartnerMeta.inbound; // neutral — no partner branding for inbound leads
-    return <StoryPage customer={customer} pm={pm} snapshotId={undefined} companyId={inboundData.company.id} loomUrl={inboundData.company.loom_url} ioradUrl={inboundData.company.iorad_url} />;
+    return <StoryPage customer={customer} pm={pm} snapshotId={inboundData.card.id} snapshotMeta={syntheticSnapshot} companyId={inboundData.company.id} loomUrl={inboundData.company.loom_url} ioradUrl={inboundData.company.iorad_url} />;
   }
 
   // --- Outbound route: /:partner/:customer/stories/:contactName ---
