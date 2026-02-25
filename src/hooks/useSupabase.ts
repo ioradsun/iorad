@@ -249,6 +249,18 @@ export function useCompanyCards(companyId: string | undefined, contactId?: strin
         .limit(1)
         .maybeSingle();
       if (error) throw error;
+      // Fallback: if no exact match, try any row for this company (supports story link)
+      if (!data) {
+        const { data: fallback, error: fbErr } = await supabase
+          .from("company_cards")
+          .select("*")
+          .eq("company_id", companyId!)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (fbErr) throw fbErr;
+        return fallback;
+      }
       return data;
     },
   });

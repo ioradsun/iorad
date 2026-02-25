@@ -288,11 +288,17 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
     }
 
     // Fetch existing row so we can MERGE per-tab data instead of overwriting all fields
-    const { data: existingRow } = await sb
+    // Filter by contact_id to avoid maybeSingle() errors when multiple rows exist
+    let existingRowQuery = sb
       .from("company_cards")
       .select("id, cards_json, assets_json, account_json")
-      .eq("company_id", company_id)
-      .maybeSingle();
+      .eq("company_id", company_id);
+    if (contact_id) {
+      existingRowQuery = existingRowQuery.eq("contact_id", contact_id);
+    } else {
+      existingRowQuery = existingRowQuery.is("contact_id", null);
+    }
+    const { data: existingRow } = await existingRowQuery.maybeSingle();
 
     // Start from existing values so tabs don't wipe each other out
     let cards_json: any = existingRow?.cards_json ?? [];
