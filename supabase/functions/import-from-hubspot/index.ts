@@ -655,14 +655,14 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
     const contactIds: string[] = [];
     let after: string | null = null;
     do {
-      const url = `https://api.hubapi.com/crm/v3/objects/companies/${hubspotCompanyId}/associations/contacts?limit=500${after ? `&after=${after}` : ""}`;
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
+      const url: string = `https://api.hubapi.com/crm/v3/objects/companies/${hubspotCompanyId}/associations/contacts?limit=500${after ? `&after=${after}` : ""}`;
+      const res: Response = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
       if (!res.ok) {
         const text = await res.text();
         console.warn(`Failed to fetch contacts for company ${hubspotCompanyId}: ${text}`);
         break;
       }
-      const data = await res.json();
+      const data: any = await res.json();
       const ids = (data.results || []).map((r: any) => String(r.toObjectId || r.id)).filter(Boolean);
       contactIds.push(...ids);
       after = data.paging?.next?.after || null;
