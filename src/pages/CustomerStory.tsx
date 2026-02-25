@@ -92,6 +92,11 @@ function useInboundStory(cardsId?: string) {
 
 // Convert inbound account_json → snapshot_json shape so snapshotToCustomer can render it
 function inboundAccountJsonToSnapshotJson(accountJson: Record<string, any>, assetsJson: Record<string, any>): Record<string, any> {
+  // If the account_json was previously saved in snapshot_json format (has whats_happening key), pass through
+  if (accountJson.whats_happening) {
+    return accountJson;
+  }
+
   // The story tab writes to account_json root with _type: inbound_story
   // Strategy tab writes under _strategy key
   // We read whichever is richer
@@ -371,7 +376,7 @@ export default function CustomerStory() {
     const customer = snapshotToCustomer(inboundData.company, syntheticSnapshot);
     customer.contactName = formattedContactName;
     const pm = staticPartnerMeta.inbound; // neutral — no partner branding for inbound leads
-    return <StoryPage customer={customer} pm={pm} snapshotId={inboundData.card.id} snapshotMeta={syntheticSnapshot} companyId={inboundData.company.id} loomUrl={inboundData.company.loom_url} ioradUrl={inboundData.company.iorad_url} />;
+    return <StoryPage customer={customer} pm={pm} snapshotId={inboundData.card.id} snapshotMeta={syntheticSnapshot} companyId={inboundData.company.id} loomUrl={inboundData.company.loom_url} ioradUrl={inboundData.company.iorad_url} saveTarget="company_cards" />;
   }
 
   // --- Outbound route: /:partner/:customer/stories/:contactName ---
@@ -394,7 +399,7 @@ export default function CustomerStory() {
   return <StoryPage customer={customer} pm={pm} snapshotId={dbData.snapshot.id} snapshotMeta={dbData.snapshot} companyId={dbData.company.id} loomUrl={dbData.company.loom_url} ioradUrl={dbData.company.iorad_url} />;
 }
 
-function StoryPage({ customer, pm, snapshotId, snapshotMeta, companyId, loomUrl, ioradUrl }: { customer: Customer; pm: PartnerMeta; snapshotId?: string; snapshotMeta?: any; companyId?: string; loomUrl?: string | null; ioradUrl?: string | null }) {
+function StoryPage({ customer, pm, snapshotId, snapshotMeta, companyId, loomUrl, ioradUrl, saveTarget = "snapshots" }: { customer: Customer; pm: PartnerMeta; snapshotId?: string; snapshotMeta?: any; companyId?: string; loomUrl?: string | null; ioradUrl?: string | null; saveTarget?: "snapshots" | "company_cards" }) {
   const { user, loading: authLoading } = useAuth();
   const [searchParams] = useSearchParams();
   const showInternal = user && searchParams.get("internal") === "true";
@@ -416,9 +421,9 @@ function StoryPage({ customer, pm, snapshotId, snapshotMeta, companyId, loomUrl,
     },
   });
 
-  return (
+   return (
     <StoryEditProvider customer={customer}>
-      <StoryPageInner customer={customer} pm={pm} snapshotId={snapshotId} showInternal={!!showInternal} isIoradUser={!!isIoradUser} queryClient={queryClient} snapshotMeta={snapshotMeta} rawSignals={rawSignals || []} loomUrl={loomUrl} ioradUrl={ioradUrl} />
+      <StoryPageInner customer={customer} pm={pm} snapshotId={snapshotId} showInternal={!!showInternal} isIoradUser={!!isIoradUser} queryClient={queryClient} snapshotMeta={snapshotMeta} rawSignals={rawSignals || []} loomUrl={loomUrl} ioradUrl={ioradUrl} saveTarget={saveTarget} />
     </StoryEditProvider>
   );
 }
@@ -434,6 +439,7 @@ function StoryPageInner({
   rawSignals,
   loomUrl,
   ioradUrl,
+  saveTarget = "snapshots",
 }: {
   customer: Customer;
   pm: PartnerMeta;
@@ -445,6 +451,7 @@ function StoryPageInner({
   rawSignals: any[];
   loomUrl?: string | null;
   ioradUrl?: string | null;
+  saveTarget?: "snapshots" | "company_cards";
 }) {
   const ctx = useStoryEdit();
   const displayCustomer = ctx?.isEditing ? ctx.editedCustomer : customer;
@@ -461,10 +468,20 @@ function StoryPageInner({
 
     const newJson = customerToSnapshotJson(ctx.editedCustomer);
 
-    const { error } = await supabase
-      .from("snapshots")
-      .update({ snapshot_json: newJson as any })
-      .eq("id", snapshotId);
+    let error: any;
+    if (saveTarget === "company_cards") {
+      const res = await supabase
+        .from("company_cards")
+        .update({ account_json: newJson as any })
+        .eq("id", snapshotId);
+      error = res.error;
+    } else {
+      const res = await supabase
+        .from("snapshots")
+        .update({ snapshot_json: newJson as any })
+        .eq("id", snapshotId);
+      error = res.error;
+    }
 
     if (error) {
       toast.error("Failed to save: " + error.message);
@@ -473,6 +490,7 @@ function StoryPageInner({
 
     toast.success("Story updated successfully");
     queryClient.invalidateQueries({ queryKey: ["story"] });
+    queryClient.invalidateQueries({ queryKey: ["company_cards"] });
     ctx.cancelEditing();
   };
 
