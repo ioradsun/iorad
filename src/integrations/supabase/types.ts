@@ -445,6 +445,7 @@ export type Database = {
           description: string
           id: string
           reactions: Json
+          resolution: string | null
           status: string
           title: string
           updated_at: string
@@ -457,6 +458,7 @@ export type Database = {
           description: string
           id?: string
           reactions?: Json
+          resolution?: string | null
           status?: string
           title: string
           updated_at?: string
@@ -469,6 +471,7 @@ export type Database = {
           description?: string
           id?: string
           reactions?: Json
+          resolution?: string | null
           status?: string
           title?: string
           updated_at?: string

@@ -1,8 +1,8 @@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { MessageCircle, MoreHorizontal } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useToggleReaction, useToggleSignalStatus, type Signal } from "@/hooks/useSignals";
 import {
   DropdownMenu,
@@ -25,6 +25,7 @@ interface SignalCardProps {
 
 export default function SignalCard({ signal, onOpenComments }: SignalCardProps) {
   const { user } = useAuth();
+  const isAdmin = useIsAdmin();
   const toggleReaction = useToggleReaction();
   const toggleStatus = useToggleSignalStatus();
 
@@ -54,32 +55,66 @@ export default function SignalCard({ signal, onOpenComments }: SignalCardProps) 
             </span>
           </div>
         </div>
-        <Badge
-          variant={signal.status === "open" ? "default" : "secondary"}
-          className="text-[10px] px-2 py-0 h-5 font-medium"
-        >
-          {signal.status === "open" ? "Open" : "Closed"}
-        </Badge>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="p-1 rounded-full hover:bg-muted transition-colors text-muted-foreground">
-              <MoreHorizontal className="w-4 h-4" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-40">
-            <DropdownMenuItem
-              onClick={() =>
-                toggleStatus.mutate({
-                  signalId: signal.id,
-                  currentStatus: signal.status,
-                  signalAuthorId: signal.author_id,
-                })
-              }
-            >
-              {signal.status === "open" ? "Close signal" : "Reopen signal"}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {signal.status === "closed" && signal.resolution && (
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+            signal.resolution === "complete"
+              ? "bg-green-500/10 text-green-600 dark:text-green-400"
+              : "bg-muted text-muted-foreground"
+          }`}>
+            {signal.resolution === "complete" ? "Completed" : "Ignored"}
+          </span>
+        )}
+        {isAdmin && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="p-1 rounded-full hover:bg-muted transition-colors text-muted-foreground">
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              {signal.status === "open" ? (
+                <>
+                  <DropdownMenuItem
+                    onClick={() =>
+                      toggleStatus.mutate({
+                        signalId: signal.id,
+                        currentStatus: signal.status,
+                        signalAuthorId: signal.author_id,
+                        resolution: "complete",
+                      })
+                    }
+                  >
+                    Close as Complete
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() =>
+                      toggleStatus.mutate({
+                        signalId: signal.id,
+                        currentStatus: signal.status,
+                        signalAuthorId: signal.author_id,
+                        resolution: "ignored",
+                      })
+                    }
+                  >
+                    Close as Ignored
+                  </DropdownMenuItem>
+                </>
+              ) : (
+                <DropdownMenuItem
+                  onClick={() =>
+                    toggleStatus.mutate({
+                      signalId: signal.id,
+                      currentStatus: signal.status,
+                      signalAuthorId: signal.author_id,
+                    })
+                  }
+                >
+                  Reopen signal
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       {/* Content */}
