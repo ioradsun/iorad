@@ -12,6 +12,7 @@ import UploadPage from "@/pages/Upload";
 import CompanyDetail from "@/pages/CompanyDetail";
 import AdminSettings from "@/pages/AdminSettings";
 import JobHistory from "@/pages/JobHistory";
+import InternalSignals from "@/pages/InternalSignals";
 import CustomerList from "@/pages/CustomerList";
 import CustomerStory from "@/pages/CustomerStory";
 import LoginPage from "@/pages/LoginPage";
@@ -44,6 +45,7 @@ const App = () => (
                       <Route path="/upload" element={<UploadPage />} />
                       <Route path="/company/:id" element={<CompanyDetail />} />
                       <Route path="/settings" element={<AdminSettings />} />
+                      <Route path="/signals" element={<InternalSignals />} />
                       <Route path="/jobs" element={<JobHistory />} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
