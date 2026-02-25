@@ -1,75 +1,146 @@
 import { useState, useMemo } from "react";
-import { useSignals, type Signal } from "@/hooks/useSignals";
+import { useSignals, useCreateSignal, type Signal } from "@/hooks/useSignals";
 import SignalCard from "@/components/signals/SignalCard";
-import NewSignalDialog from "@/components/signals/NewSignalDialog";
 import CommentPanel from "@/components/signals/CommentPanel";
-import NotificationBell from "@/components/signals/NotificationBell";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 export default function InternalSignals() {
   const [tab, setTab] = useState<"open" | "closed">("open");
-  const [search, setSearch] = useState("");
   const [activeSignal, setActiveSignal] = useState<Signal | null>(null);
   const { data: signals = [], isLoading } = useSignals(tab);
+  const { user } = useAuth();
+  const create = useCreateSignal();
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return signals;
-    const q = search.toLowerCase();
-    return signals.filter(
-      (s) =>
-        s.title.toLowerCase().includes(q) ||
-        s.description.toLowerCase().includes(q) ||
-        s.author_name.toLowerCase().includes(q)
-    );
-  }, [signals, search]);
+  // Compose state
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
 
-  const handleNotificationSignal = (signalId: string) => {
-    const found = signals.find((s) => s.id === signalId);
-    if (found) setActiveSignal(found);
+  const displayName =
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    user?.email?.split("@")[0] ||
+    "User";
+  const avatarUrl =
+    user?.user_metadata?.avatar_url || user?.user_metadata?.picture || undefined;
+  const initials = displayName
+    .split(" ")
+    .map((n: string) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+  const handlePost = async () => {
+    if (!title.trim() || !body.trim()) return;
+    try {
+      await create.mutateAsync({ title: title.trim(), description: body.trim() });
+      toast.success("Signal posted");
+      setTitle("");
+      setBody("");
+      setComposeOpen(false);
+    } catch {
+      toast.error("Failed to post signal");
+    }
   };
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold text-foreground">Internal Signals</h1>
-        <div className="flex items-center gap-2">
-          <NotificationBell onSelectSignal={handleNotificationSignal} />
-          <NewSignalDialog />
-        </div>
+    <div className="max-w-xl mx-auto">
+      {/* Compose box */}
+      <div className="border rounded-xl bg-card mb-4 overflow-hidden">
+        {!composeOpen ? (
+          <button
+            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/30 transition-colors"
+            onClick={() => setComposeOpen(true)}
+          >
+            <Avatar className="h-10 w-10 flex-shrink-0">
+              {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
+              <AvatarFallback className="text-sm bg-primary/10 text-primary font-medium">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            <span className="text-muted-foreground text-sm flex-1">
+              What's on your mind, {displayName.split(" ")[0]}?
+            </span>
+          </button>
+        ) : (
+          <div className="p-4 space-y-3">
+            <div className="flex items-start gap-3">
+              <Avatar className="h-10 w-10 flex-shrink-0 mt-0.5">
+                {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
+                <AvatarFallback className="text-sm bg-primary/10 text-primary font-medium">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 space-y-2">
+                <span className="text-sm font-semibold text-foreground">{displayName}</span>
+                <input
+                  autoFocus
+                  className="w-full bg-transparent text-foreground font-semibold text-base placeholder:text-muted-foreground/60 placeholder:font-normal outline-none"
+                  placeholder="Signal title…"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
+                <textarea
+                  className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 outline-none resize-none min-h-[60px]"
+                  placeholder="Describe the idea or improvement…"
+                  value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                  rows={3}
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between pt-2 border-t">
+              <button
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => {
+                  setComposeOpen(false);
+                  setTitle("");
+                  setBody("");
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-5 py-1.5 rounded-full bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40 hover:bg-primary/90 transition-colors"
+                disabled={!title.trim() || !body.trim() || create.isPending}
+                onClick={handlePost}
+              >
+                {create.isPending ? "Posting…" : "Post"}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Tabs + Search */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <Tabs value={tab} onValueChange={(v) => setTab(v as "open" | "closed")}>
-          <TabsList>
-            <TabsTrigger value="open">Open</TabsTrigger>
-            <TabsTrigger value="closed">Closed</TabsTrigger>
-          </TabsList>
-        </Tabs>
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search signals…"
-            className="pl-8 h-9"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
+      {/* Tab pills */}
+      <div className="flex items-center gap-2 mb-5">
+        {(["open", "closed"] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              tab === t
+                ? "bg-foreground text-background"
+                : "bg-muted text-muted-foreground hover:bg-muted/80"
+            }`}
+          >
+            {t === "open" ? "Open" : "Closed"}
+          </button>
+        ))}
       </div>
 
       {/* Feed */}
       {isLoading ? (
-        <div className="text-center text-muted-foreground py-12">Loading…</div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center text-muted-foreground py-12">
-          {search ? "No signals match your search" : "No signals yet — create the first one!"}
+        <div className="text-center text-muted-foreground py-16 text-sm">Loading…</div>
+      ) : signals.length === 0 ? (
+        <div className="text-center text-muted-foreground py-16 text-sm">
+          No {tab} signals yet — be the first to post!
         </div>
       ) : (
-        <div className="space-y-3 max-w-2xl">
-          {filtered.map((signal) => (
+        <div className="space-y-4">
+          {signals.map((signal) => (
             <SignalCard key={signal.id} signal={signal} onOpenComments={setActiveSignal} />
           ))}
         </div>
