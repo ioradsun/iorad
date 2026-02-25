@@ -584,8 +584,15 @@ function StoryPageInner({
     }
 
     toast.success("Story updated successfully");
+    // Invalidate all possible query keys that feed story data
     queryClient.invalidateQueries({ queryKey: ["story"] });
     queryClient.invalidateQueries({ queryKey: ["company_cards"] });
+    queryClient.invalidateQueries({ queryKey: ["inbound-story-slug"] });
+    queryClient.invalidateQueries({ queryKey: ["inbound-story"] });
+    // Wait for refetch before exiting edit mode so the provider picks up fresh data
+    await queryClient.refetchQueries({ queryKey: ["inbound-story-slug"] });
+    await queryClient.refetchQueries({ queryKey: ["inbound-story"] });
+    await queryClient.refetchQueries({ queryKey: ["story"] });
     ctx.cancelEditing();
   };
 
