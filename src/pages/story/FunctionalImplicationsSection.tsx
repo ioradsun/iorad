@@ -28,20 +28,13 @@ export default function FunctionalImplicationsSection({ text, contactName }: Pro
       annotation={annotation?.element}
     >
       <div className="max-w-3xl space-y-4">
-        {data
-          .split(/\n|(?=[1-9]\uFE0F?\u20E3)|(?=\d+[\.\)\]]\s)/)
-          .map(s => s.trim())
-          .filter(Boolean)
-          .map((paragraph, i) => (
-          <EditableText
-            key={i}
-            value={paragraph}
-            field={`functionalImplications`}
-            as="p"
-            className="text-sm leading-relaxed"
-            style={{ color: "var(--story-muted)" }}
-          />
-        ))}
+        <EditableText
+          value={data}
+          field="functionalImplications"
+          as="p"
+          className="text-sm leading-relaxed"
+          style={{ color: "var(--story-muted)" }}
+        />
       </div>
     </StorySection>
   );
