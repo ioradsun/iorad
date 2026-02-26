@@ -21,13 +21,13 @@ export function EditableText({ value, field, as: Tag = "span", className, style 
     : value;
 
   useEffect(() => {
-    if (ref.current && ref.current.textContent !== displayValue) {
-      ref.current.textContent = displayValue;
+    if (ref.current && ref.current.innerText !== displayValue) {
+      ref.current.innerText = displayValue;
     }
   }, [displayValue]);
 
   if (!ctx?.isEditing) {
-    return <Tag className={className} style={style}>{displayValue}</Tag>;
+    return <Tag className={className} style={{ ...style, whiteSpace: "pre-wrap" }}>{displayValue}</Tag>;
   }
 
   return (
@@ -36,9 +36,9 @@ export function EditableText({ value, field, as: Tag = "span", className, style 
       contentEditable
       suppressContentEditableWarning
       className={`${className || ""} editable-field`}
-      style={{ ...style, minHeight: "1em" }}
+      style={{ ...style, minHeight: "1em", whiteSpace: "pre-wrap" }}
       onBlur={(e) => {
-        const newVal = e.currentTarget.textContent || "";
+        const newVal = e.currentTarget.innerText || "";
         if (isOverride) {
           const key = field.replace("overrides.", "");
           const overrides = { ...(ctx.editedCustomer.overrides || {}), [key]: newVal };
