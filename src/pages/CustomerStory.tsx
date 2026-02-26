@@ -318,7 +318,7 @@ function snapshotToCustomer(company: any, snap: any): Customer {
 }
 
 function customerToSnapshotJson(c: Customer): Record<string, any> {
-  return {
+  const json: Record<string, any> = {
     whats_happening: c.whatsHappening.map((w) => ({ title: w.title, detail: w.detail })),
     functional_implications: c.functionalImplications,
     execution_friction: c.executionFriction,
@@ -341,6 +341,7 @@ function customerToSnapshotJson(c: Customer): Record<string, any> {
       relevance: s.relevance,
     })),
     why_now: c.whyNow,
+    cta: c.cta || "",
     conversation_starters: c.conversationStarters,
     internal_signals: {
       signal_types: c.internalSignals.signalTypes,
@@ -357,6 +358,23 @@ function customerToSnapshotJson(c: Customer): Record<string, any> {
     },
     text_overrides: c.overrides || {},
   };
+
+  if (c.openingHook) {
+    json.opening_hook = {
+      subject_line: c.openingHook.subjectLine,
+      opening_paragraph: c.openingHook.openingParagraph,
+    };
+  }
+
+  if (c.reinforcementPreview) {
+    json.reinforcement_preview = {
+      detected_tool: c.reinforcementPreview.detectedTool,
+      library_url: c.reinforcementPreview.libraryUrl,
+      description: c.reinforcementPreview.description,
+    };
+  }
+
+  return json;
 }
 
 function getPartnerMeta(partnerKey: string, dbConfig: any): PartnerMeta {

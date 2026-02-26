@@ -23,16 +23,13 @@ export default function ReinforcementJourneySection({ text }: Props) {
       annotation={annotation?.element}
     >
       <div className="max-w-3xl space-y-4">
-        {data.split("\n").filter(Boolean).map((paragraph, i) => (
-          <EditableText
-            key={i}
-            value={paragraph}
-            field="reinforcementJourney"
-            as="p"
-            className="text-sm leading-relaxed"
-            style={{ color: "var(--story-muted)" }}
-          />
-        ))}
+        <EditableText
+          value={data}
+          field="reinforcementJourney"
+          as="p"
+          className="text-sm leading-relaxed"
+          style={{ color: "var(--story-muted)" }}
+        />
       </div>
     </StorySection>
   );
