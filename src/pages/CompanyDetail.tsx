@@ -575,21 +575,35 @@ export default function CompanyDetail() {
         }
       }
 
-      // Step 5: Strategy → Outreach → Story
-      const tabs = ["strategy", "outreach", "story"];
-      const labels: Record<string, string> = { strategy: "Strategy", outreach: "Outreach", story: "Story" };
-      for (const tab of tabs) {
-        setGenerateStep(labels[tab]);
-        toast.info(`Generating ${labels[tab]}…`);
-        const body: Record<string, string> = { company_id: id, tab };
-        // Contact-scoped tabs must always target the active contact.
-        if (effectiveContactId) body.contact_id = effectiveContactId;
-        const { data, error } = await supabase.functions.invoke("generate-cards", { body });
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
+      // Step 5: Strategy + Outreach + Story (in parallel)
+      setGenerateStep("Contact Content");
+      toast.info("Generating contact content…");
+
+      const contactTabs = ["strategy", "outreach", "story"];
+      const results = await Promise.allSettled(
+        contactTabs.map((tab) => {
+          const body: Record<string, string> = { company_id: id, tab };
+          // Contact-scoped tabs must always target the active contact.
+          if (effectiveContactId) body.contact_id = effectiveContactId;
+          return supabase.functions.invoke("generate-cards", { body });
+        })
+      );
+
+      const failures = results
+        .map((result, i) => ({ result, tab: contactTabs[i] }))
+        .filter(
+          (r) =>
+            r.result.status === "rejected" ||
+            (r.result.status === "fulfilled" && (r.result.value.error || r.result.value.data?.error))
+        );
+
+      if (failures.length > 0) {
+        const failedTabs = failures.map((f) => f.tab).join(", ");
+        toast.warning(`Some tabs failed: ${failedTabs}. Others succeeded.`);
       }
 
-      toast.success("All content generated successfully");
+      toast.success("Contact content generated");
+
       // REFACTOR: (b) contact-scoped — prefix invalidation intentionally matches all ["company_cards", id, contactId] variants.
       queryClient.invalidateQueries({ queryKey: ["company_cards", id], exact: false });
       queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
@@ -690,25 +704,40 @@ export default function CompanyDetail() {
         queryClient.invalidateQueries({ queryKey: ["contacts", id] });
       } catch (pe: any) { console.warn("Profile extraction non-fatal:", pe.message); }
 
-      // Step 2: Generate contact-scoped tabs for this contact
-      const tabs = ["strategy", "outreach", "story"];
-      const labels: Record<string, string> = { strategy: "Strategy", outreach: "Outreach", story: "Story" };
-      for (const tab of tabs) {
-        toast.info(`Generating ${labels[tab]}…`);
-        const { data, error } = await supabase.functions.invoke("generate-cards", {
-          body: { company_id: id, tab, contact_id: contactId },
-        });
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
+      // Step 2: Generate contact-scoped tabs for this contact (in parallel)
+      setGenerateStep("Contact Content");
+      toast.info("Generating contact content…");
+
+      const contactTabs = ["strategy", "outreach", "story"];
+      const results = await Promise.allSettled(
+        contactTabs.map((tab) =>
+          supabase.functions.invoke("generate-cards", {
+            body: { company_id: id, tab, contact_id: contactId },
+          })
+        )
+      );
+
+      const failures = results
+        .map((result, i) => ({ result, tab: contactTabs[i] }))
+        .filter(
+          (r) =>
+            r.result.status === "rejected" ||
+            (r.result.status === "fulfilled" && (r.result.value.error || r.result.value.data?.error))
+        );
+
+      if (failures.length > 0) {
+        const failedTabs = failures.map((f) => f.tab).join(", ");
+        toast.warning(`Some tabs failed: ${failedTabs}. Others succeeded.`);
       }
-      toast.success("Content generated for contact");
+
+      toast.success("Contact content generated");
       // REFACTOR: (b) contact-scoped — prefix invalidation intentionally matches all ["company_cards", id, contactId] variants.
       queryClient.invalidateQueries({ queryKey: ["company_cards", id], exact: false });
       queryClient.invalidateQueries({ queryKey: ["contacts", id] });
       // Switch to this contact
       setSelectedContactId(contactId);
     } catch (e: any) { toast.error(e.message || "Generation failed"); }
-    finally { setGeneratingContactId(null); }
+    finally { setGeneratingContactId(null); setGenerateStep(null); }
   };
 
   const contactSelector = contacts.length > 0 ? (
