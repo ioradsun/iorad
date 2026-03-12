@@ -144,11 +144,11 @@ export default function Dashboard() {
     setSyncingHubspot(true);
     try {
       const { error } = await supabase.functions.invoke("import-from-hubspot", {
-        body: { action: "sync" },
+        body: { action: "sync_contacts" },
       });
       if (error) throw error;
       await qc.invalidateQueries({ queryKey: ["companies"] });
-      toast.success("HubSpot sync complete — business companies updated.");
+      toast.success("HubSpot contact sync complete.");
     } catch (err: any) {
       toast.error(`HubSpot sync failed: ${err?.message || "Unknown error"}`);
     } finally {

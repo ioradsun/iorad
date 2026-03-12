@@ -102,6 +102,16 @@ Deno.serve(async (req) => {
       return await syncRecentCompanies(supabase);
     }
 
+    // Contact-first incremental sync — replaces company-first syncRecentCompanies
+    if (body.action === "sync_contacts") {
+      return await syncContactsIncremental(supabase);
+    }
+
+    // Contact-first backfill — pages through ALL HubSpot contacts
+    if (body.action === "backfill_contacts") {
+      return await backfillContacts(supabase, body.after || null, body.job_id || null, body.total || 0);
+    }
+
     // Per-company sync — triggered from Company Detail page
     if (body.action === "sync_company") {
       return await syncSingleCompany(supabase, body.domain, body.company_id);
@@ -351,6 +361,422 @@ async function syncRecentCompanies(supabase: any) {
       auto_queued: autoQueued,
       total: results.length,
       errors: errors.slice(0, 10),
+    }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+async function syncContactsIncremental(supabase: any) {
+  const apiKey = Deno.env.get("HUBSPOT_API_KEY");
+  if (!apiKey) throw new Error("HUBSPOT_API_KEY not configured");
+
+  // Read checkpoint — default to 30 minutes ago if no checkpoint exists
+  const { data: cpRow } = await supabase
+    .from("sync_checkpoints")
+    .select("value")
+    .eq("key", "contact_sync_cursor")
+    .maybeSingle();
+
+  const defaultLookback = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+  const checkpoint = cpRow?.value || defaultLookback;
+
+  // Overlap window: start 5 minutes before checkpoint to catch edge cases
+  const overlapMs = 5 * 60 * 1000;
+  const searchFrom = new Date(new Date(checkpoint).getTime() - overlapMs).toISOString();
+
+  // Properties to fetch — only what we actually use
+  const CONTACT_PROPS = [
+    "firstname", "lastname", "email", "jobtitle", "hs_linkedin_url",
+    "hs_lastmodifieddate", "hs_object_id", "associatedcompanyid",
+    "hs_last_contacted", "num_contacted_notes",
+    "hs_email_open_count", "hs_email_click_count", "hubspot_score",
+    "first_tutorial_create_date", "first_tutorial_view_date",
+    "first_tutorial_learn_date", "answers_with_own_tutorial_month_count",
+    "answers_with_own_tutorial_previous_month_count",
+    "answers", "extension_connections",
+  ];
+
+  // Search contacts modified since checkpoint, sorted by modification date ASC
+  // so we can safely update the checkpoint as we go
+  const PAGE_SIZE = 100;
+  let totalProcessed = 0;
+  let latestModified = checkpoint;
+  let after: string | null = null;
+  let pageCount = 0;
+  const MAX_PAGES = 5; // Process up to 500 contacts per invocation
+
+  while (pageCount < MAX_PAGES) {
+    const searchBody: any = {
+      filterGroups: [{
+        filters: [{
+          propertyName: "hs_lastmodifieddate",
+          operator: "GTE",
+          value: searchFrom,
+        }],
+      }],
+      properties: CONTACT_PROPS,
+      sorts: [{ propertyName: "hs_lastmodifieddate", direction: "ASCENDING" }],
+      limit: PAGE_SIZE,
+    };
+    if (after) searchBody.after = after;
+
+    const res = await hubspotFetch("https://api.hubapi.com/crm/v3/objects/contacts/search", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(searchBody),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`HubSpot contact search failed [${res.status}]: ${text.slice(0, 300)}`);
+    }
+
+    const data = await res.json();
+    const contacts = data.results || [];
+
+    if (contacts.length === 0) break;
+
+    // Process this page
+    const { processed, newest } = await processContactPage(supabase, contacts, apiKey);
+    totalProcessed += processed;
+    if (newest > latestModified) latestModified = newest;
+
+    // Update checkpoint after each successful page
+    await supabase.from("sync_checkpoints").upsert({
+      key: "contact_sync_cursor",
+      value: latestModified,
+      updated_at: new Date().toISOString(),
+    });
+
+    after = data.paging?.next?.after || null;
+    pageCount++;
+
+    if (!after) break; // No more pages
+  }
+
+  console.log(`sync_contacts: processed ${totalProcessed} contacts across ${pageCount} pages, checkpoint=${latestModified}`);
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      contacts_processed: totalProcessed,
+      pages: pageCount,
+      checkpoint: latestModified,
+      has_more: !!after,
+    }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+// Process a single page of HubSpot contacts
+async function processContactPage(
+  supabase: any,
+  hsContacts: any[],
+  apiKey: string,
+): Promise<{ processed: number; newest: string }> {
+  let newest = "";
+  const rowsByCompany = new Map<string, any[]>(); // companyId → contact rows
+  const orphanRows: any[] = []; // contacts with no company association
+
+  for (const contact of hsContacts) {
+    const cp = contact.properties || {};
+    const name = [cp.firstname, cp.lastname].filter(Boolean).join(" ").trim();
+    if (!name) continue;
+
+    const modified = cp.hs_lastmodifieddate || "";
+    if (modified > newest) newest = modified;
+
+    const hubspotObjectId = String(contact.id || cp.hs_object_id || "").trim();
+    const associatedCompanyId = cp.associatedcompanyid || null;
+
+    const row: any = {
+      name,
+      email: cp.email || null,
+      title: cp.jobtitle || null,
+      linkedin: cp.hs_linkedin_url || null,
+      source: "hubspot",
+      confidence: "high",
+      hubspot_object_id: hubspotObjectId || null,
+      hubspot_properties: {
+        rank: 0,
+        hs_last_contacted: cp.hs_last_contacted || null,
+        num_contacted_notes: cp.num_contacted_notes || null,
+        hs_email_open_count: cp.hs_email_open_count || null,
+        hs_email_click_count: cp.hs_email_click_count || null,
+        hubspot_score: cp.hubspot_score || null,
+        first_tutorial_create_date: cp.first_tutorial_create_date || null,
+        first_tutorial_view_date: cp.first_tutorial_view_date || null,
+        first_tutorial_learn_date: cp.first_tutorial_learn_date || null,
+        answers_with_own_tutorial_month_count: cp.answers_with_own_tutorial_month_count || null,
+        answers_with_own_tutorial_previous_month_count: cp.answers_with_own_tutorial_previous_month_count || null,
+        answers: cp.answers || null,
+        extension_connections: cp.extension_connections || null,
+      },
+      _hs_company_id: associatedCompanyId,
+    };
+
+    row.hubspot_properties.rank = computeContactRank(cp);
+
+    if (associatedCompanyId) {
+      const key = String(associatedCompanyId);
+      if (!rowsByCompany.has(key)) rowsByCompany.set(key, []);
+      rowsByCompany.get(key)!.push(row);
+    } else {
+      orphanRows.push(row);
+    }
+  }
+
+  let processed = 0;
+
+  // Resolve HubSpot company IDs to our company IDs in batch
+  const hsCompanyIds = [...rowsByCompany.keys()];
+  const companyIdMap = new Map<string, string>(); // hs_company_id → our company_id
+
+  if (hsCompanyIds.length > 0) {
+    // Look up by hubspot_object_id
+    const { data: dbCompanies } = await supabase
+      .from("companies")
+      .select("id, hubspot_object_id")
+      .in("hubspot_object_id", hsCompanyIds);
+
+    for (const c of dbCompanies || []) {
+      if (c.hubspot_object_id) companyIdMap.set(c.hubspot_object_id, c.id);
+    }
+
+    // For unresolved companies, auto-create minimal records from HubSpot
+    const unresolvedIds = hsCompanyIds.filter(id => !companyIdMap.has(id));
+    if (unresolvedIds.length > 0) {
+      const batchRes = await hubspotFetch("https://api.hubapi.com/crm/v3/objects/companies/batch/read", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          inputs: unresolvedIds.slice(0, 50).map(id => ({ id })),
+          properties: ["name", "domain", "industry", "country", "numberofemployees", "lifecyclestage"],
+        }),
+      });
+
+      if (batchRes.ok) {
+        const batchData = await batchRes.json();
+        for (const hs of batchData.results || []) {
+          try {
+            const { companyId } = await upsertCompany(supabase, hs);
+            companyIdMap.set(String(hs.id), companyId);
+          } catch (e: any) {
+            console.warn(`sync_contacts: failed to upsert company ${hs.id}: ${e.message}`);
+          }
+        }
+      }
+    }
+  }
+
+  // Now upsert contacts for each resolved company
+  for (const [hsCompanyId, rows] of rowsByCompany.entries()) {
+    const companyId = companyIdMap.get(hsCompanyId);
+    if (!companyId) {
+      console.warn(`sync_contacts: could not resolve company ${hsCompanyId} — skipping ${rows.length} contacts`);
+      continue;
+    }
+
+    const { data: existing } = await supabase
+      .from("contacts")
+      .select("id, email, hubspot_object_id")
+      .eq("company_id", companyId);
+
+    const byHubspotId = new Map<string, string>();
+    const byEmail = new Map<string, string>();
+    for (const ec of existing || []) {
+      if (ec.hubspot_object_id) byHubspotId.set(ec.hubspot_object_id, ec.id);
+      if (ec.email) byEmail.set(ec.email.toLowerCase(), ec.id);
+    }
+
+    const toInsert: any[] = [];
+    const toUpdate: { id: string; data: any }[] = [];
+
+    for (const row of rows) {
+      const { _hs_company_id, ...contactData } = row;
+      contactData.company_id = companyId;
+
+      const existingId =
+        (contactData.hubspot_object_id && byHubspotId.get(contactData.hubspot_object_id)) ||
+        (contactData.email && byEmail.get(contactData.email.toLowerCase())) ||
+        null;
+
+      if (existingId && existingId !== "pending") {
+        toUpdate.push({ id: existingId, data: contactData });
+      } else if (!existingId) {
+        toInsert.push(contactData);
+        if (contactData.hubspot_object_id) byHubspotId.set(contactData.hubspot_object_id, "pending");
+        if (contactData.email) byEmail.set(contactData.email.toLowerCase(), "pending");
+      }
+    }
+
+    if (toInsert.length > 0) {
+      const { error } = await supabase
+        .from("contacts")
+        .upsert(toInsert, { onConflict: "company_id,hubspot_object_id", ignoreDuplicates: false });
+      if (error) console.warn(`sync_contacts: upsert error for company ${companyId}: ${error.message}`);
+    }
+
+    if (toUpdate.length > 0) {
+      await Promise.all(toUpdate.map(({ id, data }) =>
+        supabase.from("contacts").update(data).eq("id", id)
+      ));
+    }
+
+    processed += rows.length;
+
+    scoreCompanyAsync(companyId);
+  }
+
+  if (orphanRows.length > 0) {
+    console.warn(`sync_contacts: ${orphanRows.length} contacts have no company association — skipped`);
+  }
+
+  return { processed, newest };
+}
+
+async function backfillContacts(
+  supabase: any,
+  after: string | null,
+  jobId: string | null,
+  totalProcessed: number,
+) {
+  const apiKey = Deno.env.get("HUBSPOT_API_KEY");
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  if (!apiKey) throw new Error("HUBSPOT_API_KEY not configured");
+
+  // Create job on first call
+  let currentJobId = jobId;
+  if (!currentJobId) {
+    const { data: job } = await supabase
+      .from("processing_jobs")
+      .insert({
+        trigger: "contact_backfill",
+        status: "running",
+        total_companies_targeted: 0,
+        settings_snapshot: { action: "backfill_contacts", started: new Date().toISOString() },
+      })
+      .select("id")
+      .single();
+    currentJobId = job?.id || null;
+  }
+
+  // Check for cancellation
+  if (currentJobId) {
+    const { data: jobRow } = await supabase
+      .from("processing_jobs")
+      .select("status")
+      .eq("id", currentJobId)
+      .single();
+    if (jobRow?.status === "canceled" || jobRow?.status === "failed") {
+      return new Response(
+        JSON.stringify({ status: "stopped", reason: jobRow.status }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+  }
+
+  const CONTACT_PROPS = [
+    "firstname", "lastname", "email", "jobtitle", "hs_linkedin_url",
+    "hs_lastmodifieddate", "hs_object_id", "associatedcompanyid",
+    "hs_last_contacted", "num_contacted_notes",
+    "hs_email_open_count", "hs_email_click_count", "hubspot_score",
+    "first_tutorial_create_date", "first_tutorial_view_date",
+    "first_tutorial_learn_date", "answers_with_own_tutorial_month_count",
+    "answers_with_own_tutorial_previous_month_count",
+    "answers", "extension_connections",
+  ];
+
+  // List contacts with cursor pagination
+  const PAGE_SIZE = 100;
+  const params = new URLSearchParams({
+    limit: String(PAGE_SIZE),
+    properties: CONTACT_PROPS.join(","),
+    archived: "false",
+  });
+  if (after) params.set("after", after);
+
+  const res = await hubspotFetch(`https://api.hubapi.com/crm/v3/objects/contacts?${params}`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`HubSpot contacts list failed [${res.status}]: ${text.slice(0, 300)}`);
+  }
+
+  const data = await res.json();
+  const contacts = data.results || [];
+  const nextAfter = data.paging?.next?.after || null;
+
+  if (contacts.length === 0) {
+    // Done
+    if (currentJobId) {
+      await supabase.from("processing_jobs").update({
+        status: "completed",
+        finished_at: new Date().toISOString(),
+        companies_processed: totalProcessed,
+        companies_succeeded: totalProcessed,
+      }).eq("id", currentJobId);
+    }
+    // Set the contact sync checkpoint to now so incremental sync takes over
+    await supabase.from("sync_checkpoints").upsert({
+      key: "contact_sync_cursor",
+      value: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    return new Response(
+      JSON.stringify({ success: true, total: totalProcessed, status: "completed" }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Reuse processContactPage from the incremental sync
+  const { processed } = await processContactPage(supabase, contacts, apiKey);
+  const newTotal = totalProcessed + processed;
+
+  // Update job progress
+  if (currentJobId) {
+    await supabase.from("processing_jobs").update({
+      companies_processed: newTotal,
+      companies_succeeded: newTotal,
+      settings_snapshot: {
+        action: "backfill_contacts",
+        after: nextAfter,
+        total: newTotal,
+      },
+    }).eq("id", currentJobId);
+  }
+
+  // Save backfill cursor
+  await supabase.from("sync_checkpoints").upsert({
+    key: "contact_backfill_after",
+    value: nextAfter || "done",
+    updated_at: new Date().toISOString(),
+  });
+
+  // Self-chain if more pages
+  if (nextAfter) {
+    fetch(`${supabaseUrl}/functions/v1/import-from-hubspot`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${serviceRoleKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "backfill_contacts",
+        after: nextAfter,
+        job_id: currentJobId,
+        total: newTotal,
+      }),
+    }).catch((e: any) => console.error("backfill_contacts chain error:", e.message));
+  }
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      processed,
+      total: newTotal,
+      has_more: !!nextAfter,
+      job_id: currentJobId,
     }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
