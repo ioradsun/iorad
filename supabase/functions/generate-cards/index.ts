@@ -127,6 +127,8 @@ serve(async (req) => {
       persona: company.persona,
       contact_name: primaryContact?.name || company.buyer_name || null,
       contact_role: primaryContact?.title || company.buyer_title || null,
+      contact_focus: primaryContact?.role_focus || null,
+      contact_notes: primaryContact?.user_notes || null,
       contacts: contacts.map((c: any) => {
         // Use AI-extracted profile (Pass 1) if available, otherwise fall back to raw properties
         const profile = c.contact_profile;
@@ -138,6 +140,8 @@ serve(async (req) => {
             linkedin: c.linkedin,
             source: c.source,
             confidence: c.confidence,
+            role_focus: c.role_focus || null,
+            user_notes: c.user_notes || null,
             product_usage_profile: profile,
           };
         }
@@ -150,6 +154,8 @@ serve(async (req) => {
           linkedin: c.linkedin,
           source: c.source,
           confidence: c.confidence,
+          role_focus: c.role_focus || null,
+          user_notes: c.user_notes || null,
           plan_name: hp.plan_name || null,
           account_type: hp.account__type || null,
           category: hp.account_type || null,
@@ -180,6 +186,8 @@ serve(async (req) => {
     const userPrompt = `Generate content for the "${activeTab}" tab of the CRM dashboard for this account.
 
 ACCOUNT CONTEXT:
+- role_focus: the contact's functional area (e.g. "Instructional Design", "Sales Enablement") — use this to tailor strategy and messaging to their specific domain and priorities.
+- user_notes: free-form context from the sales rep — treat as ground truth that overrides inferred assumptions about the contact.
 ${JSON.stringify(context, null, 2)}
 
 Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
@@ -287,14 +295,19 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
       throw new Error("AI returned invalid JSON");
     }
 
-    // REFACTOR: (b) contact-scoped — existing-row lookup should include contact_id; company-only match can merge the wrong contact row.
+    // REFACTOR: (b) contact-scoped — existing-row lookup includes contact_id so contacts don't overwrite each other.
     // Fetch existing row so we can MERGE per-tab data instead of overwriting all fields
-    // company_cards has a unique constraint on company_id — one row per company
-    const { data: existingRow } = await sb
+    // company_cards has a unique constraint on (company_id, COALESCE(contact_id, ...)) — one row per (company, contact) pair
+    let existingRowQuery = sb
       .from("company_cards")
       .select("id, cards_json, assets_json, account_json")
-      .eq("company_id", company_id)
-      .maybeSingle();
+      .eq("company_id", company_id);
+
+    existingRowQuery = contact_id
+      ? existingRowQuery.eq("contact_id", contact_id)
+      : existingRowQuery.is("contact_id", null);
+
+    const { data: existingRow } = await existingRowQuery.maybeSingle();
 
     // Start from existing values so tabs don't wipe each other out
     let cards_json: any = existingRow?.cards_json ?? [];
