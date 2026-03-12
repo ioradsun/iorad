@@ -12,11 +12,12 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail, Plus, Sparkles, Eye, Building2, MapPin, Users, DollarSign, Globe, Video, BookOpen, ChevronRight, Search, PhoneCall, Clock, Brain } from "lucide-react";
+import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail, Plus, Sparkles, Eye, Building2, MapPin, Users, DollarSign, Globe, ChevronRight, Search, PhoneCall, Clock, Brain, Pencil, Save } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { motion } from "framer-motion";
 import { Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
@@ -24,10 +25,11 @@ import { toast } from "sonner";
 // Sub-components
 import { parseJson, toArray, toLoomEmbedUrl, toIoradEmbedUrl } from "./company/types";
 import type { ScoreBreakdown, SnapshotJSON, DashboardCard, EmailTouch, LinkedInStep, StoryAssets } from "./company/types";
-import { DashboardCardUI } from "./company/DashboardCardUI";
-import { EmailSequenceUI, LinkedInSequenceUI } from "./company/OutreachSequences";
 import { StoryAssetsUI } from "./company/StoryAssetsUI";
 import OnboardingTab from "./company/OnboardingTab";
+import StrategyTab from "./company/StrategyTab";
+import OutreachTab from "./company/OutreachTab";
+import StoryTab from "./company/StoryTab";
 
 function TranscriptAnalysisView({ analysis }: { analysis: any }) {
   if (!analysis) return null;
@@ -172,6 +174,9 @@ export default function CompanyDetail() {
   const [contactSearch, setContactSearch] = useState("");
   const [syncingHubspot, setSyncingHubspot] = useState(false);
   const [generatingContactId, setGeneratingContactId] = useState<string | null>(null);
+  const [editingContactId, setEditingContactId] = useState<string | null>(null);
+  const [editRoleFocus, setEditRoleFocus] = useState("");
+  const [editUserNotes, setEditUserNotes] = useState("");
   // extractingProfiles state removed — extraction is now part of the generate pipeline
 
   // Auto-generate AI summary for creator contacts on load (every time contacts change)
@@ -349,8 +354,8 @@ export default function CompanyDetail() {
       queryClient.invalidateQueries({ queryKey: ["signals", id] });
       queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
       queryClient.invalidateQueries({ queryKey: ["contacts", id] });
-      // REFACTOR: (b) contact-scoped — this invalidation should target contact-specific keys, not just company_id.
-      queryClient.invalidateQueries({ queryKey: ["company_cards", id] });
+      // REFACTOR: (b) contact-scoped — prefix invalidation intentionally matches all ["company_cards", id, contactId] variants.
+      queryClient.invalidateQueries({ queryKey: ["company_cards", id], exact: false });
       queryClient.invalidateQueries({ queryKey: ["companies"] });
     } catch (e: any) { toast.error(e.message || "Operation failed"); }
     finally { setRegenerating(false); }
@@ -467,7 +472,6 @@ export default function CompanyDetail() {
   const generateCards = async () => {
     if (!id) return;
     setGeneratingCards(true);
-    const firstContactId = contacts[0]?.id || null;
     try {
       // Non-partner: Step 0a — Run signals (Firecrawl)
       if (isPartnerCategory) {
@@ -525,7 +529,7 @@ export default function CompanyDetail() {
       toast.info("Generating Company Intel…");
       {
         const { data, error } = await supabase.functions.invoke("generate-cards", {
-          body: { company_id: id, tab: "company", ...(firstContactId ? { contact_id: firstContactId } : {}) },
+          body: { company_id: id, tab: "company" },
         });
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
@@ -579,15 +583,15 @@ export default function CompanyDetail() {
         setGenerateStep(labels[tab]);
         toast.info(`Generating ${labels[tab]}…`);
         const body: Record<string, string> = { company_id: id, tab };
-        if (firstContactId) body.contact_id = firstContactId;
+        if (effectiveContactId) body.contact_id = effectiveContactId;
         const { data, error } = await supabase.functions.invoke("generate-cards", { body });
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
       }
 
       toast.success("All content generated successfully");
-      // REFACTOR: (b) contact-scoped — this invalidation should target contact-specific keys, not just company_id.
-      queryClient.invalidateQueries({ queryKey: ["company_cards", id] });
+      // REFACTOR: (b) contact-scoped — prefix invalidation intentionally matches all ["company_cards", id, contactId] variants.
+      queryClient.invalidateQueries({ queryKey: ["company_cards", id], exact: false });
       queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
       queryClient.invalidateQueries({ queryKey: ["contacts", id] });
       queryClient.invalidateQueries({ queryKey: ["meetings", id] });
@@ -601,7 +605,6 @@ export default function CompanyDetail() {
   const regenerateSection = async (section: "signals" | "contacts" | "company" | "strategy" | "outreach" | "story" | "profiles") => {
     if (!id) return;
     setRegeneratingSection(section);
-    const firstContactId = contacts[0]?.id || null;
     try {
       switch (section) {
         case "signals": {
@@ -638,13 +641,15 @@ export default function CompanyDetail() {
           const labels: Record<string, string> = { company: "Company Intel", strategy: "Strategy", outreach: "Outreach", story: "Story" };
           toast.info(`Regenerating ${labels[section]}…`);
           const body: Record<string, string> = { company_id: id, tab: section };
-          if (firstContactId) body.contact_id = firstContactId;
+          if (section !== "company" && effectiveContactId) {
+            body.contact_id = effectiveContactId;
+          }
           const { data, error } = await supabase.functions.invoke("generate-cards", { body });
           if (error) throw error;
           if (data?.error) throw new Error(data.error);
           toast.success(`${labels[section]} regenerated`);
-          // REFACTOR: (b) contact-scoped — this invalidation should target contact-specific keys, not just company_id.
-          queryClient.invalidateQueries({ queryKey: ["company_cards", id] });
+          // REFACTOR: (b) contact-scoped — prefix invalidation intentionally matches all ["company_cards", id, contactId] variants.
+          queryClient.invalidateQueries({ queryKey: ["company_cards", id], exact: false });
           break;
         }
       }
@@ -685,8 +690,8 @@ export default function CompanyDetail() {
       } catch (pe: any) { console.warn("Profile extraction non-fatal:", pe.message); }
 
       // Step 2: Generate all card tabs for this contact
-      const tabs = ["company", "strategy", "outreach", "story"];
-      const labels: Record<string, string> = { company: "Company Intel", strategy: "Strategy", outreach: "Outreach", story: "Story" };
+      const tabs = ["strategy", "outreach", "story"];
+      const labels: Record<string, string> = { strategy: "Strategy", outreach: "Outreach", story: "Story" };
       for (const tab of tabs) {
         toast.info(`Generating ${labels[tab]}…`);
         const { data, error } = await supabase.functions.invoke("generate-cards", {
@@ -696,8 +701,8 @@ export default function CompanyDetail() {
         if (data?.error) throw new Error(data.error);
       }
       toast.success("Content generated for contact");
-      // REFACTOR: (b) contact-scoped — this invalidation should target contact-specific keys, not just company_id.
-      queryClient.invalidateQueries({ queryKey: ["company_cards", id] });
+      // REFACTOR: (b) contact-scoped — prefix invalidation intentionally matches all ["company_cards", id, contactId] variants.
+      queryClient.invalidateQueries({ queryKey: ["company_cards", id], exact: false });
       queryClient.invalidateQueries({ queryKey: ["contacts", id] });
       // Switch to this contact
       setSelectedContactId(contactId);
@@ -800,17 +805,19 @@ export default function CompanyDetail() {
   const loomEmbedUrl = toLoomEmbedUrl(effectiveLoomUrl);
   const ioradEmbedUrl = toIoradEmbedUrl(effectiveIoradUrl);
 
-  const firstContact = contacts[0] || (companyAny?.buyer_name ? { name: companyAny.buyer_name } : null);
+  const activeContact = contacts.find((c: any) => c.id === effectiveContactId)
+    || contacts[0]
+    || (companyAny?.buyer_name ? { name: companyAny.buyer_name } : null);
   // category determines story URL type: non-partner (school/business) uses company_cards.id; partner uses slug
   const companyCategory = companyAny?.category || (companyAny?.source_type === "inbound" ? "business" : companyAny?.partner ? "partner" : "business");
   const companyStage = companyAny?.stage || "prospect";
   const isPartnerCategory = companyCategory === "partner";
   const companyNameSlug = company.name.toLowerCase().replace(/\s+/g, "-");
-  const contactSlug = firstContact ? firstContact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "") : null;
+  const contactSlug = activeContact ? activeContact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "") : null;
   const storyBaseUrl = !isPartnerCategory
     ? contactSlug ? `/stories/${companyNameSlug}/${contactSlug}` : `/stories/${companyNameSlug}`
-    : firstContact && company.partner
-      ? `/${company.partner}/${companyNameSlug}/stories/${firstContact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "")}`
+    : activeContact && company.partner
+      ? `/${company.partner}/${companyNameSlug}/stories/${activeContact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "")}`
       : null;
 
   // Small ghost regen button for individual sections
@@ -1135,6 +1142,9 @@ export default function CompanyDetail() {
                                 {contact.title && (
                                   <div className="text-[12px] text-muted-foreground leading-snug">{contact.title}</div>
                                 )}
+                                {(contact as any).role_focus && (
+                                  <div className="text-[11px] text-primary/70 leading-snug">{(contact as any).role_focus}</div>
+                                )}
                                 {contact.email && (
                                   <a href={`mailto:${contact.email}`} className="text-[11px] text-muted-foreground hover:text-primary flex items-center gap-1 truncate" title={contact.email}>
                                     <Mail className="w-3 h-3 flex-shrink-0" /><span className="truncate">{contact.email}</span>
@@ -1153,6 +1163,19 @@ export default function CompanyDetail() {
                                     <ExternalLink className="w-3.5 h-3.5" />
                                   </a>
                                 )}
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0 text-muted-foreground hover:text-primary"
+                                  title="Edit contact context"
+                                  onClick={() => {
+                                    setEditingContactId((prev) => prev === contact.id ? null : contact.id);
+                                    setEditRoleFocus((contact as any).role_focus || "");
+                                    setEditUserNotes((contact as any).user_notes || "");
+                                  }}
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </Button>
                                 <Button
                                   size="sm"
                                   variant="ghost"
@@ -1221,6 +1244,59 @@ export default function CompanyDetail() {
                                 <p className="text-[11px] text-muted-foreground/50 italic">No AI summary yet</p>
                               )}
                             </div>
+
+                            {editingContactId === contact.id && (
+                              <div className="mt-2 pt-2 border-t border-border/40 space-y-2">
+                                <div>
+                                  <Label className="text-[11px] text-muted-foreground">Role / Focus Area</Label>
+                                  <Input
+                                    placeholder="e.g. Instructional Design, Sales Enablement"
+                                    value={editRoleFocus}
+                                    onChange={(e) => setEditRoleFocus(e.target.value)}
+                                    className="mt-1 h-8 text-xs"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-[11px] text-muted-foreground">Notes for AI</Label>
+                                  <Textarea
+                                    placeholder="Anything that should shape strategy & outreach — budget holder, met at conference, already trialing, reports to CTO..."
+                                    value={editUserNotes}
+                                    onChange={(e) => setEditUserNotes(e.target.value)}
+                                    className="mt-1 text-xs min-h-[60px] resize-y"
+                                    rows={3}
+                                  />
+                                </div>
+                                <div className="flex justify-end gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 text-xs"
+                                    onClick={() => setEditingContactId(null)}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    className="h-7 text-xs gap-1"
+                                    onClick={async () => {
+                                      const { error } = await supabase
+                                        .from("contacts")
+                                        .update({
+                                          role_focus: editRoleFocus || null,
+                                          user_notes: editUserNotes || null,
+                                        })
+                                        .eq("id", contact.id);
+                                      if (error) { toast.error("Failed to save"); return; }
+                                      toast.success("Contact updated");
+                                      queryClient.invalidateQueries({ queryKey: ["contacts", id] });
+                                      setEditingContactId(null);
+                                    }}
+                                  >
+                                    <Save className="w-3 h-3" /> Save
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
@@ -1675,280 +1751,47 @@ export default function CompanyDetail() {
 
         {/* ============ TAB 2: STRATEGY ============ */}
         <TabsContent value="strategy" className="space-y-6 mt-6">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Strategy & Cards</h3>
-            <RegenerateBtn section="strategy" label="Strategy" />
-          </div>
-          {cardsLoading ? (
-            <div className="flex items-center gap-2 py-4">
-              <Loader2 className="w-4 h-4 animate-spin text-primary" />
-              <span className="ml-2 text-sm text-muted-foreground">Loading cards…</span>
-            </div>
-          ) : isInboundStrategyResponse ? (
-            <div className="space-y-3">
-              {inboundStrategyFields.map(({ label, key }) =>
-                inboundStrategyData?.[key] ? (
-                  <div key={key} className="panel p-4 rounded-lg">
-                    <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground mb-1">{label}</div>
-                    <p className="text-[13px] leading-relaxed text-foreground/90">{String(inboundStrategyData[key])}</p>
-                  </div>
-                ) : null
-              )}
-              {Array.isArray(inboundStrategyData?.strategic_plays) && (inboundStrategyData.strategic_plays as any[]).length > 0 && (
-                <div className="panel p-4 rounded-lg space-y-3">
-                  <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground mb-2">Strategic Plays</div>
-                  {(inboundStrategyData.strategic_plays as any[]).map((play: any, i: number) => (
-                    <div key={i} className="border-l-2 border-primary/30 pl-3 space-y-1">
-                      <div className="text-[13px] font-semibold text-foreground">{play.name}</div>
-                      {play.objective && <div className="text-[12px] text-muted-foreground">{play.objective}</div>}
-                      {play.why_now && <div className="text-[12px] text-foreground/80"><span className="font-medium">Why now: </span>{play.why_now}</div>}
-                      {play.what_it_looks_like && <div className="text-[12px] text-foreground/80"><span className="font-medium">Looks like: </span>{play.what_it_looks_like}</div>}
-                      {play.expected_impact && <div className="text-[12px] text-primary font-medium">{play.expected_impact}</div>}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : cards.length > 0 ? (
-            <div className="space-y-4">
-              {cards.map((card) => <DashboardCardUI key={card.id} card={card} />)}
-            </div>
-          ) : (
-            <div className="panel text-center py-8">
-              <Sparkles className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground mb-3">No strategy generated yet.</p>
-            </div>
-          )}
+          <StrategyTab
+            cardsLoading={cardsLoading}
+            isInboundStrategyResponse={isInboundStrategyResponse}
+            inboundStrategyData={inboundStrategyData}
+            inboundStrategyFields={inboundStrategyFields}
+            cards={cards}
+            regeneratingSection={regeneratingSection}
+            generatingCards={generatingCards}
+            onRegenerate={() => regenerateSection("strategy")}
+          />
         </TabsContent>
 
         {/* ============ TAB 3: OUTREACH ============ */}
         <TabsContent value="outreach" className="space-y-6 mt-6">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Outreach Assets</h3>
-            <RegenerateBtn section="outreach" label="Outreach" />
-          </div>
-          {cardsLoading ? (
-            <div className="flex items-center justify-center py-10">
-              <Loader2 className="w-5 h-5 animate-spin text-primary" />
-              <span className="ml-2 text-sm text-muted-foreground">Loading…</span>
-            </div>
-          ) : (assets.email_sequence || assets.linkedin_sequence) ? (
-            <div className="space-y-6">
-              {rawAccountJson._outreach_meta && typeof rawAccountJson._outreach_meta === "object" && (() => {
-                const meta = rawAccountJson._outreach_meta as Record<string, unknown>;
-                const metaFields = [
-                  { label: "Intent Tier", key: "intent_tier" },
-                  { label: "Behavior Acknowledged", key: "behavior_acknowledged" },
-                  { label: "Momentum Frame", key: "momentum_frame" },
-                  { label: "Expansion Opportunity", key: "expansion_opportunity" },
-                  { label: "Risk If Stalled", key: "risk_if_stalled" },
-                  { label: "Upside If Executed", key: "upside_if_executed" },
-                ];
-                const hasAny = metaFields.some(({ key }) => meta[key]);
-                if (!hasAny) return null;
-                return (
-                  <div className="space-y-3">
-                    {metaFields.map(({ label, key }) =>
-                      meta[key] ? (
-                        <div key={key} className="panel p-4 rounded-lg">
-                          <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground mb-1">{label}</div>
-                          <p className="text-[13px] leading-relaxed text-foreground/90">{String(meta[key])}</p>
-                        </div>
-                      ) : null
-                    )}
-                  </div>
-                );
-              })()}
-              {assets.email_sequence && (
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium flex items-center gap-2"><Mail className="w-4 h-4 text-primary" /> Email Sequence</h4>
-                  <EmailSequenceUI emails={assets.email_sequence} />
-                </div>
-              )}
-              {assets.linkedin_sequence && (
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium flex items-center gap-2"><Linkedin className="w-4 h-4 text-primary" /> LinkedIn Sequence</h4>
-                  <LinkedInSequenceUI steps={assets.linkedin_sequence} />
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="panel text-center py-8">
-              <Mail className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground mb-3">No outreach assets generated yet.</p>
-            </div>
-          )}
+          <OutreachTab
+            cardsLoading={cardsLoading}
+            rawAccountJson={rawAccountJson}
+            emailSequence={assets.email_sequence}
+            linkedinSequence={assets.linkedin_sequence}
+            regeneratingSection={regeneratingSection}
+            generatingCards={generatingCards}
+            onRegenerate={() => regenerateSection("outreach")}
+          />
         </TabsContent>
 
         {/* ============ TAB 4: STORY ============ */}
         <TabsContent value="story" className="space-y-6 mt-6">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Story Configuration</h3>
-            <div className="flex items-center gap-2">
-              <RegenerateBtn section="story" label="Story" />
-              {storyBaseUrl && (
-                <a href={storyBaseUrl} target="_blank" rel="noopener noreferrer">
-                  <Button size="sm" variant="outline" className="gap-1.5 text-[13px]">
-                    <Eye className="w-3.5 h-3.5" /> View Story
-                  </Button>
-                </a>
-              )}
-            </div>
-          </div>
-
-          {/* Inbound Story — AI-Generated Institutional Brief */}
-          {isInboundStoryResponse && (
-            <div className="space-y-4">
-              <div className="glow-line" />
-
-              {/* Header meta */}
-              <div className="flex flex-wrap items-center gap-2">
-                {rawAccountJson.intent_tier && (
-                  <Badge variant="outline" className="text-[11px]">Tier: {String(rawAccountJson.intent_tier)}</Badge>
-                )}
-                {rawAccountJson.momentum_score !== undefined && (
-                  <Badge variant="outline" className="text-[11px]">Momentum Score: {String(rawAccountJson.momentum_score)}</Badge>
-                )}
-                {rawAccountJson.persona && (
-                  <Badge variant="secondary" className="text-[11px]">{String(rawAccountJson.persona)}</Badge>
-                )}
-              </div>
-
-              {/* Narrative sections */}
-              {[
-                { label: "Behavior Acknowledged", key: "behavior_acknowledged" },
-                { label: "Momentum Observed", key: "momentum_observed" },
-                { label: "Initiative Translation", key: "initiative_translation" },
-                { label: "Scale Risk", key: "scale_risk" },
-                { label: "Institutionalization Gap", key: "institutionalization_gap" },
-                { label: "Executive Translation", key: "executive_translation" },
-                { label: "Reinforcement Journey", key: "reinforcement_journey" },
-                { label: "Real Cost If Stalled", key: "real_cost_if_stalled" },
-                { label: "Upside If Executed", key: "upside_if_executed" },
-                { label: "Why Now", key: "why_now" },
-                { label: "CTA", key: "cta" },
-              ].map(({ label, key }) =>
-                rawAccountJson[key] ? (
-                  <div key={key} className="panel p-4 rounded-lg space-y-1">
-                    <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">{label}</div>
-                    <p className="text-[13px] leading-relaxed text-foreground/90 whitespace-pre-line">{String(rawAccountJson[key])}</p>
-                  </div>
-                ) : null
-              )}
-
-              {/* Strategic Plays */}
-              {Array.isArray(rawAccountJson.strategic_plays) && (rawAccountJson.strategic_plays as any[]).length > 0 && (
-                <div className="space-y-3">
-                  <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Strategic Expansion Plays</div>
-                  <div className="grid grid-cols-1 gap-3">
-                    {(rawAccountJson.strategic_plays as any[]).map((play: any, i: number) => (
-                      <div key={i} className="panel p-4 rounded-lg border border-border/60 space-y-2">
-                        <div className="font-semibold text-[13px] text-foreground">{play.name}</div>
-                        {play.objective && <p className="text-[12px] text-muted-foreground"><span className="font-mono uppercase tracking-wider text-[10px]">Objective:</span> {play.objective}</p>}
-                        {play.why_now && <p className="text-[12px] text-muted-foreground"><span className="font-mono uppercase tracking-wider text-[10px]">Why Now:</span> {play.why_now}</p>}
-                        {play.what_it_looks_like && <p className="text-[12px] text-foreground/80 leading-relaxed"><span className="font-mono uppercase tracking-wider text-[10px]">What It Looks Like:</span> {play.what_it_looks_like}</p>}
-                        {play.expected_impact && <p className="text-[12px] text-primary/90"><span className="font-mono uppercase tracking-wider text-[10px]">Expected Impact:</span> {play.expected_impact}</p>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Reinforcement Preview */}
-              {rawAccountJson.reinforcement_preview && typeof rawAccountJson.reinforcement_preview === "object" && (
-                <div className="panel p-4 rounded-lg space-y-2">
-                  <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Reinforcement Preview</div>
-                  {(rawAccountJson.reinforcement_preview as any).detected_tool && (
-                    <p className="text-[13px]"><span className="text-muted-foreground text-[11px]">Detected Tool:</span> {(rawAccountJson.reinforcement_preview as any).detected_tool}</p>
-                  )}
-                  {(rawAccountJson.reinforcement_preview as any).library_url && (
-                    <a href={(rawAccountJson.reinforcement_preview as any).library_url} target="_blank" rel="noopener noreferrer" className="text-primary text-[13px] underline">
-                      View Library →
-                    </a>
-                  )}
-                  {(rawAccountJson.reinforcement_preview as any).description && (
-                    <p className="text-[13px] text-foreground/80 leading-relaxed">{(rawAccountJson.reinforcement_preview as any).description}</p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* URL Inputs */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Video className="w-4 h-4 text-primary" /> Loom Video
-                  <Badge variant="outline" className="text-[10px] ml-auto">{effectiveLoomUrl ? "Ready" : "Not Set"}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <Label className="text-xs">Loom Share URL</Label>
-                  <Input
-                    placeholder="https://www.loom.com/share/abc123..."
-                    value={effectiveLoomUrl}
-                    onChange={(e) => { const v = e.target.value; setLoomUrl(v); autosaveUrls(v, effectiveIoradUrl); }}
-                    className="mt-1"
-                  />
-                  <p className="text-[10px] text-muted-foreground mt-1">Paste your Loom share link. It will embed automatically at the top of the story page.</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <BookOpen className="w-4 h-4 text-primary" /> iorad Tutorial
-                  <Badge variant="outline" className="text-[10px] ml-auto">{effectiveIoradUrl ? "Ready" : "Not Set"}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <Label className="text-xs">iorad Tutorial URL</Label>
-                  <Input
-                    placeholder="https://ior.ad/..."
-                    value={effectiveIoradUrl}
-                    onChange={(e) => { const v = e.target.value; setIoradUrl(v); autosaveUrls(effectiveLoomUrl, v); }}
-                    className="mt-1"
-                  />
-                  <p className="text-[10px] text-muted-foreground mt-1">Replaces the default tutorial in the customer story page.</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Embedded Previews */}
-          {(loomEmbedUrl || ioradEmbedUrl) && (
-            <div className="space-y-4">
-              <div className="glow-line" />
-              <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Preview</h3>
-
-              {loomEmbedUrl && (
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium flex items-center gap-2"><Video className="w-4 h-4 text-primary" /> Loom Video</h4>
-                  <div className="rounded-xl overflow-hidden border">
-                    <iframe src={loomEmbedUrl} width="100%" height="400" frameBorder="0" allowFullScreen allow="autoplay; fullscreen" title="Loom video preview" />
-                  </div>
-                </div>
-              )}
-
-              {ioradEmbedUrl && (
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium flex items-center gap-2"><BookOpen className="w-4 h-4 text-primary" /> iorad Tutorial</h4>
-                  <div className="rounded-xl overflow-hidden border">
-                    <iframe
-                      src={ioradEmbedUrl} width="100%" height="500" frameBorder="0" allowFullScreen
-                      allow="camera; microphone; clipboard-write"
-                      sandbox="allow-scripts allow-forms allow-same-origin allow-presentation allow-downloads allow-modals allow-popups allow-popups-to-escape-sandbox allow-top-navigation allow-top-navigation-by-user-activation"
-                      title="iorad tutorial preview"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+          <StoryTab
+            isInboundStoryResponse={isInboundStoryResponse}
+            rawAccountJson={rawAccountJson}
+            storyBaseUrl={storyBaseUrl}
+            loomUrl={effectiveLoomUrl}
+            ioradUrl={effectiveIoradUrl}
+            loomEmbedUrl={loomEmbedUrl}
+            ioradEmbedUrl={ioradEmbedUrl}
+            onLoomUrlChange={(v) => { setLoomUrl(v); autosaveUrls(v, effectiveIoradUrl); }}
+            onIoradUrlChange={(v) => { setIoradUrl(v); autosaveUrls(effectiveLoomUrl, v); }}
+            regeneratingSection={regeneratingSection}
+            generatingCards={generatingCards}
+            onRegenerate={() => regenerateSection("story")}
+          />
         </TabsContent>
 
         {/* ============ TAB 5: ONBOARDING ============ */}

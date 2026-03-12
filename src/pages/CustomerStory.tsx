@@ -89,15 +89,29 @@ function useInboundStoryBySlug(companySlug?: string, contactSlug?: string) {
       ) || companies?.[0];
       if (!company) return null;
 
-      // REFACTOR: (b) contact-scoped — this lookup should include contactSlug/contact_id to select the right row.
-      // Find company_cards for this company
-      const { data: card, error: cardError } = await supabase
+      // REFACTOR: (b) contact-scoped — resolve contactSlug to contact_id, then fetch the matching company_cards row.
+      let contactId: string | null = null;
+      if (contactSlug) {
+        const { data: contacts } = await supabase
+          .from("contacts")
+          .select("id, name")
+          .eq("company_id", company.id);
+        const match = (contacts || []).find((c: any) =>
+          c.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "") === contactSlug.toLowerCase()
+        );
+        if (match) contactId = match.id;
+      }
+
+      let cardQuery = supabase
         .from("company_cards")
         .select("*")
-        .eq("company_id", company.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .eq("company_id", company.id);
+
+      cardQuery = contactId
+        ? cardQuery.eq("contact_id", contactId)
+        : cardQuery.order("created_at", { ascending: false }).limit(1);
+
+      const { data: card, error: cardError } = await cardQuery.maybeSingle();
       if (cardError) throw cardError;
       if (!card) return null;
 
