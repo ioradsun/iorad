@@ -295,55 +295,30 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
       throw new Error("AI returned invalid JSON");
     }
 
-    // REFACTOR: (b) contact-scoped — existing-row lookup includes contact_id so contacts don't overwrite each other.
-    // Fetch existing row so we can MERGE per-tab data instead of overwriting all fields
-    // company_cards has a unique constraint on (company_id, COALESCE(contact_id, ...)) — one row per (company, contact) pair
-    let existingRowQuery = sb
-      .from("company_cards")
-      .select("id, cards_json, assets_json, account_json")
-      .eq("company_id", company_id);
-
-    existingRowQuery = contact_id != null
-      ? existingRowQuery.eq("contact_id", contact_id)
-      : existingRowQuery.is("contact_id", null);
-
-    const { data: existingRow } = await existingRowQuery.maybeSingle();
-
-    // Start from existing values so tabs don't wipe each other out
-    let cards_json: any = existingRow?.cards_json ?? [];
-    let assets_json: any = existingRow?.assets_json ?? {};
-    let account_json: any = existingRow?.account_json ?? {};
-
-    // --- Parse per-tab output and merge into the correct field only ---
+    // Build per-tab atomic payloads — only set the fields this tab owns
+    let p_cards_json: any = null; // null = don't touch
+    let p_assets_json: any = null;
+    let p_account_json: any = null;
 
     if (activeTab === "company") {
-      // Company tab: store its data in account_json, preserving other tab data
-      const companyData = parsed.account || parsed;
-      // Keep strategy/story keys if already present, add/overwrite company key
-      account_json = { ...account_json, _company: companyData };
+      p_account_json = { _company: parsed.account || parsed };
     } else if (activeTab === "strategy") {
-      // Outbound: cards array. Inbound: flat object (mega prompt format)
-      const isInboundStrategy =
+      const isInbound =
         !parsed.cards &&
         (parsed.momentum_observed || parsed.initiative_translation || parsed.observed_behavior ||
          parsed.inferred_initiative || parsed.execution_gap);
-      if (isInboundStrategy) {
-        // Store inbound strategy under a DEDICATED key so Story doesn't overwrite it
-        account_json = { ...account_json, _strategy: parsed, _company: account_json._company };
+      if (isInbound) {
+        p_account_json = { _strategy: parsed };
       } else {
-        cards_json = parsed.cards || parsed || [];
+        p_cards_json = parsed.cards || parsed || [];
       }
     } else if (activeTab === "outreach") {
       if (parsed.email_sequence || parsed.linkedin_sequence) {
-        // Inbound outreach: merge sequences into assets_json
-        assets_json = {
-          ...assets_json,
+        p_assets_json = {
           email_sequence: parsed.email_sequence || null,
           linkedin_sequence: parsed.linkedin_sequence || null,
         };
-        // Store outreach metadata under dedicated key
-        account_json = {
-          ...account_json,
+        p_account_json = {
           _outreach_meta: {
             intent_tier: parsed.intent_tier || null,
             behavior_acknowledged: parsed.behavior_acknowledged || null,
@@ -354,23 +329,14 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
           },
         };
       } else {
-        // Outbound outreach: assets structure
-        assets_json = { ...assets_json, ...(parsed.assets || parsed) };
+        p_assets_json = parsed.assets || parsed;
       }
     } else if (activeTab === "story") {
       if (parsed.behavior_acknowledged || parsed.momentum_observed || parsed.initiative_translation) {
-        // Inbound story: store at root with _type marker, preserve _strategy + _company + _outreach_meta
-        account_json = {
-          _company: account_json._company,
-          _strategy: account_json._strategy,
-          _outreach_meta: account_json._outreach_meta,
-          ...parsed,
-          _type: "inbound_story",
-        };
+        p_account_json = { ...parsed, _type: "inbound_story" };
       } else {
-        // Outbound story: assets structure
-        assets_json = { ...assets_json, ...(parsed.assets || {}) };
-        account_json = { ...account_json, ...(parsed.account || {}) };
+        p_assets_json = parsed.assets || {};
+        p_account_json = parsed.account || {};
       }
     }
 
@@ -378,39 +344,18 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
       activeTab === "story" &&
       (parsed.behavior_acknowledged || parsed.momentum_observed || parsed.initiative_translation);
 
-    // Upsert or insert — merge into existing row if it exists
-    let upsertErr: any = null;
-    if (existingRow?.id) {
-      // REFACTOR: (b) contact-scoped — write is row-specific by id, so this update itself is safe once the correct row is selected.
-      const { error } = await sb
-        .from("company_cards")
-        .update({
-          cards_json,
-          assets_json,
-          account_json,
-          model_version: model,
-          contact_id: contact_id || null,
-        })
-        .eq("id", existingRow.id);
-      upsertErr = error;
-    } else {
-      // REFACTOR: (b) contact-scoped — insert should preserve per-contact uniqueness via (company_id, contact_id).
-      const { error } = await sb
-        .from("company_cards")
-        .insert({
-          company_id,
-          cards_json,
-          assets_json,
-          account_json,
-          model_version: model,
-          contact_id: contact_id || null,
-        });
-      upsertErr = error;
-    }
+    const { error: rpcErr } = await sb.rpc("merge_company_card", {
+      p_company_id: company_id,
+      p_contact_id: contact_id || null,
+      p_cards_json,
+      p_assets_json,
+      p_account_json,
+      p_model_version: model,
+    });
 
-    if (upsertErr) {
-      console.error("Upsert error:", upsertErr);
-      throw new Error(upsertErr.message);
+    if (rpcErr) {
+      console.error("merge_company_card error:", rpcErr);
+      throw new Error(rpcErr.message);
     }
 
     // For inbound story: also write the rich narrative into the snapshot so the public
@@ -497,7 +442,7 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
     console.log(`Cards generated and saved for ${company.name}`);
 
     return new Response(
-      JSON.stringify({ success: true, company: company.name, cards_count: cards_json.length }),
+      JSON.stringify({ success: true, company: company.name, cards_count: Array.isArray(p_cards_json) ? p_cards_json.length : 0 }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
@@ -508,4 +453,3 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
     );
   }
 });
-
