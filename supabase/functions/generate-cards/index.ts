@@ -303,7 +303,7 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
       .select("id, cards_json, assets_json, account_json")
       .eq("company_id", company_id);
 
-    existingRowQuery = contact_id
+    existingRowQuery = contact_id != null
       ? existingRowQuery.eq("contact_id", contact_id)
       : existingRowQuery.is("contact_id", null);
 
