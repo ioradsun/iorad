@@ -2,127 +2,111 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Libre+Franklin:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @layer base {
   :root {
+    /* ══════════════════════════════════════════════════════════════
+       IVE COLOR PHILOSOPHY
+       ══════════════════════════════════════════════════════════════
+
+       1. ONE foreground color at 4 opacity levels = all text hierarchy
+       2. Warm neutrals: 220° hue, 2-6% saturation on every gray
+       3. One interactive blue (Apple system blue neighborhood)
+       4. Status colors ONLY for explicit status, never decoration
+
+       The foreground is hsl(220, 6%, 10%) — near-black with barely
+       perceptible warmth. Text hierarchy comes from OPACITY on this
+       single color, not from multiple gray values:
+
+         --foreground at 100% = primary text (headings, names)
+         --foreground at 65%  = secondary text (descriptions, body)
+         --foreground at 45%  = tertiary text (metadata, timestamps)
+         --foreground at 25%  = quaternary (placeholders, disabled)
+
+       Components use: text-foreground, text-foreground/65, text-foreground/45
+       instead of: text-foreground, text-muted-foreground, text-some-other-gray
+    */
+
     /* ── Surfaces ── */
-    --background: 210 18% 97%;
-    --foreground: 222 20% 14%;
+    --background: 220 6% 98%;
+    --foreground: 220 6% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222 20% 14%;
+    --card-foreground: 220 6% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 20% 14%;
+    --popover-foreground: 220 6% 10%;
 
-    /* ── Primary: muted indigo ── */
-    --primary: 222 40% 36%;
+    /* ── Primary: Apple system blue neighborhood ──
+       hsl(211, 100%, 50%) is iOS #007AFF.
+       We desaturate slightly for a tool context — less playful,
+       more professional, but the same hue family. */
+    --primary: 213 90% 52%;
     --primary-foreground: 0 0% 100%;
 
-    /* ── Secondary surface ── */
-    --secondary: 210 14% 94%;
-    --secondary-foreground: 222 15% 35%;
+    /* ── Secondary: barely-there warm surface ── */
+    --secondary: 220 6% 96%;
+    --secondary-foreground: 220 6% 35%;
 
-    /* ── Muted ── */
-    --muted: 210 12% 93%;
-    --muted-foreground: 215 12% 52%;
+    /* ── Muted: the "secondary text" fallback for components
+       that can't use opacity (e.g. shadcn internals).
+       Matches foreground at ~45% opacity visually. ── */
+    --muted: 220 5% 94%;
+    --muted-foreground: 220 4% 46%;
 
-    /* ── Accent: very light tint of primary ── */
-    --accent: 222 40% 94%;
-    --accent-foreground: 222 40% 30%;
+    /* ── Accent: whisper of blue on hover surfaces ── */
+    --accent: 213 40% 96%;
+    --accent-foreground: 213 50% 40%;
 
-    /* ── Semantic ── */
-    --destructive: 0 60% 48%;
+    /* ── Semantic — 3 colors, used ONLY for status ── */
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
+    --success: 152 56% 39%;
+    --warning: 38 92% 50%;
 
-    /* ── Borders: extremely subtle ── */
-    --border: 215 10% 92%;
-    --input: 215 10% 92%;
-    --ring: 222 40% 50%;
+    /* ── Borders: warm, nearly invisible ── */
+    --border: 220 5% 91%;
+    --input: 220 5% 88%;
+    --ring: 213 90% 52%;
 
-    /* ── Pink accent (kept for story/brand use) ── */
-    --pink: 330 80% 55%;
-    --pink-foreground: 0 0% 100%;
+    --radius: 0.625rem;
 
-    --radius: 0.5rem;
+    /* ══════════════════════════════════════
+       TYPOGRAPHY SCALE — The Entire Design
+       ══════════════════════════════════════
+       5 sizes. 3 weights. That's it.
+       Based on a 1.25 ratio (major third).
+    */
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
-    /* ── Status ── */
-    --success: 142 42% 38%;
-    --success-foreground: 142 30% 96%;
-    --warning: 38 72% 42%;
-    --warning-foreground: 38 60% 15%;
-    --info: 214 60% 44%;
-    --info-foreground: 214 60% 96%;
+    /* Display: page titles, hero numbers */
+    --text-display: 1.75rem; /* 28px */
+    --leading-display: 1.15;
 
-    /* ── Score ── */
-    --score-high: 142 42% 38%;
-    --score-medium: 38 72% 42%;
-    --score-low: 0 60% 48%;
+    /* Title: section headings, card titles */
+    --text-title: 1.0625rem; /* 17px */
+    --leading-title: 1.3;
 
-    /* ── Sidebar ── */
-    --sidebar-background: 222 22% 16%;
-    --sidebar-foreground: 210 14% 78%;
-    --sidebar-primary: 222 40% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 222 20% 22%;
-    --sidebar-accent-foreground: 210 14% 85%;
-    --sidebar-border: 222 15% 22%;
-    --sidebar-ring: 222 40% 55%;
+    /* Body: primary reading text */
+    --text-body: 0.9375rem; /* 15px */
+    --leading-body: 1.6;
 
-    /* ── Typography ── */
-    --font-display: 'Inter', sans-serif;
-    --font-body: 'Inter', sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
+    /* Caption: secondary info, metadata */
+    --text-caption: 0.8125rem; /* 13px */
+    --leading-caption: 1.5;
 
-    --font-size-title: 1.875rem;   /* 30px — page titles */
-    --font-size-sub: 1.25rem;      /* 20px — section headings */
-    --font-size-body: 0.9375rem;   /* 15px — body text */
-    --font-size-sm: 0.875rem;      /* 14px — secondary text */
-    --font-size-xs: 0.75rem;       /* 12px — labels, badges */
+    /* Micro: badges, timestamps, codes */
+    --text-micro: 0.6875rem; /* 11px */
+    --leading-micro: 1.4;
 
-    /* ── Buttons ── */
-    --btn-primary-bg: hsl(var(--primary));
-    --btn-primary-fg: hsl(var(--primary-foreground));
-    --btn-primary-hover: hsl(222 40% 30%);
-    --btn-secondary-bg: hsl(var(--secondary));
-    --btn-secondary-fg: hsl(var(--secondary-foreground));
-    --btn-destructive-bg: hsl(var(--destructive));
-    --btn-destructive-fg: hsl(var(--destructive-foreground));
-    --btn-radius: 0.5rem;
-    --btn-font-size: var(--font-size-sm);
+    /* ── Score (simplified) ── */
+    --score-high: 152 56% 39%;
+    --score-medium: 38 92% 50%;
+    --score-low: 0 72% 51%;
 
-    /* ── Pills / Badges ── */
-    --pill-success-bg: hsl(142 42% 38% / 0.10);
-    --pill-success-fg: hsl(142 38% 30%);
-    --pill-warning-bg: hsl(38 72% 42% / 0.10);
-    --pill-warning-fg: hsl(38 65% 34%);
-    --pill-error-bg: hsl(0 60% 48% / 0.10);
-    --pill-error-fg: hsl(0 55% 40%);
-    --pill-info-bg: hsl(214 60% 44% / 0.10);
-    --pill-info-fg: hsl(214 55% 36%);
-    --pill-neutral-bg: hsl(215 12% 52% / 0.10);
-    --pill-neutral-fg: hsl(215 10% 42%);
-    --pill-radius: 6px;
-    --pill-font-size: var(--font-size-xs);
-
-    /* ── Stat card icons ── */
-    --stat-total-bg: hsl(222 40% 36% / 0.08);
-    --stat-total-fg: hsl(222 40% 36%);
-    --stat-inbound-bg: hsl(142 42% 38% / 0.09);
-    --stat-inbound-fg: hsl(142 38% 30%);
-    --stat-outbound-bg: hsl(214 60% 44% / 0.09);
-    --stat-outbound-fg: hsl(214 55% 36%);
-
-    /* ── Source type pills ── */
-    --source-inbound-bg: hsl(142 42% 38% / 0.08);
-    --source-inbound-fg: hsl(142 38% 30%);
-    --source-inbound-border: hsl(142 42% 38% / 0.22);
-    --source-outbound-bg: hsl(214 60% 44% / 0.08);
-    --source-outbound-fg: hsl(214 55% 36%);
-    --source-outbound-border: hsl(214 60% 44% / 0.22);
-
-    /* ── Story microsite (unchanged) ── */
+    /* ── Story microsite (keep existing) ── */
     --story-bg: #ffffff;
     --story-fg: #000000;
     --story-muted: #000000bf;
@@ -130,8 +114,8 @@
     --story-border: #0000001a;
     --story-surface: #f4f4f4;
     --story-accent: #1a1a1a;
-    --story-accent-dim: rgba(255,0,214,0.08);
-    --story-accent-border: rgba(255,0,214,0.20);
+    --story-accent-dim: rgba(255, 0, 214, 0.08);
+    --story-accent-border: rgba(255, 0, 214, 0.20);
     --story-accent-strong: #1a1a1a;
     --story-gradient-from: #ff00d6;
     --story-gradient-to: #ff66e0;
@@ -142,87 +126,147 @@
     --story-btn-fg: #ffffff;
   }
 
-}
+  /* ── Dark mode ──
+     Same philosophy: warm neutrals (220° hue with low saturation),
+     opacity-based hierarchy, one blue. Dark surfaces are NOT pure
+     black — Ive used hsl(220, 6%, 8%) at Apple, never #000. */
+  .dark {
+    --background: 220 6% 8%;
+    --foreground: 220 4% 92%;
 
-@layer base {
+    --card: 220 6% 11%;
+    --card-foreground: 220 4% 92%;
+
+    --popover: 220 6% 11%;
+    --popover-foreground: 220 4% 92%;
+
+    --primary: 213 85% 62%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 5% 15%;
+    --secondary-foreground: 220 3% 68%;
+
+    --muted: 220 5% 17%;
+    --muted-foreground: 220 3% 55%;
+
+    --accent: 213 25% 18%;
+    --accent-foreground: 213 50% 72%;
+
+    --destructive: 0 62% 58%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 152 48% 48%;
+    --warning: 38 80% 55%;
+
+    --border: 220 5% 17%;
+    --input: 220 5% 20%;
+    --ring: 213 85% 62%;
+
+    --score-high: 152 48% 48%;
+    --score-medium: 38 80% 55%;
+    --score-low: 0 62% 58%;
+  }
+
   * {
     @apply border-border;
   }
 
   body {
     @apply bg-background text-foreground;
-    font-family: var(--font-body);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--leading-body);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    line-height: 1.5;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-display);
+  /* Type hierarchy — weight + size, nothing else */
+  h1 {
+    font-size: var(--text-display);
+    line-height: var(--leading-display);
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    color: hsl(var(--foreground));
+  }
+
+  h2 {
+    font-size: var(--text-title);
+    line-height: var(--leading-title);
+    font-weight: 600;
     letter-spacing: -0.015em;
-    line-height: 1.25;
+    color: hsl(var(--foreground));
+  }
+
+  h3 {
+    font-size: var(--text-body);
+    line-height: var(--leading-body);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: hsl(var(--foreground));
   }
 }
 
 @layer components {
+  /* Section label — the REPLACEMENT for font-mono uppercase tracking-widest.
+     Lightweight, not shouting. Weight 500 + muted color + small caps feel
+     without actual uppercase or monospace. */
+  .section-label {
+    font-size: var(--text-caption);
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    color: hsl(var(--muted-foreground));
+    line-height: var(--leading-caption);
+  }
+
+  /* Panel — simplified, more whitespace */
+  .panel {
+    @apply rounded-lg border bg-card;
+    padding: 1.25rem 1.5rem;
+  }
+
+  .panel-header {
+    font-size: var(--text-caption);
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    color: hsl(var(--muted-foreground));
+    margin-bottom: 1rem;
+  }
+
+  /* Score badges — keep but use new scale */
   .score-badge {
-    @apply inline-flex items-center justify-center rounded px-2 py-0.5 text-xs font-mono font-bold;
+    @apply inline-flex items-center justify-center rounded-md px-2 py-0.5 font-mono font-semibold;
+    font-size: var(--text-micro);
   }
 
   .score-badge-high {
-    background: hsl(var(--score-high) / 0.15);
+    background: hsl(var(--score-high) / 0.12);
     color: hsl(var(--score-high));
-    border: 1px solid hsl(var(--score-high) / 0.3);
   }
 
   .score-badge-medium {
-    background: hsl(38 90% 50% / 0.15);
-    color: hsl(38 90% 70%);
-    border: 1px solid hsl(38 90% 50% / 0.3);
+    background: hsl(var(--score-medium) / 0.12);
+    color: hsl(var(--score-medium));
   }
 
   .score-badge-low {
-    background: hsl(0 70% 50% / 0.15);
-    color: hsl(0 70% 65%);
-    border: 1px solid hsl(0 70% 50% / 0.3);
+    background: hsl(var(--score-low) / 0.12);
+    color: hsl(var(--score-low));
   }
 
-  .status-badge {
-    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 font-medium;
-    border-radius: var(--pill-radius);
-    font-size: var(--pill-font-size);
-  }
-
-  .status-generated {
-    background: var(--pill-success-bg);
-    color: var(--pill-success-fg);
-  }
-
-  .status-low-signal {
-    background: var(--pill-neutral-bg);
-    color: var(--pill-neutral-fg);
-  }
-
-  .status-error {
-    background: var(--pill-error-bg);
-    color: var(--pill-error-fg);
-  }
-
-  .status-no-change {
-    background: var(--pill-warning-bg);
-    color: var(--pill-warning-fg);
-  }
-
-  .status-running {
-    background: var(--pill-info-bg);
-    color: var(--pill-info-fg);
-  }
-
+  /* Glow line — subtler */
   .glow-line {
     height: 1px;
-    background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.5), transparent);
+    background: linear-gradient(90deg, transparent, hsl(var(--border)), transparent);
   }
 
+  /* Data cell */
+  .data-cell {
+    font-family: var(--font-mono);
+    font-size: var(--text-caption);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Editable field (story) — keep as-is */
   .editable-field {
     outline: none;
     border-radius: 4px;
@@ -241,17 +285,5 @@
   .editable-field:focus {
     border-color: var(--story-accent);
     box-shadow: 0 0 0 3px var(--story-accent-dim);
-  }
-
-  .data-cell {
-    @apply font-mono text-sm tabular-nums;
-  }
-
-  .panel {
-    @apply rounded-md border bg-card p-4;
-  }
-
-  .panel-header {
-    @apply text-xs font-mono uppercase tracking-widest text-muted-foreground mb-3;
   }
 }
