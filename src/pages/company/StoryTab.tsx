@@ -3,11 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { BookOpen, Eye, Loader2, RefreshCw, Video } from "lucide-react";
+import { BookOpen, Eye, Loader2, RefreshCw, Sparkles, Video } from "lucide-react";
 
 interface StoryTabProps {
+  // Story narrative data
   isInboundStoryResponse: boolean;
   rawAccountJson: Record<string, unknown>;
+  // URL management
   storyBaseUrl: string | null;
   loomUrl: string;
   ioradUrl: string;
@@ -15,6 +17,7 @@ interface StoryTabProps {
   ioradEmbedUrl: string | null;
   onLoomUrlChange: (url: string) => void;
   onIoradUrlChange: (url: string) => void;
+  // Regeneration
   regeneratingSection: string | null;
   generatingCards: boolean;
   onRegenerate: () => void;
@@ -37,7 +40,10 @@ export default function StoryTab({
   return (
     <>
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Story Configuration</h3>
+        <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+          <Sparkles className="w-3 h-3" />
+          Story Configuration
+        </h3>
         <div className="flex items-center gap-2">
           <Button
             size="sm"
