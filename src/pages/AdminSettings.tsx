@@ -1134,6 +1134,7 @@ function BulkGeneratePanel() {
   const loadMissingStories = async () => {
     setLoadingList(true);
     try {
+      // REFACTOR: (c) existence-check — this only checks whether any card rows exist per company.
       const { data: cardsRows } = await supabase.from("company_cards").select("company_id");
       const existingIds = new Set((cardsRows || []).map((r: any) => r.company_id));
       const { data: allCompanies } = await supabase.from("companies").select("id, name, source_type").order("name");

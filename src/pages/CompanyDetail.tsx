@@ -349,6 +349,7 @@ export default function CompanyDetail() {
       queryClient.invalidateQueries({ queryKey: ["signals", id] });
       queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
       queryClient.invalidateQueries({ queryKey: ["contacts", id] });
+      // REFACTOR: (b) contact-scoped — this invalidation should target contact-specific keys, not just company_id.
       queryClient.invalidateQueries({ queryKey: ["company_cards", id] });
       queryClient.invalidateQueries({ queryKey: ["companies"] });
     } catch (e: any) { toast.error(e.message || "Operation failed"); }
@@ -585,6 +586,7 @@ export default function CompanyDetail() {
       }
 
       toast.success("All content generated successfully");
+      // REFACTOR: (b) contact-scoped — this invalidation should target contact-specific keys, not just company_id.
       queryClient.invalidateQueries({ queryKey: ["company_cards", id] });
       queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
       queryClient.invalidateQueries({ queryKey: ["contacts", id] });
@@ -641,6 +643,7 @@ export default function CompanyDetail() {
           if (error) throw error;
           if (data?.error) throw new Error(data.error);
           toast.success(`${labels[section]} regenerated`);
+          // REFACTOR: (b) contact-scoped — this invalidation should target contact-specific keys, not just company_id.
           queryClient.invalidateQueries({ queryKey: ["company_cards", id] });
           break;
         }
@@ -693,6 +696,7 @@ export default function CompanyDetail() {
         if (data?.error) throw new Error(data.error);
       }
       toast.success("Content generated for contact");
+      // REFACTOR: (b) contact-scoped — this invalidation should target contact-specific keys, not just company_id.
       queryClient.invalidateQueries({ queryKey: ["company_cards", id] });
       queryClient.invalidateQueries({ queryKey: ["contacts", id] });
       // Switch to this contact

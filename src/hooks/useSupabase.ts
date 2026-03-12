@@ -232,9 +232,11 @@ export function useRunSignals() {
 // ---- Company Cards ----
 export function useCompanyCards(companyId: string | undefined, contactId?: string) {
   return useQuery({
+    // REFACTOR: (b) contact-scoped — cache key should include contactId so each contact gets the right row.
     queryKey: ["company_cards", companyId],
     enabled: !!companyId,
     queryFn: async () => {
+      // REFACTOR: (b) contact-scoped — this read currently filters by company_id only and should include contact_id.
       // company_cards has a unique constraint on company_id — one row per company
       const { data, error } = await supabase
         .from("company_cards")

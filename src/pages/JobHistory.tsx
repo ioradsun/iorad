@@ -60,6 +60,7 @@ function useStoryGenerationData() {
       }
 
       // Companies with stories (cards)
+      // REFACTOR: (c) existence-check — this only discovers which companies have any cards.
       const { data: cards } = await supabase
         .from("company_cards")
         .select("company_id, created_at")
