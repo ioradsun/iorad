@@ -27,14 +27,14 @@ export default function OutreachTab({
   return (
     <>
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">
+        <h3 className="section-label">
           Outreach Assets
           {contactName && <span className="ml-2 normal-case tracking-normal text-primary/70 font-medium">for {contactName}</span>}
         </h3>
         <Button
           size="sm"
           variant="ghost"
-          className="h-6 gap-1 text-[11px] text-muted-foreground hover:text-foreground px-2"
+          className="h-6 gap-1 text-micro text-foreground/45 hover:text-foreground px-2"
           disabled={regeneratingSection === "outreach" || generatingCards}
           onClick={onRegenerate}
         >
@@ -47,10 +47,10 @@ export default function OutreachTab({
       {cardsLoading ? (
         <div className="flex items-center justify-center py-10">
           <Loader2 className="w-5 h-5 animate-spin text-primary" />
-          <span className="ml-2 text-sm text-muted-foreground">Loading…</span>
+          <span className="ml-2 text-body text-foreground/45">Loading…</span>
         </div>
       ) : (emailSequence || linkedinSequence) ? (
-        <div className="space-y-6">
+        <div className="space-y-8">
           {rawAccountJson._outreach_meta && typeof rawAccountJson._outreach_meta === "object" && (() => {
             const meta = rawAccountJson._outreach_meta as Record<string, unknown>;
             const metaFields = [
@@ -64,12 +64,12 @@ export default function OutreachTab({
             const hasAny = metaFields.some(({ key }) => meta[key]);
             if (!hasAny) return null;
             return (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {metaFields.map(({ label, key }) =>
                   meta[key] ? (
-                    <div key={key} className="panel p-4 rounded-lg">
-                      <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground mb-1">{label}</div>
-                      <p className="text-[13px] leading-relaxed text-foreground/90">{String(meta[key])}</p>
+                    <div key={key} className="panel p-5 rounded-lg">
+                      <div className="section-label mb-1">{label}</div>
+                      <p className="text-body leading-relaxed text-foreground/65">{String(meta[key])}</p>
                     </div>
                   ) : null,
                 )}
@@ -91,8 +91,8 @@ export default function OutreachTab({
         </div>
       ) : (
         <div className="panel text-center py-8">
-          <Sparkles className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground mb-3">
+          <Sparkles className="w-8 h-8 text-foreground/45 mx-auto mb-3" />
+          <p className="text-body text-foreground/45 mb-3">
             {contactName
               ? `No outreach generated for ${contactName} yet.`
               : "No outreach assets generated yet."}
