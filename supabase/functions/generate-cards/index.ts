@@ -187,7 +187,7 @@ serve(async (req) => {
 
 ACCOUNT CONTEXT:
 - role_focus: the contact's functional area (e.g. "Instructional Design", "Sales Enablement") — use this to tailor strategy and messaging to their specific domain and priorities.
-- user_notes: free-form context from the sales rep — treat as ground truth that overrides inferred assumptions about the contact.
+- user_notes: free-form context from the sales rep — treat as ground truth that overrides any inferred assumptions about the contact.
 ${JSON.stringify(context, null, 2)}
 
 Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
