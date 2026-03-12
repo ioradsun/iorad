@@ -292,6 +292,17 @@ async function autoSync(supabase: any, systemPrompt: string, hoursBack = 12) {
   const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
   console.log(`auto_sync: fetching HubSpot companies modified since ${since}`);
 
+  // Run contact-first incremental sync first so company rescoring has fresh contacts.
+  try {
+    await fetch(`${supabaseUrl}/functions/v1/import-from-hubspot`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${serviceRoleKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "sync_contacts" }),
+    });
+  } catch (e: any) {
+    console.warn(`auto_sync: sync_contacts trigger failed: ${e.message}`);
+  }
+
   let processed = 0;
   let after: string | null = null;
 
@@ -338,17 +349,6 @@ async function autoSync(supabase: any, systemPrompt: string, hoursBack = 12) {
         .maybeSingle();
 
       if (!dbCompany) continue;
-
-      // Re-sync contacts via import-from-hubspot
-      try {
-        await fetch(`${supabaseUrl}/functions/v1/import-from-hubspot`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${serviceRoleKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "sync_hubspot_id", hubspot_id: hsCompany.id }),
-        });
-      } catch (e: any) {
-        console.warn(`auto_sync: re-sync failed for ${domain}: ${e.message}`);
-      }
 
       // Re-score
       await scoreOneCompany(supabase, dbCompany.id, systemPrompt);
