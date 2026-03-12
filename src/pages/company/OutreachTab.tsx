@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Loader2, Linkedin, Mail, RefreshCw } from "lucide-react";
+import { Loader2, Linkedin, Mail, RefreshCw, Sparkles } from "lucide-react";
 import { EmailSequenceUI, LinkedInSequenceUI } from "./OutreachSequences";
 import type { EmailTouch, LinkedInStep } from "./types";
 
@@ -86,7 +86,7 @@ export default function OutreachTab({
         </div>
       ) : (
         <div className="panel text-center py-8">
-          <Mail className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+          <Sparkles className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
           <p className="text-sm text-muted-foreground mb-3">No outreach assets generated yet.</p>
         </div>
       )}
