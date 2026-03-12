@@ -583,6 +583,7 @@ export default function CompanyDetail() {
         setGenerateStep(labels[tab]);
         toast.info(`Generating ${labels[tab]}…`);
         const body: Record<string, string> = { company_id: id, tab };
+        // Contact-scoped tabs must always target the active contact.
         if (effectiveContactId) body.contact_id = effectiveContactId;
         const { data, error } = await supabase.functions.invoke("generate-cards", { body });
         if (error) throw error;
@@ -641,6 +642,7 @@ export default function CompanyDetail() {
           const labels: Record<string, string> = { company: "Company Intel", strategy: "Strategy", outreach: "Outreach", story: "Story" };
           toast.info(`Regenerating ${labels[section]}…`);
           const body: Record<string, string> = { company_id: id, tab: section };
+          // Company tab is company-scoped; only attach contact_id for contact-scoped tabs.
           if (section !== "company" && effectiveContactId) {
             body.contact_id = effectiveContactId;
           }
@@ -689,7 +691,7 @@ export default function CompanyDetail() {
         queryClient.invalidateQueries({ queryKey: ["contacts", id] });
       } catch (pe: any) { console.warn("Profile extraction non-fatal:", pe.message); }
 
-      // Step 2: Generate all card tabs for this contact
+      // Step 2: Generate contact-scoped tabs for this contact
       const tabs = ["strategy", "outreach", "story"];
       const labels: Record<string, string> = { strategy: "Strategy", outreach: "Outreach", story: "Story" };
       for (const tab of tabs) {
