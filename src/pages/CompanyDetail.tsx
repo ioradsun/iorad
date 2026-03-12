@@ -665,6 +665,7 @@ export default function CompanyDetail() {
   const activeContact = contacts.find((c: any) => c.id === effectiveContactId)
     || contacts[0]
     || (companyAny?.buyer_name ? { name: companyAny.buyer_name } : null);
+  const activeContactName = activeContact?.name?.split(" ")[0] || null;
   // category determines story URL type: non-partner (school/business) uses company_cards.id; partner uses slug
   const companyCategory = companyAny?.category || (companyAny?.source_type === "inbound" ? "business" : companyAny?.partner ? "partner" : "business");
   const companyStage = companyAny?.stage || "prospect";
@@ -1218,6 +1219,7 @@ export default function CompanyDetail() {
         {/* ============ TAB 3: STRATEGY ============ */}
         <TabsContent value="strategy" className="space-y-6 mt-6">
           <StrategyTab
+            contactName={activeContactName}
             cardsLoading={cardsLoading}
             isInboundStrategyResponse={isInboundStrategyResponse}
             inboundStrategyData={inboundStrategyData}
@@ -1232,6 +1234,7 @@ export default function CompanyDetail() {
         {/* ============ TAB 4: OUTREACH ============ */}
         <TabsContent value="outreach" className="space-y-6 mt-6">
           <OutreachTab
+            contactName={activeContactName}
             cardsLoading={cardsLoading}
             rawAccountJson={rawAccountJson}
             emailSequence={assets.email_sequence}
@@ -1245,6 +1248,7 @@ export default function CompanyDetail() {
         {/* ============ TAB 5: STORY ============ */}
         <TabsContent value="story" className="space-y-6 mt-6">
           <StoryTab
+            contactName={activeContactName}
             isInboundStoryResponse={isInboundStoryResponse}
             rawAccountJson={rawAccountJson}
             storyBaseUrl={storyBaseUrl}

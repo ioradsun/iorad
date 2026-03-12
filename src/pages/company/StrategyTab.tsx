@@ -6,6 +6,7 @@ import { DashboardCardUI } from "./DashboardCardUI";
 import type { DashboardCard } from "./types";
 
 interface StrategyTabProps {
+  contactName: string | null;
   cardsLoading: boolean;
   isInboundStrategyResponse: boolean;
   inboundStrategyData: Record<string, unknown> | null;
@@ -17,6 +18,7 @@ interface StrategyTabProps {
 }
 
 export default function StrategyTab({
+  contactName,
   cardsLoading,
   isInboundStrategyResponse,
   inboundStrategyData,
@@ -29,7 +31,10 @@ export default function StrategyTab({
   return (
     <>
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Strategy & Cards</h3>
+        <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">
+          Strategy & Cards
+          {contactName && <span className="ml-2 normal-case tracking-normal text-primary/70 font-medium">for {contactName}</span>}
+        </h3>
         <Button
           size="sm"
           variant="ghost"
@@ -83,7 +88,11 @@ export default function StrategyTab({
       ) : (
         <Card className="panel text-center py-8">
           <Sparkles className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground mb-3">No strategy generated yet.</p>
+          <p className="text-sm text-muted-foreground mb-3">
+            {contactName
+              ? `No strategy generated for ${contactName} yet.`
+              : "No strategy generated yet."}
+          </p>
         </Card>
       )}
     </>

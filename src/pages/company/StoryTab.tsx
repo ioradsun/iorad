@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { BookOpen, Eye, Loader2, RefreshCw, Sparkles, Video } from "lucide-react";
 
 interface StoryTabProps {
+  contactName: string | null;
   // Story narrative data
   isInboundStoryResponse: boolean;
   rawAccountJson: Record<string, unknown>;
@@ -24,6 +25,7 @@ interface StoryTabProps {
 }
 
 export default function StoryTab({
+  contactName,
   isInboundStoryResponse,
   rawAccountJson,
   storyBaseUrl,
@@ -43,6 +45,7 @@ export default function StoryTab({
         <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
           <Sparkles className="w-3 h-3" />
           Story Configuration
+          {contactName && <span className="normal-case tracking-normal text-primary/70 font-medium">for {contactName}</span>}
         </h3>
         <div className="flex items-center gap-2">
           <Button

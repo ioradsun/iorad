@@ -4,6 +4,7 @@ import { EmailSequenceUI, LinkedInSequenceUI } from "./OutreachSequences";
 import type { EmailTouch, LinkedInStep } from "./types";
 
 interface OutreachTabProps {
+  contactName: string | null;
   cardsLoading: boolean;
   rawAccountJson: Record<string, unknown>;
   emailSequence: Record<string, EmailTouch> | undefined;
@@ -14,6 +15,7 @@ interface OutreachTabProps {
 }
 
 export default function OutreachTab({
+  contactName,
   cardsLoading,
   rawAccountJson,
   emailSequence,
@@ -25,7 +27,10 @@ export default function OutreachTab({
   return (
     <>
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Outreach Assets</h3>
+        <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">
+          Outreach Assets
+          {contactName && <span className="ml-2 normal-case tracking-normal text-primary/70 font-medium">for {contactName}</span>}
+        </h3>
         <Button
           size="sm"
           variant="ghost"
@@ -87,7 +92,11 @@ export default function OutreachTab({
       ) : (
         <div className="panel text-center py-8">
           <Sparkles className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground mb-3">No outreach assets generated yet.</p>
+          <p className="text-sm text-muted-foreground mb-3">
+            {contactName
+              ? `No outreach generated for ${contactName} yet.`
+              : "No outreach assets generated yet."}
+          </p>
         </div>
       )}
     </>
