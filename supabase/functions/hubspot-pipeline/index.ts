@@ -26,6 +26,35 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+
+// ── HubSpot rate-limit-aware fetch ──────────────────────────────────────────
+let _lastHubSpotCall = 0;
+const MIN_DELAY_MS = 110;
+
+async function hubspotFetch(url: string, options?: RequestInit, retries = 3): Promise<Response> {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    const now = Date.now();
+    const elapsed = now - _lastHubSpotCall;
+    if (elapsed < MIN_DELAY_MS) {
+      await new Promise(r => setTimeout(r, MIN_DELAY_MS - elapsed));
+    }
+    _lastHubSpotCall = Date.now();
+
+    const res = await fetch(url, options);
+
+    if (res.status === 429) {
+      const retryAfter = parseInt(res.headers.get("Retry-After") || "2", 10);
+      const waitMs = Math.min(retryAfter * 1000, 10_000);
+      console.warn(`HubSpot 429 — retrying in ${waitMs}ms (attempt ${attempt + 1}/${retries})`);
+      await new Promise(r => setTimeout(r, waitMs));
+      continue;
+    }
+    return res;
+  }
+  _lastHubSpotCall = Date.now();
+  return fetch(url, options);
+}
+
 const COMPANY_BATCH = 20;   // companies upserted per Phase-1 invocation
 const CONTACT_BATCH = 15;   // companies whose contacts are fetched per Phase-2 invocation
 const SCORE_BATCH   = 30;   // companies scored per Phase-3 invocation
@@ -44,7 +73,7 @@ function chainSelf(payload: Record<string, unknown>) {
 // ── HubSpot helpers ───────────────────────────────────────────────────────────
 async function getAllPropertyNames(apiKey: string): Promise<string[]> {
   try {
-    const res = await fetch("https://api.hubapi.com/crm/v3/properties/companies", {
+    const res = await hubspotFetch("https://api.hubapi.com/crm/v3/properties/companies", {
       headers: { Authorization: `Bearer ${apiKey}` },
     });
     if (!res.ok) return [];
@@ -65,7 +94,7 @@ async function listHubSpotPage(
   url.searchParams.set("properties", properties);
   if (after) url.searchParams.set("after", after);
 
-  const res = await fetch(url.toString(), {
+  const res = await hubspotFetch(url.toString(), {
     headers: { Authorization: `Bearer ${apiKey}` },
   });
   if (!res.ok) {
@@ -208,7 +237,7 @@ async function importContactsForCompany(
   companyId: string,
   apiKey: string
 ): Promise<number> {
-  const assocRes = await fetch(
+  const assocRes = await hubspotFetch(
     `https://api.hubapi.com/crm/v3/objects/companies/${hubspotCompanyId}/associations/contacts?limit=500`,
     { headers: { Authorization: `Bearer ${apiKey}` } }
   );
@@ -221,10 +250,23 @@ async function importContactsForCompany(
 
   console.log(`phase2: ${contactIds.length} contacts for hs company ${hubspotCompanyId}`);
 
+  // Pre-load existing contacts for batch dedup
+  const { data: existingContacts } = await supabase
+    .from("contacts")
+    .select("id, email, hubspot_object_id")
+    .eq("company_id", companyId);
+
+  const byHubspotId = new Map<string, string>();
+  const byEmail = new Map<string, string>();
+  for (const ec of existingContacts || []) {
+    if (ec.hubspot_object_id) byHubspotId.set(ec.hubspot_object_id, ec.id);
+    if (ec.email) byEmail.set(ec.email.toLowerCase(), ec.id);
+  }
+
   let inserted = 0;
   for (let i = 0; i < contactIds.length; i += 100) {
     const batch = contactIds.slice(i, i + 100);
-    const batchRes = await fetch("https://api.hubapi.com/crm/v3/objects/contacts/batch/read", {
+    const batchRes = await hubspotFetch("https://api.hubapi.com/crm/v3/objects/contacts/batch/read", {
       method : "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body   : JSON.stringify({ inputs: batch.map(id => ({ id })), properties: CONTACT_PROPS }),
@@ -237,17 +279,22 @@ async function importContactsForCompany(
       const cp   = contact.properties || {};
       const name = [cp.firstname, cp.lastname].filter(Boolean).join(" ").trim();
       if (!name) continue;
-      if (cp.email) {
-        const { data: existing } = await supabase
-          .from("contacts").select("id")
-          .eq("company_id", companyId).eq("email", cp.email).maybeSingle();
-        if (existing) continue;
-      }
+      const hsId = String(contact.id || cp.hs_object_id || "").trim();
+      const existingId =
+        (hsId && byHubspotId.get(hsId)) ||
+        (cp.email && byEmail.get(cp.email.toLowerCase())) ||
+        null;
+      if (existingId) continue;
+
+      // Track in maps to prevent intra-batch duplicates
+      if (hsId) byHubspotId.set(hsId, "pending");
+      if (cp.email) byEmail.set(cp.email.toLowerCase(), "pending");
       toInsert.push({
         company_id: companyId, name,
         email: cp.email || null, title: cp.jobtitle || null,
         linkedin: cp.hs_linkedin_url || null,
         source: "hubspot", confidence: "high",
+        hubspot_object_id: String(contact.id || cp.hs_object_id || "").trim() || null,
         hubspot_properties: {
           hs_last_contacted: cp.hs_last_contacted || null,
           num_contacted_notes: cp.num_contacted_notes || null,
@@ -265,9 +312,17 @@ async function importContactsForCompany(
       });
     }
     if (toInsert.length > 0) {
-      const { error } = await supabase.from("contacts").insert(toInsert);
-      if (error) console.warn(`phase2 insert error: ${error.message}`);
-      else inserted += toInsert.length;
+      const { error } = await supabase
+        .from("contacts")
+        .upsert(toInsert, {
+          onConflict: "company_id,hubspot_object_id",
+          ignoreDuplicates: true,
+        });
+      if (error) {
+        console.warn(`phase2 upsert error: ${error.message}`);
+      } else {
+        inserted += toInsert.length;
+      }
     }
   }
   return inserted;
