@@ -11,136 +11,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, UserSearch, Linkedin, Mail, Plus, Sparkles, Eye, Building2, Users, DollarSign, ChevronRight, Search, PhoneCall, Pencil, Save } from "lucide-react";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { motion } from "framer-motion";
+import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, Eye, Building2, Users, DollarSign, ChevronRight, PhoneCall } from "lucide-react";
 import { Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 
 // Sub-components
 import { parseJson, toArray, toLoomEmbedUrl, toIoradEmbedUrl } from "./company/types";
-import type { ScoreBreakdown, SnapshotJSON, DashboardCard, EmailTouch, LinkedInStep, StoryAssets } from "./company/types";
+import type { SnapshotJSON, DashboardCard, EmailTouch, LinkedInStep, StoryAssets } from "./company/types";
 import { StoryAssetsUI } from "./company/StoryAssetsUI";
 import OnboardingTab from "./company/OnboardingTab";
 import StrategyTab from "./company/StrategyTab";
 import OutreachTab from "./company/OutreachTab";
 import StoryTab from "./company/StoryTab";
-
-function TranscriptAnalysisView({ analysis }: { analysis: any }) {
-  if (!analysis) return null;
-  if (analysis.raw_text) {
-    return <pre className="text-xs whitespace-pre-wrap text-foreground/80 font-sans leading-relaxed">{analysis.raw_text}</pre>;
-  }
-  const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div className="mb-4">
-      <div className="text-[11px] font-mono uppercase tracking-widest text-primary mb-2">{title}</div>
-      {children}
-    </div>
-  );
-  const BulletList = ({ items }: { items: any[] }) => (
-    <ul className="space-y-1.5">
-      {items.map((item: any, i: number) => (
-        <li key={i} className="text-[13px] text-foreground/80 flex items-start gap-1.5 leading-relaxed">
-          <span className="text-primary mt-0.5">•</span>
-          <span>{typeof item === "string" ? item : JSON.stringify(item)}</span>
-        </li>
-      ))}
-    </ul>
-  );
-  return (
-    <div className="space-y-3 pr-2">
-      {analysis.executive_snapshot && <Section title="Executive Snapshot"><BulletList items={analysis.executive_snapshot} /></Section>}
-      {analysis.compelling_events?.length > 0 && (
-        <Section title="Compelling Events">
-          {analysis.compelling_events.map((ev: any, i: number) => (
-            <div key={i} className="text-xs mb-2 border-l-2 border-primary/30 pl-2">
-              <div className="font-medium text-foreground">{ev.event}</div>
-              {ev.timeline && <div className="text-muted-foreground">Timeline: {ev.timeline}</div>}
-              {ev.implication && <div className="text-foreground/70">→ {ev.implication}</div>}
-            </div>
-          ))}
-        </Section>
-      )}
-      {analysis.stated_initiatives?.length > 0 && (
-        <Section title="Stated Initiatives">
-          {analysis.stated_initiatives.map((init: any, i: number) => (
-            <div key={i} className="text-xs mb-2 border-l-2 border-primary/30 pl-2">
-              <div className="font-medium text-foreground">{init.initiative}</div>
-              {init.owner && <div className="text-muted-foreground">Owner: {init.owner}</div>}
-              {init.urgency && <Badge variant="outline" className="text-[9px] h-4">{init.urgency}</Badge>}
-              {init.iorad_fit && <div className="text-foreground/70 mt-0.5">iorad fit: {init.iorad_fit}</div>}
-            </div>
-          ))}
-        </Section>
-      )}
-      {analysis.usage_analysis && (
-        <Section title="iorad Usage Analysis">
-          <div className="text-xs space-y-1 text-foreground/80">
-            {analysis.usage_analysis.maturity && <div><span className="text-muted-foreground">Maturity:</span> {analysis.usage_analysis.maturity}</div>}
-            {analysis.usage_analysis.use_cases && <div><span className="text-muted-foreground">Use cases:</span> {Array.isArray(analysis.usage_analysis.use_cases) ? analysis.usage_analysis.use_cases.join(", ") : analysis.usage_analysis.use_cases}</div>}
-            {analysis.usage_analysis.double_usage_answer && <div className="mt-1 italic text-foreground/70">{analysis.usage_analysis.double_usage_answer}</div>}
-          </div>
-        </Section>
-      )}
-      {analysis.power_map?.length > 0 && (
-        <Section title="Power Map">
-          {analysis.power_map.map((p: any, i: number) => (
-            <div key={i} className="text-xs mb-1.5 flex items-start gap-2">
-              <span className="font-medium text-foreground min-w-[80px]">{p.name || p.role}</span>
-              <span className="text-muted-foreground">{p.role}{p.influence ? ` · ${p.influence}` : ""}{p.sentiment ? ` · ${p.sentiment}` : ""}</span>
-            </div>
-          ))}
-        </Section>
-      )}
-      {analysis.risk_assessment && (
-        <Section title="Risk Assessment">
-          <div className="text-xs text-foreground/80">
-            <div className="font-medium">Churn Risk: <span className={analysis.risk_assessment.churn_risk === "High" ? "text-destructive" : analysis.risk_assessment.churn_risk === "Medium" ? "text-warning" : "text-primary"}>{analysis.risk_assessment.churn_risk}</span></div>
-            {analysis.risk_assessment.churn_reason && <div className="mt-0.5 text-muted-foreground">{analysis.risk_assessment.churn_reason}</div>}
-            {analysis.risk_assessment.signals && <BulletList items={analysis.risk_assessment.signals} />}
-          </div>
-        </Section>
-      )}
-      {analysis.expansion_angles?.length > 0 && (
-        <Section title="Expansion Angles">
-          {analysis.expansion_angles.map((a: any, i: number) => (
-            <div key={i} className="text-xs mb-1.5 border-l-2 border-primary/30 pl-2">
-              <div className="font-medium text-foreground">{a.angle}</div>
-              {a.details && <div className="text-foreground/70">{a.details}</div>}
-            </div>
-          ))}
-        </Section>
-      )}
-      {analysis.messaging_strategy && (
-        <Section title="Messaging Strategy">
-          <div className="text-xs space-y-2 text-foreground/80">
-            {analysis.messaging_strategy.positioning_angles && <div><span className="text-muted-foreground font-medium">Positioning:</span><BulletList items={analysis.messaging_strategy.positioning_angles} /></div>}
-            {analysis.messaging_strategy.questions && <div><span className="text-muted-foreground font-medium">Questions:</span><BulletList items={analysis.messaging_strategy.questions} /></div>}
-            {analysis.messaging_strategy.renewal_storyline && <div><span className="text-muted-foreground font-medium">Renewal:</span> {analysis.messaging_strategy.renewal_storyline}</div>}
-          </div>
-        </Section>
-      )}
-      {analysis.action_plan && (
-        <Section title="30-60-90 Day Plan">
-          <div className="text-xs space-y-2">
-            {analysis.action_plan.day_30 && <div><span className="text-muted-foreground font-medium">30 Days:</span><BulletList items={analysis.action_plan.day_30} /></div>}
-            {analysis.action_plan.day_60 && <div><span className="text-muted-foreground font-medium">60 Days:</span><BulletList items={analysis.action_plan.day_60} /></div>}
-            {analysis.action_plan.day_90 && <div><span className="text-muted-foreground font-medium">90 Days:</span><BulletList items={analysis.action_plan.day_90} /></div>}
-          </div>
-        </Section>
-      )}
-      {analysis.account_thesis && (
-        <Section title="Account Thesis">
-          <p className="text-xs font-medium text-foreground italic">"{analysis.account_thesis}"</p>
-        </Section>
-      )}
-    </div>
-  );
-}
+import ContactsSection from "./company/ContactsSection";
+import CompanySignalsSection from "./company/CompanySignalsSection";
 
 export default function CompanyDetail() {
   const { id } = useParams<{ id: string }>();
@@ -162,11 +46,9 @@ export default function CompanyDetail() {
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [newContact, setNewContact] = useState({ name: "", title: "", email: "", linkedin: "" });
   const [savingContact, setSavingContact] = useState(false);
-  const [extraOpen, setExtraOpen] = useState(true);
   const [loomUrl, setLoomUrl] = useState<string | null>(null);
   const [ioradUrl, setIoradUrl] = useState<string | null>(null);
   const [findingContacts, setFindingContacts] = useState(false);
-  const [searchingPersona, setSearchingPersona] = useState<string | null>(null);
   const [syncingFathom, setSyncingFathom] = useState(false);
   const [fixingDomain, setFixingDomain] = useState(false);
   const [analyzingMeeting, setAnalyzingMeeting] = useState<string | null>(null);
@@ -360,8 +242,6 @@ export default function CompanyDetail() {
     finally { setRegenerating(false); }
   };
 
-  const PERSONAS = ["Learning & Development", "Enablement", "Customer Ed"];
-
   const syncFathom = async () => {
     if (!company?.domain) { toast.error("Company needs a domain to sync Fathom meetings"); return; }
     setSyncingFathom(true);
@@ -444,27 +324,6 @@ export default function CompanyDetail() {
       }
     } catch (e: any) { toast.error(e.message || "Domain fix failed"); }
     finally { setFixingDomain(false); }
-  };
-
-  const searchByPersona = async (persona: string) => {
-    if (!id) return;
-    setSearchingPersona(persona);
-    toast.info(`Searching Apollo for "${persona}" contacts…`);
-    try {
-      const { data, error } = await supabase.functions.invoke("find-contacts", { body: { company_id: id, persona } });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      if (data?.contacts_found > 0) {
-        toast.success(`Found ${data.contacts_found} "${persona}" contacts`);
-      } else {
-        toast.warning(`No "${persona}" contacts found at this company`);
-      }
-      queryClient.invalidateQueries({ queryKey: ["contacts", id] });
-    } catch (e: any) {
-      toast.error(e.message || "Persona search failed");
-    } finally {
-      setSearchingPersona(null);
-    }
   };
 
   // Unified generation for both outbound and inbound
@@ -785,7 +644,6 @@ export default function CompanyDetail() {
   }
 
   const latestSnapshot = snapshots[0];
-  const bd = latestSnapshot ? parseJson<ScoreBreakdown>(latestSnapshot.score_breakdown) : null;
   const snap = latestSnapshot ? parseJson<SnapshotJSON>(latestSnapshot.snapshot_json) : null;
 
   const cards = (companyCards?.cards_json as unknown as DashboardCard[] | null) || [];
@@ -1042,337 +900,39 @@ export default function CompanyDetail() {
             </Collapsible>
           )}
 
-          {/* Contacts */}
-          <div className="panel">
-            <div className="panel-header flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span>Contacts ({contacts.filter((c: any) => !c.email?.toLowerCase().includes("student")).length || (companyAny?.buyer_name ? 1 : 0)})</span>
-                {findingContacts && (
-                  <span className="text-[11px] text-muted-foreground font-normal flex items-center gap-1">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    Finding contacts via Apollo…
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-1">
-              {isPartnerCategory && (
-                <RegenerateBtn section="contacts" label="Find Contacts" />
-              )}
-              <Dialog open={addContactOpen} onOpenChange={setAddContactOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm" variant="ghost" className="gap-1 text-xs h-7"><Plus className="w-3.5 h-3.5" /> Add</Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader><DialogTitle>Add Contact</DialogTitle></DialogHeader>
-                  <div className="space-y-3">
-                    <div><Label>Name *</Label><Input value={newContact.name} onChange={e => setNewContact(p => ({ ...p, name: e.target.value }))} placeholder="Jane Smith" /></div>
-                    <div><Label>Title</Label><Input value={newContact.title} onChange={e => setNewContact(p => ({ ...p, title: e.target.value }))} placeholder="VP of Learning" /></div>
-                    <div><Label>Email</Label><Input type="email" value={newContact.email} onChange={e => setNewContact(p => ({ ...p, email: e.target.value }))} placeholder="jane@company.com" /></div>
-                    <div><Label>LinkedIn</Label><Input value={newContact.linkedin} onChange={e => setNewContact(p => ({ ...p, linkedin: e.target.value }))} placeholder="https://linkedin.com/in/..." /></div>
-                    <Button onClick={handleAddContact} disabled={!newContact.name.trim() || savingContact} className="w-full">
-                      {savingContact ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Looking up…</> : (!newContact.email.trim() && !newContact.linkedin.trim()) ? "Add & Enrich via Apollo" : "Add Contact"}
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-              </div>
-            </div>
-            {/* Persona Search — only for outbound companies */}
-            {companyAny?.source_type !== "inbound" && (
-            <div className="flex items-center gap-2 flex-wrap px-4 pb-3">
-              <span className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Search by persona:</span>
-              {PERSONAS.map((p) => (
-                <Button
-                  key={p}
-                  size="sm"
-                  variant="outline"
-                  className="text-[12px] h-7 px-2.5 gap-1"
-                  disabled={!!searchingPersona || findingContacts}
-                  onClick={() => searchByPersona(p)}
-                >
-                  {searchingPersona === p ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
-                  {p}
-                </Button>
-              ))}
-            </div>
-            )}
-            {contacts.filter((c: any) => !c.email?.toLowerCase().includes("student")).length > 0 && (
-              <div className="px-4 pb-3">
-                <Input
-                  placeholder="Search contacts…"
-                  value={contactSearch}
-                  onChange={e => setContactSearch(e.target.value)}
-                  className="h-7 text-xs"
-                />
-              </div>
-            )}
-            <div className="px-4 pb-4">
-              {contacts.filter((c: any) => !c.email?.toLowerCase().includes("student")).length > 0 ? (() => {
-                const filtered = contacts
-                  .filter((c) => {
-                    if (c.email?.toLowerCase().includes("student")) return false;
-                    if (!contactSearch) return true;
-                    const q = contactSearch.toLowerCase();
-                    return (c.name?.toLowerCase().includes(q) || c.title?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q));
-                  })
-                  .sort((a: any, b: any) => {
-                    const rankA = (a.hubspot_properties as any)?.rank ?? 0;
-                    const rankB = (b.hubspot_properties as any)?.rank ?? 0;
-                    return rankB - rankA;
-                  });
-
-                const getRankBadge = (contact: any) => {
-                  const rank = (contact.hubspot_properties as any)?.rank ?? 0;
-                  if (rank >= 50) return { label: "Top", cls: "bg-primary/15 text-primary border-primary/30" };
-                  if (rank >= 25) return { label: "Mid", cls: "bg-warning/15 text-warning border-warning/30" };
-                  if (rank > 0)  return { label: "Low", cls: "bg-muted text-muted-foreground border-border/40" };
-                  return null;
-                };
-
-                const getIoradActivity = (contact: any) => {
-                  const hp = (contact.hubspot_properties as any) || {};
-                  return {
-                    isCreator: !!hp.first_tutorial_create_date,
-                    isViewer: !!(hp.first_tutorial_view_date || hp.first_tutorial_learn_date),
-                    monthAnswers: parseInt(hp.answers_with_own_tutorial_month_count || "0", 10) || 0,
-                    hasExtension: parseInt(hp.extension_connections || "0", 10) > 0,
-                  };
-                };
-
-                return (
-                  <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollSnapType: "x mandatory" }}>
-                    {filtered.map((contact) => {
-                      const firstName = contact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "");
-                      const storyUrl = isPartnerCategory && company.partner
-                        ? `/${company.partner}/${companyNameSlug}/stories/${firstName}`
-                        : `/stories/${companyNameSlug}/${firstName}`;
-                      
-                      const profile = (contact as any).contact_profile as any;
-                      const isGenerating = generatingContactId === contact.id;
-                      const rankBadge = getRankBadge(contact);
-                      const ioradActivity = getIoradActivity(contact);
-                      const hasSnap = snapshots.length > 0;
-
-                      return (
-                        <div
-                          key={contact.id}
-                          className="border border-border/50 rounded-lg bg-secondary/20 hover:bg-secondary/30 transition-colors flex flex-col flex-shrink-0 w-72"
-                          style={{ scrollSnapAlign: "start" }}
-                        >
-                          <div className="p-3 flex flex-col gap-2 flex-1">
-                            {/* Top row: name/title + action icons + generate button */}
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-                                {rankBadge && (
-                                  <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold w-fit mb-0.5 ${rankBadge.cls}`}>
-                                    {rankBadge.label}
-                                  </span>
-                                )}
-                                <div className="text-[14px] font-semibold leading-tight">{contact.name}</div>
-                                {contact.title && (
-                                  <div className="text-[12px] text-muted-foreground leading-snug">{contact.title}</div>
-                                )}
-                                {(contact as any).role_focus && (
-                                  <div className="text-[11px] text-primary/70 leading-snug">{(contact as any).role_focus}</div>
-                                )}
-                                {contact.email && (
-                                  <a href={`mailto:${contact.email}`} className="text-[11px] text-muted-foreground hover:text-primary flex items-center gap-1 truncate" title={contact.email}>
-                                    <Mail className="w-3 h-3 flex-shrink-0" /><span className="truncate">{contact.email}</span>
-                                  </a>
-                                )}
-                              </div>
-                              {/* Top-right actions */}
-                              <div className="flex items-center gap-0.5 flex-shrink-0">
-                                {contact.linkedin && (
-                                  <a href={contact.linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary p-1" title="LinkedIn">
-                                    <Linkedin className="w-3.5 h-3.5" />
-                                  </a>
-                                )}
-                                {storyUrl && hasSnap && (
-                                  <a href={storyUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary p-1" title="View story">
-                                    <ExternalLink className="w-3.5 h-3.5" />
-                                  </a>
-                                )}
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 w-7 p-0 text-muted-foreground hover:text-primary"
-                                  title="Edit contact context"
-                                  onClick={() => {
-                                    setEditingContactId((prev) => prev === contact.id ? null : contact.id);
-                                    setEditRoleFocus((contact as any).role_focus || "");
-                                    setEditUserNotes((contact as any).user_notes || "");
-                                  }}
-                                >
-                                  <Pencil className="w-3.5 h-3.5" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 w-7 p-0 text-muted-foreground hover:text-primary"
-                                  title="Generate cards for this contact"
-                                  onClick={() => generateForContact(contact.id)}
-                                  disabled={isGenerating || !!generatingContactId}
-                                >
-                                  {isGenerating
-                                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                    : <Sparkles className="w-3.5 h-3.5" />}
-                                </Button>
-                              </div>
-                            </div>
-
-                            {/* iorad activity badges */}
-                            {(ioradActivity.isCreator || ioradActivity.isViewer || ioradActivity.hasExtension || ioradActivity.monthAnswers > 0) && (
-                              <div className="flex flex-wrap gap-1">
-                                {ioradActivity.isCreator && (
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded border border-primary/30 bg-primary/10 text-primary font-medium flex items-center gap-0.5" title="Has created tutorials">
-                                    <BookOpen className="w-2.5 h-2.5" /> Creator
-                                  </span>
-                                )}
-                                {ioradActivity.isViewer && !ioradActivity.isCreator && (
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded border border-info/30 bg-info/10 text-info font-medium flex items-center gap-0.5" title="Has viewed tutorials">
-                                    <Eye className="w-2.5 h-2.5" /> Viewer
-                                  </span>
-                                )}
-                                {ioradActivity.monthAnswers > 0 && (
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded border border-warning/30 bg-warning/10 text-warning font-medium" title={`${ioradActivity.monthAnswers} answers this month`}>
-                                    {ioradActivity.monthAnswers} ans/mo
-                                  </span>
-                                )}
-                                {ioradActivity.hasExtension && (
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded border border-border/40 bg-secondary text-muted-foreground font-medium flex items-center gap-0.5" title="Extension connected">
-                                    <Zap className="w-2.5 h-2.5" /> Ext
-                                  </span>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Key metrics row if profile exists */}
-                            {profile?.key_metrics && (
-                              <div className="flex gap-2 text-[10px] text-muted-foreground">
-                                {profile.key_metrics.tutorials_created != null && (
-                                  <span title="Tutorials created"><span className="font-semibold text-foreground">{profile.key_metrics.tutorials_created}</span> created</span>
-                                )}
-                                {profile.key_metrics.tutorials_viewed != null && (
-                                  <span title="Tutorials viewed"><span className="font-semibold text-foreground">{profile.key_metrics.tutorials_viewed}</span> viewed</span>
-                                )}
-                                {profile.key_metrics.plan && (
-                                  <span className="ml-auto text-[10px] px-1.5 py-0 rounded bg-secondary text-muted-foreground">{profile.key_metrics.plan}</span>
-                                )}
-                              </div>
-                            )}
-
-                            {/* AI summary */}
-                            <div className="mt-1 pt-2 border-t border-border/40 flex-1">
-                              {profile?.account_narrative ? (
-                                <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-4">{profile.account_narrative}</p>
-                              ) : isGenerating ? (
-                                <p className="text-[11px] text-muted-foreground/50 italic flex items-center gap-1.5">
-                                  <Loader2 className="w-3 h-3 animate-spin inline" /> Generating summary…
-                                </p>
-                              ) : (
-                                <p className="text-[11px] text-muted-foreground/50 italic">No AI summary yet</p>
-                              )}
-                            </div>
-
-                            {editingContactId === contact.id && (
-                              <div className="mt-2 pt-2 border-t border-border/40 space-y-2">
-                                <div>
-                                  <Label className="text-[11px] text-muted-foreground">Role / Focus Area</Label>
-                                  <Input
-                                    placeholder="e.g. Instructional Design, Sales Enablement"
-                                    value={editRoleFocus}
-                                    onChange={(e) => setEditRoleFocus(e.target.value)}
-                                    className="mt-1 h-8 text-xs"
-                                  />
-                                </div>
-                                <div>
-                                  <Label className="text-[11px] text-muted-foreground">Notes for AI</Label>
-                                  <Textarea
-                                    placeholder="Anything that should shape strategy & outreach — budget holder, met at conference, already trialing, reports to CTO..."
-                                    value={editUserNotes}
-                                    onChange={(e) => setEditUserNotes(e.target.value)}
-                                    className="mt-1 text-xs min-h-[60px] resize-y"
-                                    rows={3}
-                                  />
-                                </div>
-                                <div className="flex justify-end gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-7 text-xs"
-                                    onClick={() => setEditingContactId(null)}
-                                  >
-                                    Cancel
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    className="h-7 text-xs gap-1"
-                                    onClick={async () => {
-                                      const { error } = await supabase
-                                        .from("contacts")
-                                        .update({
-                                          role_focus: editRoleFocus || null,
-                                          user_notes: editUserNotes || null,
-                                        })
-                                        .eq("id", contact.id);
-                                      if (error) { toast.error("Failed to save"); return; }
-                                      toast.success("Contact updated");
-                                      queryClient.invalidateQueries({ queryKey: ["contacts", id] });
-                                      setEditingContactId(null);
-                                    }}
-                                  >
-                                    <Save className="w-3 h-3" /> Save
-                                  </Button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-
-
-              })() : companyAny?.buyer_name ? (
-                <div className="flex items-center gap-4 p-2 rounded-md hover:bg-secondary/30 transition-colors">
-                  <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center"><UserSearch className="w-4 h-4 text-primary" /></div>
-                  <div className="flex-1 min-w-0 space-y-0.5">
-                    <div className="text-[14px] font-medium">{companyAny.buyer_name}</div>
-                    {companyAny.buyer_title && <div className="text-[13px] text-muted-foreground">{companyAny.buyer_title}</div>}
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {companyAny.buyer_email && <a href={`mailto:${companyAny.buyer_email}`} className="text-muted-foreground hover:text-primary"><Mail className="w-4 h-4" /></a>}
-                    {companyAny.buyer_linkedin && <a href={companyAny.buyer_linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary"><Linkedin className="w-4 h-4" /></a>}
-                  </div>
-                </div>
-              ) : (
-                <p className="text-[14px] text-muted-foreground">No contacts yet. Add one manually or run enrichment.</p>
-              )}
-            </div>
-          </div>
-
-          {/* Delete Contact Confirmation */}
-          <AlertDialog open={!!deleteContactId} onOpenChange={(open) => !open && setDeleteContactId(null)}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete contact?</AlertDialogTitle>
-                <AlertDialogDescription>This will permanently remove the contact. This action cannot be undone.</AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  onClick={() => deleteContactId && handleDeleteContact(deleteContactId)}
-                  disabled={deletingContact}
-                >
-                  {deletingContact ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <ContactsSection
+            companyId={id!}
+            contacts={contacts}
+            snapshots={snapshots}
+            company={company}
+            isPartnerCategory={isPartnerCategory}
+            companyNameSlug={companyNameSlug}
+            findingContacts={findingContacts}
+            generatingContactId={generatingContactId}
+            editingContactId={editingContactId}
+            editRoleFocus={editRoleFocus}
+            editUserNotes={editUserNotes}
+            onSetEditingContactId={setEditingContactId}
+            onSetEditRoleFocus={setEditRoleFocus}
+            onSetEditUserNotes={setEditUserNotes}
+            onGenerateForContact={generateForContact}
+            onDeleteContact={(cid) => setDeleteContactId(cid)}
+            addContactOpen={addContactOpen}
+            onSetAddContactOpen={setAddContactOpen}
+            newContact={newContact}
+            onSetNewContact={setNewContact}
+            onAddContact={handleAddContact}
+            savingContact={savingContact}
+            contactSearch={contactSearch}
+            onSetContactSearch={setContactSearch}
+            onRegenerateContacts={() => regenerateSection("contacts")}
+            regeneratingSection={regeneratingSection}
+            generatingCards={generatingCards}
+            deleteContactId={deleteContactId}
+            onSetDeleteContactId={setDeleteContactId}
+            deletingContact={deletingContact}
+            onConfirmDelete={() => deleteContactId && handleDeleteContact(deleteContactId)}
+          />
 
           {/* Meetings (Fathom) */}
           <Card className="bg-secondary/30">
@@ -1623,160 +1183,13 @@ export default function CompanyDetail() {
 
           <div className="glow-line" />
 
-          {/* Score + Signals + Analysis (collapsible) */}
-          <Collapsible open={extraOpen} onOpenChange={setExtraOpen}>
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" className="w-full justify-between text-xs font-mono uppercase tracking-wider text-muted-foreground hover:text-foreground">
-                Score · Signals · Analysis
-                <ChevronRight className={`w-4 h-4 transition-transform ${extraOpen ? "rotate-90" : ""}`} />
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-6 pt-4">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Score */}
-                <div className="panel">
-                  <div className="panel-header flex items-center justify-between">
-                    <span>Score</span>
-                    <ScoreCell score={company.last_score_total} />
-                  </div>
-                  {bd ? (
-                    <div className="space-y-4">
-                      {[
-                        { label: "Hiring", value: bd.relevance || bd.hiring || 0, max: 30 },
-                        { label: "News", value: bd.urgency || bd.news || 0, max: 40 },
-                        { label: "Expansion", value: bd.buyer_signal || bd.expansion || 0, max: 30 },
-                      ].map(({ label, value, max }) => (
-                        <div key={label}>
-                          <div className="flex justify-between text-sm mb-1">
-                            <span className="text-muted-foreground">{label}</span>
-                            <span className="font-mono font-bold text-foreground">{value}/{max}</span>
-                          </div>
-                          <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-                            <motion.div initial={{ width: 0 }} animate={{ width: `${(value / max) * 100}%` }} transition={{ duration: 0.8, ease: "easeOut" }} className="h-full bg-primary rounded-full" />
-                          </div>
-                        </div>
-                      ))}
-                      {snap?.confidence_level && (
-                        <div className="flex items-start gap-3 bg-secondary/50 rounded p-3 mt-2">
-                          <AlertCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                          <div>
-                            <div className="text-xs font-mono font-bold text-primary">{snap.confidence_level} Confidence</div>
-                            {snap.confidence_reason && <p className="text-xs text-muted-foreground mt-0.5">{snap.confidence_reason}</p>}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No score computed yet.</p>
-                  )}
-                </div>
-
-                {/* Signals */}
-                <div className="panel lg:col-span-2">
-                  <div className="panel-header">Signals ({signals.length})</div>
-                  {signals.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No signals discovered yet.</p>
-                  ) : (
-                    <div className="space-y-4">
-                      {signals.map(signal => {
-                        const snippets = (Array.isArray(signal.evidence_snippets) ? signal.evidence_snippets : []) as string[];
-                        return (
-                          <div key={signal.id} className="border rounded-md p-3 space-y-2">
-                            <div className="flex items-start justify-between gap-3">
-                            <div className="flex items-center gap-2">
-                                {signal.type === "job" ? <Briefcase className="w-4 h-4 text-info flex-shrink-0" /> : <Newspaper className="w-4 h-4 text-warning flex-shrink-0" />}
-                                <div>
-                                  <div className="text-[14px] font-medium">{signal.title}</div>
-                                  <div className="text-[12px] text-muted-foreground">{signal.date || "No date"} · {signal.type}</div>
-                                </div>
-                              </div>
-                              <a href={signal.url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary flex-shrink-0"><ExternalLink className="w-3.5 h-3.5" /></a>
-                            </div>
-                            {signal.raw_excerpt && <p className="text-[13px] text-muted-foreground leading-relaxed">{signal.raw_excerpt}</p>}
-                            {snippets.length > 0 && (
-                              <div className="space-y-1 pt-1 border-t border-border/50">
-                                <div className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground">Evidence Snippets</div>
-                                {snippets.map((snippet, i) => (
-                                  <div key={i} className="text-[13px] text-accent-foreground bg-accent/20 rounded px-2 py-1.5 border-l-2 border-primary/40">"{snippet}"</div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Snapshot History */}
-              <div className="panel">
-                <div className="panel-header">Snapshot History</div>
-                {snapshots.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No snapshots generated yet.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {snapshots.map(s => (
-                      <div key={s.id} className="flex items-center justify-between text-sm border rounded px-3 py-2">
-                        <div className="flex items-center gap-3">
-                          <ScoreCell score={s.score_total} />
-                          <span className="font-mono text-xs text-muted-foreground">{s.model_version}</span>
-                        </div>
-                        <span className="text-xs text-muted-foreground">{new Date(s.created_at).toLocaleString()}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-
-          {/* Intent Activity Timeline */}
-          {activityEvents.length > 0 && (
-            <div className="panel space-y-3">
-              <div className="panel-header flex items-center gap-2">
-                <Zap className="w-4 h-4 text-primary" />
-                <span>Intent Activity ({activityEvents.length})</span>
-              </div>
-              <p className="text-xs text-muted-foreground">Actions captured from HubSpot — page views, form submissions, emails, and meetings.</p>
-              <div className="space-y-1 max-h-[400px] overflow-y-auto">
-                {activityEvents.map((evt: any) => {
-                  const typeIcons: Record<string, string> = {
-                    FORM_SUBMISSION: "📝", EMAIL: "📧", EMAIL_RECEIVED: "📩",
-                    MEETING: "📅", CALL: "📞", PAGE_VIEW: "👁️",
-                    NOTE: "📒", TASK: "✅",
-                  };
-                  const icon = typeIcons[evt.activity_type] || "⚡";
-                  return (
-                    <div key={evt.id} className="flex items-start gap-3 px-3 py-2 rounded-lg border border-border/50 bg-secondary/20 hover:bg-secondary/40 transition-colors">
-                      <span className="text-base mt-0.5">{icon}</span>
-                        <div className="flex-1 min-w-0">
-                        <div className="text-[14px] font-medium text-foreground truncate">{evt.title}</div>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className={`text-[11px] font-mono uppercase tracking-widest px-1.5 py-0.5 rounded border ${
-                            evt.activity_type === "FORM_SUBMISSION"
-                              ? "border-emerald-500/40 text-emerald-400 bg-emerald-500/10"
-                              : evt.activity_type?.includes("EMAIL")
-                              ? "border-blue-500/40 text-blue-400 bg-blue-500/10"
-                              : "border-border text-muted-foreground bg-muted/50"
-                          }`}>{evt.activity_type?.replace(/_/g, " ")}</span>
-                          {evt.url && (
-                            <a href={evt.url} target="_blank" rel="noopener noreferrer" className="text-[11px] text-primary hover:underline truncate max-w-[200px]">
-                              {evt.url}
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                      <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-                        {new Date(evt.occurred_at).toLocaleDateString()}{" "}
-                        {new Date(evt.occurred_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          <CompanySignalsSection
+            signals={signals}
+            snapshots={snapshots}
+            activityEvents={activityEvents}
+            meetings={meetings}
+            company={company}
+          />
         </TabsContent>
 
         {/* ============ TAB 2: STRATEGY ============ */}
