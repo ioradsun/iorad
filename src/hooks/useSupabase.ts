@@ -2,11 +2,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables, TablesInsert } from "@/integrations/supabase/types";
 
-export type DbCompany = Tables<"companies">;
-export type DbSignal = Tables<"signals">;
-export type DbSnapshot = Tables<"snapshots">;
-export type DbProcessingJob = Tables<"processing_jobs">;
-export type DbProcessingJobItem = Tables<"processing_job_items">;
 export type DbAppSettings = Tables<"app_settings">;
 
 // ---- Companies ----
@@ -16,7 +11,7 @@ export function useCompanies() {
     queryFn: async () => {
       // Fetch all companies — paginate past the default 1000-row limit
       const PAGE = 1000;
-      let allData: DbCompany[] = [];
+      let allData: Tables<"companies">[] = [];
       let from = 0;
       while (true) {
         const { data, error } = await supabase
@@ -25,7 +20,7 @@ export function useCompanies() {
           .order("last_score_total", { ascending: false, nullsFirst: false })
           .range(from, from + PAGE - 1);
         if (error) throw error;
-        allData = allData.concat(data as DbCompany[]);
+        allData = allData.concat(data as Tables<"companies">[]);
         if (!data || data.length < PAGE) break;
         from += PAGE;
       }
@@ -81,7 +76,7 @@ export function useSignals(companyId: string | undefined) {
         .eq("company_id", companyId!)
         .order("discovered_at", { ascending: false });
       if (error) throw error;
-      return data as DbSignal[];
+      return data as Tables<"signals">[];
     },
   });
 }
@@ -115,7 +110,7 @@ export function useSnapshots(companyId: string | undefined) {
         .eq("company_id", companyId!)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data as DbSnapshot[];
+      return data as Tables<"snapshots">[];
     },
   });
 }
@@ -160,7 +155,7 @@ export function useProcessingJobs() {
         .select("*")
         .order("started_at", { ascending: false });
       if (error) throw error;
-      return data as DbProcessingJob[];
+      return data as Tables<"processing_jobs">[];
     },
   });
 }
@@ -178,54 +173,9 @@ export function useActiveJob() {
         .limit(1)
         .maybeSingle();
       if (error) throw error;
-      return data as DbProcessingJob | null;
+      return data as Tables<"processing_jobs"> | null;
     },
     refetchInterval: 5000,
-  });
-}
-
-export function useJobItems(jobId: string | undefined) {
-  return useQuery({
-    queryKey: ["job_items", jobId],
-    enabled: !!jobId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("processing_job_items")
-        .select("*, companies(name)")
-        .eq("job_id", jobId!);
-      if (error) throw error;
-      return data;
-    },
-  });
-}
-
-// ---- Run Signals (fires first call only — edge function self-chains in background) ----
-export function useRunSignals() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (onProgress?: (processed: number, total: number, companyName: string) => void) => {
-      const { count } = await supabase
-        .from("companies")
-        .select("id", { count: "exact", head: true });
-      const total = count || 0;
-
-      // Fire the first call only — the edge function self-chains for all subsequent companies
-      const { data, error } = await supabase.functions.invoke("run-signals", {
-        body: { offset: 0 },
-      });
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-
-      if (onProgress) onProgress(1, total, data?.company || "");
-
-      return { job_id: data?.job_id, total_processed: total };
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["companies"] });
-      qc.invalidateQueries({ queryKey: ["processing_jobs"] });
-      qc.invalidateQueries({ queryKey: ["signal_counts"] });
-    },
   });
 }
 

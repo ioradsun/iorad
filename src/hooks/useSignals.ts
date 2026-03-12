@@ -29,16 +29,6 @@ export interface SignalComment {
   created_at: string;
 }
 
-export interface SignalNotification {
-  id: string;
-  user_id: string;
-  signal_id: string;
-  type: string;
-  actor_name: string;
-  read: boolean;
-  created_at: string;
-}
-
 export function useSignals(status: "open" | "closed") {
   return useQuery({
     queryKey: ["internal_signals", status],
@@ -261,7 +251,7 @@ export function useUnreadNotifications() {
         .order("created_at", { ascending: false })
         .limit(20);
       if (error) throw error;
-      return (data || []) as SignalNotification[];
+      return data || [];
     },
     refetchInterval: 30_000,
   });

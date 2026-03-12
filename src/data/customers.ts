@@ -24,12 +24,6 @@ export interface EnterpriseSystem {
   risk: string;
 }
 
-export interface ReinforcementPreview {
-  detectedTool: string;
-  libraryUrl: string | null;
-  description: string;
-}
-
 export interface InternalSignals {
   signalTypes: string[];
   enterpriseSystems?: EnterpriseSystem[];
@@ -56,7 +50,11 @@ export interface Customer {
   blindSpot: string;
   plays: StrategicPlay[];
   reinforcementJourney: string;
-  reinforcementPreview?: ReinforcementPreview;
+  reinforcementPreview?: {
+    detectedTool: string;
+    libraryUrl: string | null;
+    description: string;
+  };
   caseStudies: CaseStudy[];
   whyNow: string;
   cta?: string;

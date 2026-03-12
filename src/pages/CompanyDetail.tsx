@@ -18,7 +18,6 @@ import { toast } from "sonner";
 // Sub-components
 import { parseJson, toArray, toLoomEmbedUrl, toIoradEmbedUrl } from "./company/types";
 import type { SnapshotJSON, DashboardCard, EmailTouch, LinkedInStep, StoryAssets } from "./company/types";
-import { StoryAssetsUI } from "./company/StoryAssetsUI";
 import OnboardingTab from "./company/OnboardingTab";
 import StrategyTab from "./company/StrategyTab";
 import OutreachTab from "./company/OutreachTab";
