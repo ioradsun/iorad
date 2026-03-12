@@ -232,19 +232,20 @@ export function useRunSignals() {
 // ---- Company Cards ----
 export function useCompanyCards(companyId: string | undefined, contactId?: string) {
   return useQuery({
-    // REFACTOR: (b) contact-scoped — cache key includes contactId so each contact gets the right row.
     queryKey: ["company_cards", companyId, contactId ?? null],
     enabled: !!companyId,
     queryFn: async () => {
-      // REFACTOR: (b) contact-scoped — read by (company_id, contact_id); null contactId targets company-scoped row.
-      let query = supabase
-        .from("company_cards")
-        .select("*")
-        .eq("company_id", companyId!);
-
-      query = contactId
-        ? query.eq("contact_id", contactId)
-        : query.is("contact_id", null);
+      const query = contactId
+        ? supabase
+          .from("company_cards")
+          .select("*")
+          .eq("company_id", companyId!)
+          .eq("contact_id", contactId)
+        : supabase
+          .from("company_cards")
+          .select("*")
+          .eq("company_id", companyId!)
+          .is("contact_id", null);
 
       const { data, error } = await query.maybeSingle();
       if (error) throw error;
