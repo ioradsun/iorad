@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, Eye, Building2, Users, DollarSign, ChevronRight, PhoneCall } from "lucide-react";
+import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, Eye, Building2, Users, DollarSign, ChevronRight, PhoneCall, Sparkles, UserSearch } from "lucide-react";
 import { Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 
@@ -599,37 +599,6 @@ export default function CompanyDetail() {
     finally { setGeneratingContactId(null); setGenerateStep(null); }
   };
 
-  const contactSelector = contacts.length > 0 ? (
-    <Select value={selectedContactId || contacts[0]?.id || ""} onValueChange={setSelectedContactId}>
-      <SelectTrigger className="h-auto min-w-[200px] max-w-[320px] py-1.5 px-3 text-xs bg-background">
-        <SelectValue placeholder="Select contact">
-          {(() => {
-            const c = contacts.find((c: any) => c.id === (selectedContactId || contacts[0]?.id));
-            if (!c) return null;
-            return (
-              <div className="flex flex-col items-start text-left">
-                <span className="font-medium text-[13px] leading-tight">{c.name}</span>
-                {c.title && <span className="text-muted-foreground text-[11px] leading-tight">{c.title}</span>}
-              </div>
-            );
-          })()}
-        </SelectValue>
-      </SelectTrigger>
-      <SelectContent className="bg-background z-50 min-w-[280px]">
-        {contacts.map((c: any) => (
-          <SelectItem key={c.id} value={c.id} className="py-2">
-            <div className="flex flex-col items-start">
-              <span className="font-medium text-[13px] leading-tight">{c.name}</span>
-              {c.title && <span className="text-muted-foreground text-[11px] leading-tight">{c.title}</span>}
-            </div>
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  ) : (
-    <span className="text-xs text-muted-foreground italic">No contacts</span>
-  );
-
   if (isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
   }
@@ -781,18 +750,58 @@ export default function CompanyDetail() {
         </div>
       </div>
 
+      {contacts.length > 0 && (
+        <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-secondary/30 border border-border/40">
+          <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
+            <UserSearch className="w-3.5 h-3.5" />
+            <span className="font-medium">Contact</span>
+          </div>
+          <Select value={selectedContactId || contacts[0]?.id || ""} onValueChange={setSelectedContactId}>
+            <SelectTrigger className="h-8 min-w-[220px] max-w-[320px] py-1 px-3 text-xs bg-background border-border/50">
+              <SelectValue placeholder="Select contact">
+                {(() => {
+                  const c = contacts.find((c: any) => c.id === effectiveContactId);
+                  if (!c) return null;
+                  return (
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-[13px]">{c.name}</span>
+                      {c.title && <span className="text-muted-foreground text-[11px]">· {c.title}</span>}
+                    </div>
+                  );
+                })()}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent className="bg-background z-50 min-w-[280px]">
+              {contacts.map((c: any) => (
+                <SelectItem key={c.id} value={c.id} className="py-2">
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium text-[13px] leading-tight">{c.name}</span>
+                    {c.title && <span className="text-muted-foreground text-[11px] leading-tight">{c.title}</span>}
+                    {(c as any).role_focus && <span className="text-primary/70 text-[10px] leading-tight">{(c as any).role_focus}</span>}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span className="text-[11px] text-muted-foreground/60 ml-auto">
+            Strategy, Outreach & Story are generated for this contact
+          </span>
+        </div>
+      )}
+
       <Tabs defaultValue="company" className="w-full" onValueChange={setActiveTab}>
         <div className="flex items-center justify-between gap-3 mb-1">
-          <TabsList className="justify-start">
+          <TabsList className="justify-start gap-0">
             <TabsTrigger value="company" className="text-sm">Company</TabsTrigger>
+            <TabsTrigger value="onboarding" className="text-sm">Onboarding</TabsTrigger>
+            <div className="w-px h-5 bg-border/60 mx-1.5" />
             <TabsTrigger value="strategy" className="text-sm">Strategy</TabsTrigger>
             <TabsTrigger value="outreach" className="text-sm">Outreach</TabsTrigger>
             <TabsTrigger value="story" className="text-sm">Story</TabsTrigger>
-            <TabsTrigger value="onboarding" className="text-sm">Onboarding</TabsTrigger>
           </TabsList>
 
           {/* Unified generate + view story buttons — visible on all tabs for all companies */}
-          {activeTab !== "onboarding" && (
+          {!["onboarding", "company"].includes(activeTab) ? (
             <div className="flex items-center gap-2">
               {storyBaseUrl && (
                 <a href={storyBaseUrl} target="_blank" rel="noopener noreferrer">
@@ -808,7 +817,12 @@ export default function CompanyDetail() {
                   : (isInboundStoryResponse || isInboundStrategyResponse || cards.length > 0 || assets.email_sequence || signals.length > 0) ? "Regenerate All" : "Generate All"}
               </Button>
             </div>
-          )}
+          ) : activeTab === "company" ? (
+            <Button size="sm" className="gap-1.5 text-[13px]" onClick={() => regenerateSection("company")} disabled={regeneratingSection === "company"}>
+              {regeneratingSection === "company" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              Refresh Company Intel
+            </Button>
+          ) : null}
         </div>
 
         {/* ============ TAB 1: COMPANY ============ */}
@@ -1192,7 +1206,16 @@ export default function CompanyDetail() {
           />
         </TabsContent>
 
-        {/* ============ TAB 2: STRATEGY ============ */}
+        {/* ============ TAB 2: ONBOARDING ============ */}
+        <TabsContent value="onboarding">
+          <OnboardingTab
+            meetings={meetings}
+            analyzingMeeting={analyzingMeeting}
+            onAnalyze={analyzeTranscript}
+          />
+        </TabsContent>
+
+        {/* ============ TAB 3: STRATEGY ============ */}
         <TabsContent value="strategy" className="space-y-6 mt-6">
           <StrategyTab
             cardsLoading={cardsLoading}
@@ -1206,7 +1229,7 @@ export default function CompanyDetail() {
           />
         </TabsContent>
 
-        {/* ============ TAB 3: OUTREACH ============ */}
+        {/* ============ TAB 4: OUTREACH ============ */}
         <TabsContent value="outreach" className="space-y-6 mt-6">
           <OutreachTab
             cardsLoading={cardsLoading}
@@ -1219,7 +1242,7 @@ export default function CompanyDetail() {
           />
         </TabsContent>
 
-        {/* ============ TAB 4: STORY ============ */}
+        {/* ============ TAB 5: STORY ============ */}
         <TabsContent value="story" className="space-y-6 mt-6">
           <StoryTab
             isInboundStoryResponse={isInboundStoryResponse}
@@ -1237,14 +1260,6 @@ export default function CompanyDetail() {
           />
         </TabsContent>
 
-        {/* ============ TAB 5: ONBOARDING ============ */}
-        <TabsContent value="onboarding">
-          <OnboardingTab
-            meetings={meetings}
-            analyzingMeeting={analyzingMeeting}
-            onAnalyze={analyzeTranscript}
-          />
-        </TabsContent>
       </Tabs>
     </div>
   );
