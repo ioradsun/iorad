@@ -89,6 +89,7 @@ function useInboundStoryBySlug(companySlug?: string, contactSlug?: string) {
       ) || companies?.[0];
       if (!company) return null;
 
+      // REFACTOR: (b) contact-scoped — this lookup should include contactSlug/contact_id to select the right row.
       // Find company_cards for this company
       const { data: card, error: cardError } = await supabase
         .from("company_cards")
@@ -111,6 +112,7 @@ function useInboundStory(cardsId?: string) {
     queryKey: ["inbound-story", cardsId],
     enabled: !!cardsId,
     queryFn: async () => {
+      // REFACTOR: (b) contact-scoped — safe here because lookup is by company_cards.id (already row-specific).
       const { data: card, error } = await supabase
         .from("company_cards")
         .select("*, companies(*)")
@@ -583,6 +585,7 @@ function StoryPageInner({
 
     let error: any;
     if (saveTarget === "company_cards") {
+      // REFACTOR: (b) contact-scoped — safe here because write targets a specific company_cards.id.
       const res = await supabase
         .from("company_cards")
         .update({ account_json: newJson as any })
@@ -604,6 +607,7 @@ function StoryPageInner({
     toast.success("Story updated successfully");
     // Invalidate all possible query keys that feed story data
     queryClient.invalidateQueries({ queryKey: ["story"] });
+    // REFACTOR: (c) existence-check/prefix invalidation — broad ["company_cards"] invalidation is safe.
     queryClient.invalidateQueries({ queryKey: ["company_cards"] });
     queryClient.invalidateQueries({ queryKey: ["inbound-story-slug"] });
     queryClient.invalidateQueries({ queryKey: ["inbound-story"] });

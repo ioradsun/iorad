@@ -287,6 +287,7 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
       throw new Error("AI returned invalid JSON");
     }
 
+    // REFACTOR: (b) contact-scoped — existing-row lookup should include contact_id; company-only match can merge the wrong contact row.
     // Fetch existing row so we can MERGE per-tab data instead of overwriting all fields
     // company_cards has a unique constraint on company_id — one row per company
     const { data: existingRow } = await sb
@@ -367,6 +368,7 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
     // Upsert or insert — merge into existing row if it exists
     let upsertErr: any = null;
     if (existingRow?.id) {
+      // REFACTOR: (b) contact-scoped — write is row-specific by id, so this update itself is safe once the correct row is selected.
       const { error } = await sb
         .from("company_cards")
         .update({
@@ -379,6 +381,7 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
         .eq("id", existingRow.id);
       upsertErr = error;
     } else {
+      // REFACTOR: (b) contact-scoped — insert should preserve per-contact uniqueness via (company_id, contact_id).
       const { error } = await sb
         .from("company_cards")
         .insert({
