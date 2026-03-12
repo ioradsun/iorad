@@ -6,6 +6,37 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// ── HubSpot rate-limit-aware fetch ──────────────────────────────────────────
+// HubSpot private app limit: 100 calls per 10 seconds.
+// This wrapper enforces a minimum gap between calls and retries on 429.
+let _lastHubSpotCall = 0;
+const MIN_DELAY_MS = 110; // ~9 calls/sec, well under the 100/10s limit
+
+async function hubspotFetch(url: string, options?: RequestInit, retries = 3): Promise<Response> {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    const now = Date.now();
+    const elapsed = now - _lastHubSpotCall;
+    if (elapsed < MIN_DELAY_MS) {
+      await new Promise(r => setTimeout(r, MIN_DELAY_MS - elapsed));
+    }
+    _lastHubSpotCall = Date.now();
+
+    const res = await fetch(url, options);
+
+    if (res.status === 429) {
+      const retryAfter = parseInt(res.headers.get("Retry-After") || "2", 10);
+      const waitMs = Math.min(retryAfter * 1000, 10_000);
+      console.warn(`HubSpot 429 — retrying in ${waitMs}ms (attempt ${attempt + 1}/${retries})`);
+      await new Promise(r => setTimeout(r, waitMs));
+      continue;
+    }
+    return res;
+  }
+  // Final attempt, no more retries
+  _lastHubSpotCall = Date.now();
+  return fetch(url, options);
+}
+
 // Fire-and-forget Scout scoring for a single company after import
 function scoreCompanyAsync(companyId: string) {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -190,22 +221,31 @@ async function fetchHubSpotCompany(objectId: string | number) {
   const apiKey = Deno.env.get("HUBSPOT_API_KEY");
   if (!apiKey) throw new Error("HUBSPOT_API_KEY not configured");
 
-  // First get all available company properties to request them all
   const allProps = await getAllCompanyPropertyNames(apiKey);
-  const propsParam = allProps.length > 0 ? allProps.join(",") : "name,domain,industry,country,numberofemployees,hubspot_owner_id";
+  const properties = allProps.length > 0
+    ? allProps
+    : ["name", "domain", "industry", "country", "numberofemployees", "hubspot_owner_id"];
 
-  const res = await fetch(
-    `https://api.hubapi.com/crm/v3/objects/companies/${objectId}?properties=${encodeURIComponent(propsParam)}`,
-    { headers: { Authorization: `Bearer ${apiKey}` } }
-  );
+  // Use POST batch read instead of GET to avoid URL length limits
+  const res = await hubspotFetch("https://api.hubapi.com/crm/v3/objects/companies/batch/read", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      inputs: [{ id: String(objectId) }],
+      properties,
+    }),
+  });
 
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`HubSpot API error [${res.status}]: ${text}`);
   }
-
   const data = await res.json();
-  return data;
+  // Batch read wraps results in an array — extract the single result
+  return data.results?.[0] || null;
 }
 
 // Cache for property names (per invocation)
@@ -215,7 +255,7 @@ let _contactPropNamesCache: string[] | null = null;
 async function getAllCompanyPropertyNames(apiKey: string): Promise<string[]> {
   if (_companyPropNamesCache) return _companyPropNamesCache;
   try {
-    const res = await fetch("https://api.hubapi.com/crm/v3/properties/companies", {
+    const res = await hubspotFetch("https://api.hubapi.com/crm/v3/properties/companies", {
       headers: { Authorization: `Bearer ${apiKey}` },
     });
     if (!res.ok) { await res.text(); return []; }
@@ -228,7 +268,7 @@ async function getAllCompanyPropertyNames(apiKey: string): Promise<string[]> {
 async function getAllContactPropertyNames(apiKey: string): Promise<string[]> {
   if (_contactPropNamesCache) return _contactPropNamesCache;
   try {
-    const res = await fetch("https://api.hubapi.com/crm/v3/properties/contacts", {
+    const res = await hubspotFetch("https://api.hubapi.com/crm/v3/properties/contacts", {
       headers: { Authorization: `Bearer ${apiKey}` },
     });
     if (!res.ok) { await res.text(); return []; }
@@ -246,22 +286,22 @@ async function syncRecentCompanies(supabase: any) {
   const allProps = await getAllCompanyPropertyNames(apiKey);
   const properties = allProps.length > 0 ? allProps.join(",") : "name,domain,industry,country,numberofemployees";
 
-  // Look back 2 hours to catch anything webhooks may have missed
-  const lookback = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+  // Look back 30 minutes to catch anything webhooks may have missed
+  const lookback = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 
   const searchBody = {
     filterGroups: [
-      // Companies created in the last 2 hours
+      // Companies created in the last 30 minutes
       { filters: [{ propertyName: "createdate", operator: "GTE", value: lookback }] },
-      // Companies modified in the last 2 hours
+      // Companies modified in the last 30 minutes
       { filters: [{ propertyName: "hs_lastmodifieddate", operator: "GTE", value: lookback }] },
     ],
     properties: properties.split(","),
-    limit: 100,
+    limit: 20,
     sorts: [{ propertyName: "hs_lastmodifieddate", direction: "DESCENDING" }],
   };
 
-  const res = await fetch("https://api.hubapi.com/crm/v3/objects/companies/search", {
+  const res = await hubspotFetch("https://api.hubapi.com/crm/v3/objects/companies/search", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -405,7 +445,7 @@ async function fetchDealsForCompany(hubspotCompanyId: string | number, apiKey: s
 }> {
   try {
     // Get associated deal IDs
-    const assocRes = await fetch(
+    const assocRes = await hubspotFetch(
       `https://api.hubapi.com/crm/v3/objects/companies/${hubspotCompanyId}/associations/deals`,
       { headers: { Authorization: `Bearer ${apiKey}` } }
     );
@@ -416,7 +456,7 @@ async function fetchDealsForCompany(hubspotCompanyId: string | number, apiKey: s
     if (dealIds.length === 0) return { hasClosedWon: false, hasOpenDeal: false, dealCount: 0 };
 
     // Batch-read deal details
-    const batchRes = await fetch("https://api.hubapi.com/crm/v3/objects/deals/batch/read", {
+    const batchRes = await hubspotFetch("https://api.hubapi.com/crm/v3/objects/deals/batch/read", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -656,7 +696,7 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
     let after: string | null = null;
     do {
       const url: string = `https://api.hubapi.com/crm/v3/objects/companies/${hubspotCompanyId}/associations/contacts?limit=500${after ? `&after=${after}` : ""}`;
-      const res: Response = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
+      const res: Response = await hubspotFetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
       if (!res.ok) {
         const text = await res.text();
         console.warn(`Failed to fetch contacts for company ${hubspotCompanyId}: ${text}`);
@@ -669,6 +709,20 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
     } while (after);
 
     if (contactIds.length === 0) return;
+
+    // Pre-load all existing contacts for this company in ONE query
+    const { data: existingContacts } = await supabase
+      .from("contacts")
+      .select("id, email, hubspot_object_id")
+      .eq("company_id", companyId);
+
+    const byHubspotId = new Map<string, string>();
+    const byEmail = new Map<string, string>();
+    for (const ec of existingContacts || []) {
+      if (ec.hubspot_object_id) byHubspotId.set(ec.hubspot_object_id, ec.id);
+      if (ec.email) byEmail.set(ec.email.toLowerCase(), ec.id);
+    }
+
     console.log(`HubSpot: found ${contactIds.length} associated contacts for company ${hubspotCompanyId}`);
 
     // Fetch contact details in batches of 100 (HubSpot batch read limit)
@@ -677,7 +731,7 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
       const batchIds = contactIds.slice(i, i + BATCH_SIZE);
       let batchContacts: any[] = [];
       try {
-        const batchRes = await fetch("https://api.hubapi.com/crm/v3/objects/contacts/batch/read", {
+        const batchRes = await hubspotFetch("https://api.hubapi.com/crm/v3/objects/contacts/batch/read", {
           method: "POST",
           headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -735,66 +789,63 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
           },
         };
 
-        // Prefer exact HubSpot contact object ID match
         const hubspotContactId = String(contact.id || cp.hs_object_id || "").trim();
-        if (hubspotContactId) {
-          const { data: existingByHubspotId } = await supabase
-            .from("contacts")
-            .select("id")
-            .eq("company_id", companyId)
-            .eq("hubspot_object_id", hubspotContactId)
-            .maybeSingle();
-          if (existingByHubspotId) {
-            rowsToUpdate.push({
-              id: existingByHubspotId.id,
-              data: {
-                name: contactName,
-                email: row.email,
-                title: row.title,
-                linkedin: row.linkedin,
-                hubspot_object_id: row.hubspot_object_id,
-                hubspot_properties: row.hubspot_properties,
-              },
-            });
-            continue;
-          }
-        }
 
-        // Fallback: match by email if present
-        if (cp.email) {
-          const { data: existing } = await supabase
-            .from("contacts")
-            .select("id")
-            .eq("company_id", companyId)
-            .eq("email", cp.email)
-            .maybeSingle();
-          if (existing) {
-            rowsToUpdate.push({
-              id: existing.id,
-              data: {
-                name: contactName,
-                title: row.title,
-                linkedin: row.linkedin,
-                email: row.email,
-                hubspot_object_id: row.hubspot_object_id,
-                hubspot_properties: row.hubspot_properties,
-              },
-            });
-            continue;
-          }
+        // In-memory dedup instead of per-contact DB queries
+        const existingId =
+          (hubspotContactId && byHubspotId.get(hubspotContactId)) ||
+          (cp.email && byEmail.get(cp.email.toLowerCase())) ||
+          null;
+
+        if (existingId && existingId !== "pending") {
+          rowsToUpdate.push({
+            id: existingId,
+            data: {
+              name: contactName,
+              email: row.email,
+              title: row.title,
+              linkedin: row.linkedin,
+              hubspot_object_id: row.hubspot_object_id,
+              hubspot_properties: row.hubspot_properties,
+            },
+          });
+        } else {
+          rowsToInsert.push(row);
+          // Track in maps to prevent duplicates within the same batch
+          if (row.hubspot_object_id) byHubspotId.set(row.hubspot_object_id, "pending");
+          if (row.email) byEmail.set(row.email.toLowerCase(), "pending");
         }
-        rowsToInsert.push(row);
       }
 
-      // Bulk insert new contacts
       if (rowsToInsert.length > 0) {
-        const { error } = await supabase.from("contacts").insert(rowsToInsert);
-        if (error) console.warn(`Bulk insert error (batch ${i}): ${error.message}`);
+        const { error } = await supabase
+          .from("contacts")
+          .upsert(rowsToInsert, {
+            onConflict: "company_id,hubspot_object_id",
+            ignoreDuplicates: false,
+          });
+        if (error) {
+          // Fallback: try one-by-one if batch fails on mixed constraint violations
+          console.warn(`Batch upsert error: ${error.message} — falling back to individual inserts`);
+          for (const row of rowsToInsert) {
+            try {
+              await supabase.from("contacts").upsert(row, {
+                onConflict: "company_id,hubspot_object_id",
+                ignoreDuplicates: true,
+              });
+            } catch (e: any) {
+              console.warn(`Individual insert failed for ${row.name}: ${e.message}`);
+            }
+          }
+        }
       }
 
-      // Update existing contacts individually (rare case)
-      for (const { id, data } of rowsToUpdate) {
-        await supabase.from("contacts").update(data).eq("id", id);
+      if (rowsToUpdate.length > 0) {
+        await Promise.all(
+          rowsToUpdate.map(({ id, data }) =>
+            supabase.from("contacts").update(data).eq("id", id)
+          )
+        );
       }
     }
     console.log(`HubSpot: finished importing contacts for company ${companyId}`);
@@ -816,7 +867,7 @@ async function importContactActivity(
 ) {
   try {
     // Fetch engagements associated with this contact (last 50)
-    const engRes = await fetch(
+    const engRes = await hubspotFetch(
       `https://api.hubapi.com/engagements/v1/engagements/associated/CONTACT/${hubspotContactId}/paged?limit=50`,
       { headers: { Authorization: `Bearer ${apiKey}` } }
     );
@@ -886,7 +937,7 @@ async function importWebAnalyticsEvents(
 ) {
   try {
     // Get contact's recent page views via the contacts API timeline
-    const timelineRes = await fetch(
+    const timelineRes = await hubspotFetch(
       `https://api.hubapi.com/contacts/v1/contact/vid/${hubspotContactId}/profile?propertyMode=value_and_history&formSubmissionMode=all&showListMemberships=false`,
       { headers: { Authorization: `Bearer ${apiKey}` } }
     );
@@ -944,6 +995,27 @@ async function syncSingleCompany(supabase: any, domain: string | undefined, comp
     });
   }
 
+  // Domain-less company — try hubspot_object_id fallback
+  if (!domain) {
+    if (companyId) {
+      const { data: comp } = await supabase
+        .from("companies")
+        .select("hubspot_object_id")
+        .eq("id", companyId)
+        .maybeSingle();
+
+      if (comp?.hubspot_object_id) {
+        return await syncByHubSpotId(supabase, comp.hubspot_object_id);
+      }
+    }
+
+    return new Response(JSON.stringify({
+      success: true,
+      found: false,
+      message: "Company has no domain and no HubSpot ID — cannot search HubSpot",
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
   try {
     // Search HubSpot by domain
     const allProps = await getAllCompanyPropertyNames(apiKey);
@@ -955,7 +1027,7 @@ async function syncSingleCompany(supabase: any, domain: string | undefined, comp
       limit: 1,
     };
 
-    const hsRes = await fetch("https://api.hubapi.com/crm/v3/objects/companies/search", {
+    const hsRes = await hubspotFetch("https://api.hubapi.com/crm/v3/objects/companies/search", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify(searchBody),
@@ -1090,7 +1162,7 @@ async function listHubSpotCompanies(search: string, after: string | null) {
     fetchOpts = { headers: { Authorization: `Bearer ${apiKey}` } };
   }
 
-  const res = await fetch(url, fetchOpts);
+  const res = await hubspotFetch(url, fetchOpts);
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`HubSpot list error [${res.status}]: ${text}`);
@@ -1161,7 +1233,7 @@ async function bulkImportCompanies(
   });
   if (after) params.set("after", after);
 
-  const res = await fetch(`https://api.hubapi.com/crm/v3/objects/companies?${params}`, {
+  const res = await hubspotFetch(`https://api.hubapi.com/crm/v3/objects/companies?${params}`, {
     headers: { Authorization: `Bearer ${apiKey}` },
   });
 
