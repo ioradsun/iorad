@@ -89,7 +89,6 @@ function useInboundStoryBySlug(companySlug?: string, contactSlug?: string) {
       ) || companies?.[0];
       if (!company) return null;
 
-      // REFACTOR: (b) contact-scoped — resolve contactSlug to contact_id, then fetch the matching company_cards row.
       let contactId: string | null = null;
       if (contactSlug) {
         const { data: contacts } = await supabase
@@ -102,14 +101,17 @@ function useInboundStoryBySlug(companySlug?: string, contactSlug?: string) {
         if (match) contactId = match.id;
       }
 
-      let cardQuery = supabase
-        .from("company_cards")
-        .select("*")
-        .eq("company_id", company.id);
-
-      cardQuery = contactId
-        ? cardQuery.eq("contact_id", contactId)
-        : cardQuery.order("created_at", { ascending: false }).limit(1);
+      let cardQuery = supabase.from("company_cards").select("*");
+      if (contactId) {
+        cardQuery = cardQuery
+          .eq("company_id", company.id)
+          .eq("contact_id", contactId);
+      } else {
+        cardQuery = cardQuery
+          .eq("company_id", company.id)
+          .order("created_at", { ascending: false })
+          .limit(1);
+      }
 
       const { data: card, error: cardError } = await cardQuery.maybeSingle();
       if (cardError) throw cardError;
