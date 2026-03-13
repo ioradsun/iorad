@@ -253,7 +253,7 @@ export function useUnreadNotifications() {
       if (error) throw error;
       return data || [];
     },
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
   });
 }
 
