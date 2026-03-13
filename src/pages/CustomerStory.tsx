@@ -101,20 +101,27 @@ function useInboundStoryBySlug(companySlug?: string, contactSlug?: string) {
         if (match) contactId = match.id;
       }
 
-      let cardQuery = supabase.from("company_cards").select("*");
+      let card = null;
       if (contactId) {
-        cardQuery = cardQuery
+        const { data, error } = await supabase
+          .from("company_cards").select("*")
           .eq("company_id", company.id)
-          .eq("contact_id", contactId);
-      } else {
-        cardQuery = cardQuery
+          .eq("contact_id", contactId)
+          .maybeSingle();
+        if (error) throw error;
+        card = data;
+      }
+      // Fallback: if no card for specific contact, get latest for company
+      if (!card) {
+        const { data, error } = await supabase
+          .from("company_cards").select("*")
           .eq("company_id", company.id)
           .order("created_at", { ascending: false })
-          .limit(1);
+          .limit(1)
+          .maybeSingle();
+        if (error) throw error;
+        card = data;
       }
-
-      const { data: card, error: cardError } = await cardQuery.maybeSingle();
-      if (cardError) throw cardError;
       if (!card) return null;
 
       return { card, company };
