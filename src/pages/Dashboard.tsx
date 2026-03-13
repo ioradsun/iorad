@@ -1,19 +1,12 @@
-import { useState, useMemo, useRef, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Building2, Search, Loader2, ArrowUpDown, ExternalLink, RefreshCw, Download, Zap, ChevronDown, RefreshCcw, Repeat2 } from "lucide-react";
-import { useCompanies, useCompaniesPage, useSignalCounts, useCompanyStats, useProcessingJobs, useBulkImport, useScoreCompanies } from "@/hooks/useSupabase";
-import { useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
+import { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { Search, ArrowUpDown, ChevronRight } from "lucide-react";
+import { useCompanies, useCompaniesPage, useSignalCounts } from "@/hooks/useSupabase";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast } from "sonner";
 import HubSpotPickerModal from "@/components/HubSpotPickerModal";
-import ImportStatusBanner from "@/components/ImportStatusBanner";
 
-type SortKey = "name" | "last_score_total" | "signals_count" | "updated_at" | "created_at" | "scout_score";
+type SortKey = "name" | "scout_score";
 type CategoryTab = "school" | "business" | "partner";
-type StageFilter = "all" | "prospect" | "active_opp" | "customer" | "expansion";
 
 const CATEGORY_LABELS: Record<CategoryTab, string> = {
   school: "School",
@@ -21,8 +14,7 @@ const CATEGORY_LABELS: Record<CategoryTab, string> = {
   partner: "Partner",
 };
 
-const STAGE_LABELS: Record<StageFilter, string> = {
-  all: "All",
+const STAGE_LABELS: Record<string, string> = {
   prospect: "Prospect",
   active_opp: "Active Opp",
   customer: "Customer",
@@ -30,166 +22,29 @@ const STAGE_LABELS: Record<StageFilter, string> = {
 };
 
 const STAGE_COLORS: Record<string, string> = {
-  prospect:   "bg-muted text-muted-foreground border-border",
+  prospect: "bg-muted text-muted-foreground border-border",
   active_opp: "bg-info/10 text-info border-info/20",
-  customer:   "bg-success/10 text-success border-success/20",
-  expansion:  "bg-primary/10 text-primary border-primary/20",
+  customer: "bg-success/10 text-success border-success/20",
+  expansion: "bg-primary/10 text-primary border-primary/20",
 };
-
-// ── HubSpot Sync split-dropdown ──────────────────────────────────────────────
-function HubSpotSyncButton({
-  onManual,
-  onAuto,
-  isLoading,
-}: {
-  onManual: () => void;
-  onAuto: () => void;
-  isLoading: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  return (
-    <div ref={ref} className="relative">
-      {/* Main button + chevron split */}
-      <div className="flex items-stretch rounded-md overflow-hidden border border-border">
-        {/* Primary action: Manual (pick a specific company) */}
-        <button
-          onClick={() => { onAuto(); setOpen(false); }}
-          className="flex items-center gap-1.5 px-3 h-8 text-xs font-medium bg-card text-foreground hover:bg-muted transition-colors"
-        >
-          <Repeat2 className="w-3.5 h-3.5 text-primary" />
-          HubSpot Sync
-        </button>
-
-        {/* Divider */}
-        <div className="w-px bg-border" />
-
-        {/* Chevron toggle */}
-        <button
-          onClick={() => setOpen(v => !v)}
-          className="flex items-center px-1.5 h-8 bg-card text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          aria-label="More sync options"
-        >
-          <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-150 ${open ? "rotate-180" : ""}`} />
-        </button>
-      </div>
-
-      {/* Dropdown menu */}
-      {open && (
-        <div
-          className="absolute right-0 mt-1.5 w-52 rounded-lg border border-border bg-card shadow-lg z-50 overflow-hidden"
-          style={{ top: "100%" }}
-        >
-          <div className="px-3 py-2 border-b border-border">
-            <p className="text-micro font-medium uppercase tracking-wide text-foreground/45">HubSpot Sync</p>
-          </div>
-
-          <button
-            onClick={() => { onAuto(); setOpen(false); }}
-            className="w-full flex items-start gap-3 px-3 py-2.5 text-left hover:bg-muted transition-colors disabled:opacity-50"
-          >
-            <RefreshCcw className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary" />
-            <div>
-              <p className="text-xs font-medium text-foreground">Manual</p>
-              <p className="text-micro text-foreground/45 leading-snug">Pick a specific HubSpot company</p>
-            </div>
-          </button>
-
-          <button
-            onClick={() => { onManual(); setOpen(false); }}
-            disabled={isLoading}
-            className="w-full flex items-start gap-3 px-3 py-2.5 text-left hover:bg-muted transition-colors border-t border-border disabled:opacity-50"
-          >
-            <Download className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary" />
-            <div>
-              <p className="text-xs font-medium text-foreground">Auto</p>
-              <p className="text-micro text-foreground/45 leading-snug">Sync all companies from HubSpot</p>
-            </div>
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const qc = useQueryClient();
-  const [syncingHubspot, setSyncingHubspot] = useState(false);
   const [hubspotPickerOpen, setHubspotPickerOpen] = useState(false);
-  const bulkImport = useBulkImport();
-  const scoreCompanies = useScoreCompanies();
 
   const [sortKey, setSortKey] = useState<SortKey>("scout_score");
   const [sortAsc, setSortAsc] = useState(false);
   const [search, setSearch] = useState("");
-  const [partnerFilter, setPartnerFilter] = useState<string>("all");
   const [activeTab, setActiveTab] = useState<CategoryTab>("business");
-  const [stageFilter, setStageFilter] = useState<StageFilter>("all");
   const [visibleCount, setVisibleCount] = useState(50);
 
-  // Phase 1: fast first page (50 companies for current tab) — renders immediately
   const { data: firstPage = [], isLoading: firstPageLoading } = useCompaniesPage(activeTab);
-
-  // Phase 2: full list (background) — enables search, accurate sort, full stats
   const { data: fullList } = useCompanies();
 
-  // Merge: use full list when available, fall back to first page
   const companies = fullList ?? firstPage;
   const isLoading = firstPageLoading;
-  const isFullyLoaded = !!fullList;
 
-  // Signal counts + stats — non-blocking
   const { data: signalCounts = {} } = useSignalCounts();
-  const { data: stats } = useCompanyStats();
-  const { data: jobs = [] } = useProcessingJobs();
-
-  const handleHubspotSync = async () => {
-    setSyncingHubspot(true);
-    try {
-      const { error } = await supabase.functions.invoke("import-from-hubspot", {
-        body: { action: "sync_contacts" },
-      });
-      if (error) throw error;
-      await qc.invalidateQueries({ queryKey: ["companies"] });
-      toast.success("HubSpot contact sync complete.");
-    } catch (err: any) {
-      toast.error(`HubSpot sync failed: ${err?.message || "Unknown error"}`);
-    } finally {
-      setSyncingHubspot(false);
-    }
-  };
-
-  const handleBulkImport = async () => {
-    toast.info("Starting full HubSpot sync (companies → contacts → scoring)…", { duration: 6000 });
-    try {
-      const { data, error } = await supabase.functions.invoke("hubspot-pipeline", { body: {} });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      toast.success("Pipeline started — check Job History for live progress.");
-    } catch (err: any) {
-      toast.error(`Pipeline failed: ${err?.message || "Unknown error"}`);
-    }
-  };
-
-  const handleRefreshScores = async () => {
-    toast.info("Refreshing Scout Scores…");
-    try {
-      const result = await scoreCompanies.mutateAsync("score_all");
-      toast.success(`Scoring started — ${result.scored ?? 0} companies scored in first batch.`);
-    } catch (err: any) {
-      toast.error(`Scoring failed: ${err?.message || "Unknown error"}`);
-    }
-  };
 
   const companiesWithSignals = useMemo(() => {
     return companies.map(c => ({ ...c, signals_count: signalCounts[c.id] || 0 }));
@@ -201,65 +56,52 @@ export default function Dashboard() {
       const q = search.toLowerCase();
       list = list.filter(c => c.name.toLowerCase().includes(q) || (c.domain || "").toLowerCase().includes(q));
     }
-    if (partnerFilter !== "all") list = list.filter(c => c.partner === partnerFilter);
+
     list.sort((a, b) => {
-      let av: any, bv: any;
+      let av: any;
+      let bv: any;
       switch (sortKey) {
-        case "name": av = a.name; bv = b.name; break;
-        case "last_score_total": av = a.last_score_total ?? -1; bv = b.last_score_total ?? -1; break;
-        case "signals_count": av = a.signals_count; bv = b.signals_count; break;
-        case "updated_at": av = a.updated_at; bv = b.updated_at; break;
-        case "created_at": av = a.created_at; bv = b.created_at; break;
-        case "scout_score": av = (a as any).scout_score ?? -1; bv = (b as any).scout_score ?? -1; break;
-        default: av = 0; bv = 0;
+        case "name":
+          av = a.name.toLowerCase();
+          bv = b.name.toLowerCase();
+          break;
+        case "scout_score":
+          av = (a as any).scout_score ?? -1;
+          bv = (b as any).scout_score ?? -1;
+          break;
+        default:
+          av = 0;
+          bv = 0;
       }
       if (av < bv) return sortAsc ? -1 : 1;
       if (av > bv) return sortAsc ? 1 : -1;
       return 0;
     });
-    return list;
-  }, [search, partnerFilter, sortKey, sortAsc, companiesWithSignals]);
 
-  // Category buckets
+    return list;
+  }, [search, sortKey, sortAsc, companiesWithSignals]);
+
   const byCategory = useMemo(() => ({
-    school:   sorted.filter(c => (c as any).category === "school"),
+    school: sorted.filter(c => (c as any).category === "school"),
     business: sorted.filter(c => (c as any).category === "business" || !(c as any).category),
-    partner:  sorted.filter(c => (c as any).category === "partner"),
+    partner: sorted.filter(c => (c as any).category === "partner"),
   }), [sorted]);
 
-  // Active list: search shows all, otherwise filter by category + stage
   const activeList = useMemo(() => {
     if (search) return sorted;
-    let list = byCategory[activeTab] || [];
-    if (stageFilter !== "all") {
-      list = list.filter(c => (c as any).stage === stageFilter);
-    }
-    return list;
-  }, [search, sorted, byCategory, activeTab, stageFilter]);
+    return byCategory[activeTab] || [];
+  }, [search, sorted, byCategory, activeTab]);
 
-
-  // Reset pagination when tab/search/filter changes
   useEffect(() => {
     setVisibleCount(50);
-  }, [activeTab, search, stageFilter, partnerFilter]);
-
-  const partners = useMemo(() => {
-    const set = new Set(companies.map(c => c.partner).filter(Boolean) as string[]);
-    return Array.from(set).sort();
-  }, [companies]);
-
-  const effectiveStats = stats ?? {
-    total: companies.length,
-    school: 0,
-    business: 0,
-    partner: 0,
-    newThisWeek: 0,
-    stageCounts: { prospect: 0, active_opp: 0, customer: 0, expansion: 0 },
-  };
+  }, [activeTab, search]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
-    else { setSortKey(key); setSortAsc(false); }
+    else {
+      setSortKey(key);
+      setSortAsc(false);
+    }
   };
 
   const SortHeader = ({ label, field }: { label: string; field: SortKey }) => (
@@ -274,23 +116,19 @@ export default function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="max-w-6xl mx-auto px-1 space-y-6">
-        <div className="grid grid-cols-3 gap-3 pt-1">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="bg-card rounded-lg px-5 py-4 animate-pulse">
-              <div className="h-8 w-16 bg-foreground/[0.06] rounded mb-2" />
-              <div className="h-4 w-24 bg-foreground/[0.04] rounded" />
-            </div>
-          ))}
+      <div className="max-w-5xl mx-auto px-1 space-y-5">
+        <div className="flex items-center gap-3 pt-1">
+          <div className="h-9 w-72 rounded-md bg-foreground/[0.05] animate-pulse" />
+          <div className="h-9 flex-1 max-w-sm rounded-md bg-foreground/[0.05] animate-pulse" />
         </div>
-        <div className="rounded-lg border bg-card overflow-hidden">
+        <div className="rounded-lg border border-border/30 bg-card overflow-hidden">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-4 px-5 py-4 border-b border-border/30">
+            <div key={i} className="flex items-center gap-4 px-5 py-3.5 border-b border-border/30">
               <div className="flex-1 space-y-2">
                 <div className="h-4 bg-foreground/[0.06] rounded w-48" />
                 <div className="h-3 bg-foreground/[0.04] rounded w-32" />
               </div>
-              <div className="h-5 bg-foreground/[0.04] rounded w-16" />
+              <div className="h-5 bg-foreground/[0.04] rounded w-20" />
             </div>
           ))}
         </div>
@@ -298,257 +136,120 @@ export default function Dashboard() {
     );
   }
 
-  const stageFilters: StageFilter[] = ["all", "prospect", "active_opp", "customer", "expansion"];
   const visibleList = activeList.slice(0, visibleCount);
   const hasMore = activeList.length > visibleCount;
 
   return (
-    <div className="max-w-6xl mx-auto px-1 space-y-8">
-
-      {/* ── KPI strip ── */}
-      <div className="grid grid-cols-3 gap-3 pt-1">
-        <KpiCard
-          value={effectiveStats.total}
-          label="Total tracked"
-          icon={<Building2 className="w-4 h-4 text-primary" />}
-          iconBg="var(--stat-total-bg)"
-        />
-        <KpiCard
-          value={effectiveStats.newThisWeek}
-          label="New this week"
-          icon={<Building2 className="w-4 h-4 text-primary" />}
-          iconBg="var(--stat-inbound-bg)"
-          onRefresh={handleHubspotSync}
-          refreshing={syncingHubspot}
-        />
-        {/* Stage breakdown mini-card */}
-        <div className="bg-card shadow-sm shadow-black/[0.04] rounded-lg px-5 py-4">
-          <div className="text-caption font-medium text-foreground/45 mb-2.5 leading-tight">Pipeline stages</div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-            {(Object.entries(effectiveStats.stageCounts) as [string, number][]).map(([stage, count]) => (
-              <div key={stage} className="flex items-center justify-between gap-2">
-                <span className="text-micro text-foreground/45 capitalize">{stage.replace("_", " ")}</span>
-                <span className="text-caption font-semibold tabular-nums text-foreground">{count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Import / Scoring status banner ── */}
-      <ImportStatusBanner />
-
-      {/* ── Category Tabs ── */}
-      <div className="flex flex-wrap items-center gap-2.5">
+    <div className="max-w-5xl mx-auto px-1 space-y-5">
+      <div className="flex items-center gap-3 pt-1">
         <div className="flex items-center bg-secondary rounded-md p-0.5 gap-0.5">
           {(["school", "business", "partner"] as CategoryTab[]).map(tab => (
             <button
               key={tab}
-              onClick={() => { setActiveTab(tab); setStageFilter("all"); }}
+              onClick={() => { setActiveTab(tab); setSearch(""); }}
               className={`px-3.5 py-1.5 rounded text-sm font-medium transition-all ${
                 activeTab === tab
                   ? "bg-card text-foreground shadow-sm shadow-black/[0.06]"
-                  : "text-muted-foreground hover:text-foreground"
+                  : "text-foreground/45 hover:text-foreground"
               }`}
             >
               {CATEGORY_LABELS[tab]}
-              <span className="ml-1.5 tabular-nums text-xs text-foreground/25">
-                {isFullyLoaded ? byCategory[tab].length : (stats?.[tab] ?? "…")}
+              <span className="ml-1.5 tabular-nums text-micro text-foreground/25">
+                {byCategory[tab].length}
               </span>
             </button>
           ))}
         </div>
 
-        <div className="relative flex-1 min-w-[180px] max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-foreground/25" />
           <Input
-            placeholder={isFullyLoaded ? "Search…" : "Loading all companies…"}
+            placeholder="Search…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            disabled={!isFullyLoaded}
-            className={`pl-8 h-8 text-sm bg-secondary border-0 focus-visible:ring-1 focus-visible:ring-ring/30 ${
-              !isFullyLoaded ? "opacity-50" : ""
-            }`}
-          />
-        </div>
-
-        {activeTab === "partner" && partners.length > 0 && (
-          <Select value={partnerFilter} onValueChange={setPartnerFilter}>
-            <SelectTrigger className="w-[160px] h-8 text-xs bg-secondary border-0 focus:ring-1 focus:ring-ring/30">
-              <SelectValue placeholder="All partners" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All partners</SelectItem>
-              {partners.map(p => (
-                <SelectItem key={p} value={p}>{p}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-
-        <div className="ml-auto flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1.5 font-medium h-8 text-xs"
-            onClick={handleRefreshScores}
-            disabled={scoreCompanies.isPending}
-          >
-            {scoreCompanies.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
-            Refresh Scores
-          </Button>
-
-          {/* HubSpot Sync dropdown */}
-          <HubSpotSyncButton
-            onManual={handleBulkImport}
-            onAuto={() => setHubspotPickerOpen(true)}
-            isLoading={bulkImport.isPending}
+            className="pl-8 h-9 text-body bg-secondary border-0 focus-visible:ring-1 focus-visible:ring-ring/30"
           />
         </div>
       </div>
 
-      {/* ── Stage pill filter ── */}
-      {!search && (
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {stageFilters.map(stage => (
-            <button
-              key={stage}
-              onClick={() => setStageFilter(stage)}
-              className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${
-                stageFilter === stage
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/40"
-              }`}
-            >
-              {STAGE_LABELS[stage]}
-              {stage !== "all" && (
-                <span className="ml-1.5 tabular-nums opacity-70">
-                  {byCategory[activeTab].filter(c => (c as any).stage === stage).length}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {!isFullyLoaded && !isLoading && (
-        <div className="flex items-center gap-2 text-micro text-foreground/25">
-          <Loader2 className="w-3 h-3 animate-spin" />
-          Loading all companies for search and stats…
-        </div>
-      )}
-
-      {/* ── Table ── */}
-      <div className="rounded-lg bg-card overflow-hidden">
+      <div className="rounded-lg border border-border/30 bg-card overflow-hidden">
         <table className="w-full">
           <thead>
             <tr className="border-b border-border/40">
-              <th className="text-left px-5 py-3.5">
+              <th className="text-left px-5 py-3">
                 <SortHeader label="Company" field="name" />
               </th>
               {search && (
-                <th className="text-left px-5 py-3.5 hidden sm:table-cell">
+                <th className="text-left px-5 py-3 hidden sm:table-cell">
                   <span className="text-micro font-medium uppercase tracking-wide text-foreground/45">Category</span>
                 </th>
               )}
-              <th className="text-left px-5 py-3.5 hidden sm:table-cell">
+              <th className="text-left px-5 py-3 hidden sm:table-cell">
                 <span className="text-micro font-medium uppercase tracking-wide text-foreground/45">Stage</span>
               </th>
-              {activeTab === "partner" && (
-                <th className="text-left px-5 py-3.5 hidden md:table-cell">
-                  <span className="text-micro font-medium uppercase tracking-wide text-foreground/45">Partner</span>
-                </th>
-              )}
-              {activeTab === "partner" && (
-                <th className="text-left px-5 py-3.5 hidden lg:table-cell">
-                  <span className="text-micro font-medium uppercase tracking-wide text-foreground/45">Rep</span>
-                </th>
-              )}
-              <th className="text-left px-5 py-3.5 hidden md:table-cell">
-                <SortHeader label="Scout" field="scout_score" />
+              <th className="text-left px-5 py-3 hidden md:table-cell">
+                <SortHeader label="Score" field="scout_score" />
               </th>
-              <th className="text-left px-5 py-3.5 hidden lg:table-cell">
-                <SortHeader label="Added" field="created_at" />
-              </th>
-              <th className="px-5 py-3.5 w-28" />
+              <th className="px-5 py-3 w-20" />
             </tr>
           </thead>
           <tbody>
             {visibleList.map((company) => (
               <tr
                 key={company.id}
-                className="group relative cursor-pointer transition-colors border-b border-border/30 hover:border-border/50 hover:bg-secondary/50"
+                className="group cursor-pointer transition-colors border-b border-border/30 hover:bg-secondary/40"
                 onClick={() => navigate(`/company/${company.id}`)}
               >
-                <td className="px-5 py-4">
-                  <div className="font-semibold text-body text-foreground leading-snug">{company.name}</div>
+                <td className="px-5 py-3.5">
+                  <div className="font-medium text-body text-foreground">{company.name}</div>
                   {company.domain && (
                     <div className="text-caption text-foreground/45 mt-0.5">{company.domain}</div>
                   )}
                 </td>
                 {search && (
-                  <td className="px-5 py-4 hidden sm:table-cell">
+                  <td className="px-5 py-3.5 hidden sm:table-cell">
                     <CategoryPill category={(company as any).category || "business"} />
                   </td>
                 )}
-                <td className="px-5 py-4 hidden sm:table-cell">
+                <td className="px-5 py-3.5 hidden sm:table-cell">
                   <StagePill stage={(company as any).stage || "prospect"} />
                 </td>
-                {activeTab === "partner" && (
-                  <td className="px-5 py-4 hidden md:table-cell">
-                    <span className="text-body text-foreground/45">{company.partner || "—"}</span>
-                  </td>
-                )}
-                {activeTab === "partner" && (
-                  <td className="px-5 py-4 hidden lg:table-cell">
-                    <span className="text-body text-foreground/45">{company.partner_rep_name || "—"}</span>
-                    {company.partner_rep_email && (
-                      <div className="text-caption text-foreground/25 mt-0.5">{company.partner_rep_email}</div>
-                    )}
-                  </td>
-                )}
-                <td className="px-5 py-4 hidden md:table-cell">
+                <td className="px-5 py-3.5 hidden md:table-cell">
                   <ScoutBadge score={(company as any).scout_score ?? null} />
                 </td>
-                <td className="px-5 py-4 hidden lg:table-cell">
-                  <span className="text-body text-foreground/45">
-                    {new Date(company.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                  </span>
-                </td>
-                <td className="px-5 py-4 text-right">
-                  {company.snapshot_status === "Generated" && (
-                    <Link
-                      to={`/company/${company.id}`}
-                      onClick={e => e.stopPropagation()}
-                    >
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="gap-1.5 text-caption h-8 text-foreground/45 hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        View story
-                      </Button>
-                    </Link>
-                  )}
+                <td className="px-5 py-3.5 text-right">
+                  <ChevronRight className="w-4 h-4 text-foreground/15 group-hover:text-foreground/45 transition-colors inline" />
                 </td>
               </tr>
             ))}
-            {visibleList.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-5 py-16 text-center text-sm text-muted-foreground">
-                  {companies.length === 0
-                    ? "No companies yet — upload a CSV to get started."
-                    : `No ${CATEGORY_LABELS[activeTab]} companies match your filters.`}
-                </td>
-              </tr>
-            )}
           </tbody>
         </table>
+
+        {visibleList.length === 0 && !isLoading && (
+          <div className="px-5 py-16 text-center">
+            {search ? (
+              <>
+                <p className="text-body text-foreground/45 mb-1">
+                  No companies match "{search}"
+                </p>
+                <button
+                  onClick={() => setHubspotPickerOpen(true)}
+                  className="text-caption text-primary hover:text-primary/80 font-medium transition-colors"
+                >
+                  Import from HubSpot →
+                </button>
+              </>
+            ) : (
+              <p className="text-body text-foreground/45">
+                No {CATEGORY_LABELS[activeTab].toLowerCase()} companies yet.
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {hasMore && (
-        <div className="flex justify-center py-4">
+        <div className="flex justify-center">
           <button
             onClick={() => setVisibleCount(prev => prev + 50)}
             className="text-caption text-primary hover:text-primary/80 font-medium transition-colors"
@@ -563,56 +264,9 @@ export default function Dashboard() {
   );
 }
 
-// ── Sub-components ──────────────────────────────────────────────
-
-function KpiCard({
-  value,
-  label,
-  icon,
-  iconBg,
-  subtitle,
-  onRefresh,
-  refreshing,
-}: {
-  value: number;
-  label: string;
-  icon: React.ReactNode;
-  iconBg: string;
-  subtitle?: string;
-  onRefresh?: () => void;
-  refreshing?: boolean;
-}) {
-  return (
-    <div className="bg-card shadow-sm shadow-black/[0.04] rounded-lg px-5 py-4 flex items-center gap-4">
-      <div className="rounded-md p-2 shrink-0" style={{ background: iconBg }}>
-        {icon}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="text-display font-semibold tracking-tight leading-none text-foreground tabular-nums">
-          {value}
-        </div>
-        <div className="text-caption font-medium text-foreground/45 mt-1.5 leading-tight">{label}</div>
-        {subtitle && (
-          <div className="text-micro text-foreground/25 mt-1 leading-tight">{subtitle}</div>
-        )}
-      </div>
-      {onRefresh && (
-        <button
-          onClick={onRefresh}
-          disabled={refreshing}
-          title="Sync from HubSpot"
-          className="shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-40"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
-        </button>
-      )}
-    </div>
-  );
-}
-
 function StagePill({ stage }: { stage: string }) {
   const colors = STAGE_COLORS[stage] || STAGE_COLORS.prospect;
-  const label = STAGE_LABELS[stage as StageFilter] || stage;
+  const label = STAGE_LABELS[stage] || stage;
   return (
     <span className={`inline-flex items-center text-micro font-medium px-2 py-0.5 rounded border ${colors}`}>
       {label}
@@ -622,9 +276,9 @@ function StagePill({ stage }: { stage: string }) {
 
 function CategoryPill({ category }: { category: string }) {
   const colorMap: Record<string, string> = {
-    school:   "bg-info/10 text-info border-info/20",
+    school: "bg-info/10 text-info border-info/20",
     business: "bg-muted text-muted-foreground border-border",
-    partner:  "bg-primary/10 text-primary border-primary/20",
+    partner: "bg-primary/10 text-primary border-primary/20",
   };
   const colors = colorMap[category] || colorMap.business;
   const labelMap: Record<string, string> = { school: "School", business: "Business", partner: "Partner" };
