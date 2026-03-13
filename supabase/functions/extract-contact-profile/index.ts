@@ -169,6 +169,65 @@ Important:
 - Be specific in narratives: mention actual products, numbers, and behaviors`;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CONTACT FETCH HELPERS (batched to avoid oversized `id=in.(...)` requests)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CONTACT_SELECT = "id, name, title, email, hubspot_properties, company_id";
+const CONTACT_FETCH_BATCH_SIZE = 100;
+const CONTACT_PAGE_SIZE = 200;
+
+type ContactRow = {
+  id: string;
+  name: string;
+  title: string | null;
+  email: string | null;
+  hubspot_properties: Record<string, any> | null;
+  company_id: string;
+};
+
+async function fetchContactsByIds(sb: any, ids: string[]): Promise<ContactRow[]> {
+  const contacts: ContactRow[] = [];
+
+  for (let i = 0; i < ids.length; i += CONTACT_FETCH_BATCH_SIZE) {
+    const batchIds = ids.slice(i, i + CONTACT_FETCH_BATCH_SIZE);
+    const { data, error } = await sb
+      .from("contacts")
+      .select(CONTACT_SELECT)
+      .in("id", batchIds);
+
+    if (error) throw error;
+    contacts.push(...((data || []) as ContactRow[]));
+  }
+
+  return contacts;
+}
+
+async function fetchContactsByCompany(sb: any, companyId: string): Promise<ContactRow[]> {
+  const contacts: ContactRow[] = [];
+  let from = 0;
+
+  while (true) {
+    const to = from + CONTACT_PAGE_SIZE - 1;
+    const { data, error } = await sb
+      .from("contacts")
+      .select(CONTACT_SELECT)
+      .eq("company_id", companyId)
+      .not("hubspot_properties", "is", null)
+      .range(from, to);
+
+    if (error) throw error;
+
+    const batch = (data || []) as ContactRow[];
+    contacts.push(...batch);
+
+    if (batch.length < CONTACT_PAGE_SIZE) break;
+    from += CONTACT_PAGE_SIZE;
+  }
+
+  return contacts;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // HANDLER
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -189,35 +248,22 @@ Deno.serve(async (req) => {
     // Support single contact or batch (by company_id)
     const { contact_id, company_id } = body;
 
-    let contactIds: string[] = [];
+    let contacts: ContactRow[] = [];
 
     if (contact_id) {
-      contactIds = [contact_id];
+      contacts = await fetchContactsByIds(sb, [contact_id]);
     } else if (company_id) {
-      const { data: contacts } = await sb
-        .from("contacts")
-        .select("id")
-        .eq("company_id", company_id)
-        .not("hubspot_properties", "is", null);
-      contactIds = (contacts || []).map((c: any) => c.id);
+      contacts = await fetchContactsByCompany(sb, company_id);
     } else {
       throw new Error("contact_id or company_id is required");
     }
 
-    if (contactIds.length === 0) {
+    if (contacts.length === 0) {
       return new Response(
-        JSON.stringify({ success: true, profiles_extracted: 0, message: "No contacts with HubSpot data" }),
+        JSON.stringify({ success: true, profiles_extracted: 0, message: "No contacts with HubSpot data", total: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    // Load all contacts
-    const { data: contacts, error: contactErr } = await sb
-      .from("contacts")
-      .select("id, name, title, email, hubspot_properties, company_id")
-      .in("id", contactIds);
-
-    if (contactErr) throw contactErr;
 
     let extracted = 0;
     let failed = 0;
@@ -337,7 +383,7 @@ Return ONLY the JSON profile object.`;
         success: true,
         profiles_extracted: extracted,
         failed,
-        total: contactIds.length,
+        total: contacts.length,
         errors: errors.slice(0, 10),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
