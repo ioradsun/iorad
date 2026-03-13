@@ -117,4 +117,6 @@ const InternalSignalSummary = forwardRef<HTMLElement, Props>(function InternalSi
       </div>
     </section>
   );
-}
+});
+
+export default InternalSignalSummary;

@@ -124,4 +124,6 @@ const StoryHero = forwardRef<HTMLElement, StoryHeroProps>(function StoryHero({ c
       </div>
     </section>
   );
-}
+});
+
+export default StoryHero;
