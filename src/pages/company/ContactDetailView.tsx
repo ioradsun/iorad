@@ -574,7 +574,7 @@ export default function ContactDetailView({
               )}
 
               {!hasStory ? (
-                <div className="py-6 text-center">
+                <div className="py-6">
                   <p className="text-caption text-foreground/25 mb-4">Strategy & outreach are ready. Generate a story built on the strategic angle.</p>
                   <Button onClick={onGenerateStory} disabled={generatingStory} variant="outline" className="gap-2">
                     {generatingStory
