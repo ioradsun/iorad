@@ -382,6 +382,42 @@ export default function CompanyDetail() {
         },
       },
       {
+        label: "Syncing Fathom meetings",
+        needed: !!(companyAny?.domain),
+        fn: async (updateDetail) => {
+          updateDetail(`Fetching meetings for ${companyAny?.domain}…`);
+          const { data, error } = await supabase.functions.invoke("sync-fathom", {
+            body: { domain: companyAny.domain, company_id: id },
+          });
+          if (error) throw new Error(error.message || "Fathom sync failed");
+          if (data?.error) throw new Error(data.error);
+          const synced = data?.meetings_synced || 0;
+          queryClient.invalidateQueries({ queryKey: ["meetings", id] });
+
+          // Auto-analyze new transcripts
+          if (synced > 0) {
+            updateDetail(`Analyzing ${synced} meeting transcripts…`);
+            const { data: freshMeetings } = await supabase
+              .from("meetings")
+              .select("id, transcript, transcript_analysis")
+              .eq("company_id", id!)
+              .not("transcript", "is", null)
+              .is("transcript_analysis", null);
+
+            if (freshMeetings && freshMeetings.length > 0) {
+              for (const m of freshMeetings) {
+                await supabase.functions.invoke("analyze-transcript", {
+                  body: { meeting_id: m.id },
+                });
+              }
+              queryClient.invalidateQueries({ queryKey: ["meetings", id] });
+            }
+          }
+
+          return synced > 0 ? `${synced} meetings synced` : "No new meetings";
+        },
+      },
+      {
         label: "Computing score",
         needed: company.scout_score == null,
         fn: async (updateDetail) => {
