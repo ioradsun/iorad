@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, Building2, Users, DollarSign, ChevronRight, PhoneCall } from "lucide-react";
+import { ArrowLeft, RefreshCw, ExternalLink, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, ChevronRight } from "lucide-react";
 import { Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 
@@ -44,7 +44,6 @@ export default function CompanyDetail() {
   const [savingContact, setSavingContact] = useState(false);
   const [syncingFathom, setSyncingFathom] = useState(false);
   const [analyzingMeeting, setAnalyzingMeeting] = useState<string | null>(null);
-  const [syncingHubspot, setSyncingHubspot] = useState(false);
   const [generatingContactId, setGeneratingContactId] = useState<string | null>(null);
   const [regeneratingSection, setRegeneratingSection] = useState<string | null>(null);
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
@@ -420,27 +419,6 @@ export default function CompanyDetail() {
     }
   }, [company, isLoading]);
 
-  const syncHubspot = async () => {
-    if (!id) return;
-    setSyncingHubspot(true);
-    try {
-      toast.info("Syncing HubSpot data…");
-      const { data, error } = await supabase.functions.invoke("import-from-hubspot", {
-        body: { action: "sync_company", domain: (company as any)?.domain, company_id: id },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      toast.success(
-        data?.is_existing_customer
-          ? "HubSpot synced — flagged as existing customer"
-          : `HubSpot synced — ${data?.contacts_imported ?? 0} contact(s) updated`
-      );
-      queryClient.invalidateQueries({ queryKey: ["company", id] });
-      queryClient.invalidateQueries({ queryKey: ["contacts", id] });
-    } catch (e: any) { toast.error(e.message || "HubSpot sync failed"); }
-    finally { setSyncingHubspot(false); }
-  };
-
   const generateForContact = async (contactId: string) => {
     if (!id) return;
     setGeneratingContactId(contactId);
@@ -528,76 +506,15 @@ export default function CompanyDetail() {
     products_services?: { name: string; status?: string }[];
   }>(companyCards?.account_json as Json);
 
-  // Small ghost regen button for individual sections
-  const RegenerateBtn = ({ section, label }: { section: Parameters<typeof regenerateSection>[0]; label: string }) => (
-    <Button
-      size="sm"
-      variant="ghost"
-      className="h-6 gap-1 text-micro text-foreground/45 hover:text-foreground px-2"
-      disabled={regeneratingSection === section || setupRunning}
-      onClick={() => regenerateSection(section)}
-    >
-      {regeneratingSection === section
-        ? <Loader2 className="w-3 h-3 animate-spin" />
-        : <RefreshCw className="w-3 h-3" />}
-      {label}
-    </Button>
-  );
-
   return (
     <div className="space-y-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4">
           <Link to="/" className="text-foreground/45 hover:text-foreground transition-colors"><ArrowLeft className="w-5 h-5" /></Link>
           <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-display font-bold tracking-tight leading-tight">{company.name}</h1>
-              {company.scout_score !== null && company.scout_score !== undefined && (
-                <ScoreCell score={company.scout_score} size="lg" />
-              )}
-            </div>
-            <p className="text-caption text-foreground/45 mt-0.5">{company.domain || "no domain"}</p>
-            {company.scout_summary && (
-              <p className="text-caption text-foreground/45 mt-1 max-w-xl leading-relaxed italic">{company.scout_summary}</p>
-            )}
+            <h1 className="text-display font-bold tracking-tight leading-tight">{company.name}</h1>
           </div>
-        </div>
-        {/* Category + Stage inline selectors */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <Select
-            value={companyCategory}
-            onValueChange={async (val) => {
-              await updateCompany.mutateAsync({ id: id!, updates: { category: val } as any });
-              queryClient.invalidateQueries({ queryKey: ["company", id] });
-            }}
-          >
-            <SelectTrigger className="h-7 text-xs w-[130px] bg-secondary border-0">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="school">School (EDU)</SelectItem>
-              <SelectItem value="business">Business (B2B)</SelectItem>
-              <SelectItem value="partner">Partner</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select
-            value={companyStage}
-            onValueChange={async (val) => {
-              await updateCompany.mutateAsync({ id: id!, updates: { stage: val } as any });
-              queryClient.invalidateQueries({ queryKey: ["company", id] });
-            }}
-          >
-            <SelectTrigger className="h-7 text-xs w-[130px] bg-secondary border-0">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="prospect">Prospect</SelectItem>
-              <SelectItem value="active_opp">Active Opp</SelectItem>
-              <SelectItem value="customer">Customer</SelectItem>
-              <SelectItem value="expansion">Expansion</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
       </div>
 
@@ -623,79 +540,113 @@ export default function CompanyDetail() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Tab action bar */}
-          {activeTab === "company" ? (
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-1.5 text-caption"
-              onClick={() => { setupRanRef.current = false; runCompanySetup(); }}
-              disabled={setupRunning}
-            >
-              {setupRunning
-                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                : <RefreshCw className="w-3.5 h-3.5" />}
-              {setupRunning ? (setupStep || "Setting up…") : "Refresh Company Data"}
-            </Button>
-          ) : null}
         </div>
 
         {/* ============ TAB 1: COMPANY ============ */}
         <TabsContent value="company" className="space-y-8 mt-6">
-          <div className="flex items-center justify-between">
-            <h3 className="section-label">Company Intel</h3>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 px-2.5 text-xs gap-1.5"
-                onClick={syncHubspot}
-                disabled={syncingHubspot}
-                title="Sync contacts and customer status from HubSpot"
+          <div className="flex items-center justify-between gap-3 pb-6">
+            <div className="flex items-center gap-2 flex-wrap text-caption text-foreground/45">
+              {company.domain && <span>{company.domain}</span>}
+              {company.domain && <span className="text-foreground/15">·</span>}
+              <Select
+                value={companyCategory}
+                onValueChange={async (val) => {
+                  await updateCompany.mutateAsync({ id: id!, updates: { category: val } as any });
+                  queryClient.invalidateQueries({ queryKey: ["company", id] });
+                }}
               >
-                {syncingHubspot ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                HubSpot Sync
-              </Button>
-              {companyAny?.source_type !== "inbound" && <RegenerateBtn section="signals" label="Signals" />}
-              <RegenerateBtn section="company" label="Company Intel" />
+                <SelectTrigger className="h-6 text-micro w-auto border-0 bg-transparent p-0 gap-1 text-foreground/45 hover:text-foreground [&>svg]:w-3 [&>svg]:h-3">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="school">School</SelectItem>
+                  <SelectItem value="business">Business</SelectItem>
+                  <SelectItem value="partner">Partner</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-foreground/15">·</span>
+              <Select
+                value={companyStage}
+                onValueChange={async (val) => {
+                  await updateCompany.mutateAsync({ id: id!, updates: { stage: val } as any });
+                  queryClient.invalidateQueries({ queryKey: ["company", id] });
+                }}
+              >
+                <SelectTrigger className="h-6 text-micro w-auto border-0 bg-transparent p-0 gap-1 text-foreground/45 hover:text-foreground [&>svg]:w-3 [&>svg]:h-3">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="prospect">Prospect</SelectItem>
+                  <SelectItem value="active_opp">Active Opp</SelectItem>
+                  <SelectItem value="customer">Customer</SelectItem>
+                  <SelectItem value="expansion">Expansion</SelectItem>
+                </SelectContent>
+              </Select>
+              {company.scout_score != null && (
+                <>
+                  <span className="text-foreground/15">·</span>
+                  <ScoreCell score={company.scout_score} size="sm" />
+                </>
+              )}
             </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-micro gap-1 text-foreground/25 hover:text-foreground"
+              onClick={() => { setupRanRef.current = false; runCompanySetup(); }}
+              disabled={setupRunning}
+            >
+              {setupRunning
+                ? <Loader2 className="w-3 h-3 animate-spin" />
+                : <RefreshCw className="w-3 h-3" />}
+              Refresh
+            </Button>
           </div>
 
-          {/* Company Profile */}
-          {accountData?.about?.text && (
-            <p className="text-body text-foreground/65 leading-relaxed line-clamp-2">
-              {accountData.about.text}
-            </p>
-          )}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {(accountData?.industry?.value || company.industry) && (
-              <Card className="bg-secondary/30"><CardContent className="p-4 flex flex-col items-start gap-1.5">
-                <Building2 className="w-4 h-4 text-primary" />
-                <span className="section-label">Industry</span>
-                <span className="text-caption font-medium text-foreground leading-tight">{accountData?.industry?.value || company.industry?.replace(/_/g, " ").toLowerCase()}</span>
-              </CardContent></Card>
+          {/* Company profile — flat, no cards */}
+          <div className="space-y-3">
+            {accountData?.about?.text && (
+              <p className="text-body text-foreground/65 leading-relaxed max-w-2xl">
+                {accountData.about.text}
+              </p>
             )}
-            {(accountData?.employees?.value || company.headcount) && (
-              <Card className="bg-secondary/30"><CardContent className="p-4 flex flex-col items-start gap-1.5">
-                <Users className="w-4 h-4 text-primary" />
-                <span className="section-label">Employees</span>
-                <span className="text-caption font-medium text-foreground">{accountData?.employees?.value || `${company.headcount}+`}</span>
-              </CardContent></Card>
+            {company.scout_summary && (
+              <p className="text-caption text-foreground/45 leading-relaxed max-w-2xl italic">
+                {company.scout_summary}
+              </p>
             )}
-            {accountData?.revenue_range?.value && accountData.revenue_range.value !== "Unknown" && (
-              <Card className="bg-secondary/30"><CardContent className="p-4 flex flex-col items-start gap-1.5">
-                <DollarSign className="w-4 h-4 text-primary" />
-                <span className="section-label">Revenue</span>
-                <span className="text-caption font-medium text-foreground">{accountData.revenue_range.value}</span>
-              </CardContent></Card>
-            )}
-            {company.partner && (
-              <Card className="bg-secondary/30"><CardContent className="p-4 flex flex-col items-start gap-1.5">
-                <Briefcase className="w-4 h-4 text-primary" />
-                <span className="section-label">Partner</span>
-                <span className="text-caption font-medium text-foreground">{company.partner}</span>
-              </CardContent></Card>
-            )}
+            <div className="flex flex-wrap gap-x-6 gap-y-1 text-caption">
+              {(accountData?.industry?.value || company.industry) && (
+                <span className="text-foreground/45">
+                  <span className="text-foreground/25">Industry</span>{" "}
+                  <span className="text-foreground/65">{accountData?.industry?.value || company.industry?.replace(/_/g, " ")}</span>
+                </span>
+              )}
+              {(accountData?.employees?.value || company.headcount) && (
+                <span className="text-foreground/45">
+                  <span className="text-foreground/25">Employees</span>{" "}
+                  <span className="text-foreground/65">{accountData?.employees?.value || `${company.headcount?.toLocaleString()}+`}</span>
+                </span>
+              )}
+              {accountData?.revenue_range?.value && accountData.revenue_range.value !== "Unknown" && (
+                <span className="text-foreground/45">
+                  <span className="text-foreground/25">Revenue</span>{" "}
+                  <span className="text-foreground/65">{accountData.revenue_range.value}</span>
+                </span>
+              )}
+              {company.partner && (
+                <span className="text-foreground/45">
+                  <span className="text-foreground/25">Partner</span>{" "}
+                  <span className="text-foreground/65">{company.partner}</span>
+                </span>
+              )}
+              {company.hq_country && (
+                <span className="text-foreground/45">
+                  <span className="text-foreground/25">HQ</span>{" "}
+                  <span className="text-foreground/65">{company.hq_country}</span>
+                </span>
+              )}
+            </div>
           </div>
 
           {/* HubSpot Product Properties */}
@@ -730,33 +681,21 @@ export default function CompanyDetail() {
           )}
 
           {/* Meetings (Fathom) */}
-          <Card className="bg-secondary/30">
-            <CardContent className="p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <PhoneCall className="w-4 h-4 text-primary" />
-                </div>
-                <div>
-                  <div className="text-body font-medium text-foreground">
-                    {meetings.length} Meeting{meetings.length !== 1 ? "s" : ""} Synced
-                  </div>
-                  <div className="text-caption text-foreground/45">
-                    {meetings.filter((m: any) => m.transcript_analysis).length} analyzed
-                    {(syncingFathom || analyzingMeeting) && (
-                      <span className="ml-2 inline-flex items-center gap-1">
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        {syncingFathom ? "Syncing…" : "Analyzing…"}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <Button size="sm" variant="outline" className="gap-1.5 text-caption" onClick={syncFathom} disabled={syncingFathom || !!analyzingMeeting}>
-                {syncingFathom ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                Sync Fathom
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="flex items-center justify-between py-3 border-t border-border/20">
+            <span className="text-caption text-foreground/45">
+              {meetings.length} meeting{meetings.length !== 1 ? "s" : ""} synced
+              {meetings.filter((m: any) => m.transcript_analysis).length > 0 && (
+                <span> · {meetings.filter((m: any) => m.transcript_analysis).length} analyzed</span>
+              )}
+            </span>
+            <button
+              onClick={syncFathom}
+              disabled={syncingFathom || !!analyzingMeeting}
+              className="text-micro text-primary hover:text-primary/80 font-medium disabled:opacity-40"
+            >
+              {syncingFathom ? "Syncing…" : "Sync Fathom"}
+            </button>
+          </div>
 
           {snap && latestSnapshot && (
             <div className="panel">
@@ -976,7 +915,6 @@ export default function CompanyDetail() {
             </div>
           )}
 
-          <div className="glow-line" />
 
           <Collapsible>
             <CollapsibleTrigger className="flex items-center justify-between w-full py-3">
