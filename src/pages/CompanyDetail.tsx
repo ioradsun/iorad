@@ -680,6 +680,7 @@ export default function CompanyDetail() {
           ) : effectiveContact ? (
             <ContactMetaLine contact={effectiveContact} />
           ) : null}
+        </div>
 
           {viewMode === "company" ? (
         <div>
