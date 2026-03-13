@@ -248,35 +248,22 @@ Deno.serve(async (req) => {
     // Support single contact or batch (by company_id)
     const { contact_id, company_id } = body;
 
-    let contactIds: string[] = [];
+    let contacts: ContactRow[] = [];
 
     if (contact_id) {
-      contactIds = [contact_id];
+      contacts = await fetchContactsByIds(sb, [contact_id]);
     } else if (company_id) {
-      const { data: contacts } = await sb
-        .from("contacts")
-        .select("id")
-        .eq("company_id", company_id)
-        .not("hubspot_properties", "is", null);
-      contactIds = (contacts || []).map((c: any) => c.id);
+      contacts = await fetchContactsByCompany(sb, company_id);
     } else {
       throw new Error("contact_id or company_id is required");
     }
 
-    if (contactIds.length === 0) {
+    if (contacts.length === 0) {
       return new Response(
-        JSON.stringify({ success: true, profiles_extracted: 0, message: "No contacts with HubSpot data" }),
+        JSON.stringify({ success: true, profiles_extracted: 0, message: "No contacts with HubSpot data", total: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    // Load all contacts
-    const { data: contacts, error: contactErr } = await sb
-      .from("contacts")
-      .select("id, name, title, email, hubspot_properties, company_id")
-      .in("id", contactIds);
-
-    if (contactErr) throw contactErr;
 
     let extracted = 0;
     let failed = 0;
