@@ -696,6 +696,35 @@ export type Database = {
         }
         Relationships: []
       }
+      recent_companies: {
+        Row: {
+          company_id: string
+          id: string
+          user_id: string
+          visited_at: string
+        }
+        Insert: {
+          company_id: string
+          id?: string
+          user_id: string
+          visited_at?: string
+        }
+        Update: {
+          company_id?: string
+          id?: string
+          user_id?: string
+          visited_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recent_companies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       signal_comments: {
         Row: {
           author_avatar: string | null
