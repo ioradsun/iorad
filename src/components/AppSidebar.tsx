@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  Building2, Signal, ChevronLeft, ChevronRight,
+  Building2, Signal, ChevronLeft,
   LogOut, Shield, Briefcase, GraduationCap, Handshake, User, Info, Plus,
 } from "lucide-react";
 import ioradLogoDark from "@/assets/iorad-logo-new.png";
@@ -27,7 +27,6 @@ const categoryItems = [
 ];
 
 export default function AppSidebar() {
-  const [collapsed, setCollapsed] = useState(false);
   const [contactSearch, setContactSearch] = useState("");
   const { user, signOut } = useAuth();
   const isAdmin = useIsAdmin();
@@ -72,50 +71,27 @@ export default function AppSidebar() {
     return location.pathname === "/" && params.get("category") === cat;
   };
 
-  const w = collapsed ? "w-14" : "w-56";
-
   const NavItem = ({ to, icon: Icon, label, active }: { to: string; icon: any; label: string; active: boolean }) => (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Link
-          to={to}
-          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-caption font-medium transition-colors ${
-            active
-              ? "bg-secondary text-foreground"
-              : "text-foreground/45 hover:text-foreground hover:bg-secondary/50"
-          }`}
-        >
-          <Icon className="w-4 h-4 shrink-0" />
-          {!collapsed && <span className="truncate">{label}</span>}
-        </Link>
-      </TooltipTrigger>
-      {collapsed && (
-        <TooltipContent side="right" className="text-xs">{label}</TooltipContent>
-      )}
-    </Tooltip>
+    <Link
+      to={to}
+      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-caption font-medium transition-colors ${
+        active
+          ? "bg-secondary text-foreground"
+          : "text-foreground/45 hover:text-foreground hover:bg-secondary/50"
+      }`}
+    >
+      <Icon className="w-4 h-4 shrink-0" />
+      <span className="truncate">{label}</span>
+    </Link>
   );
 
   return (
-    <aside
-      className={`${w} shrink-0 border-r border-border/50 bg-background flex flex-col h-screen sticky top-0 transition-all duration-200 overflow-hidden`}
-    >
-      {/* Logo + collapse */}
-      <div className="flex items-center justify-between px-3 h-12 border-b border-border/30">
-        {!collapsed ? (
-          <Link to="/" className="flex items-center gap-2">
-            <img src={ioradLogo} alt="iorad" className="h-5" />
-          </Link>
-        ) : (
-          <Link to="/" className="mx-auto">
-            <img src={ioradLogo} alt="iorad" className="h-5" />
-          </Link>
-        )}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="text-foreground/30 hover:text-foreground/60 transition-colors p-1"
-        >
-          {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
-        </button>
+    <aside className="w-56 shrink-0 border-r border-border/50 bg-background flex flex-col h-screen sticky top-0 overflow-hidden">
+      {/* Logo */}
+      <div className="flex items-center px-3 h-12 border-b border-border/30">
+        <Link to="/" className="flex items-center gap-2">
+          <img src={ioradLogo} alt="iorad" className="h-6 w-auto object-contain" />
+        </Link>
       </div>
 
       {/* Navigation */}
@@ -127,16 +103,14 @@ export default function AppSidebar() {
               className="flex items-center gap-2 px-3 py-1.5 text-caption text-foreground/30 hover:text-foreground/60 transition-colors w-full"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
-              {!collapsed && <span>Companies</span>}
+              <span>Companies</span>
             </button>
 
             <div className="my-2 border-t border-border/20" />
 
-            {!collapsed && (
-              <div className="text-micro font-semibold uppercase tracking-wider text-foreground/40 px-3 pb-1">
-                {currentCompany?.company_name || "Company"}
-              </div>
-            )}
+            <div className="text-micro font-semibold uppercase tracking-wider text-foreground/40 px-3 pb-1">
+              {currentCompany?.company_name || "Company"}
+            </div>
 
             <NavItem
               to={`/company/${companyId}`}
@@ -147,29 +121,10 @@ export default function AppSidebar() {
 
             <div className="my-2 border-t border-border/20" />
 
-            {!collapsed && (
-              <div className="flex items-center justify-between px-3 pb-1">
-                <span className="text-micro font-medium uppercase tracking-wider text-foreground/25">
-                  Contacts {companyContacts.length > 0 && `(${companyContacts.length})`}
-                </span>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => {
-                        const params = new URLSearchParams(window.location.search);
-                        params.set("addContact", "true");
-                        navigate(`/company/${companyId}?${params.toString()}`);
-                      }}
-                      className="text-foreground/25 hover:text-primary transition-colors p-0.5 rounded hover:bg-secondary/50"
-                    >
-                      <Plus className="w-3 h-3" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="text-xs">Add contact</TooltipContent>
-                </Tooltip>
-              </div>
-            )}
-            {collapsed && (
+            <div className="flex items-center justify-between px-3 pb-1">
+              <span className="text-micro font-medium uppercase tracking-wider text-foreground/25">
+                Contacts {companyContacts.length > 0 && `(${companyContacts.length})`}
+              </span>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -178,16 +133,16 @@ export default function AppSidebar() {
                       params.set("addContact", "true");
                       navigate(`/company/${companyId}?${params.toString()}`);
                     }}
-                    className="w-full flex items-center justify-center px-3 py-1.5 text-foreground/25 hover:text-primary transition-colors"
+                    className="text-foreground/25 hover:text-primary transition-colors p-0.5 rounded hover:bg-secondary/50"
                   >
-                    <Plus className="w-3.5 h-3.5" />
+                    <Plus className="w-3 h-3" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="right" className="text-xs">Add contact</TooltipContent>
               </Tooltip>
-            )}
+            </div>
 
-            {!collapsed && companyContacts.length > 3 && (
+            {companyContacts.length > 3 && (
               <div className="px-3 pb-1">
                 <input
                   type="text"
@@ -203,65 +158,30 @@ export default function AppSidebar() {
               {filteredContacts.map((c: any) => {
                 const isSelected = location.search.includes(`contact=${c.id}`);
                 return (
-                  <Tooltip key={c.id}>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => navigate(`/company/${companyId}?contact=${c.id}`)}
-                        className={`w-full flex items-start gap-2.5 px-3 py-1.5 rounded-lg text-left transition-colors ${
-                          isSelected
-                            ? "bg-secondary text-foreground"
-                            : "text-foreground/40 hover:text-foreground/70 hover:bg-secondary/50"
-                        }`}
-                      >
-                        <User className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                        {!collapsed && (
-                          <div className="min-w-0">
-                            <div className="text-caption font-medium truncate">{c.name}</div>
-                            {c.title && <div className="text-micro text-foreground/20 truncate">{c.title}</div>}
-                          </div>
-                        )}
-                      </button>
-                    </TooltipTrigger>
-                    {collapsed && <TooltipContent side="right" className="text-xs">{c.name}</TooltipContent>}
-                  </Tooltip>
+                  <button
+                    key={c.id}
+                    onClick={() => navigate(`/company/${companyId}?contact=${c.id}`)}
+                    className={`w-full flex items-start gap-2.5 px-3 py-1.5 rounded-lg text-left transition-colors ${
+                      isSelected
+                        ? "bg-secondary text-foreground"
+                        : "text-foreground/40 hover:text-foreground/70 hover:bg-secondary/50"
+                    }`}
+                  >
+                    <User className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                    <div className="min-w-0">
+                      <div className="text-caption font-medium truncate">{c.name}</div>
+                      {c.title && <div className="text-micro text-foreground/20 truncate">{c.title}</div>}
+                    </div>
+                  </button>
                 );
               })}
             </div>
-
-            {recents.filter((r) => r.company_id !== companyId).length > 0 && (
-              <>
-                <div className="my-3 border-t border-border/20" />
-                {!collapsed && (
-                  <div className="text-micro font-medium uppercase tracking-wider text-foreground/20 px-3 pb-1">
-                    Recent
-                  </div>
-                )}
-                {recents.filter((r) => r.company_id !== companyId).slice(0, 5).map((r) => (
-                  <Tooltip key={r.company_id}>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => navigate(`/company/${r.company_id}`)}
-                        className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-caption text-foreground/25 hover:text-foreground/50 hover:bg-secondary/50 transition-colors text-left"
-                      >
-                        <Building2 className="w-3.5 h-3.5 shrink-0" />
-                        {!collapsed && <span className="truncate">{r.company_name}</span>}
-                      </button>
-                    </TooltipTrigger>
-                    {collapsed && (
-                      <TooltipContent side="right" className="text-xs">{r.company_name}</TooltipContent>
-                    )}
-                  </Tooltip>
-                ))}
-              </>
-            )}
           </>
         ) : (
           <>
-            {!collapsed && (
-              <div className="text-micro font-medium uppercase tracking-wider text-foreground/25 px-3 pb-1">
-                Companies
-              </div>
-            )}
+            <div className="text-micro font-medium uppercase tracking-wider text-foreground/25 px-3 pb-1">
+              Companies
+            </div>
             {categoryItems.map(({ key, label, icon }) => (
               <NavItem
                 key={key}
@@ -279,28 +199,22 @@ export default function AppSidebar() {
             {recents.length > 0 && (
               <>
                 <div className="my-3 border-t border-border/20" />
-                {!collapsed && (
-                  <div className="text-micro font-medium uppercase tracking-wider text-foreground/25 px-3 pb-1">
-                    Recent
-                  </div>
-                )}
+                <div className="text-micro font-medium uppercase tracking-wider text-foreground/25 px-3 pb-1">
+                  Recent
+                </div>
                 {recents.map((r) => (
-                  <Tooltip key={r.company_id}>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => navigate(`/company/${r.company_id}`)}
-                        className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-caption transition-colors text-left ${
-                          location.pathname === `/company/${r.company_id}`
-                            ? "bg-secondary text-foreground font-medium"
-                            : "text-foreground/40 hover:text-foreground/70 hover:bg-secondary/50"
-                        }`}
-                      >
-                        <Building2 className="w-3.5 h-3.5 shrink-0" />
-                        {!collapsed && <span className="truncate">{r.company_name}</span>}
-                      </button>
-                    </TooltipTrigger>
-                    {collapsed && <TooltipContent side="right" className="text-xs">{r.company_name}</TooltipContent>}
-                  </Tooltip>
+                  <button
+                    key={r.company_id}
+                    onClick={() => navigate(`/company/${r.company_id}`)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-caption transition-colors text-left ${
+                      location.pathname === `/company/${r.company_id}`
+                        ? "bg-secondary text-foreground font-medium"
+                        : "text-foreground/40 hover:text-foreground/70 hover:bg-secondary/50"
+                    }`}
+                  >
+                    <Building2 className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">{r.company_name}</span>
+                  </button>
                 ))}
               </>
             )}
@@ -313,16 +227,14 @@ export default function AppSidebar() {
         <div className="border-t border-border/30 p-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className={`w-full flex items-center gap-2 rounded-lg p-2 hover:bg-secondary transition-colors focus:outline-none ${collapsed ? "justify-center" : ""}`}>
+              <button className="w-full flex items-center gap-2 rounded-lg p-2 hover:bg-secondary transition-colors focus:outline-none">
                 <Avatar className="h-7 w-7 shrink-0">
                   {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
                   <AvatarFallback className="text-xs bg-primary/10 text-primary">
                     {initials}
                   </AvatarFallback>
                 </Avatar>
-                {!collapsed && (
-                  <span className="text-caption text-foreground/50 truncate">{displayName}</span>
-                )}
+                <span className="text-caption text-foreground/50 truncate">{displayName}</span>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" side="top" className="w-48">
