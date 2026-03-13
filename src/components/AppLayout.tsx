@@ -16,8 +16,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const topTabs = [
-  { to: "/", label: "Customer Signals" },
-  { to: "/signals", label: "Product Signals" },
+  { to: "/", label: "Companies" },
+  { to: "/signals", label: "Signals" },
+  { to: "/jobs", label: "HubSpot" },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
