@@ -12,7 +12,7 @@ const urgencyColors: Record<string, string> = {
   "High Momentum": "rgb(239,68,68)",
 };
 
-export default function InternalSignalSummary({ signals, conversationStarters }: Props) {
+const InternalSignalSummary = forwardRef<HTMLElement, Props>(function InternalSignalSummary({ signals, conversationStarters }, _ref) {
   return (
     <section className="max-w-5xl mx-auto px-6 py-12">
       <div className="rounded-xl p-6" style={{ border: "1px dashed var(--story-border)", background: "var(--story-surface)" }}>
