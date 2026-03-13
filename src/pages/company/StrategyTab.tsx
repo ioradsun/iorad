@@ -33,7 +33,6 @@ export default function StrategyTab({
       <div className="flex items-center justify-between gap-3">
         <h3 className="section-label">
           Strategy & Cards
-          {contactName && <span className="ml-2 normal-case tracking-normal text-primary/70 font-medium">for {contactName}</span>}
         </h3>
         <Button
           size="sm"

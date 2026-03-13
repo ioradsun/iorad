@@ -45,7 +45,6 @@ export default function StoryTab({
         <h3 className="section-label flex items-center gap-1.5">
           <Sparkles className="w-3 h-3" />
           Story Configuration
-          {contactName && <span className="normal-case tracking-normal text-primary/70 font-medium">for {contactName}</span>}
         </h3>
         <div className="flex items-center gap-2">
           <Button
