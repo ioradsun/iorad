@@ -295,8 +295,9 @@ export default function ContactDetailView({
                 {activity.score > 0 ? (
                   <div className="flex items-baseline gap-1.5">
                     <span className={`text-display font-semibold tabular-nums ${
-                      activity.tier === "hot" ? "text-success"
-                      : activity.tier === "warm" ? "text-primary"
+                      activity.tier === "hot" ? "text-orange-400"
+                      : activity.tier === "warm" ? "text-amber-400"
+                      : activity.tier === "cool" ? "text-blue-400"
                       : "text-foreground/30"
                     }`}>
                       {activity.score}
