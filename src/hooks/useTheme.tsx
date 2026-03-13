@@ -5,6 +5,7 @@ type Theme = "dark" | "light";
 
 const APP_VARS_KEY = "iorad-custom-app-vars";
 const STORY_VARS_KEY = "iorad-custom-story-vars";
+const THEME_CACHE_KEY = "iorad-theme-cache";
 
 /** Apply a record of CSS custom properties to the document root */
 export function applyCustomVars(vars: Record<string, string>) {
@@ -40,9 +41,16 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue>({ theme: "dark", setTheme: () => {} });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("dark");
+  // Initialize from localStorage cache (instant, no network)
+  const [theme, setThemeState] = useState<Theme>(() => {
+    try {
+      const cached = localStorage.getItem(THEME_CACHE_KEY);
+      if (cached === "light" || cached === "dark") return cached;
+    } catch {}
+    return "dark";
+  });
 
-  // Fetch theme from DB on mount
+  // Background sync from DB — updates cache if different
   useEffect(() => {
     supabase
       .from("app_settings")
@@ -52,7 +60,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       .then(({ data }) => {
         const dbTheme = (data as any)?.theme as Theme | undefined;
         if (dbTheme === "light" || dbTheme === "dark") {
-          setThemeState(dbTheme);
+          setThemeState((current) => (current === dbTheme ? current : dbTheme));
+          try { localStorage.setItem(THEME_CACHE_KEY, dbTheme); } catch {}
         }
       });
   }, []);
@@ -71,6 +80,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setTheme = async (t: Theme) => {
     setThemeState(t);
+    try { localStorage.setItem(THEME_CACHE_KEY, t); } catch {}
     await supabase
       .from("app_settings")
       .update({ theme: t } as any)
