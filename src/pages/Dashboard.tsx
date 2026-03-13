@@ -143,35 +143,14 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-3 pt-1">
-        <div className="flex items-center bg-secondary rounded-md p-0.5 gap-0.5">
-          {(["school", "business", "partner"] as CategoryTab[]).map(tab => (
-            <button
-              key={tab}
-              onClick={() => { setActiveTab(tab); setSearch(""); }}
-              className={`px-3.5 py-1.5 rounded text-sm font-medium transition-all ${
-                activeTab === tab
-                  ? "bg-card text-foreground shadow-sm shadow-black/[0.06]"
-                  : "text-foreground/45 hover:text-foreground"
-              }`}
-            >
-              {CATEGORY_LABELS[tab]}
-              <span className="ml-1.5 tabular-nums text-micro text-foreground/25">
-                {byCategory[tab].length}
-              </span>
-            </button>
-          ))}
-        </div>
-
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-foreground/25" />
-          <Input
-            placeholder="Search…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-8 h-9 text-body bg-secondary border-0 focus-visible:ring-1 focus-visible:ring-ring/30"
-          />
-        </div>
+      <div className="relative max-w-xl mb-2">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/25" />
+        <Input
+          placeholder="Search companies…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="pl-10 h-11 text-body bg-secondary border-0 rounded-xl focus-visible:ring-1 focus-visible:ring-ring/30"
+        />
       </div>
 
       <div className="rounded-lg border border-border/30 bg-card overflow-hidden">
