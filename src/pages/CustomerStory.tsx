@@ -117,10 +117,9 @@ function useInboundStoryBySlug(companySlug?: string, contactSlug?: string) {
           .from("company_cards").select("*")
           .eq("company_id", company.id)
           .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .limit(1);
         if (error) throw error;
-        card = data;
+        card = data?.[0] ?? null;
       }
       if (!card) return null;
 
