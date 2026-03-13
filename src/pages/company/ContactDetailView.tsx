@@ -545,16 +545,24 @@ export default function ContactDetailView({
             </div>
 
             <div className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div>
-                  <label className="field-label block mb-1.5">Loom Video</label>
-                  <input type="text" value={effectiveLoomUrl} onChange={(e) => handleLoomUrlChange(e.target.value)} placeholder="https://www.loom.com/share/..." className="field-editable" />
-                  <p className="text-micro text-foreground/15 mt-1">Embeds at top of story page</p>
+              <div className="relative pl-4 border-l-[3px] border-primary/40 bg-primary/[0.03] rounded-r-lg py-4 pr-4 -ml-1">
+                <div className="mb-4">
+                  <div className="text-caption font-semibold text-foreground/70">Story Assets</div>
+                  <p className="text-micro text-foreground/25 mt-0.5">
+                    Add a Loom video or iorad tutorial to embed in the published story
+                  </p>
                 </div>
-                <div>
-                  <label className="field-label block mb-1.5">iorad Tutorial</label>
-                  <input type="text" value={effectiveIoradUrl} onChange={(e) => handleIoradUrlChange(e.target.value)} placeholder="https://ior.ad/..." className="field-editable" />
-                  <p className="text-micro text-foreground/15 mt-1">Replaces default tutorial embed</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-micro font-medium text-foreground/35 block mb-1">Loom Video</label>
+                    <input type="text" value={effectiveLoomUrl} onChange={(e) => handleLoomUrlChange(e.target.value)} placeholder="https://www.loom.com/share/..." className="w-full bg-transparent border border-border/30 rounded px-3 py-2 text-body text-foreground placeholder:text-foreground/15 placeholder:italic outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/10 transition-colors" />
+                    <p className="text-micro text-foreground/15 mt-1">Embeds at top of story page</p>
+                  </div>
+                  <div>
+                    <label className="text-micro font-medium text-foreground/35 block mb-1">iorad Tutorial</label>
+                    <input type="text" value={effectiveIoradUrl} onChange={(e) => handleIoradUrlChange(e.target.value)} placeholder="https://ior.ad/..." className="w-full bg-transparent border border-border/30 rounded px-3 py-2 text-body text-foreground placeholder:text-foreground/15 placeholder:italic outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/10 transition-colors" />
+                    <p className="text-micro text-foreground/15 mt-1">Replaces default tutorial embed</p>
+                  </div>
                 </div>
               </div>
 
