@@ -248,6 +248,66 @@
     font-style: italic;
   }
 
+  .field-editable {
+    font-size: var(--text-body);
+    color: hsl(var(--foreground));
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: calc(var(--radius) - 2px);
+    padding: 0.375rem 0.5rem;
+    margin: -0.375rem -0.5rem;
+    outline: none;
+    transition: border-color 0.15s, background-color 0.15s;
+    width: calc(100% + 1rem);
+  }
+
+  .field-editable:hover {
+    border-color: hsl(var(--border));
+    background: hsl(var(--secondary) / 0.3);
+  }
+
+  .field-editable:focus {
+    border-color: hsl(var(--primary) / 0.4);
+    background: hsl(var(--secondary) / 0.5);
+    box-shadow: 0 0 0 2px hsl(var(--primary) / 0.08);
+  }
+
+  .field-editable::placeholder {
+    color: hsl(var(--foreground) / 0.18);
+    font-style: italic;
+  }
+
+  .field-editable-area {
+    font-size: var(--text-body);
+    color: hsl(var(--foreground));
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: calc(var(--radius) - 2px);
+    padding: 0.375rem 0.5rem;
+    margin: -0.375rem -0.5rem;
+    outline: none;
+    transition: border-color 0.15s, background-color 0.15s;
+    width: calc(100% + 1rem);
+    resize: none;
+    line-height: var(--leading-body);
+  }
+
+  .field-editable-area:hover {
+    border-color: hsl(var(--border));
+    background: hsl(var(--secondary) / 0.3);
+  }
+
+  .field-editable-area:focus {
+    border-color: hsl(var(--primary) / 0.4);
+    background: hsl(var(--secondary) / 0.5);
+    box-shadow: 0 0 0 2px hsl(var(--primary) / 0.08);
+  }
+
+  .field-editable-area::placeholder {
+    color: hsl(var(--foreground) / 0.18);
+    font-style: italic;
+  }
+
   /* Panel — simplified, more whitespace */
   .panel {
     @apply rounded-lg border bg-card;

@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, Linkedin, Loader2, Plus } from "lucide-react";
+import { ChevronRight, ExternalLink, Linkedin, Loader2, Plus, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Json } from "@/integrations/supabase/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -190,6 +190,38 @@ export default function ContactDetailView({
     autosave({ firstName: localFirstName, lastName: localLastName, roleFocus: localRoleFocus, userNotes: localUserNotes });
   };
 
+  const hasStrategy = cards.length > 0 || !!(rawAccountJson as any)?._strategy;
+  const hasStory = !!(rawAccountJson as any)?._type || !!(rawAccountJson as any)?.opening_hook || !!(rawAccountJson as any)?.behavior_acknowledged;
+  const generatingStory = regeneratingSection === "story" || ensureRunning;
+
+  const onGenerateStory = () => onRegenerateSection("story");
+
+  const handleLoomUrlChange = async (url: string) => {
+    if (!companyId || !effectiveContact?.id) return;
+    try {
+      const { error } = await supabase
+        .from("company_cards")
+        .update({ loom_url: url })
+        .eq("company_id", companyId)
+        .eq("contact_id", effectiveContact.id);
+      if (error) console.warn("Loom URL save failed:", error.message);
+      queryClient.invalidateQueries({ queryKey: ["company_cards", companyId], exact: false });
+    } catch {}
+  };
+
+  const handleIoradUrlChange = async (url: string) => {
+    if (!companyId || !effectiveContact?.id) return;
+    try {
+      const { error } = await supabase
+        .from("company_cards")
+        .update({ iorad_url: url })
+        .eq("company_id", companyId)
+        .eq("contact_id", effectiveContact.id);
+      if (error) console.warn("iorad URL save failed:", error.message);
+      queryClient.invalidateQueries({ queryKey: ["company_cards", companyId], exact: false });
+    } catch {}
+  };
+
   if (!contacts.length) {
     return (
       <>
@@ -250,7 +282,7 @@ export default function ContactDetailView({
                   onChange={(e) => handleFirstNameChange(e.target.value)}
                   onBlur={handleFieldBlur}
                   placeholder="First"
-                  className="w-full bg-transparent border-0 border-b border-border/30 focus:border-primary/60 outline-none text-body text-foreground placeholder:text-foreground/25 pb-1.5 transition-colors"
+                  className="field-editable"
                 />
               </div>
               <div>
@@ -261,7 +293,7 @@ export default function ContactDetailView({
                   onChange={(e) => handleLastNameChange(e.target.value)}
                   onBlur={handleFieldBlur}
                   placeholder="Last"
-                  className="w-full bg-transparent border-0 border-b border-border/30 focus:border-primary/60 outline-none text-body text-foreground placeholder:text-foreground/25 pb-1.5 transition-colors"
+                  className="field-editable"
                 />
               </div>
             </div>
@@ -420,40 +452,40 @@ export default function ContactDetailView({
               </div>
             )}
 
-            <div className="rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40 p-5 space-y-4">
+            <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-body font-semibold text-amber-900 dark:text-amber-200">Context for AI</h3>
-                  <p className="text-micro text-amber-700/70 dark:text-amber-400/60 mt-0.5">Add details here before generating Strategy, Outreach & Story tabs</p>
+                  <div className="field-label">AI Context</div>
+                  <p className="text-micro text-foreground/20 mt-0.5">Powers strategy, outreach & story</p>
                 </div>
                 <span className={`text-micro transition-opacity duration-300 ${
-                  saveStatus === "saving" ? "text-amber-600/60 dark:text-amber-400/50 opacity-100"
-                  : saveStatus === "saved" ? "text-emerald-600 dark:text-emerald-400 opacity-100"
+                  saveStatus === "saving" ? "text-foreground/40 opacity-100"
+                  : saveStatus === "saved" ? "text-success opacity-100"
                   : "opacity-0"
                 }`}>
-                  {saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "✓ Saved" : ""}
+                  {saveStatus === "saving" ? "Saving…" : "✓ Saved"}
                 </span>
               </div>
               <div>
-                <label className="text-caption font-semibold text-amber-900/80 dark:text-amber-200/80 block mb-1.5">Role / Focus Area</label>
+                <label className="field-label block mb-1.5">Role / Focus</label>
                 <input
                   type="text"
                   value={localRoleFocus}
                   onChange={(e) => handleRoleFocusChange(e.target.value)}
                   onBlur={handleFieldBlur}
-                  placeholder="e.g. Instructional Design, Training Operations"
-                  className="w-full bg-white/60 dark:bg-white/5 border border-amber-200/80 dark:border-amber-700/40 rounded-lg px-3 py-2 text-body text-foreground placeholder:text-foreground/30 outline-none focus:ring-2 focus:ring-amber-300/50 dark:focus:ring-amber-600/40 focus:border-amber-300 dark:focus:border-amber-600 transition-all"
+                  placeholder="e.g. Instructional Design, Training Ops"
+                  className="field-editable"
                 />
               </div>
               <div>
-                <label className="text-caption font-semibold text-amber-900/80 dark:text-amber-200/80 block mb-1.5">Notes</label>
+                <label className="field-label block mb-1.5">Notes</label>
                 <textarea
                   value={localUserNotes}
                   onChange={(e) => handleUserNotesChange(e.target.value)}
                   onBlur={handleFieldBlur}
-                  placeholder="Any context that helps generate better content — e.g. 'Recently promoted, scaling onboarding across 12 offices, prefers direct communication'"
+                  placeholder="Context that improves AI output — role details, priorities, recent conversations"
                   rows={3}
-                  className="w-full bg-white/60 dark:bg-white/5 border border-amber-200/80 dark:border-amber-700/40 rounded-lg px-3 py-2 text-body text-foreground placeholder:text-foreground/30 outline-none focus:ring-2 focus:ring-amber-300/50 dark:focus:ring-amber-600/40 focus:border-amber-300 dark:focus:border-amber-600 transition-all resize-none leading-[1.7]"
+                  className="field-editable-area"
                 />
               </div>
             </div>
@@ -509,21 +541,118 @@ export default function ContactDetailView({
         </TabsContent>
 
         <TabsContent value="story" className="mt-0">
-          <StoryTab
-            contactName={firstName}
-            isInboundStoryResponse={isInboundStoryResponse}
-            rawAccountJson={rawAccountJson}
-            storyBaseUrl={storyUrl}
-            loomUrl={effectiveLoomUrl}
-            ioradUrl={effectiveIoradUrl}
-            loomEmbedUrl={loomEmbedUrl}
-            ioradEmbedUrl={ioradEmbedUrl}
-            onLoomUrlChange={() => {}}
-            onIoradUrlChange={() => {}}
-            regeneratingSection={regeneratingSection}
-            ensureRunning={ensureRunning}
-            onRegenerate={() => onRegenerateSection("story")}
-          />
+          {hasStrategy && (
+            <section className="pt-4 max-w-2xl">
+              <div className="flex items-center gap-4 mb-8">
+                <div className="flex-1 border-t border-border/20" />
+                <span className="text-micro font-medium uppercase tracking-wider text-foreground/20">
+                  Story Time
+                </span>
+                <div className="flex-1 border-t border-border/20" />
+              </div>
+
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div>
+                    <label className="field-label block mb-1.5">Loom Video</label>
+                    <input
+                      type="text"
+                      value={effectiveLoomUrl}
+                      onChange={(e) => handleLoomUrlChange(e.target.value)}
+                      placeholder="https://www.loom.com/share/..."
+                      className="field-editable"
+                    />
+                    <p className="text-micro text-foreground/15 mt-1">Embeds at the top of the story page</p>
+                  </div>
+                  <div>
+                    <label className="field-label block mb-1.5">iorad Tutorial</label>
+                    <input
+                      type="text"
+                      value={effectiveIoradUrl}
+                      onChange={(e) => handleIoradUrlChange(e.target.value)}
+                      placeholder="https://ior.ad/..."
+                      className="field-editable"
+                    />
+                    <p className="text-micro text-foreground/15 mt-1">Replaces the default tutorial embed</p>
+                  </div>
+                </div>
+
+                {(loomEmbedUrl || ioradEmbedUrl) && (
+                  <div className="space-y-4">
+                    {loomEmbedUrl && (
+                      <div className="rounded-lg overflow-hidden border border-border/20">
+                        <iframe src={loomEmbedUrl} width="100%" height="360" frameBorder="0" allowFullScreen allow="autoplay; fullscreen" title="Loom preview" />
+                      </div>
+                    )}
+                    {ioradEmbedUrl && (
+                      <div className="rounded-lg overflow-hidden border border-border/20">
+                        <iframe
+                          src={ioradEmbedUrl} width="100%" height="400" frameBorder="0" allowFullScreen
+                          allow="camera; microphone; clipboard-write"
+                          sandbox="allow-scripts allow-forms allow-same-origin allow-presentation allow-downloads allow-modals allow-popups allow-popups-to-escape-sandbox allow-top-navigation allow-top-navigation-by-user-activation"
+                          title="iorad preview"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!hasStory ? (
+                  <div className="py-6 text-center">
+                    <p className="text-caption text-foreground/25 mb-4">
+                      Strategy & outreach are ready. Generate a story built on the strategic angle.
+                    </p>
+                    <Button
+                      onClick={onGenerateStory}
+                      disabled={generatingStory}
+                      className="gap-2"
+                    >
+                      {generatingStory
+                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating Story…</>
+                        : <><Sparkles className="w-4 h-4" /> Generate Story</>}
+                    </Button>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="field-label">Story</div>
+                      <div className="flex items-center gap-3">
+                        {storyUrl && (
+                          <a href={storyUrl} target="_blank" rel="noopener noreferrer">
+                            <Button size="sm" variant="outline" className="gap-1.5 text-micro">
+                              <ExternalLink className="w-3 h-3" /> View Story
+                            </Button>
+                          </a>
+                        )}
+                        <button
+                          onClick={onGenerateStory}
+                          disabled={generatingStory}
+                          className="text-micro text-foreground/15 hover:text-foreground/40 transition-colors"
+                        >
+                          {generatingStory ? "Regenerating…" : "Regenerate"}
+                        </button>
+                      </div>
+                    </div>
+                    <StoryTab
+                      contactName={firstName}
+                      isInboundStoryResponse={isInboundStoryResponse}
+                      rawAccountJson={rawAccountJson}
+                      storyBaseUrl={storyUrl}
+                      loomUrl={effectiveLoomUrl}
+                      ioradUrl={effectiveIoradUrl}
+                      loomEmbedUrl={loomEmbedUrl}
+                      ioradEmbedUrl={ioradEmbedUrl}
+                      onLoomUrlChange={() => {}}
+                      onIoradUrlChange={() => {}}
+                      regeneratingSection={regeneratingSection}
+                      ensureRunning={false}
+                      onRegenerate={() => onRegenerateSection("story")}
+                    />
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
         </TabsContent>
       </Tabs>
 

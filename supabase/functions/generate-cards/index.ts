@@ -165,11 +165,43 @@ serve(async (req) => {
         : null,
     };
 
-    const userPrompt = `Generate content for the "${activeTab}" tab of the CRM dashboard for this account.
+    // When generating story, inject existing strategy so the narrative
+    // builds off the identified angle — not from scratch
+    if (activeTab === "story" && contact_id) {
+      try {
+        const { data: existingCards } = await sb
+          .from("company_cards")
+          .select("cards_json, account_json")
+          .eq("company_id", company_id)
+          .eq("contact_id", contact_id)
+          .maybeSingle();
+
+        if (existingCards) {
+          (context as any).strategy_briefing = {
+            strategy_cards: existingCards.cards_json || null,
+            strategy_analysis: (existingCards.account_json as any)?._strategy || null,
+            outreach_meta: (existingCards.account_json as any)?._outreach_meta || null,
+          };
+        }
+      } catch (e: any) {
+        console.warn("Could not load strategy for story:", e.message);
+      }
+    }
+
+    const strategyNote = (context as any).strategy_briefing
+      ? `\n\nA strategy briefing has already been generated for this contact.
+The story_briefing field in the context contains the strategic angle,
+outreach framing, and identified plays. BUILD YOUR STORY ON THIS FOUNDATION.
+The strategy identified the play — your job is to bring it to life as a
+narrative that the contact would actually want to read.`
+      : "";
+
+    const userPrompt = `Generate content for the "${activeTab}" tab.
 
 ACCOUNT CONTEXT:
-- role_focus: the contact's functional area (e.g. "Instructional Design", "Sales Enablement") — use this to tailor strategy and messaging to their specific domain and priorities.
-- user_notes: free-form context from the sales rep — treat as ground truth that overrides any inferred assumptions about the contact.
+- role_focus: the contact's functional area — tailor the angle to their world.
+- user_notes: ground truth from the sales rep — override any assumptions.
+- strategy_briefing: if present, the pre-generated strategy analysis — align your narrative with it.${strategyNote}
 ${JSON.stringify(context, null, 2)}
 
 Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
@@ -203,9 +235,93 @@ Generate outreach sequences. Return JSON:
 { "email_sequence": { "touch_1": { "subject": "...", "body": "...", "purpose": "..." }, "touch_2": {...}, "touch_3": {...} }, "linkedin_sequence": [{ "step": 1, "type": "connect|message", "content": "..." }] }
 Personalize to the contact's role and product usage. Return ONLY valid JSON.`,
 
-      story: `You are a B2B storyteller for iorad.
-Generate a customer story brief as JSON with headline, subheadline, key metrics, and narrative sections.
-Return ONLY valid JSON.`,
+      story: `You are a world-class B2B storyteller — think Don Draper meets
+enterprise SaaS. You don't sell features. You sell the future the buyer
+already wants but can't articulate yet.
+
+Your job: take raw intelligence about a company and a specific contact,
+and craft a compelling narrative that makes doing nothing feel more
+dangerous than taking action.
+
+CONTEXT YOU HAVE:
+- Company profile, industry, size, product usage data
+- Contact's role, activity metrics, behavioral signals
+- Strategy briefing (if available in strategy_briefing field) — USE THIS
+  as the narrative angle. The strategy identified the play; the story
+  brings it to life.
+- Outreach meta (if available) — the emotional hooks and framing
+
+STORYTELLING PRINCIPLES:
+1. OPEN WITH RECOGNITION, NOT A PITCH — acknowledge what the contact
+   is already doing. They're a creator with 14 tutorials. They've been
+   a viewer for 2 years. Name their behavior. Make them feel seen.
+
+2. FRAME THE GAP — the distance between where they are and where they
+   could be. Not "you're doing it wrong" but "imagine if the 12 other
+   offices had the same setup you've built." The gap creates tension.
+
+3. MAKE INACTION EXPENSIVE — what happens if they don't act? Knowledge
+   stays trapped. Onboarding stays manual. The person who leaves takes
+   the process with them. Quantify it if data exists.
+
+4. SHOW THE PATH — not a product demo, but a 3-step journey from their
+   current state to the future state. Each step should feel inevitable,
+   not salesy.
+
+5. END WITH URGENCY — not fake scarcity, but real momentum. "Your team
+   is already creating. The question isn't whether to scale — it's
+   whether you do it before Q3 planning locks."
+
+OUTPUT SCHEMA — return ONLY this JSON, no markdown:
+{
+  "opening_hook": {
+    "subject_line": "A one-line subject for email or page hero — provocative, specific to them",
+    "opening_paragraph": "2-3 sentences that acknowledge their behavior and frame the opportunity"
+  },
+  "whats_happening": [
+    { "title": "Signal category", "detail": "What we observed and why it matters" }
+  ],
+  "functional_implications": "What this means for their specific role and department — connect to their day-to-day",
+  "execution_friction": ["Specific barrier 1 they face in scaling", "Barrier 2"],
+  "accountability_pressure": ["What leadership is likely asking about", "Metric they need to move"],
+  "real_cost": ["Cost of inaction — quantified if possible", "What they lose by waiting"],
+  "blind_spot": "The thing they haven't considered — the insight that makes them pause",
+  "strategic_plays": [
+    {
+      "name": "Play name — active, verb-driven",
+      "objective": "What this achieves",
+      "why_now": "Why this quarter, not next",
+      "what_it_looks_like": "Concrete 2-3 step description",
+      "expected_impact": "Quantified or qualified outcome"
+    }
+  ],
+  "reinforcement_journey": "How iorad fits into their existing workflow — not a product pitch, but a systems narrative",
+  "why_now": "The timing argument — connect to their signals, their industry, their role transition, their company moment",
+  "cta": "A specific, low-friction next step — not 'schedule a demo' but something that matches their current engagement level",
+  "conversation_starters": ["Question that references their behavior", "Question that surfaces their priority"],
+  "case_studies": [
+    {
+      "company": "Similar company name",
+      "similarity": "Why they're comparable",
+      "challenge": "What they faced",
+      "outcome": "What happened with iorad",
+      "relevance": "Why this matters to the contact"
+    }
+  ]
+}
+
+CRITICAL RULES:
+- If strategy_briefing exists in the context, the story MUST align with
+  the strategic angle identified there. Don't contradict the strategy.
+- Everything should feel like it was written by someone who deeply
+  understands their specific situation — not a template.
+- No jargon. No "leverage synergies." Write like a sharp human.
+- The opening_hook.subject_line should be something the contact would
+  actually click on — specific to their company, their role, their data.
+- case_studies can be real or composite. Be honest about which.
+- Every section should pass the test: "Would this make me stop scrolling?"
+
+Return ONLY the JSON. No markdown fences. No commentary.`,
     };
 
     const isInbound = company.source_type === "inbound";
