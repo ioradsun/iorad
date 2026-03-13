@@ -54,6 +54,7 @@ export default function CompanyDetail() {
   const [contactSearch, setContactSearch] = useState("");
   const [syncingHubspot, setSyncingHubspot] = useState(false);
   const [generatingContactId, setGeneratingContactId] = useState<string | null>(null);
+  const [regeneratingSection, setRegeneratingSection] = useState<string | null>(null);
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const [editRoleFocus, setEditRoleFocus] = useState("");
   const [editUserNotes, setEditUserNotes] = useState("");
