@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { AlertTriangle } from "lucide-react";
 import StorySection from "./StorySection";
 import { EditableText, EditableListItemWrapper } from "./EditableText";
@@ -8,7 +9,7 @@ interface Props {
   items: string[];
 }
 
-export default function RealCostSection({ items }: Props) {
+const RealCostSection = forwardRef<HTMLElement, Props>(function RealCostSection({ items }: Props, _ref) {
   const ctx = useStoryEdit();
   const data = ctx?.isEditing ? ctx.editedCustomer.realCost : items;
   const annotation = useSectionAnnotation("realCost");
@@ -36,4 +37,7 @@ export default function RealCostSection({ items }: Props) {
       </div>
     </StorySection>
   );
-}
+});
+
+
+export default RealCostSection;

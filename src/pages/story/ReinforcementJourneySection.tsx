@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { Layers } from "lucide-react";
 import StorySection from "./StorySection";
 import { EditableText } from "./EditableText";
@@ -8,7 +9,7 @@ interface Props {
   text: string;
 }
 
-export default function ReinforcementJourneySection({ text }: Props) {
+const ReinforcementJourneySection = forwardRef<HTMLElement, Props>(function ReinforcementJourneySection({ text }: Props, _ref) {
   const ctx = useStoryEdit();
   const data = ctx?.isEditing ? ctx.editedCustomer.reinforcementJourney : text;
   const annotation = useSectionAnnotation("reinforcement");
@@ -33,4 +34,7 @@ export default function ReinforcementJourneySection({ text }: Props) {
       </div>
     </StorySection>
   );
-}
+});
+
+
+export default ReinforcementJourneySection;

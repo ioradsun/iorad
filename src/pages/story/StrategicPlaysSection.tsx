@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { Layout } from "lucide-react";
 import StorySection from "./StorySection";
 import type { StrategicPlay } from "@/data/customers";
@@ -24,7 +25,7 @@ function FadeInItem({ children, delay }: { children: React.ReactNode; delay: num
   );
 }
 
-export default function StrategicPlaysSection({ plays }: Props) {
+const StrategicPlaysSection = forwardRef<HTMLElement, Props>(function StrategicPlaysSection({ plays }: Props, _ref) {
   const ctx = useStoryEdit();
   const data = ctx?.isEditing ? ctx.editedCustomer.plays : plays;
   const annotation = useSectionAnnotation("strategicPlays");
@@ -67,4 +68,7 @@ export default function StrategicPlaysSection({ plays }: Props) {
       </div>
     </StorySection>
   );
-}
+});
+
+
+export default StrategicPlaysSection;

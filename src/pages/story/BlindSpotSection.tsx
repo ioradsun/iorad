@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { Lightbulb } from "lucide-react";
 import { EditableText } from "./EditableText";
 import { useStoryEdit } from "./EditContext";
@@ -8,7 +9,7 @@ interface Props {
   text: string;
 }
 
-export default function BlindSpotSection({ text }: Props) {
+const BlindSpotSection = forwardRef<HTMLElement, Props>(function BlindSpotSection({ text }: Props, _ref) {
   const ctx = useStoryEdit();
   const val = ctx?.isEditing ? ctx.editedCustomer.blindSpot : text;
   const defaultLabel = "A Common Blind Spot";
@@ -36,4 +37,7 @@ export default function BlindSpotSection({ text }: Props) {
       </div>
     </section>
   );
-}
+});
+
+
+export default BlindSpotSection;

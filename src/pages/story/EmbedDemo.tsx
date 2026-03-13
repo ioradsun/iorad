@@ -1,11 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, forwardRef } from "react";
 import { EditableText } from "./EditableText";
 import { useStoryEdit } from "./EditContext";
 import { useStoryDebug } from "./StoryDebugContext";
 import { useSectionAnnotation } from "./sectionAnnotations";
 import { useFadeIn } from "./useFadeIn";
 
-export default function EmbedDemo({ ioradUrl }: { ioradUrl?: string | null }) {
+interface Props {
+  ioradUrl?: string | null;
+}
+
+const EmbedDemo = forwardRef<HTMLElement, Props>(function EmbedDemo({ ioradUrl }: Props, _ref) {
   const ctx = useStoryEdit();
   const debug = useStoryDebug();
   const annotation = useSectionAnnotation("embedDemo");
@@ -90,4 +94,7 @@ export default function EmbedDemo({ ioradUrl }: { ioradUrl?: string | null }) {
       </div>
     </section>
   );
-}
+});
+
+
+export default EmbedDemo;
