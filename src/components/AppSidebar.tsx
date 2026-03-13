@@ -11,6 +11,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useRecentCompanies } from "@/hooks/useRecentCompanies";
 import { useContacts } from "@/hooks/useSupabase";
+import { useRecentContacts } from "@/hooks/useRecentContacts";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
