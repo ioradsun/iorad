@@ -40,6 +40,15 @@ export default function AppSidebar() {
   const companyId = companyMatch ? companyMatch[1] : null;
   const { data: companyContacts = [] } = useContacts(companyId || undefined);
   const currentCompany = recents.find((r) => r.company_id === companyId);
+  const { recentContactIds, trackContact, isRecent } = useRecentContacts(companyId);
+
+  // Track contact visit when selected
+  const selectedContactId = new URLSearchParams(location.search).get("contact");
+  useEffect(() => {
+    if (selectedContactId) {
+      trackContact(selectedContactId);
+    }
+  }, [selectedContactId, trackContact]);
 
   const filteredContacts = companyContacts
     .filter((c: any) => {
@@ -47,6 +56,14 @@ export default function AppSidebar() {
       const q = contactSearch.toLowerCase();
       return c.name?.toLowerCase().includes(q) || c.title?.toLowerCase().includes(q);
     });
+
+  // Separate recent contacts from the rest (only when not searching)
+  const recentContacts = contactSearch
+    ? []
+    : filteredContacts.filter((c: any) => isRecent(c.id) && c.id !== selectedContactId);
+  const otherContacts = contactSearch
+    ? filteredContacts
+    : filteredContacts.filter((c: any) => !isRecent(c.id) || c.id === selectedContactId);
 
   const displayName =
     user?.user_metadata?.full_name ||
