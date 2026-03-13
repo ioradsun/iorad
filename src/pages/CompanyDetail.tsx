@@ -83,6 +83,8 @@ export default function CompanyDetail() {
   const effectiveContactId = selectedContactId || contacts[0]?.id || "";
   const { data: companyCards, isLoading: cardsLoading } = useCompanyCards(id, effectiveContactId || undefined);
 
+  const companyAny = company as any;
+
   // Auto-switch to contacts when contacts load and company is set up
   useEffect(() => {
     if (contacts.length > 0 && companyAny?.last_processed_at && activeTab === "company") {
@@ -115,7 +117,7 @@ export default function CompanyDetail() {
     }
   }, [id, effectiveContactId, queryClient]);
 
-  const companyAny = company as any;
+  // companyAny declared above
   const companyCategory = companyAny?.category || (companyAny?.source_type === "inbound" ? "business" : companyAny?.partner ? "partner" : "business");
   const isPartnerCategory = companyCategory === "partner";
 
@@ -625,13 +627,7 @@ export default function CompanyDetail() {
                       ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating…</>
                       : <><Sparkles className="w-3.5 h-3.5" /> Generate</>}
                   </Button>
-                  {storyBaseUrl && (
-                    <a href={storyBaseUrl} target="_blank" rel="noopener noreferrer">
-                      <Button size="sm" variant="outline" className="gap-1.5">
-                        <ExternalLink className="w-3.5 h-3.5" /> Story
-                      </Button>
-                    </a>
-                  )}
+                  {/* Story link moved to ContactDetailView */}
                 </>
               )}
               {activeTab === "company" && (
@@ -694,8 +690,8 @@ export default function CompanyDetail() {
                 </>
               )}
             </div>
-          ) : effectiveContact ? (
-            <ContactMetaLine contact={effectiveContact} />
+          ) : contacts.find((c: any) => c.id === effectiveContactId) ? (
+            <ContactMetaLine contact={contacts.find((c: any) => c.id === effectiveContactId)} />
           ) : null}
         </div>
 
