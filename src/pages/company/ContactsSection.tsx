@@ -36,7 +36,7 @@ interface ContactsSectionProps {
   onSetContactSearch: (val: string) => void;
   onRegenerateContacts: () => void;
   regeneratingSection: string | null;
-  generatingCards: boolean;
+  setupRunning: boolean;
   deleteContactId: string | null;
   onSetDeleteContactId: (id: string | null) => void;
   deletingContact: boolean;
@@ -70,7 +70,7 @@ export default function ContactsSection({
   onSetContactSearch,
   onRegenerateContacts,
   regeneratingSection,
-  generatingCards,
+  setupRunning,
   deleteContactId,
   onSetDeleteContactId,
   deletingContact,
@@ -130,9 +130,9 @@ export default function ContactsSection({
                 size="sm"
                 className="h-7 text-xs gap-1"
                 onClick={onRegenerateContacts}
-                disabled={regeneratingSection === "contacts" || generatingCards}
+                disabled={regeneratingSection === "contacts" || setupRunning}
               >
-                {(regeneratingSection === "contacts" || generatingCards) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                {(regeneratingSection === "contacts" || setupRunning) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                 Find Contacts
               </Button>
             )}
@@ -208,9 +208,6 @@ export default function ContactsSection({
                           >
                             <Pencil className="w-3.5 h-3.5" />
                           </Button>
-                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-primary" title="Generate cards for this contact" onClick={() => onGenerateForContact(contact.id)} disabled={isGenerating || !!generatingContactId}>
-                            {isGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                          </Button>
                           <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" title="Delete contact" onClick={() => onDeleteContact(contact.id)}>
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>
@@ -237,6 +234,18 @@ export default function ContactsSection({
                       <div className="mt-1 pt-2 border-t border-border/40 flex-1">
                         {profile?.account_narrative ? <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-4">{profile.account_narrative}</p> : isGenerating ? <p className="text-[11px] text-muted-foreground/50 italic flex items-center gap-1.5"><Loader2 className="w-3 h-3 animate-spin inline" /> Generating summary…</p> : <p className="text-[11px] text-muted-foreground/50 italic">No AI summary yet</p>}
                       </div>
+
+                      <Button
+                        size="sm"
+                        className="w-full gap-1.5 text-micro mt-2"
+                        variant={isGenerating ? "secondary" : "default"}
+                        onClick={() => onGenerateForContact(contact.id)}
+                        disabled={isGenerating || !!generatingContactId || setupRunning}
+                      >
+                        {isGenerating
+                          ? <><Loader2 className="w-3 h-3 animate-spin" /> Generating…</>
+                          : <><Sparkles className="w-3 h-3" /> Generate for {contact.name.split(" ")[0]}</>}
+                      </Button>
 
                       {editingContactId === contact.id && (
                         <div className="mt-2 pt-2 border-t border-border/40 space-y-2">
