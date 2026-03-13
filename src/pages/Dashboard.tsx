@@ -91,7 +91,7 @@ function HubSpotSyncButton({
           style={{ top: "100%" }}
         >
           <div className="px-3 py-2 border-b border-border">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">HubSpot Sync</p>
+            <p className="text-micro font-medium uppercase tracking-wide text-foreground/45">HubSpot Sync</p>
           </div>
 
           <button
@@ -101,7 +101,7 @@ function HubSpotSyncButton({
             <RefreshCcw className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary" />
             <div>
               <p className="text-xs font-medium text-foreground">Manual</p>
-              <p className="text-[11px] text-muted-foreground leading-snug">Pick a specific HubSpot company</p>
+              <p className="text-micro text-foreground/45 leading-snug">Pick a specific HubSpot company</p>
             </div>
           </button>
 
@@ -113,7 +113,7 @@ function HubSpotSyncButton({
             <Download className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary" />
             <div>
               <p className="text-xs font-medium text-foreground">Auto</p>
-              <p className="text-[11px] text-muted-foreground leading-snug">Sync all companies from HubSpot</p>
+              <p className="text-micro text-foreground/45 leading-snug">Sync all companies from HubSpot</p>
             </div>
           </button>
         </div>
@@ -255,7 +255,7 @@ export default function Dashboard() {
   const SortHeader = ({ label, field }: { label: string; field: SortKey }) => (
     <button
       onClick={() => toggleSort(field)}
-      className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
+      className="flex items-center gap-1.5 text-micro font-medium uppercase tracking-wide text-foreground/45 hover:text-foreground transition-colors"
     >
       {label}
       <ArrowUpDown className={`w-3 h-3 transition-colors ${sortKey === field ? "text-foreground" : "text-muted-foreground/40"}`} />
@@ -274,32 +274,32 @@ export default function Dashboard() {
   const stageFilters: StageFilter[] = ["all", "prospect", "active_opp", "customer", "expansion"];
 
   return (
-    <div className="max-w-6xl mx-auto px-1 space-y-6">
+    <div className="max-w-6xl mx-auto px-1 space-y-8">
 
       {/* ── KPI strip ── */}
       <div className="grid grid-cols-3 gap-3 pt-1">
         <KpiCard
           value={stats.total}
           label="Total tracked"
-          icon={<Building2 className="w-4 h-4" style={{ color: "var(--stat-total-fg)" }} />}
+          icon={<Building2 className="w-4 h-4 text-primary" />}
           iconBg="var(--stat-total-bg)"
         />
         <KpiCard
           value={stats.newThisWeek}
           label="New this week"
-          icon={<Building2 className="w-4 h-4" style={{ color: "var(--stat-inbound-fg)" }} />}
+          icon={<Building2 className="w-4 h-4 text-primary" />}
           iconBg="var(--stat-inbound-bg)"
           onRefresh={handleHubspotSync}
           refreshing={syncingHubspot}
         />
         {/* Stage breakdown mini-card */}
         <div className="bg-card shadow-sm shadow-black/[0.04] rounded-lg px-5 py-4">
-          <div className="text-[13px] font-medium text-muted-foreground mb-2.5 leading-tight">Pipeline stages</div>
+          <div className="text-caption font-medium text-foreground/45 mb-2.5 leading-tight">Pipeline stages</div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1">
             {(Object.entries(stats.stageCounts) as [string, number][]).map(([stage, count]) => (
               <div key={stage} className="flex items-center justify-between gap-2">
-                <span className="text-[11px] text-muted-foreground capitalize">{stage.replace("_", " ")}</span>
-                <span className="text-[13px] font-semibold tabular-nums text-foreground">{count}</span>
+                <span className="text-micro text-foreground/45 capitalize">{stage.replace("_", " ")}</span>
+                <span className="text-caption font-semibold tabular-nums text-foreground">{count}</span>
               </div>
             ))}
           </div>
@@ -403,26 +403,26 @@ export default function Dashboard() {
       <div className="rounded-lg bg-card overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr style={{ borderBottom: "1px solid hsl(215 10% 88% / 0.7)" }}>
+            <tr className="border-b border-border/40">
               <th className="text-left px-5 py-3.5">
                 <SortHeader label="Company" field="name" />
               </th>
               {search && (
                 <th className="text-left px-5 py-3.5 hidden sm:table-cell">
-                  <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Category</span>
+                  <span className="text-micro font-medium uppercase tracking-wide text-foreground/45">Category</span>
                 </th>
               )}
               <th className="text-left px-5 py-3.5 hidden sm:table-cell">
-                <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Stage</span>
+                <span className="text-micro font-medium uppercase tracking-wide text-foreground/45">Stage</span>
               </th>
               {activeTab === "partner" && (
                 <th className="text-left px-5 py-3.5 hidden md:table-cell">
-                  <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Partner</span>
+                  <span className="text-micro font-medium uppercase tracking-wide text-foreground/45">Partner</span>
                 </th>
               )}
               {activeTab === "partner" && (
                 <th className="text-left px-5 py-3.5 hidden lg:table-cell">
-                  <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Rep</span>
+                  <span className="text-micro font-medium uppercase tracking-wide text-foreground/45">Rep</span>
                 </th>
               )}
               <th className="text-left px-5 py-3.5 hidden md:table-cell">
@@ -441,16 +441,13 @@ export default function Dashboard() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: Math.min(i * 0.015, 0.4) }}
-                className="group relative cursor-pointer transition-colors hover:bg-secondary/50"
-                style={{ borderBottom: "1px solid hsl(215 10% 92% / 0.6)" }}
-                onMouseEnter={e => (e.currentTarget.style.borderBottomColor = "hsl(215 10% 70% / 0.5)")}
-                onMouseLeave={e => (e.currentTarget.style.borderBottomColor = "hsl(215 10% 92% / 0.6)")}
+                className="group relative cursor-pointer transition-colors border-b border-border/30 hover:border-border/50 hover:bg-secondary/50"
                 onClick={() => navigate(`/company/${company.id}`)}
               >
                 <td className="px-5 py-4">
-                  <div className="font-semibold text-[15px] text-foreground leading-snug">{company.name}</div>
+                  <div className="font-semibold text-body text-foreground leading-snug">{company.name}</div>
                   {company.domain && (
-                    <div className="text-[13px] text-muted-foreground mt-0.5">{company.domain}</div>
+                    <div className="text-caption text-foreground/45 mt-0.5">{company.domain}</div>
                   )}
                 </td>
                 {search && (
@@ -463,14 +460,14 @@ export default function Dashboard() {
                 </td>
                 {activeTab === "partner" && (
                   <td className="px-5 py-4 hidden md:table-cell">
-                    <span className="text-[14px] text-muted-foreground">{company.partner || "—"}</span>
+                    <span className="text-body text-foreground/45">{company.partner || "—"}</span>
                   </td>
                 )}
                 {activeTab === "partner" && (
                   <td className="px-5 py-4 hidden lg:table-cell">
-                    <span className="text-[14px] text-muted-foreground">{company.partner_rep_name || "—"}</span>
+                    <span className="text-body text-foreground/45">{company.partner_rep_name || "—"}</span>
                     {company.partner_rep_email && (
-                      <div className="text-[13px] text-muted-foreground/60 mt-0.5">{company.partner_rep_email}</div>
+                      <div className="text-caption text-foreground/25 mt-0.5">{company.partner_rep_email}</div>
                     )}
                   </td>
                 )}
@@ -478,7 +475,7 @@ export default function Dashboard() {
                   <ScoutBadge score={(company as any).scout_score ?? null} />
                 </td>
                 <td className="px-5 py-4 hidden lg:table-cell">
-                  <span className="text-[14px] text-muted-foreground">
+                  <span className="text-body text-foreground/45">
                     {new Date(company.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                   </span>
                 </td>
@@ -491,7 +488,7 @@ export default function Dashboard() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="gap-1.5 text-[13px] h-8 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="gap-1.5 text-caption h-8 text-foreground/45 hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
                         View story
@@ -544,12 +541,12 @@ function KpiCard({
         {icon}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-[2rem] font-semibold tracking-tight leading-none text-foreground tabular-nums">
+        <div className="text-display font-semibold tracking-tight leading-none text-foreground tabular-nums">
           {value}
         </div>
-        <div className="text-[13px] font-medium text-muted-foreground mt-1.5 leading-tight">{label}</div>
+        <div className="text-caption font-medium text-foreground/45 mt-1.5 leading-tight">{label}</div>
         {subtitle && (
-          <div className="text-[11px] text-muted-foreground/60 mt-1 leading-tight">{subtitle}</div>
+          <div className="text-micro text-foreground/25 mt-1 leading-tight">{subtitle}</div>
         )}
       </div>
       {onRefresh && (
@@ -570,7 +567,7 @@ function StagePill({ stage }: { stage: string }) {
   const colors = STAGE_COLORS[stage] || STAGE_COLORS.prospect;
   const label = STAGE_LABELS[stage as StageFilter] || stage;
   return (
-    <span className={`inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded border ${colors}`}>
+    <span className={`inline-flex items-center text-micro font-medium px-2 py-0.5 rounded border ${colors}`}>
       {label}
     </span>
   );
@@ -585,14 +582,14 @@ function CategoryPill({ category }: { category: string }) {
   const colors = colorMap[category] || colorMap.business;
   const labelMap: Record<string, string> = { school: "School", business: "Business", partner: "Partner" };
   return (
-    <span className={`inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded border ${colors}`}>
+    <span className={`inline-flex items-center text-micro font-medium px-2 py-0.5 rounded border ${colors}`}>
       {labelMap[category] || category}
     </span>
   );
 }
 
 function ScoutBadge({ score }: { score: number | null }) {
-  if (score === null) return <span className="text-muted-foreground text-xs">—</span>;
+  if (score === null) return <span className="text-foreground/45 text-xs">—</span>;
   let cls = "";
   let tier = "";
   if (score >= 75) { cls = "bg-destructive/15 text-destructive border-destructive/30"; tier = "Hot"; }
@@ -600,7 +597,7 @@ function ScoutBadge({ score }: { score: number | null }) {
   else if (score >= 25) { cls = "bg-muted text-muted-foreground border-border"; tier = "Lukewarm"; }
   else { cls = "bg-info/10 text-info border-info/20"; tier = "Cold"; }
   return (
-    <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded border ${cls}`}>
+    <span className={`inline-flex items-center gap-1 text-micro font-semibold px-2 py-0.5 rounded border ${cls}`}>
       {score} <span className="font-normal opacity-70">{tier}</span>
     </span>
   );
