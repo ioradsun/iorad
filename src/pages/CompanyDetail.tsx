@@ -79,6 +79,15 @@ export default function CompanyDetail() {
 
   const companyAny = company as any;
 
+  // Track recent visit
+  const hasTrackedRecent = useRef(false);
+  useEffect(() => {
+    if (id && company && !hasTrackedRecent.current) {
+      hasTrackedRecent.current = true;
+      trackRecent.mutate(id);
+    }
+  }, [id, company]);
+
   // Auto-switch to contacts on first load only
   const hasAutoSwitched = useRef(false);
   useEffect(() => {
