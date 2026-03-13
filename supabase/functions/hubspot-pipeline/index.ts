@@ -197,7 +197,6 @@ async function runPhase1(supabase: any, apiKey: string, jobId: string, snap: any
     phase: 1,
     phase1_cursor: nextAfter,
     phase1_processed: newProcessed,
-    touched_ids: touchedIds,
   };
 
   // Update job progress
