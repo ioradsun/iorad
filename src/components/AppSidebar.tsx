@@ -226,7 +226,7 @@ export default function AppSidebar() {
 
             <div className="my-3 border-t border-border/20" />
 
-            <NavItem to="/signals" icon={Signal} label="Signals" active={isActive("/signals")} />
+            
 
             {recents.length > 0 && (
               <>
