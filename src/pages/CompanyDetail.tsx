@@ -677,8 +677,6 @@ export default function CompanyDetail() {
                 </>
               )}
             </div>
-          ) : effectiveContact ? (
-            <ContactMetaLine contact={effectiveContact} />
           ) : null}
         </div>
 
