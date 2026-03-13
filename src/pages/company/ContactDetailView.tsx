@@ -329,6 +329,36 @@ export default function ContactDetailView({
               {/* Metrics grid — only show fields with data */}
               {activity.score > 0 && (
                 <div className="flex flex-wrap gap-x-8 gap-y-3">
+                  {/* Last Active Date — the most important signal */}
+                  {activity.lastActiveDate && (
+                    <div>
+                      <div className="field-label">Last Active</div>
+                      <div className="text-body font-semibold text-foreground">
+                        {activity.lastActiveDate.toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </div>
+                      <div className={`text-micro font-medium mt-0.5 ${
+                        activity.daysSinceActive !== null && activity.daysSinceActive <= 7
+                          ? "text-orange-400"
+                          : activity.daysSinceActive !== null && activity.daysSinceActive <= 30
+                          ? "text-amber-400"
+                          : activity.daysSinceActive !== null && activity.daysSinceActive <= 90
+                          ? "text-blue-400"
+                          : "text-destructive/60"
+                      }`}>
+                        {activity.recencyLabel}
+                      </div>
+                    </div>
+                  )}
+                  {!activity.lastActiveDate && activity.score > 0 && (
+                    <div>
+                      <div className="field-label">Last Active</div>
+                      <div className="text-caption text-foreground/20 italic">Unknown</div>
+                    </div>
+                  )}
                   {activity.tutorialsCreated > 0 && (
                     <div>
                       <div className="field-label">Created</div>

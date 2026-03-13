@@ -81,7 +81,11 @@ export default function CompanyDetail() {
   const [savingContact, setSavingContact] = useState(false);
   
   const [analyzingMeeting, setAnalyzingMeeting] = useState<string | null>(null);
-  const [generatingContactId, setGeneratingContactId] = useState<string | null>(null);
+  const [contactEnsureSteps, setContactEnsureSteps] = useState<
+    { label: string; status: "pending" | "running" | "done" | "failed"; detail: string }[]
+  >([]);
+  const contactEnsuredRef = useRef<string | null>(null); // tracks which contact was ensured
+  const [generatingStory, setGeneratingStory] = useState(false);
   const [regeneratingSection, setRegeneratingSection] = useState<string | null>(null);
   const [refreshingAnalysis, setRefreshingAnalysis] = useState(false);
   // extractingProfiles state removed — extraction is now part of the generate pipeline
@@ -545,6 +549,135 @@ export default function CompanyDetail() {
     })();
   }, [id, company, isLoading, setupComplete, signals.length, snapshots.length, queryClient]);
 
+  // ── Auto-ensure contact data when a contact is selected ──
+  useEffect(() => {
+    if (!id || !effectiveContactId || !company || isLoading) return;
+    if (viewMode !== "contact") return;
+    // Don't re-run for the same contact
+    if (contactEnsuredRef.current === effectiveContactId) return;
+    contactEnsuredRef.current = effectiveContactId;
+
+    const contact = contacts.find((c: any) => c.id === effectiveContactId);
+    if (!contact) return;
+
+    // Check what exists
+    const hasProfile = !!(contact as any).contact_profile?.account_narrative;
+    const hasStrategy = !!companyCards?.cards_json;
+    const hasOutreach = !!companyCards?.assets_json;
+
+    // Fast path: everything exists
+    if (hasProfile && hasStrategy && hasOutreach) return;
+
+    // 7-day skip: if contact cards were updated recently, refresh silently
+    const cardUpdatedAt = companyCards?.updated_at;
+    const daysSinceCardUpdate = cardUpdatedAt
+      ? (Date.now() - new Date(cardUpdatedAt).getTime()) / (1000 * 60 * 60 * 24)
+      : Infinity;
+
+    if (daysSinceCardUpdate < 7 && (hasStrategy || hasOutreach)) {
+      // Recent but possibly incomplete — fill in background
+      (async () => {
+        try {
+          if (!hasProfile) {
+            await supabase.functions.invoke("extract-contact-profile", {
+              body: { contact_id: effectiveContactId, company_id: id },
+            });
+            queryClient.invalidateQueries({ queryKey: ["contacts", id] });
+          }
+          if (!hasStrategy) {
+            await supabase.functions.invoke("generate-cards", {
+              body: { company_id: id, tab: "strategy", contact_id: effectiveContactId },
+            });
+            queryClient.invalidateQueries({ queryKey: ["company_cards", id], exact: false });
+          }
+          if (!hasOutreach) {
+            await supabase.functions.invoke("generate-cards", {
+              body: { company_id: id, tab: "outreach", contact_id: effectiveContactId },
+            });
+            queryClient.invalidateQueries({ queryKey: ["company_cards", id], exact: false });
+          }
+        } catch (e: any) {
+          console.warn("Background contact ensure failed:", e.message);
+        }
+      })();
+      return;
+    }
+
+    // First visit for this contact — show inline progress
+    const steps = [
+      {
+        label: "Building profile",
+        needed: !hasProfile,
+        fn: async () => {
+          await supabase.functions.invoke("extract-contact-profile", {
+            body: { contact_id: effectiveContactId, company_id: id },
+          });
+          queryClient.invalidateQueries({ queryKey: ["contacts", id] });
+        },
+      },
+      {
+        label: "Generating strategy",
+        needed: !hasStrategy,
+        fn: async () => {
+          await supabase.functions.invoke("generate-cards", {
+            body: { company_id: id, tab: "strategy", contact_id: effectiveContactId },
+          });
+          queryClient.invalidateQueries({ queryKey: ["company_cards", id], exact: false });
+        },
+      },
+      {
+        label: "Generating outreach",
+        needed: !hasOutreach,
+        fn: async () => {
+          await supabase.functions.invoke("generate-cards", {
+            body: { company_id: id, tab: "outreach", contact_id: effectiveContactId },
+          });
+          queryClient.invalidateQueries({ queryKey: ["company_cards", id], exact: false });
+        },
+      },
+    ].filter((s) => s.needed);
+
+    if (steps.length === 0) return;
+
+    setContactEnsureSteps(steps.map((s) => ({ label: s.label, status: "pending", detail: "" })));
+
+    (async () => {
+      for (let i = 0; i < steps.length; i++) {
+        setContactEnsureSteps((prev) => prev.map((s, idx) =>
+          idx === i ? { ...s, status: "running" } : s
+        ));
+
+        try {
+          await Promise.race([
+            steps[i].fn(),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error("Timed out")), 50_000)
+            ),
+          ]);
+          setContactEnsureSteps((prev) => prev.map((s, idx) =>
+            idx === i ? { ...s, status: "done" } : s
+          ));
+        } catch (e: any) {
+          console.warn(`Contact ensure "${steps[i].label}" failed:`, e.message);
+          setContactEnsureSteps((prev) => prev.map((s, idx) =>
+            idx === i ? { ...s, status: "failed", detail: e.message } : s
+          ));
+        }
+      }
+
+      // Clear steps after brief pause
+      setTimeout(() => setContactEnsureSteps([]), 1000);
+    })();
+  }, [id, effectiveContactId, viewMode, company, isLoading, contacts, companyCards, queryClient]);
+
+  // Reset ensure ref when contact changes
+  useEffect(() => {
+    if (effectiveContactId !== contactEnsuredRef.current) {
+      contactEnsuredRef.current = null;
+      setContactEnsureSteps([]);
+    }
+  }, [effectiveContactId]);
+
   const refreshAnalysis = async () => {
     if (!id || refreshingAnalysis) return;
     setRefreshingAnalysis(true);
@@ -578,63 +711,28 @@ export default function CompanyDetail() {
     }
   };
 
-  const generateForContact = async (contactId: string) => {
-    if (!id) return;
-    setGeneratingContactId(contactId);
+  const generateStory = async () => {
+    if (!id || !effectiveContactId) return;
+    setGeneratingStory(true);
     try {
-      // Step 1: Extract profile for this contact
-      toast.info("Extracting contact profile…");
-      try {
-        await supabase.functions.invoke("extract-contact-profile", { body: { company_id: id, contact_id: contactId } });
-        queryClient.invalidateQueries({ queryKey: ["contacts", id] });
-      } catch (pe: any) { console.warn("Profile extraction non-fatal:", pe.message); }
+      await supabase.functions.invoke("generate-cards", {
+        body: { company_id: id, tab: "story", contact_id: effectiveContactId },
+      });
+      queryClient.invalidateQueries({ queryKey: ["company_cards", id], exact: false });
 
-      // Step 2: Generate contact-scoped tabs for this contact (in parallel)
-      toast.info("Generating contact content…");
-
-      const contactTabs = ["strategy", "outreach", "story"];
-      const results = await Promise.allSettled(
-        contactTabs.map((tab) =>
-          supabase.functions.invoke("generate-cards", {
-            body: { company_id: id, tab, contact_id: contactId },
-          })
-        )
-      );
-
-      const failures = results
-        .map((result, i) => ({ result, tab: contactTabs[i] }))
-        .filter(
-          (r) =>
-            r.result.status === "rejected" ||
-            (r.result.status === "fulfilled" && (r.result.value.error || r.result.value.data?.error))
-        );
-
-      if (failures.length > 0) {
-        const failedTabs = failures.map((f) => f.tab).join(", ");
-        toast.warning(`Some tabs failed: ${failedTabs}. Others succeeded.`);
-      }
-
-      const firstName = contacts.find((c: any) => c.id === contactId)?.name?.split(" ")[0] || "contact";
-      const slug = firstName.toLowerCase().replace(/[^a-z]/g, "");
-      const storyUrl = !isPartnerCategory
-        ? `/stories/${companyNameSlug}/${slug}`
-        : company.partner
-          ? `/${company.partner}/${companyNameSlug}/stories/${slug}`
-          : null;
-      toast.success(`Content generated for ${firstName}`, {
-        action: storyUrl ? {
+      const firstName = effectiveContact?.name?.split(" ")[0] || "Contact";
+      toast.success(`Story generated for ${firstName}`, {
+        action: storyBaseUrl ? {
           label: "View Story →",
-          onClick: () => window.open(storyUrl, "_blank"),
+          onClick: () => window.open(storyBaseUrl, "_blank"),
         } : undefined,
         duration: 8000,
       });
-      // REFACTOR: (b) contact-scoped — prefix invalidation intentionally matches all ["company_cards", id, contactId] variants.
-      queryClient.invalidateQueries({ queryKey: ["company_cards", id], exact: false });
-      queryClient.invalidateQueries({ queryKey: ["contacts", id] });
-      // Switch to this contact
-      setSearchParams({ contact: contactId });
-    } catch (e: any) { toast.error(e.message || "Generation failed"); }
-    finally { setGeneratingContactId(null); }
+    } catch (e: any) {
+      toast.error("Story generation failed: " + (e.message || "Unknown error"));
+    } finally {
+      setGeneratingStory(false);
+    }
   };
 
   if (isLoading) {
@@ -1309,22 +1407,54 @@ export default function CompanyDetail() {
               <Button
                 size="sm"
                 className="gap-1.5"
-                onClick={() => generateForContact(effectiveContactId)}
-                disabled={!!generatingContactId}
+                onClick={generateStory}
+                disabled={generatingStory || contactEnsureSteps.length > 0}
               >
-                {generatingContactId === effectiveContactId
-                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating…</>
-                  : <><Sparkles className="w-3.5 h-3.5" /> Generate</>}
+                {generatingStory
+                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating Story…</>
+                  : <><Sparkles className="w-3.5 h-3.5" /> Generate Story</>}
               </Button>
               {storyBaseUrl && (
                 <a href={storyBaseUrl} target="_blank" rel="noopener noreferrer">
                   <Button size="sm" variant="outline" className="gap-1.5">
-                    <ExternalLink className="w-3.5 h-3.5" /> Story
+                    <ExternalLink className="w-3.5 h-3.5" /> View Story
                   </Button>
                 </a>
               )}
             </div>
           </div>
+
+          {contactEnsureSteps.length > 0 && (
+            <div className="mb-6 space-y-2">
+              {contactEnsureSteps.map((step, i) => (
+                <div key={i} className="flex items-center gap-2.5">
+                  {step.status === "pending" && (
+                    <div className="w-3.5 h-3.5 rounded-full border border-border/40 shrink-0" />
+                  )}
+                  {step.status === "running" && (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />
+                  )}
+                  {step.status === "done" && (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" />
+                  )}
+                  {step.status === "failed" && (
+                    <AlertCircle className="w-3.5 h-3.5 text-destructive/50 shrink-0" />
+                  )}
+                  <span className={`text-caption ${
+                    step.status === "running" ? "text-foreground/60"
+                    : step.status === "done" ? "text-foreground/30"
+                    : step.status === "failed" ? "text-destructive/40"
+                    : "text-foreground/20"
+                  }`}>
+                    {step.label}
+                    {step.status === "failed" && step.detail && (
+                      <span className="text-micro ml-2 text-destructive/30">{step.detail}</span>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
 
           <ContactDetailView
             companyId={id!}
@@ -1343,7 +1473,7 @@ export default function CompanyDetail() {
             onSetDeleteContactId={setDeleteContactId}
             deletingContact={deletingContact}
             onConfirmDelete={() => deleteContactId && handleDeleteContact(deleteContactId)}
-            ensureRunning={false}
+            ensureRunning={contactEnsureSteps.length > 0}
             companyCards={companyCards}
             cardsLoading={cardsLoading}
             regeneratingSection={regeneratingSection}
