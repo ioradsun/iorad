@@ -12,19 +12,21 @@ interface Props {
   items: InitiativeItem[];
 }
 
-function FadeInItem({ children, delay }: { children: React.ReactNode; delay: number }) {
-  const ref = useFadeIn();
+const FadeInItem = forwardRef<HTMLDivElement, { children: React.ReactNode; delay: number }>(
+  function FadeInItem({ children, delay }, _ref) {
+    const ref = useFadeIn();
 
-  return (
-    <div
-      ref={ref}
-      className="fade-in rounded-xl p-6"
-      style={{ border: "1px solid var(--story-border)", background: "var(--story-surface)", transitionDelay: `${delay}s` }}
-    >
-      {children}
-    </div>
-  );
-}
+    return (
+      <div
+        ref={ref}
+        className="fade-in rounded-xl p-6"
+        style={{ border: "1px solid var(--story-border)", background: "var(--story-surface)", transitionDelay: `${delay}s` }}
+      >
+        {children}
+      </div>
+    );
+  }
+);
 
 const WhatsHappeningSection = forwardRef<HTMLElement, Props>(function WhatsHappeningSection({ companyName, items }: Props, _ref) {
   const ctx = useStoryEdit();

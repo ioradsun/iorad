@@ -10,19 +10,21 @@ interface Props {
   items: string[];
 }
 
-function FadeInQuote({ children, delay }: { children: React.ReactNode; delay: number }) {
-  const ref = useFadeIn<HTMLParagraphElement>();
+const FadeInQuote = forwardRef<HTMLParagraphElement, { children: React.ReactNode; delay: number }>(
+  function FadeInQuote({ children, delay }, _ref) {
+    const ref = useFadeIn<HTMLParagraphElement>();
 
-  return (
-    <p
-      ref={ref}
-      className="fade-in text-sm italic pl-4 leading-relaxed"
-      style={{ color: "var(--story-muted)", borderLeft: "2px solid var(--story-accent-border)", transitionDelay: `${delay}s` }}
-    >
-      {children}
-    </p>
-  );
-}
+    return (
+      <p
+        ref={ref}
+        className="fade-in text-sm italic pl-4 leading-relaxed"
+        style={{ color: "var(--story-muted)", borderLeft: "2px solid var(--story-accent-border)", transitionDelay: `${delay}s` }}
+      >
+        {children}
+      </p>
+    );
+  }
+);
 
 const AccountabilityPressureSection = forwardRef<HTMLElement, Props>(function AccountabilityPressureSection({ items }: Props, _ref) {
   const ctx = useStoryEdit();

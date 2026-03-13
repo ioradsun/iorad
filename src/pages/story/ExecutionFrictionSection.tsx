@@ -10,19 +10,21 @@ interface Props {
   items: string[];
 }
 
-function FadeInItem({ children, delay }: { children: React.ReactNode; delay: number }) {
-  const ref = useFadeIn();
+const FadeInItem = forwardRef<HTMLDivElement, { children: React.ReactNode; delay: number }>(
+  function FadeInItem({ children, delay }, _ref) {
+    const ref = useFadeIn();
 
-  return (
-    <div
-      ref={ref}
-      className="fade-in flex items-start gap-4 rounded-xl p-5"
-      style={{ border: "1px solid var(--story-border)", background: "var(--story-surface)", transitionDelay: `${delay}s` }}
-    >
-      {children}
-    </div>
-  );
-}
+    return (
+      <div
+        ref={ref}
+        className="fade-in flex items-start gap-4 rounded-xl p-5"
+        style={{ border: "1px solid var(--story-border)", background: "var(--story-surface)", transitionDelay: `${delay}s` }}
+      >
+        {children}
+      </div>
+    );
+  }
+);
 
 const ExecutionFrictionSection = forwardRef<HTMLElement, Props>(function ExecutionFrictionSection({ items }: Props, _ref) {
   const ctx = useStoryEdit();
