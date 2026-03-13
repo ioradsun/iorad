@@ -7,11 +7,12 @@ import ScoreCell from "@/components/ScoreCell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, RefreshCw, ExternalLink, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, ChevronRight } from "lucide-react";
+import { ArrowLeft, RefreshCw, ExternalLink, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, ChevronRight, ChevronDown, Plus } from "lucide-react";
 import { Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 
@@ -78,12 +79,6 @@ export default function CompanyDetail() {
     runExtraction();
   }, [id, contacts, queryClient]);
 
-
-  useEffect(() => {
-    if (contacts.length > 0 && activeTab === "company") {
-      setActiveTab("contacts");
-    }
-  }, [contacts.length, activeTab]);
 
   const effectiveContactId = selectedContactId || contacts[0]?.id || "";
   const { data: companyCards, isLoading: cardsLoading } = useCompanyCards(id, effectiveContactId || undefined);
@@ -508,31 +503,82 @@ export default function CompanyDetail() {
 
   return (
     <div className="space-y-0">
-      <Tabs defaultValue={contacts.length > 0 ? "contacts" : "company"} className="w-full" onValueChange={setActiveTab}>
-        <div className="flex items-baseline gap-4 mb-6">
-          <Link to="/" className="text-foreground/25 hover:text-foreground transition-colors self-center">
+      <Tabs value={activeTab} className="w-full" onValueChange={setActiveTab}>
+        <div className="flex items-baseline gap-1 mb-6">
+          <Link to="/" className="text-foreground/25 hover:text-foreground transition-colors self-center mr-2">
             <ArrowLeft className="w-5 h-5" />
           </Link>
-          <h1 className="text-display font-semibold tracking-tight shrink-0">
-            {company.name}
-          </h1>
-          <TabsList className="bg-transparent p-0 h-auto ml-auto gap-1">
+          <TabsList className="bg-transparent p-0 h-auto gap-0">
             <TabsTrigger
               value="company"
-              className="text-caption font-medium px-3 py-1.5 rounded-md data-[state=active]:bg-secondary data-[state=active]:text-foreground data-[state=active]:shadow-sm text-foreground/35"
+              className="text-display font-semibold tracking-tight px-0 py-0 rounded-none bg-transparent shadow-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-foreground text-foreground/30 hover:text-foreground/50 transition-colors"
             >
-              Company
+              {company.name}
             </TabsTrigger>
-            <TabsTrigger
-              value="contacts"
-              className="text-caption font-medium px-3 py-1.5 rounded-md data-[state=active]:bg-secondary data-[state=active]:text-foreground data-[state=active]:shadow-sm text-foreground/35"
-            >
-              Contacts
-              {contacts.length > 0 && (
-                <span className="ml-1 text-micro tabular-nums opacity-50">{contacts.length}</span>
-              )}
-            </TabsTrigger>
+            <span className="text-foreground/15 mx-3 text-title font-light self-center select-none">/</span>
           </TabsList>
+
+          {/* Contacts dropdown — switches tab AND picks a contact */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                className={`text-title font-medium transition-colors inline-flex items-baseline gap-1.5 ${
+                  activeTab === "contacts"
+                    ? "text-foreground"
+                    : "text-foreground/30 hover:text-foreground/50"
+                }`}
+              >
+                Contacts
+                {contacts.length > 0 && (
+                  <span className="text-micro tabular-nums opacity-50">{contacts.length}</span>
+                )}
+                <ChevronDown className="w-3.5 h-3.5 opacity-40 self-center" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-80 p-1">
+              <div className="max-h-[400px] overflow-y-auto">
+                {contacts.length === 0 ? (
+                  <div className="px-3 py-4 text-center text-caption text-foreground/45">
+                    No contacts yet
+                  </div>
+                ) : (
+                  contacts.map((c: any) => {
+                    const isSelected = c.id === (selectedContactId || contacts[0]?.id);
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => {
+                          setSelectedContactId(c.id);
+                          setActiveTab("contacts");
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
+                          isSelected
+                            ? "bg-primary/10 text-foreground"
+                            : "hover:bg-secondary text-foreground/65"
+                        }`}
+                      >
+                        <div className="text-caption font-medium leading-tight">{c.name}</div>
+                        {c.title && (
+                          <div className="text-micro text-foreground/45 leading-tight">{c.title}</div>
+                        )}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+              <div className="border-t border-border/30 mt-1 pt-1">
+                <button
+                  onClick={() => {
+                    setActiveTab("contacts");
+                    setAddContactOpen(true);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-caption text-primary hover:bg-accent rounded-md transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add contact
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
 
         {setupRunning && (
@@ -950,7 +996,6 @@ export default function CompanyDetail() {
             isPartnerCategory={isPartnerCategory}
             contacts={contacts}
             selectedContactId={selectedContactId || contacts[0]?.id || ""}
-            onSelectContact={setSelectedContactId}
             editingContactId={editingContactId}
             editRoleFocus={editRoleFocus}
             editUserNotes={editUserNotes}
