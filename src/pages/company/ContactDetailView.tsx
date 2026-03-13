@@ -323,14 +323,14 @@ export default function ContactDetailView({
                 />
               </div>
               <div>
-                <label className="text-micro text-foreground/25 block mb-1">Notes</label>
+                <label className="text-micro text-foreground/45 block mb-1">Notes</label>
                 <textarea
                   value={localUserNotes}
                   onChange={(e) => handleUserNotesChange(e.target.value)}
                   onBlur={handleFieldBlur}
                   placeholder="Any context that helps generate better content — e.g. 'Recently promoted, scaling onboarding across 12 offices, prefers direct communication'"
                   rows={3}
-                  className="w-full max-w-lg bg-transparent border-0 border-b border-border/15 focus:border-primary/40 outline-none text-body text-foreground/80 placeholder:text-foreground/15 pb-1.5 transition-colors resize-none leading-[1.7]"
+                  className="w-full max-w-lg bg-transparent border-0 border-b border-border/30 focus:border-primary/60 outline-none text-body text-foreground placeholder:text-foreground/25 pb-1.5 transition-colors resize-none leading-[1.7]"
                 />
               </div>
             </div>
