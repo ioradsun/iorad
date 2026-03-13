@@ -218,6 +218,26 @@
     line-height: var(--leading-caption);
   }
 
+  .field-label {
+    font-size: var(--text-micro);
+    line-height: var(--leading-micro);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: hsl(var(--foreground) / 0.30);
+  }
+
+  .field-value {
+    font-size: var(--text-body);
+    color: hsl(var(--foreground) / 0.75);
+  }
+
+  .field-value-empty {
+    font-size: var(--text-caption);
+    color: hsl(var(--foreground) / 0.20);
+    font-style: italic;
+  }
+
   /* Panel — simplified, more whitespace */
   .panel {
     @apply rounded-lg border bg-card;
