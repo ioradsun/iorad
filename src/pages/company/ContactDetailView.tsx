@@ -247,6 +247,30 @@ export default function ContactDetailView({
 
         <TabsContent value="about" className="mt-0">
           <div className="max-w-2xl space-y-8">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-8 gap-y-5">
+              <div>
+                <label className="field-label block mb-1">First Name</label>
+                <input
+                  type="text"
+                  value={localFirstName}
+                  onChange={(e) => handleFirstNameChange(e.target.value)}
+                  onBlur={handleFieldBlur}
+                  placeholder="First"
+                  className="w-full bg-transparent border-0 border-b border-border/30 focus:border-primary/60 outline-none text-body text-foreground placeholder:text-foreground/25 pb-1.5 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="field-label block mb-1">Last Name</label>
+                <input
+                  type="text"
+                  value={localLastName}
+                  onChange={(e) => handleLastNameChange(e.target.value)}
+                  onBlur={handleFieldBlur}
+                  placeholder="Last"
+                  className="w-full bg-transparent border-0 border-b border-border/30 focus:border-primary/60 outline-none text-body text-foreground placeholder:text-foreground/25 pb-1.5 transition-colors"
+                />
+              </div>
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-5">
               <div>
                 <div className="field-label">Email</div>
