@@ -407,10 +407,19 @@ async function syncContactsIncremental(supabase: any) {
     "hs_lastmodifieddate", "hs_object_id", "associatedcompanyid",
     "hs_last_contacted", "num_contacted_notes",
     "hs_email_open_count", "hs_email_click_count", "hubspot_score",
+    // iorad activity dates
     "first_tutorial_create_date", "first_tutorial_view_date",
-    "first_tutorial_learn_date", "answers_with_own_tutorial_month_count",
+    "first_tutorial_learn_date",
+    // iorad usage counts
+    "tutorials_created", "tutorials_views",
+    "answers_with_own_tutorial_month_count",
     "answers_with_own_tutorial_previous_month_count",
     "answers", "extension_connections",
+    // iorad account info
+    "plan_name", "account_type", "account__type",
+    "last_active_date", "engagement_segment",
+    "first_embed_tutorial_base_domain_name",
+    "first_embed_base_domain_name",
   ];
 
   // Search contacts modified since checkpoint, sorted by modification date ASC
@@ -704,13 +713,24 @@ async function processContactPage(
         hs_email_open_count: cp.hs_email_open_count || null,
         hs_email_click_count: cp.hs_email_click_count || null,
         hubspot_score: cp.hubspot_score || null,
+        // iorad activity dates
         first_tutorial_create_date: cp.first_tutorial_create_date || null,
         first_tutorial_view_date: cp.first_tutorial_view_date || null,
         first_tutorial_learn_date: cp.first_tutorial_learn_date || null,
+        // iorad usage counts
+        tutorials_created: cp.tutorials_created || null,
+        tutorials_views: cp.tutorials_views || null,
         answers_with_own_tutorial_month_count: cp.answers_with_own_tutorial_month_count || null,
         answers_with_own_tutorial_previous_month_count: cp.answers_with_own_tutorial_previous_month_count || null,
         answers: cp.answers || null,
         extension_connections: cp.extension_connections || null,
+        // iorad account info
+        plan_name: cp.plan_name || null,
+        account_type: cp.account_type || cp.account__type || null,
+        last_active_date: cp.last_active_date || null,
+        engagement_segment: cp.engagement_segment || null,
+        first_embed_tutorial_base_domain_name: cp.first_embed_tutorial_base_domain_name || null,
+        first_embed_base_domain_name: cp.first_embed_base_domain_name || null,
       },
       _hs_company_id: associatedCompanyId,
     };
@@ -882,10 +902,19 @@ async function backfillContacts(
     "hs_lastmodifieddate", "hs_object_id", "associatedcompanyid",
     "hs_last_contacted", "num_contacted_notes",
     "hs_email_open_count", "hs_email_click_count", "hubspot_score",
+    // iorad activity dates
     "first_tutorial_create_date", "first_tutorial_view_date",
-    "first_tutorial_learn_date", "answers_with_own_tutorial_month_count",
+    "first_tutorial_learn_date",
+    // iorad usage counts
+    "tutorials_created", "tutorials_views",
+    "answers_with_own_tutorial_month_count",
     "answers_with_own_tutorial_previous_month_count",
     "answers", "extension_connections",
+    // iorad account info
+    "plan_name", "account_type", "account__type",
+    "last_active_date", "engagement_segment",
+    "first_embed_tutorial_base_domain_name",
+    "first_embed_base_domain_name",
   ];
 
   // List contacts with cursor pagination
@@ -1310,10 +1339,16 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
     "hs_last_contacted", "num_contacted_notes", "hs_email_open_count",
     "hs_email_click_count", "hubspot_score", "notes_last_contacted",
     "hs_sales_email_last_replied",
-    // iorad-specific activity fields
+    // iorad activity dates
     "first_tutorial_create_date", "first_tutorial_view_date", "first_tutorial_learn_date",
+    // iorad usage counts
+    "tutorials_created", "tutorials_views",
     "answers_with_own_tutorial_month_count", "answers_with_own_tutorial_previous_month_count",
-    "answers", "extension_connections", "first_embed_tutorial_base_domain_name",
+    "answers", "extension_connections",
+    // iorad account info
+    "plan_name", "account_type", "account__type",
+    "last_active_date", "engagement_segment",
+    "first_embed_tutorial_base_domain_name", "first_embed_base_domain_name",
   ];
 
   try {
@@ -1404,14 +1439,24 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
             hs_email_open_count: cp.hs_email_open_count || null,
             hs_email_click_count: cp.hs_email_click_count || null,
             hubspot_score: cp.hubspot_score || null,
-            // iorad activity
+            // iorad activity dates
             first_tutorial_create_date: cp.first_tutorial_create_date || null,
             first_tutorial_view_date: cp.first_tutorial_view_date || null,
             first_tutorial_learn_date: cp.first_tutorial_learn_date || null,
+            // iorad usage counts
+            tutorials_created: cp.tutorials_created || null,
+            tutorials_views: cp.tutorials_views || null,
             answers_with_own_tutorial_month_count: cp.answers_with_own_tutorial_month_count || null,
             answers_with_own_tutorial_previous_month_count: cp.answers_with_own_tutorial_previous_month_count || null,
             answers: cp.answers || null,
             extension_connections: cp.extension_connections || null,
+            // iorad account info
+            plan_name: cp.plan_name || null,
+            account_type: cp.account_type || cp.account__type || null,
+            last_active_date: cp.last_active_date || null,
+            engagement_segment: cp.engagement_segment || null,
+            first_embed_tutorial_base_domain_name: cp.first_embed_tutorial_base_domain_name || null,
+            first_embed_base_domain_name: cp.first_embed_base_domain_name || null,
           },
         };
 
