@@ -46,10 +46,16 @@ export default function CompanyDetail() {
   const [deletingContact, setDeletingContact] = useState(false);
   // Setup overlay
   type StepStatus = "pending" | "running" | "done" | "failed";
+  interface SetupStep {
+    label: string;
+    status: StepStatus;
+    detail: string;
+    startedAt: number | null;
+    duration: number | null;
+    error: string | null;
+  }
   const [showSetupOverlay, setShowSetupOverlay] = useState(false);
-  const [setupSteps, setSetupSteps] = useState<
-    { label: string; status: StepStatus }[]
-  >([]);
+  const [setupSteps, setSetupSteps] = useState<SetupStep[]>([]);
   const [setupComplete, setSetupComplete] = useState(false);
   const setupRanRef = useRef(false);
   const hubspotSyncedRef = useRef(false);
@@ -345,8 +351,6 @@ export default function CompanyDetail() {
 
     const hasCompanyCards = !!companyCards?.account_json;
     const hasScore = company.scout_score != null;
-
-    // If essential AI data exists, don't show overlay
     if (hasCompanyCards && hasScore) {
       setSetupComplete(true);
       return;
@@ -355,83 +359,123 @@ export default function CompanyDetail() {
     setupRanRef.current = true;
     setShowSetupOverlay(true);
 
-    // Define steps
-    const steps: { label: string; needed: boolean; fn: () => Promise<void> }[] = [
+    type StepDef = {
+      label: string;
+      needed: boolean;
+      fn: (updateDetail: (d: string) => void) => Promise<string>;
+    };
+
+    const stepDefs: StepDef[] = [
       {
         label: "Syncing from HubSpot",
         needed: !!(companyAny?.domain || companyAny?.hubspot_object_id),
-        fn: async () => {
-          await supabase.functions.invoke("import-from-hubspot", {
+        fn: async (updateDetail) => {
+          updateDetail(`Searching HubSpot for ${companyAny?.domain || "company"}…`);
+          const { data, error } = await supabase.functions.invoke("import-from-hubspot", {
             body: { action: "sync_company", domain: companyAny.domain, company_id: id },
           });
+          if (error) throw new Error(error.message || "HubSpot sync failed");
           queryClient.invalidateQueries({ queryKey: ["company", id] });
           queryClient.invalidateQueries({ queryKey: ["contacts", id] });
+          const imported = data?.contacts_imported || data?.contacts_found || 0;
+          return imported > 0 ? `${imported} contacts synced` : "Company data updated";
         },
       },
       {
         label: "Computing score",
-        needed: !hasScore,
-        fn: async () => {
-          await supabase.functions.invoke("score-companies", {
+        needed: company.scout_score == null,
+        fn: async (updateDetail) => {
+          updateDetail("Reading contact activity data…");
+          const { data, error } = await supabase.functions.invoke("score-companies", {
             body: { action: "score_one", company_id: id },
           });
+          if (error) throw new Error(error.message || "Scoring failed");
           queryClient.invalidateQueries({ queryKey: ["company", id] });
+          const score = data?.score ?? null;
+          if (score !== null) return `Score: ${score}/100`;
+          if (data?.scored === false) return "Skipped — no contacts with product data";
+          return "Score computed";
         },
       },
       {
         label: "Analyzing company",
         needed: !hasCompanyCards,
-        fn: async () => {
-          await supabase.functions.invoke("generate-cards", {
+        fn: async (updateDetail) => {
+          updateDetail("Building company profile with AI…");
+          const { error } = await supabase.functions.invoke("generate-cards", {
             body: { company_id: id, tab: "company" },
           });
+          if (error) {
+            const msg = error.message || "";
+            if (msg.includes("not configured")) throw new Error("Company prompt not configured in Admin Settings");
+            if (msg.includes("402")) throw new Error("AI credits exhausted — add credits to continue");
+            if (msg.includes("429")) throw new Error("AI rate limited — try again in a minute");
+            throw new Error(msg || "Company analysis failed");
+          }
           queryClient.invalidateQueries({ queryKey: ["company_cards", id], exact: false });
+          return "Company profile generated";
         },
       },
     ];
 
-    const activeSteps = steps.filter((step) => step.needed);
+    const activeSteps = stepDefs.filter((s) => s.needed);
     if (activeSteps.length === 0) {
       setSetupComplete(true);
       setShowSetupOverlay(false);
       return;
     }
 
-    // Initialize step statuses
-    setSetupSteps(activeSteps.map((step) => ({ label: step.label, status: "pending" as StepStatus })));
+    setSetupSteps(activeSteps.map((s) => ({
+      label: s.label,
+      status: "pending",
+      detail: "",
+      startedAt: null,
+      duration: null,
+      error: null,
+    })));
 
-    // Run sequentially
+    const updateStep = (idx: number, patch: Partial<SetupStep>) => {
+      setSetupSteps((prev) => prev.map((s, i) => (
+        i === idx ? { ...s, ...patch } : s
+      )));
+    };
+
     (async () => {
       for (let i = 0; i < activeSteps.length; i++) {
-        setSetupSteps((prev) => prev.map((step, idx) => (
-          idx === i ? { ...step, status: "running" } : step
-        )));
+        const startTime = Date.now();
+        updateStep(i, { status: "running", startedAt: startTime, detail: "Starting…" });
+
+        const updateDetail = (d: string) => updateStep(i, { detail: d });
 
         try {
-          await Promise.race([
-            activeSteps[i].fn(),
+          const result = await Promise.race([
+            activeSteps[i].fn(updateDetail),
             new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error("timeout")), 45_000)
+              setTimeout(() => reject(new Error("Timed out after 50 seconds")), 50_000)
             ),
           ]);
-          setSetupSteps((prev) => prev.map((step, idx) => (
-            idx === i ? { ...step, status: "done" } : step
-          )));
+          updateStep(i, {
+            status: "done",
+            duration: Date.now() - startTime,
+            detail: result,
+          });
         } catch (e: any) {
-          console.warn(`Setup "${activeSteps[i].label}" failed:`, e.message);
-          setSetupSteps((prev) => prev.map((step, idx) => (
-            idx === i ? { ...step, status: "failed" } : step
-          )));
+          const errMsg = e.message || "Unknown error";
+          console.warn(`Setup "${activeSteps[i].label}" failed:`, errMsg);
+          updateStep(i, {
+            status: "failed",
+            duration: Date.now() - startTime,
+            detail: "",
+            error: errMsg,
+          });
         }
       }
 
-      // Auto-close overlay when done
       setTimeout(() => {
         setShowSetupOverlay(false);
         setSetupComplete(true);
-      }, 800);
+      }, 1000);
 
-      // Mark processed
       try {
         await updateCompany.mutateAsync({
           id: id!,
@@ -593,11 +637,9 @@ export default function CompanyDetail() {
 
   return (
     <div>
-      {/* Setup overlay — dismissable, non-blocking */}
       {showSetupOverlay && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-          <div className="relative bg-card border border-border/40 rounded-lg shadow-lg p-8 max-w-sm w-full mx-4">
-            {/* Close button */}
+          <div className="relative bg-card border border-border/40 rounded-lg shadow-lg p-8 max-w-md w-full mx-4">
             <button
               onClick={() => setShowSetupOverlay(false)}
               className="absolute top-3 right-3 text-foreground/20 hover:text-foreground/50 transition-colors"
@@ -612,32 +654,75 @@ export default function CompanyDetail() {
               Preparing company data
             </p>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               {setupSteps.map((step, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  {step.status === "pending" && (
-                    <div className="w-4 h-4 rounded-full border border-border/40 shrink-0" />
+                <div key={i} className="space-y-1">
+                  <div className="flex items-center gap-3">
+                    {step.status === "pending" && (
+                      <div className="w-4 h-4 rounded-full border border-border/40 shrink-0" />
+                    )}
+                    {step.status === "running" && (
+                      <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
+                    )}
+                    {step.status === "done" && (
+                      <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
+                    )}
+                    {step.status === "failed" && (
+                      <AlertCircle className="w-4 h-4 text-destructive/60 shrink-0" />
+                    )}
+                    <span className={`text-caption font-medium ${
+                      step.status === "running" ? "text-foreground"
+                      : step.status === "done" ? "text-foreground/50"
+                      : step.status === "failed" ? "text-destructive/60"
+                      : "text-foreground/25"
+                    }`}>
+                      {step.label}
+                    </span>
+                    {step.duration != null && (
+                      <span className="ml-auto text-micro text-foreground/15 tabular-nums">
+                        {(step.duration / 1000).toFixed(1)}s
+                      </span>
+                    )}
+                  </div>
+
+                  {step.status === "running" && step.detail && (
+                    <div className="pl-7 text-micro text-foreground/30">
+                      {step.detail}
+                    </div>
                   )}
-                  {step.status === "running" && (
-                    <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
+
+                  {step.status === "done" && step.detail && (
+                    <div className="pl-7 text-micro text-success/60">
+                      {step.detail}
+                    </div>
                   )}
-                  {step.status === "done" && (
-                    <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
+
+                  {step.status === "failed" && step.error && (
+                    <div className="pl-7 text-micro text-destructive/50 leading-relaxed">
+                      {step.error}
+                    </div>
                   )}
-                  {step.status === "failed" && (
-                    <AlertCircle className="w-4 h-4 text-foreground/15 shrink-0" />
-                  )}
-                  <span className={`text-caption ${
-                    step.status === "running" ? "text-foreground"
-                      : step.status === "done" ? "text-foreground/40"
-                        : step.status === "failed" ? "text-foreground/20 line-through"
-                          : "text-foreground/25"
-                  }`}>
-                    {step.label}
-                  </span>
                 </div>
               ))}
             </div>
+
+            {setupSteps.length > 0 && setupSteps.every((s) => s.status === "done" || s.status === "failed") && (
+              <div className="mt-6 pt-4 border-t border-border/20">
+                {setupSteps.every((s) => s.status === "done") ? (
+                  <p className="text-caption text-success/60">All steps complete — loading page</p>
+                ) : (
+                  <p className="text-caption text-foreground/30">
+                    {setupSteps.filter((s) => s.status === "done").length} of {setupSteps.length} steps succeeded ·{" "}
+                    <button
+                      onClick={() => setShowSetupOverlay(false)}
+                      className="text-primary/60 hover:text-primary transition-colors"
+                    >
+                      View available data
+                    </button>
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

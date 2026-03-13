@@ -174,24 +174,55 @@ ${JSON.stringify(context, null, 2)}
 
 Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
 
-    // Select the prompt for the requested tab, using inbound variants for inbound companies
+    // ── Built-in defaults — always work even when ai_config is empty ──
+    const DEFAULTS: Record<string, string> = {
+      company: `You are a B2B sales intelligence analyst for iorad, a tutorial creation platform used by enterprises for employee onboarding, customer training, and knowledge management.
+
+Given the company data below, return a JSON object:
+{
+  "account": {
+    "about": { "text": "2-3 sentence description of the company and their relevance as an iorad prospect", "status": "confirmed" },
+    "industry": { "value": "industry name", "status": "confirmed" },
+    "employees": { "value": "employee count or range", "status": "estimated" },
+    "revenue_range": { "value": "revenue range if inferable, otherwise Unknown", "status": "estimated" },
+    "hq": { "value": "headquarters location", "status": "confirmed" },
+    "products_services": [{ "name": "key product or service", "status": "confirmed" }]
+  }
+}
+
+Use ONLY the provided data. Do not fabricate information. Use "Unknown" for unavailable fields.
+Return ONLY valid JSON. No markdown fences, no commentary.`,
+
+      strategy: `You are a B2B sales strategist for iorad, a tutorial creation platform.
+Analyze the account and return a JSON object with a "cards" array. Each card: { "title": "...", "type": "insight|action|risk", "body": "...", "priority": "high|medium|low" }.
+Focus on tutorial adoption, expansion opportunities, and competitive positioning.
+Return ONLY valid JSON.`,
+
+      outreach: `You are a B2B sales copywriter for iorad.
+Generate outreach sequences. Return JSON:
+{ "email_sequence": { "touch_1": { "subject": "...", "body": "...", "purpose": "..." }, "touch_2": {...}, "touch_3": {...} }, "linkedin_sequence": [{ "step": 1, "type": "connect|message", "content": "..." }] }
+Personalize to the contact's role and product usage. Return ONLY valid JSON.`,
+
+      story: `You are a B2B storyteller for iorad.
+Generate a customer story brief as JSON with headline, subheadline, key metrics, and narrative sections.
+Return ONLY valid JSON.`,
+    };
+
     const isInbound = company.source_type === "inbound";
     const promptMap: Record<string, string> = {
-      company: aiConfig?.company_prompt || "",
+      company: aiConfig?.company_prompt || DEFAULTS.company,
       strategy: isInbound
-        ? (aiConfig?.inbound_strategy_prompt || aiConfig?.strategy_prompt || aiConfig?.cards_prompt_template || "")
-        : (aiConfig?.strategy_prompt || aiConfig?.cards_prompt_template || ""),
+        ? (aiConfig?.inbound_strategy_prompt || aiConfig?.strategy_prompt || aiConfig?.cards_prompt_template || DEFAULTS.strategy)
+        : (aiConfig?.strategy_prompt || aiConfig?.cards_prompt_template || DEFAULTS.strategy),
       outreach: isInbound
-        ? (aiConfig?.inbound_outreach_prompt || aiConfig?.outreach_prompt || "")
-        : (aiConfig?.outreach_prompt || ""),
+        ? (aiConfig?.inbound_outreach_prompt || aiConfig?.outreach_prompt || DEFAULTS.outreach)
+        : (aiConfig?.outreach_prompt || DEFAULTS.outreach),
       story: isInbound
-        ? (aiConfig?.inbound_story_prompt || aiConfig?.story_prompt || "")
-        : (aiConfig?.story_prompt || ""),
+        ? (aiConfig?.inbound_story_prompt || aiConfig?.story_prompt || DEFAULTS.story)
+        : (aiConfig?.story_prompt || DEFAULTS.story),
     };
     const systemPrompt = promptMap[activeTab];
-    if (!systemPrompt || !systemPrompt.trim()) {
-      throw new Error(`${activeTab}${isInbound ? " (inbound)" : ""} prompt is not configured. Go to Admin Settings → AI & Prompt to set it up.`);
-    }
+    // Defaults guarantee this is never empty — no throw needed
 
     console.log(`Generating cards for ${company.name} using ${model}`);
 
