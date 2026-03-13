@@ -1,74 +1,133 @@
-// Contact activity score — computed client-side from HubSpot properties.
-// Focused on iorad product usage, not generic HubSpot engagement.
-// Returns 0-100 score + tier label. No API calls.
-
-export interface ContactScore {
+export interface ContactActivity {
   score: number;
-  tier: "active" | "engaged" | "viewer" | "none";
-  label: string;
+  tier: "hot" | "warm" | "cool" | "cold" | "none";
+
+  // Recency
+  lastActiveDate: Date | null;
+  daysSinceActive: number | null;
+  recencyLabel: string;
+
+  // iorad usage (real counts from HubSpot)
+  isCreator: boolean;
+  creatorSince: string | null;
+  tutorialsCreated: number;
+  tutorialsViewed: number;
+  isViewer: boolean;
+  viewerSince: string | null;
+  hasExtension: boolean;
+  monthlyAnswers: number;
+  prevMonthAnswers: number;
+  totalAnswers: number;
+
+  // Account
+  plan: string | null;
+  accountType: string | null;
+  engagementSegment: string | null;
+  documentingProduct: string | null;
+  embeddedIn: string | null;
 }
 
-export function scoreContact(hubspotProperties: Record<string, any> | null): ContactScore {
-  if (!hubspotProperties) return { score: 0, tier: "none", label: "" };
-
-  const hp = hubspotProperties;
-  let score = 0;
-
-  // ── Tutorial Creation (max 40) — the strongest signal ──────────
-  const isCreator = !!hp.first_tutorial_create_date;
-  if (isCreator) {
-    score += 25;
-
-    // Recency bonus
-    const createDate = new Date(hp.first_tutorial_create_date).getTime();
-    const daysSince = (Date.now() - createDate) / (1000 * 60 * 60 * 24);
-    if (daysSince <= 14) score += 15;
-    else if (daysSince <= 60) score += 10;
-    else score += 5;
-  }
-
-  // ── Tutorial Viewing (max 15) ──────────────────────────────────
-  const isViewer = !!(hp.first_tutorial_view_date || hp.first_tutorial_learn_date);
-  if (isViewer) {
-    score += 10;
-    const viewDate = new Date(hp.first_tutorial_view_date || hp.first_tutorial_learn_date).getTime();
-    const daysSince = (Date.now() - viewDate) / (1000 * 60 * 60 * 24);
-    if (daysSince <= 30) score += 5;
-  }
-
-  // ── Extension Installed (max 10) ───────────────────────────────
-  const hasExtension = parseInt(hp.extension_connections || "0", 10) > 0;
-  if (hasExtension) score += 10;
-
-  // ── Monthly Active Usage (max 15) ──────────────────────────────
-  const monthlyAnswers = parseInt(hp.answers_with_own_tutorial_month_count || "0", 10) || 0;
-  if (monthlyAnswers >= 10) score += 15;
-  else if (monthlyAnswers >= 5) score += 10;
-  else if (monthlyAnswers > 0) score += 5;
-
-  // ── Previous Month Activity (max 10) — retention signal ────────
-  const prevMonthAnswers = parseInt(hp.answers_with_own_tutorial_previous_month_count || "0", 10) || 0;
-  if (prevMonthAnswers > 0) score += 10;
-
-  // ── Plan / Account Type (max 10) ──────────────────────────────
-  const plan = (hp.plan_name || "").toLowerCase();
-  if (plan.includes("enterprise") || plan.includes("premium")) score += 10;
-  else if (plan.includes("pro") || plan.includes("team")) score += 5;
-
-  const finalScore = Math.min(100, score);
-
-  // ── Tier assignment ────────────────────────────────────────────
-  if (finalScore >= 50) return { score: finalScore, tier: "active", label: "Active" };
-  if (finalScore >= 25) return { score: finalScore, tier: "engaged", label: "Engaged" };
-  if (finalScore >= 10) return { score: finalScore, tier: "viewer", label: "Viewer" };
-  return { score: finalScore, tier: "none", label: "" };
+function daysSince(dateStr: string | null | undefined): number | null {
+  if (!dateStr) return null;
+  const t = new Date(dateStr).getTime();
+  if (isNaN(t)) return null;
+  return Math.floor((Date.now() - t) / (1000 * 60 * 60 * 24));
 }
 
-// Sort contacts by score descending (most active first)
+function formatDate(dateStr: string | null | undefined): string | null {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+}
+
+export function getContactActivity(hp: Record<string, any> | null): ContactActivity {
+  const empty: ContactActivity = {
+    score: 0,
+    tier: "none",
+    lastActiveDate: null,
+    daysSinceActive: null,
+    recencyLabel: "No data",
+    isCreator: false,
+    creatorSince: null,
+    tutorialsCreated: 0,
+    tutorialsViewed: 0,
+    isViewer: false,
+    viewerSince: null,
+    hasExtension: false,
+    monthlyAnswers: 0,
+    prevMonthAnswers: 0,
+    totalAnswers: 0,
+    plan: null,
+    accountType: null,
+    engagementSegment: null,
+    documentingProduct: null,
+    embeddedIn: null,
+  };
+  if (!hp) return empty;
+
+  const score = Math.min(100, parseInt(String(hp.rank || "0"), 10) || 0);
+
+  let tier: ContactActivity["tier"] = "none";
+  if (score >= 60) tier = "hot";
+  else if (score >= 35) tier = "warm";
+  else if (score >= 15) tier = "cool";
+  else if (score > 0) tier = "cold";
+
+  // Recency — use last_active_date first (most accurate), then fallbacks
+  const candidates = [
+    hp.last_active_date,
+    hp.first_tutorial_create_date,
+    hp.first_tutorial_view_date,
+    hp.first_tutorial_learn_date,
+    hp.hs_last_contacted,
+    hp.hs_analytics_last_visit_timestamp,
+  ]
+    .filter(Boolean)
+    .map((d) => new Date(d).getTime())
+    .filter((t) => !isNaN(t));
+
+  const lastMs = candidates.length > 0 ? Math.max(...candidates) : null;
+  const lastActiveDate = lastMs ? new Date(lastMs) : null;
+  const dsa = lastMs ? daysSince(new Date(lastMs).toISOString()) : null;
+
+  let recencyLabel = "No data";
+  if (dsa !== null) {
+    if (dsa === 0) recencyLabel = "Today";
+    else if (dsa <= 7) recencyLabel = `${dsa}d ago`;
+    else if (dsa <= 30) recencyLabel = `${Math.floor(dsa / 7)}w ago`;
+    else if (dsa <= 365) recencyLabel = `${Math.floor(dsa / 30)}mo ago`;
+    else recencyLabel = `${Math.floor(dsa / 365)}y ago`;
+  }
+
+  return {
+    score,
+    tier,
+    lastActiveDate,
+    daysSinceActive: dsa,
+    recencyLabel,
+    isCreator: !!hp.first_tutorial_create_date,
+    creatorSince: formatDate(hp.first_tutorial_create_date),
+    tutorialsCreated: parseInt(String(hp.tutorials_created || "0"), 10) || 0,
+    tutorialsViewed: parseInt(String(hp.tutorials_views || "0"), 10) || 0,
+    isViewer: !!(hp.first_tutorial_view_date || hp.first_tutorial_learn_date),
+    viewerSince: formatDate(hp.first_tutorial_view_date || hp.first_tutorial_learn_date),
+    hasExtension: parseInt(String(hp.extension_connections || "0"), 10) > 0,
+    monthlyAnswers: parseInt(String(hp.answers_with_own_tutorial_month_count || "0"), 10) || 0,
+    prevMonthAnswers: parseInt(String(hp.answers_with_own_tutorial_previous_month_count || "0"), 10) || 0,
+    totalAnswers: parseInt(String(hp.answers || "0"), 10) || 0,
+    plan: hp.plan_name || null,
+    accountType: hp.account_type || null,
+    engagementSegment: hp.engagement_segment || null,
+    documentingProduct: hp.first_embed_tutorial_base_domain_name || null,
+    embeddedIn: hp.first_embed_base_domain_name || null,
+  };
+}
+
 export function sortContactsByActivity(contacts: any[]): any[] {
   return [...contacts].sort((a, b) => {
-    const aScore = scoreContact((a.hubspot_properties as any) || null).score;
-    const bScore = scoreContact((b.hubspot_properties as any) || null).score;
-    return bScore - aScore;
+    const aS = getContactActivity((a.hubspot_properties as any) || null).score;
+    const bS = getContactActivity((b.hubspot_properties as any) || null).score;
+    return bS - aS;
   });
 }

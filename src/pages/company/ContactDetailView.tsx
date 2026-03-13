@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, Eye, Linkedin, Loader2, Plus } from "lucide-react";
+import { ChevronRight, Linkedin, Loader2, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Json } from "@/integrations/supabase/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -14,6 +14,7 @@ import StoryTab from "./StoryTab";
 import StrategyTab from "./StrategyTab";
 import { parseJson, toIoradEmbedUrl, toLoomEmbedUrl } from "./types";
 import type { DashboardCard, EmailTouch, LinkedInStep, StoryAssets } from "./types";
+import { getContactActivity } from "@/lib/contactScore";
 
 interface ContactDetailViewProps {
   companyId: string;
@@ -109,15 +110,8 @@ export default function ContactDetailView({
   const effectiveIoradUrl = companyCards?.iorad_url || companyAny?.iorad_url || "";
   const loomEmbedUrl = toLoomEmbedUrl(effectiveLoomUrl);
   const ioradEmbedUrl = toIoradEmbedUrl(effectiveIoradUrl);
-  const ioradActivity = useMemo(() => {
-    const hp = ((effectiveContact as any)?.hubspot_properties as Record<string, any> | undefined) || {};
-    return {
-      isCreator: !!hp.first_tutorial_create_date,
-      isViewer: !!(hp.first_tutorial_view_date || hp.first_tutorial_learn_date),
-      hasExtension: parseInt(String(hp.extension_connections || "0"), 10) > 0,
-      monthAnswers: hp.month_answers != null ? Number(hp.month_answers) : null,
-      rank: hp.rank != null ? Number(hp.rank) : null,
-    };
+  const activity = useMemo(() => {
+    return getContactActivity((effectiveContact as any)?.hubspot_properties || null);
   }, [effectiveContact?.id]);
 
   // ── Autosave for name, role_focus and user_notes ──
@@ -294,43 +288,98 @@ export default function ContactDetailView({
               </div>
             </div>
 
-            <div>
-              <div className="field-label mb-3">Product Usage</div>
-              <div className="flex flex-wrap gap-2">
-                {ioradActivity?.isCreator && <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-caption font-medium bg-primary/8 text-primary border border-primary/15">Creator</span>}
-                {ioradActivity?.isViewer && <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-caption font-medium bg-secondary text-foreground/55 border border-border/30"><Eye className="w-3.5 h-3.5" /> Viewer</span>}
-                {ioradActivity?.hasExtension && <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-caption font-medium bg-secondary text-foreground/55 border border-border/30">Extension</span>}
-                {!ioradActivity?.isCreator && !ioradActivity?.isViewer && !ioradActivity?.hasExtension && (
-                  <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-caption text-foreground/20 border border-dashed border-border/25">No recorded product usage</span>
+            {/* ── Activity ── */}
+            <div className="space-y-4">
+              {/* Score + Recency */}
+              <div className="flex items-center gap-4">
+                {activity.score > 0 ? (
+                  <div className="flex items-baseline gap-1.5">
+                    <span className={`text-display font-semibold tabular-nums ${
+                      activity.tier === "hot" ? "text-success"
+                      : activity.tier === "warm" ? "text-primary"
+                      : "text-foreground/30"
+                    }`}>
+                      {activity.score}
+                    </span>
+                    <span className="text-micro text-foreground/15">/100</span>
+                  </div>
+                ) : (
+                  <span className="text-caption text-foreground/20 italic">No iorad activity</span>
+                )}
+
+                {activity.daysSinceActive !== null && (
+                  <span className={`text-micro font-medium px-2 py-0.5 rounded ${
+                    activity.daysSinceActive <= 7
+                      ? "bg-success/10 text-success"
+                      : activity.daysSinceActive <= 30
+                      ? "bg-primary/10 text-primary/70"
+                      : activity.daysSinceActive <= 90
+                      ? "bg-foreground/[0.05] text-foreground/35"
+                      : "bg-destructive/8 text-destructive/60"
+                  }`}>
+                    {activity.daysSinceActive <= 7 ? "Active now"
+                      : activity.daysSinceActive <= 30 ? `${activity.recencyLabel}`
+                      : activity.daysSinceActive <= 90 ? `Cooling · ${activity.recencyLabel}`
+                      : `At risk · ${activity.recencyLabel}`}
+                  </span>
                 )}
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-8 gap-y-4 mt-5">
-                <div>
-                  <div className="field-label">Created</div>
-                  <div className="text-title font-semibold tabular-nums text-foreground">
-                    {(effectiveContact as any)?.contact_profile?.key_metrics?.tutorials_created ?? 0}
-                  </div>
+              {/* Metrics grid — only show fields with data */}
+              {activity.score > 0 && (
+                <div className="flex flex-wrap gap-x-8 gap-y-3">
+                  {activity.tutorialsCreated > 0 && (
+                    <div>
+                      <div className="field-label">Created</div>
+                      <div className="text-body font-semibold tabular-nums text-foreground">{activity.tutorialsCreated}</div>
+                      {activity.creatorSince && <div className="text-micro text-foreground/20">since {activity.creatorSince}</div>}
+                    </div>
+                  )}
+                  {activity.tutorialsViewed > 0 && (
+                    <div>
+                      <div className="field-label">Viewed</div>
+                      <div className="text-body font-semibold tabular-nums text-foreground">{activity.tutorialsViewed}</div>
+                      {activity.viewerSince && <div className="text-micro text-foreground/20">since {activity.viewerSince}</div>}
+                    </div>
+                  )}
+                  {activity.monthlyAnswers > 0 && (
+                    <div>
+                      <div className="field-label">This month</div>
+                      <div className="text-body font-semibold tabular-nums text-foreground">{activity.monthlyAnswers}</div>
+                    </div>
+                  )}
+                  {activity.prevMonthAnswers > 0 && (
+                    <div>
+                      <div className="field-label">Last month</div>
+                      <div className="text-body font-semibold tabular-nums text-foreground">{activity.prevMonthAnswers}</div>
+                    </div>
+                  )}
+                  {activity.totalAnswers > 0 && (
+                    <div>
+                      <div className="field-label">All time</div>
+                      <div className="text-body font-semibold tabular-nums text-foreground">{activity.totalAnswers}</div>
+                    </div>
+                  )}
+                  {activity.hasExtension && (
+                    <div>
+                      <div className="field-label">Extension</div>
+                      <div className="text-caption text-foreground/50">Installed</div>
+                    </div>
+                  )}
+                  {activity.plan && (
+                    <div>
+                      <div className="field-label">Plan</div>
+                      <div className="text-caption text-foreground/50">{activity.plan}</div>
+                    </div>
+                  )}
+                  {activity.documentingProduct && (
+                    <div>
+                      <div className="field-label">Documenting</div>
+                      <div className="text-caption text-foreground/50">{activity.documentingProduct}</div>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <div className="field-label">Viewed</div>
-                  <div className="text-title font-semibold tabular-nums text-foreground">
-                    {(effectiveContact as any)?.contact_profile?.key_metrics?.tutorials_viewed ?? 0}
-                  </div>
-                </div>
-                {ioradActivity?.monthAnswers != null && ioradActivity.monthAnswers > 0 && (
-                  <div>
-                    <div className="field-label">Answers / mo</div>
-                    <div className="text-title font-semibold tabular-nums text-foreground">{ioradActivity.monthAnswers}</div>
-                  </div>
-                )}
-                {ioradActivity?.rank != null && Number(ioradActivity.rank) > 0 && (
-                  <div>
-                    <div className="field-label">Rank</div>
-                    <div className="text-title font-semibold tabular-nums text-foreground">#{ioradActivity.rank}</div>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
 
             {(effectiveContact as any)?.contact_profile?.account_narrative && (
