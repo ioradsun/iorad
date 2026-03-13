@@ -450,7 +450,7 @@ export default function CustomerStory() {
 
   // Also handle /stories/:id where id is a non-UUID slug (single segment)
   const isSingleSlugRoute = !!id && !isUuid && !partner && !legacyCustomer;
-  const { data: singleSlugData, isLoading: singleSlugLoading } = useInboundStoryBySlug(
+  const { data: singleSlugData, isLoading: singleSlugLoading, error: singleSlugError } = useInboundStoryBySlug(
     isSingleSlugRoute ? id : undefined,
     undefined
   );
