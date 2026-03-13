@@ -169,6 +169,65 @@ Important:
 - Be specific in narratives: mention actual products, numbers, and behaviors`;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CONTACT FETCH HELPERS (batched to avoid oversized `id=in.(...)` requests)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CONTACT_SELECT = "id, name, title, email, hubspot_properties, company_id";
+const CONTACT_FETCH_BATCH_SIZE = 100;
+const CONTACT_PAGE_SIZE = 200;
+
+type ContactRow = {
+  id: string;
+  name: string;
+  title: string | null;
+  email: string | null;
+  hubspot_properties: Record<string, any> | null;
+  company_id: string;
+};
+
+async function fetchContactsByIds(sb: any, ids: string[]): Promise<ContactRow[]> {
+  const contacts: ContactRow[] = [];
+
+  for (let i = 0; i < ids.length; i += CONTACT_FETCH_BATCH_SIZE) {
+    const batchIds = ids.slice(i, i + CONTACT_FETCH_BATCH_SIZE);
+    const { data, error } = await sb
+      .from("contacts")
+      .select(CONTACT_SELECT)
+      .in("id", batchIds);
+
+    if (error) throw error;
+    contacts.push(...((data || []) as ContactRow[]));
+  }
+
+  return contacts;
+}
+
+async function fetchContactsByCompany(sb: any, companyId: string): Promise<ContactRow[]> {
+  const contacts: ContactRow[] = [];
+  let from = 0;
+
+  while (true) {
+    const to = from + CONTACT_PAGE_SIZE - 1;
+    const { data, error } = await sb
+      .from("contacts")
+      .select(CONTACT_SELECT)
+      .eq("company_id", companyId)
+      .not("hubspot_properties", "is", null)
+      .range(from, to);
+
+    if (error) throw error;
+
+    const batch = (data || []) as ContactRow[];
+    contacts.push(...batch);
+
+    if (batch.length < CONTACT_PAGE_SIZE) break;
+    from += CONTACT_PAGE_SIZE;
+  }
+
+  return contacts;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // HANDLER
 // ─────────────────────────────────────────────────────────────────────────────
 
