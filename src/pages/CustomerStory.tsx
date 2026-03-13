@@ -78,8 +78,14 @@ function useInboundStoryBySlug(companySlug?: string, contactSlug?: string) {
     queryFn: async () => {
       const normalizedCompanySlug = companySlug!.trim().toLowerCase();
       const normalizedContactSlug = contactSlug?.trim().toLowerCase();
+      const toSlug = (value: string) =>
+        value
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9\s-]/g, "")
+          .replace(/\s+/g, "-");
 
-      // Find company by slug (robust to spacing/case variants)
+      // Find candidate companies by slug pattern
       const namePattern = `%${slugToName(companySlug!).replace(/\s+/g, "%")}%`;
       const { data: companies, error: compError } = await supabase
         .from("companies")
@@ -88,54 +94,79 @@ function useInboundStoryBySlug(companySlug?: string, contactSlug?: string) {
         .limit(200);
       if (compError) throw compError;
 
-      const company = (companies || []).find(
-        (c) => c.name.toLowerCase().replace(/\s+/g, "-") === normalizedCompanySlug
-      ) || (companies || [])[0];
-      if (!company) return null;
+      const allCompanies = companies || [];
+      const exactSlugCompanies = allCompanies.filter(
+        (c) => toSlug(c.name) === normalizedCompanySlug
+      );
+      const candidateCompanies = exactSlugCompanies.length > 0 ? exactSlugCompanies : allCompanies;
 
-      let matchedContactIds: string[] = [];
+      if (candidateCompanies.length === 0) return null;
+
+      const candidateCompanyIds = candidateCompanies.map((c) => c.id);
+      const companyById = new Map(candidateCompanies.map((c) => [c.id, c]));
+
+      const matchedContactIdsByCompany = new Map<string, Set<string>>();
+
       if (normalizedContactSlug) {
         const { data: contacts, error: contactsError } = await supabase
           .from("contacts")
-          .select("id, name")
-          .eq("company_id", company.id);
+          .select("id, company_id, name")
+          .in("company_id", candidateCompanyIds);
         if (contactsError) throw contactsError;
 
-        matchedContactIds = (contacts || [])
-          .filter((c: any) => c.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "") === normalizedContactSlug)
-          .map((c: any) => c.id);
+        for (const contact of contacts || []) {
+          const fullNameSlug = toSlug(contact.name || "");
+          const firstNameSlug = toSlug((contact.name || "").split(/\s+/)[0] || "");
+
+          if (fullNameSlug !== normalizedContactSlug && firstNameSlug !== normalizedContactSlug) {
+            continue;
+          }
+
+          const existing = matchedContactIdsByCompany.get(contact.company_id) ?? new Set<string>();
+          existing.add(contact.id);
+          matchedContactIdsByCompany.set(contact.company_id, existing);
+        }
       }
 
-      let card = null;
+      const { data: cards, error: cardsError } = await supabase
+        .from("company_cards")
+        .select("*")
+        .in("company_id", candidateCompanyIds)
+        .order("created_at", { ascending: false });
+      if (cardsError) throw cardsError;
 
-      // Prefer contact-specific card when contact slug resolves
-      if (matchedContactIds.length > 0) {
-        const { data, error } = await supabase
-          .from("company_cards")
-          .select("*")
-          .eq("company_id", company.id)
-          .in("contact_id", matchedContactIds)
-          .order("created_at", { ascending: false })
-          .limit(1);
-        if (error) throw error;
-        card = data?.[0] ?? null;
+      const allCards = cards || [];
+      if (allCards.length === 0) return null;
+
+      let selectedCard = null as (typeof allCards)[number] | null;
+
+      // 1) Best match: card tied to matched contact(s)
+      if (normalizedContactSlug && matchedContactIdsByCompany.size > 0) {
+        selectedCard =
+          allCards.find((card) => {
+            if (!card.contact_id) return false;
+            const matches = matchedContactIdsByCompany.get(card.company_id);
+            return !!matches?.has(card.contact_id);
+          }) ?? null;
       }
 
-      // Fallback: latest company card
-      if (!card) {
-        const { data, error } = await supabase
-          .from("company_cards")
-          .select("*")
-          .eq("company_id", company.id)
-          .order("created_at", { ascending: false })
-          .limit(1);
-        if (error) throw error;
-        card = data?.[0] ?? null;
+      // 2) Fallback for matched contact slug: latest card in matching company
+      if (!selectedCard && normalizedContactSlug && matchedContactIdsByCompany.size > 0) {
+        const matchedCompanyIds = new Set(Array.from(matchedContactIdsByCompany.keys()));
+        selectedCard = allCards.find((card) => matchedCompanyIds.has(card.company_id)) ?? null;
       }
 
-      if (!card) return null;
+      // 3) Final fallback: latest card for any candidate company
+      if (!selectedCard) {
+        selectedCard = allCards[0] ?? null;
+      }
 
-      return { card, company };
+      if (!selectedCard) return null;
+
+      const company = companyById.get(selectedCard.company_id) ?? null;
+      if (!company) return null;
+
+      return { card: selectedCard, company };
     },
   });
 }
