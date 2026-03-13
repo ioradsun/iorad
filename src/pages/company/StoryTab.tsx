@@ -42,8 +42,7 @@ export default function StoryTab({
   return (
     <>
       <div className="flex items-center justify-between gap-3">
-        <h3 className="section-label flex items-center gap-1.5">
-          <Sparkles className="w-3 h-3" />
+        <h3 className="section-label">
           Story Configuration
         </h3>
         <div className="flex items-center gap-2">
