@@ -1,5 +1,4 @@
-import { Input } from "@/components/ui/input";
-import { Loader2, RefreshCw } from "lucide-react";
+
 
 interface StoryTabProps {
   contactName: string | null;
@@ -20,15 +19,6 @@ interface StoryTabProps {
 export default function StoryTab({
   isInboundStoryResponse,
   rawAccountJson,
-  loomUrl,
-  ioradUrl,
-  loomEmbedUrl,
-  ioradEmbedUrl,
-  onLoomUrlChange,
-  onIoradUrlChange,
-  regeneratingSection,
-  ensureRunning,
-  onRegenerate,
 }: StoryTabProps) {
   return (
     <div className="max-w-2xl space-y-6">
@@ -107,74 +97,7 @@ export default function StoryTab({
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-6 pt-6 border-t border-border/15">
-        <div>
-          <div className="field-label mb-1.5">Loom Video URL</div>
-          <Input
-            placeholder="https://www.loom.com/share/..."
-            value={loomUrl}
-            onChange={(e) => onLoomUrlChange(e.target.value)}
-            className="h-9 text-body"
-          />
-          <p className="text-micro text-foreground/20 mt-1.5">
-            Embeds at the top of the story page
-          </p>
-        </div>
-        <div>
-          <div className="field-label mb-1.5">iorad Tutorial URL</div>
-          <Input
-            placeholder="https://ior.ad/..."
-            value={ioradUrl}
-            onChange={(e) => onIoradUrlChange(e.target.value)}
-            className="h-9 text-body"
-          />
-          <p className="text-micro text-foreground/20 mt-1.5">
-            Replaces the default tutorial on the story page
-          </p>
-        </div>
-      </div>
 
-      {(loomEmbedUrl || ioradEmbedUrl) && (
-        <div className="space-y-5">
-          <h3 className="field-label">Preview</h3>
-
-          {loomEmbedUrl && (
-            <div className="space-y-2">
-              <h4 className="text-title font-semibold text-foreground">Loom Video</h4>
-              <div className="rounded-xl overflow-hidden border">
-                <iframe src={loomEmbedUrl} width="100%" height="400" frameBorder="0" allowFullScreen allow="autoplay; fullscreen" title="Loom video preview" />
-              </div>
-            </div>
-          )}
-
-          {ioradEmbedUrl && (
-            <div className="space-y-2">
-              <h4 className="text-title font-semibold text-foreground">iorad Tutorial</h4>
-              <div className="rounded-xl overflow-hidden border">
-                <iframe
-                  src={ioradEmbedUrl} width="100%" height="500" frameBorder="0" allowFullScreen
-                  allow="camera; microphone; clipboard-write"
-                  sandbox="allow-scripts allow-forms allow-same-origin allow-presentation allow-downloads allow-modals allow-popups allow-popups-to-escape-sandbox allow-top-navigation allow-top-navigation-by-user-activation"
-                  title="iorad tutorial preview"
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="flex justify-end mt-6">
-        <button
-          className="text-micro text-foreground/20 hover:text-foreground/50 transition-colors flex items-center gap-1"
-          disabled={regeneratingSection === "story" || ensureRunning}
-          onClick={onRegenerate}
-        >
-          {regeneratingSection === "story"
-            ? <Loader2 className="w-3 h-3 animate-spin" />
-            : <RefreshCw className="w-3 h-3" />}
-          Regenerate
-        </button>
-      </div>
     </div>
   );
 }
