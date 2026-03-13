@@ -76,51 +76,63 @@ function useInboundStoryBySlug(companySlug?: string, contactSlug?: string) {
     queryKey: ["inbound-story-slug", companySlug, contactSlug],
     enabled: !!companySlug,
     queryFn: async () => {
-      // Find company by name slug
-      const namePattern = slugToName(companySlug!).replace(/ /g, "%");
+      const normalizedCompanySlug = companySlug!.trim().toLowerCase();
+      const normalizedContactSlug = contactSlug?.trim().toLowerCase();
+
+      // Find company by slug (robust to spacing/case variants)
+      const namePattern = `%${slugToName(companySlug!).replace(/\s+/g, "%")}%`;
       const { data: companies, error: compError } = await supabase
         .from("companies")
         .select("*")
-        .ilike("name", namePattern);
+        .ilike("name", namePattern)
+        .limit(200);
       if (compError) throw compError;
 
-      const company = companies?.find(
-        (c) => c.name.toLowerCase().replace(/\s+/g, "-") === companySlug!.toLowerCase()
-      ) || companies?.[0];
+      const company = (companies || []).find(
+        (c) => c.name.toLowerCase().replace(/\s+/g, "-") === normalizedCompanySlug
+      ) || (companies || []).[0];
       if (!company) return null;
 
-      let contactId: string | null = null;
-      if (contactSlug) {
-        const { data: contacts } = await supabase
+      let matchedContactIds: string[] = [];
+      if (normalizedContactSlug) {
+        const { data: contacts, error: contactsError } = await supabase
           .from("contacts")
           .select("id, name")
           .eq("company_id", company.id);
-        const match = (contacts || []).find((c: any) =>
-          c.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "") === contactSlug.toLowerCase()
-        );
-        if (match) contactId = match.id;
+        if (contactsError) throw contactsError;
+
+        matchedContactIds = (contacts || [])
+          .filter((c: any) => c.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "") === normalizedContactSlug)
+          .map((c: any) => c.id);
       }
 
       let card = null;
-      if (contactId) {
+
+      // Prefer contact-specific card when contact slug resolves
+      if (matchedContactIds.length > 0) {
         const { data, error } = await supabase
-          .from("company_cards").select("*")
+          .from("company_cards")
+          .select("*")
           .eq("company_id", company.id)
-          .eq("contact_id", contactId)
-          .maybeSingle();
+          .in("contact_id", matchedContactIds)
+          .order("created_at", { ascending: false })
+          .limit(1);
         if (error) throw error;
-        card = data;
+        card = data?.[0] ?? null;
       }
-      // Fallback: if no card for specific contact, get latest for company
+
+      // Fallback: latest company card
       if (!card) {
         const { data, error } = await supabase
-          .from("company_cards").select("*")
+          .from("company_cards")
+          .select("*")
           .eq("company_id", company.id)
           .order("created_at", { ascending: false })
           .limit(1);
         if (error) throw error;
         card = data?.[0] ?? null;
       }
+
       if (!card) return null;
 
       return { card, company };
