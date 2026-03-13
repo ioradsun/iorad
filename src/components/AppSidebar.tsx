@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Building2, Signal, Clock, ChevronLeft, ChevronRight,
-  LogOut, Shield, Briefcase, GraduationCap, Handshake, Menu,
+  LogOut, Shield, Briefcase, GraduationCap, Handshake, User, Info, Plus,
 } from "lucide-react";
 import ioradLogoDark from "@/assets/iorad-logo-new.png";
 import ioradLogoLight from "@/assets/iorad-logo-light.png";
@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useRecentCompanies } from "@/hooks/useRecentCompanies";
+import { useContacts } from "@/hooks/useSupabase";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -34,6 +35,10 @@ export default function AppSidebar() {
   const navigate = useNavigate();
   const ioradLogo = theme === "light" ? ioradLogoLight : ioradLogoDark;
   const { data: recents = [] } = useRecentCompanies(8);
+  const companyMatch = location.pathname.match(/^\/company\/([^/?#]+)/);
+  const companyId = companyMatch ? companyMatch[1] : null;
+  const { data: companyContacts = [] } = useContacts(companyId || undefined);
+  const currentCompany = recents.find((r) => r.company_id === companyId);
 
   const displayName =
     user?.user_metadata?.full_name ||
@@ -107,58 +112,155 @@ export default function AppSidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
-        {/* Companies section */}
-        {!collapsed && (
-          <div className="text-micro font-medium uppercase tracking-wider text-foreground/25 px-3 pb-1">
-            Companies
-          </div>
-        )}
-        {categoryItems.map(({ key, label, icon }) => (
-          <NavItem
-            key={key}
-            to={`/?category=${key}`}
-            icon={icon}
-            label={label}
-            active={isCompanyCategory(key) || (key === "business" && location.pathname === "/" && !location.search)}
-          />
-        ))}
-
-        <div className="my-3 border-t border-border/30" />
-
-        <NavItem to="/signals" icon={Signal} label="Signals" active={isActive("/signals")} />
-        <NavItem to="/jobs" icon={Clock} label="HubSpot" active={isActive("/jobs")} />
-
-        {/* Recent companies */}
-        {recents.length > 0 && (
+        {companyId ? (
           <>
-            <div className="my-3 border-t border-border/30" />
+            <button
+              onClick={() => navigate("/")}
+              className="flex items-center gap-2 px-3 py-1.5 text-caption text-foreground/30 hover:text-foreground/60 transition-colors w-full"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              {!collapsed && <span>Companies</span>}
+            </button>
+
+            <div className="my-2 border-t border-border/20" />
+
             {!collapsed && (
-              <div className="text-micro font-medium uppercase tracking-wider text-foreground/25 px-3 pb-1">
-                Recent
+              <div className="text-micro font-semibold uppercase tracking-wider text-foreground/40 px-3 pb-1">
+                {currentCompany?.company_name || "Company"}
               </div>
             )}
-            {recents.map((r) => (
-              <Tooltip key={r.company_id}>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => navigate(`/company/${r.company_id}`)}
-                    className={`w-full flex items-center gap-3 px-3 py-1.5 rounded-lg text-caption transition-colors text-left ${
-                      location.pathname === `/company/${r.company_id}`
-                        ? "bg-secondary text-foreground font-medium"
-                        : "text-foreground/40 hover:text-foreground/70 hover:bg-secondary/50"
-                    }`}
-                  >
-                    <Building2 className="w-3.5 h-3.5 shrink-0" />
-                    {!collapsed && (
-                      <span className="truncate">{r.company_name}</span>
-                    )}
-                  </button>
-                </TooltipTrigger>
-                {collapsed && (
-                  <TooltipContent side="right" className="text-xs">{r.company_name}</TooltipContent>
+
+            <NavItem
+              to={`/company/${companyId}`}
+              icon={Info}
+              label="Overview"
+              active={location.pathname === `/company/${companyId}` && !location.search.includes("contact=")}
+            />
+
+            <div className="my-2 border-t border-border/20" />
+
+            {!collapsed && (
+              <div className="text-micro font-medium uppercase tracking-wider text-foreground/25 px-3 pb-1">
+                Contacts {companyContacts.length > 0 && `(${companyContacts.length})`}
+              </div>
+            )}
+
+            <div className="space-y-0.5">
+              {companyContacts.map((c: any) => {
+                const isSelected = location.search.includes(`contact=${c.id}`);
+                return (
+                  <Tooltip key={c.id}>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => navigate(`/company/${companyId}?contact=${c.id}`)}
+                        className={`w-full flex items-start gap-2.5 px-3 py-2 rounded-lg text-left transition-colors ${
+                          isSelected
+                            ? "bg-secondary text-foreground"
+                            : "text-foreground/40 hover:text-foreground/70 hover:bg-secondary/50"
+                        }`}
+                      >
+                        <User className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        {!collapsed && (
+                          <div className="min-w-0">
+                            <div className="text-caption font-medium truncate">{c.name}</div>
+                            {c.title && <div className="text-micro text-foreground/25 truncate">{c.title}</div>}
+                          </div>
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    {collapsed && <TooltipContent side="right" className="text-xs">{c.name}</TooltipContent>}
+                  </Tooltip>
+                );
+              })}
+            </div>
+
+            {!collapsed && (
+              <button
+                onClick={() => navigate(`/company/${companyId}?addContact=true`)}
+                className="flex items-center gap-2 px-3 py-1.5 text-caption text-primary/60 hover:text-primary transition-colors w-full"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add contact
+              </button>
+            )}
+
+            {recents.filter((r) => r.company_id !== companyId).length > 0 && (
+              <>
+                <div className="my-3 border-t border-border/20" />
+                {!collapsed && (
+                  <div className="text-micro font-medium uppercase tracking-wider text-foreground/20 px-3 pb-1">
+                    Recent
+                  </div>
                 )}
-              </Tooltip>
+                {recents.filter((r) => r.company_id !== companyId).slice(0, 5).map((r) => (
+                  <Tooltip key={r.company_id}>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => navigate(`/company/${r.company_id}`)}
+                        className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-caption text-foreground/25 hover:text-foreground/50 hover:bg-secondary/50 transition-colors text-left"
+                      >
+                        <Building2 className="w-3.5 h-3.5 shrink-0" />
+                        {!collapsed && <span className="truncate">{r.company_name}</span>}
+                      </button>
+                    </TooltipTrigger>
+                    {collapsed && (
+                      <TooltipContent side="right" className="text-xs">{r.company_name}</TooltipContent>
+                    )}
+                  </Tooltip>
+                ))}
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            {!collapsed && (
+              <div className="text-micro font-medium uppercase tracking-wider text-foreground/25 px-3 pb-1">
+                Companies
+              </div>
+            )}
+            {categoryItems.map(({ key, label, icon }) => (
+              <NavItem
+                key={key}
+                to={`/?category=${key}`}
+                icon={icon}
+                label={label}
+                active={isCompanyCategory(key) || (key === "business" && location.pathname === "/" && !location.search)}
+              />
             ))}
+
+            <div className="my-3 border-t border-border/20" />
+
+            <NavItem to="/signals" icon={Signal} label="Signals" active={isActive("/signals")} />
+            <NavItem to="/jobs" icon={Clock} label="HubSpot" active={isActive("/jobs")} />
+
+            {recents.length > 0 && (
+              <>
+                <div className="my-3 border-t border-border/20" />
+                {!collapsed && (
+                  <div className="text-micro font-medium uppercase tracking-wider text-foreground/25 px-3 pb-1">
+                    Recent
+                  </div>
+                )}
+                {recents.map((r) => (
+                  <Tooltip key={r.company_id}>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => navigate(`/company/${r.company_id}`)}
+                        className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-caption transition-colors text-left ${
+                          location.pathname === `/company/${r.company_id}`
+                            ? "bg-secondary text-foreground font-medium"
+                            : "text-foreground/40 hover:text-foreground/70 hover:bg-secondary/50"
+                        }`}
+                      >
+                        <Building2 className="w-3.5 h-3.5 shrink-0" />
+                        {!collapsed && <span className="truncate">{r.company_name}</span>}
+                      </button>
+                    </TooltipTrigger>
+                    {collapsed && <TooltipContent side="right" className="text-xs">{r.company_name}</TooltipContent>}
+                  </Tooltip>
+                ))}
+              </>
+            )}
           </>
         )}
       </nav>

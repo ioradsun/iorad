@@ -1,16 +1,15 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { useCompany, useSignals, useSnapshots, useContacts, useCompanyCards, useUpdateCompany, useMeetings, useCustomerActivity } from "@/hooks/useSupabase";
 import { supabase } from "@/integrations/supabase/client";
 import { useTrackRecent } from "@/hooks/useRecentCompanies";
 import { useQueryClient } from "@tanstack/react-query";
 import ScoreCell from "@/components/ScoreCell";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, ExternalLink, Loader2, ChevronRight, ChevronDown, Plus, Trash2, Sparkles } from "lucide-react";
+import { ExternalLink, Loader2, ChevronRight, Plus, Sparkles } from "lucide-react";
 import { Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 
@@ -19,6 +18,17 @@ import { parseJson, toArray } from "./company/types";
 import type { ScoreBreakdown, SnapshotJSON } from "./company/types";
 import OnboardingTab from "./company/OnboardingTab";
 import ContactDetailView from "./company/ContactDetailView";
+
+
+function ContactMetaLine({ contact }: { contact: any }) {
+  if (!contact) return null;
+
+  return (
+    <div className="text-caption text-foreground/40 mt-1">
+      {contact.email || contact.linkedin || contact.title || "No details available"}
+    </div>
+  );
+}
 
 export default function CompanyDetail() {
   const { id } = useParams<{ id: string }>();
@@ -36,8 +46,9 @@ export default function CompanyDetail() {
   const [deletingContact, setDeletingContact] = useState(false);
   const ensuredRef = useRef(false);
   const [loadingSteps, setLoadingSteps] = useState<string[]>([]);
-  const [selectedContactId, setSelectedContactId] = useState<string>("");
-  const [viewMode, setViewMode] = useState<"company" | "contact">("company");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedContactId = searchParams.get("contact") || "";
+  const viewMode = selectedContactId ? "contact" : "company";
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [newContact, setNewContact] = useState({ name: "", title: "", email: "", linkedin: "" });
   const [savingContact, setSavingContact] = useState(false);
@@ -88,14 +99,13 @@ export default function CompanyDetail() {
     }
   }, [id, company]);
 
-  // Auto-switch to contacts on first load only
-  const hasAutoSwitched = useRef(false);
   useEffect(() => {
-    if (!hasAutoSwitched.current && contacts.length > 0 && companyAny?.last_processed_at) {
-      hasAutoSwitched.current = true;
-      setViewMode("contact");
+    if (searchParams.get("addContact") === "true") {
+      setAddContactOpen(true);
+      setSearchParams(selectedContactId ? { contact: selectedContactId } : {}, { replace: true });
     }
-  }, [contacts.length, companyAny?.last_processed_at]);
+  }, [searchParams, selectedContactId, setSearchParams]);
+
 
   const regenerateSection = useCallback(async (section: "contacts" | "strategy" | "outreach" | "story" | "signals" | "company") => {
     if (!id) return;
@@ -305,7 +315,6 @@ export default function CompanyDetail() {
           setAnalyzingMeeting(null);
           toast.success("Transcript analysis complete — check the Onboarding tab");
           queryClient.invalidateQueries({ queryKey: ["meetings", id] });
-          setViewMode("company");
         }
       }
     } catch (e: any) { toast.error(e.message || "Fathom sync failed"); }
@@ -556,7 +565,7 @@ export default function CompanyDetail() {
       queryClient.invalidateQueries({ queryKey: ["company_cards", id], exact: false });
       queryClient.invalidateQueries({ queryKey: ["contacts", id] });
       // Switch to this contact
-      setSelectedContactId(contactId);
+      setSearchParams({ contact: contactId });
     } catch (e: any) { toast.error(e.message || "Generation failed"); }
     finally { setGeneratingContactId(null); }
   };
@@ -602,110 +611,25 @@ export default function CompanyDetail() {
 
   return (
     <div>
-        <div className="mb-6">
-          <div className="flex items-center gap-0 mb-2">
-            <Link to="/" className="text-foreground/20 hover:text-foreground transition-colors mr-3 shrink-0">
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-
-            <button
-              onClick={() => setViewMode("company")}
-              className={`text-title font-semibold tracking-tight transition-colors ${
-                viewMode === "company" ? "text-foreground" : "text-foreground/30 hover:text-foreground/50"
-              }`}
-            >
-              {company.name}
-            </button>
-
-            <span className="text-foreground/15 mx-2 text-title select-none">/</span>
-
-            {contacts.length > 0 ? (
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button
-                    className={`text-title font-semibold tracking-tight transition-colors inline-flex items-center gap-1.5 ${
-                      viewMode === "contact" ? "text-foreground" : "text-foreground/30 hover:text-foreground/50"
-                    }`}
-                  >
-                    {(contacts.find((c: any) => c.id === (selectedContactId || contacts[0]?.id))?.name || "Select contact")}
-                    <ChevronDown className="w-3.5 h-3.5 opacity-40" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent align="start" className="w-80 p-1">
-                  <div className="max-h-[400px] overflow-y-auto">
-                    {contacts.map((c: any) => {
-                      const isActive = c.id === (selectedContactId || contacts[0]?.id);
-                      return (
-                        <button
-                          key={c.id}
-                          onClick={() => {
-                            setSelectedContactId(c.id);
-                            setViewMode("contact");
-                          }}
-                          className={`w-full text-left px-3 py-2.5 rounded-md transition-colors ${
-                            isActive ? "bg-primary/8 text-foreground" : "hover:bg-secondary text-foreground/65"
-                          }`}
-                        >
-                          <div className="font-medium text-caption">{c.name}</div>
-                          {c.title && <div className="text-micro text-foreground/40 mt-0.5">{c.title}</div>}
-                          {c.email && <div className="text-micro text-foreground/25 mt-0.5">{c.email}</div>}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <div className="border-t border-border/30 mt-1 pt-1">
-                    <button
-                      onClick={() => { setViewMode("contact"); setAddContactOpen(true); }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-caption text-primary hover:bg-accent rounded-md transition-colors"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> Add contact
-                    </button>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            ) : (
-              <button
-                onClick={() => { setViewMode("contact"); setAddContactOpen(true); }}
-                className="text-title text-foreground/30 hover:text-foreground/50 transition-colors"
-              >
-                + Add contact
-              </button>
-            )}
-
-            <div className="ml-auto flex items-center gap-2">
-              {viewMode === "contact" && effectiveContactId && (
-                <>
-                  <button
-                    onClick={() => setDeleteContactId(effectiveContactId)}
-                    className="p-1.5 rounded text-foreground/20 hover:text-destructive hover:bg-destructive/10 transition-colors"
-                    title="Delete contact"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                  <Button
-                    size="sm"
-                    className="gap-1.5"
-                    onClick={() => generateForContact(effectiveContactId)}
-                    disabled={!!generatingContactId || loadingSteps.length > 0}
-                  >
-                    {generatingContactId === effectiveContactId
-                      ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating…</>
-                      : <><Sparkles className="w-3.5 h-3.5" /> Generate</>}
-                  </Button>
-                  {storyBaseUrl && (
-                    <a href={storyBaseUrl} target="_blank" rel="noopener noreferrer">
-                      <Button size="sm" variant="outline" className="gap-1.5">
-                        <ExternalLink className="w-3.5 h-3.5" /> Story
-                      </Button>
-                    </a>
-                  )}
-                </>
-              )}
-            </div>
+      {loadingSteps.length > 0 && (
+        <div className="flex items-center gap-2 py-2 mb-4">
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />
+          <div className="flex items-center gap-2 text-caption text-foreground/40">
+            {loadingSteps.map((step, i) => (
+              <span key={step}>
+                {i > 0 && <span className="text-foreground/15 mx-1">·</span>}
+                {step}
+              </span>
+            ))}
           </div>
+        </div>
+      )}
 
-          {viewMode === "company" ? (
-            <div className="flex items-center gap-2 pl-8 text-caption text-foreground/40">
+      {viewMode === "company" ? (
+        <div>
+          <div className="mb-6">
+            <h1 className="text-display font-semibold tracking-tight">{company.name}</h1>
+            <div className="flex items-center gap-2 mt-1 text-caption text-foreground/40">
               {company.domain && <span>{company.domain}</span>}
               {company.domain && <span className="text-foreground/15">·</span>}
               <Select
@@ -749,25 +673,7 @@ export default function CompanyDetail() {
                 </>
               )}
             </div>
-          ) : null}
-        </div>
-
-          {viewMode === "company" ? (
-        <div>
-          {loadingSteps.length > 0 && (
-            <div className="flex items-center gap-2 py-2 mb-4">
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />
-              <div className="flex items-center gap-2 text-caption text-foreground/40">
-                {loadingSteps.map((step, i) => (
-                  <span key={step}>
-                    {i > 0 && <span className="text-foreground/15 mx-1">·</span>}
-                    {step}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
+          </div>
           <Tabs defaultValue="about" className="w-full">
             <TabsList className="bg-transparent p-0 h-auto border-b border-border/15 w-full justify-start gap-0 rounded-none mb-6">
               {["about", "score", "signals", "analysis"].map((tab) => (
@@ -1248,7 +1154,34 @@ export default function CompanyDetail() {
           </Tabs>
         </div>
       ) : (
-        <ContactDetailView
+        <div>
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-display font-semibold tracking-tight">{effectiveContact?.name}</h1>
+              <ContactMetaLine contact={effectiveContact} />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                className="gap-1.5"
+                onClick={() => generateForContact(effectiveContactId)}
+                disabled={!!generatingContactId || loadingSteps.length > 0}
+              >
+                {generatingContactId === effectiveContactId
+                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating…</>
+                  : <><Sparkles className="w-3.5 h-3.5" /> Generate</>}
+              </Button>
+              {storyBaseUrl && (
+                <a href={storyBaseUrl} target="_blank" rel="noopener noreferrer">
+                  <Button size="sm" variant="outline" className="gap-1.5">
+                    <ExternalLink className="w-3.5 h-3.5" /> Story
+                  </Button>
+                </a>
+              )}
+            </div>
+          </div>
+
+          <ContactDetailView
             companyId={id!}
             company={company}
             companyNameSlug={companyNameSlug}
@@ -1271,6 +1204,7 @@ export default function CompanyDetail() {
             regeneratingSection={regeneratingSection}
             onRegenerateSection={(section) => regenerateSection(section as any)}
           />
+        </div>
       )}
     </div>
   );
