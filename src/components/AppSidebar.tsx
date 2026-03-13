@@ -20,7 +20,7 @@ import {
 import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { scoreContact, sortContactsByActivity } from "@/lib/contactScore";
+import { getContactActivity, sortContactsByActivity } from "@/lib/contactScore";
 
 const categoryItems = [
   { key: "business", label: "Business", icon: Briefcase },
@@ -178,7 +178,7 @@ export default function AppSidebar() {
             <div className="max-h-[320px] overflow-y-auto space-y-0.5 scrollbar-thin">
               {sortContactsByActivity(filteredContacts).map((c: any) => {
                 const isSelected = selectedContactId === c.id;
-                const activity = scoreContact((c.hubspot_properties as any) || null);
+                const activity = getContactActivity((c.hubspot_properties as any) || null);
                 return (
                   <button
                     key={c.id}
@@ -194,16 +194,16 @@ export default function AppSidebar() {
                       {c.title && <div className="text-micro text-foreground/20 truncate">{c.title}</div>}
                     </div>
                     {activity.tier !== "none" && (
-                      <span className={`shrink-0 text-micro font-medium px-1.5 py-0.5 rounded ${
-                        activity.tier === "active"
-                          ? "bg-success/10 text-success"
-                          : activity.tier === "engaged"
-                          ? "bg-primary/10 text-primary/70"
-                          : "bg-foreground/[0.06] text-foreground/30"
-                      }`}>
-                        {activity.label}
-                      </span>
-                    )}
+                       <span className={`shrink-0 text-micro font-medium px-1.5 py-0.5 rounded ${
+                         activity.tier === "hot"
+                           ? "bg-success/10 text-success"
+                           : activity.tier === "warm"
+                           ? "bg-primary/10 text-primary/70"
+                           : "bg-foreground/[0.06] text-foreground/30"
+                       }`}>
+                         {activity.tier}
+                       </span>
+                     )}
                   </button>
                 );
               })}
