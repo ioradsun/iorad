@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Building2, Signal, ChevronLeft,
-  LogOut, Shield, Briefcase, GraduationCap, Handshake, User, Info, Plus,
+  LogOut, Shield, Briefcase, GraduationCap, Handshake, User, Info, Plus, Clock,
 } from "lucide-react";
 import ioradLogoDark from "@/assets/iorad-logo-new.png";
 import ioradLogoLight from "@/assets/iorad-logo-light.png";
@@ -11,6 +11,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useRecentCompanies } from "@/hooks/useRecentCompanies";
 import { useContacts } from "@/hooks/useSupabase";
+import { useRecentContacts } from "@/hooks/useRecentContacts";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -39,6 +40,15 @@ export default function AppSidebar() {
   const companyId = companyMatch ? companyMatch[1] : null;
   const { data: companyContacts = [] } = useContacts(companyId || undefined);
   const currentCompany = recents.find((r) => r.company_id === companyId);
+  const { recentContactIds, trackContact, isRecent } = useRecentContacts(companyId);
+
+  // Track contact visit when selected
+  const selectedContactId = new URLSearchParams(location.search).get("contact");
+  useEffect(() => {
+    if (selectedContactId) {
+      trackContact(selectedContactId);
+    }
+  }, [selectedContactId, trackContact]);
 
   const filteredContacts = companyContacts
     .filter((c: any) => {
@@ -46,6 +56,14 @@ export default function AppSidebar() {
       const q = contactSearch.toLowerCase();
       return c.name?.toLowerCase().includes(q) || c.title?.toLowerCase().includes(q);
     });
+
+  // Separate recent contacts from the rest (only when not searching)
+  const recentContacts = contactSearch
+    ? []
+    : filteredContacts.filter((c: any) => isRecent(c.id) && c.id !== selectedContactId);
+  const otherContacts = contactSearch
+    ? filteredContacts
+    : filteredContacts.filter((c: any) => !isRecent(c.id) || c.id === selectedContactId);
 
   const displayName =
     user?.user_metadata?.full_name ||
@@ -155,8 +173,42 @@ export default function AppSidebar() {
             )}
 
             <div className="max-h-[320px] overflow-y-auto space-y-0.5 scrollbar-thin">
-              {filteredContacts.map((c: any) => {
-                const isSelected = location.search.includes(`contact=${c.id}`);
+              {/* Recent contacts section */}
+              {recentContacts.length > 0 && (
+                <>
+                  <div className="flex items-center gap-1.5 px-3 pt-1 pb-0.5">
+                    <Clock className="w-2.5 h-2.5 text-foreground/20" />
+                    <span className="text-micro text-foreground/20">Recent</span>
+                  </div>
+                  {recentContacts.map((c: any) => {
+                    const isSelected = selectedContactId === c.id;
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => navigate(`/company/${companyId}?contact=${c.id}`)}
+                        className={`w-full flex items-start gap-2.5 px-3 py-1.5 rounded-lg text-left transition-colors ${
+                          isSelected
+                            ? "bg-secondary text-foreground"
+                            : "text-foreground/40 hover:text-foreground/70 hover:bg-secondary/50"
+                        }`}
+                      >
+                        <User className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        <div className="min-w-0">
+                          <div className="text-caption font-medium truncate">{c.name}</div>
+                          {c.title && <div className="text-micro text-foreground/20 truncate">{c.title}</div>}
+                        </div>
+                      </button>
+                    );
+                  })}
+                  {otherContacts.length > 0 && (
+                    <div className="my-1.5 border-t border-border/15 mx-3" />
+                  )}
+                </>
+              )}
+
+              {/* All / remaining contacts */}
+              {otherContacts.map((c: any) => {
+                const isSelected = selectedContactId === c.id;
                 return (
                   <button
                     key={c.id}
