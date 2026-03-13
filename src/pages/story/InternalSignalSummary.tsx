@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { ShieldCheck, MessageCircle, Server, AlertOctagon } from "lucide-react";
 import type { InternalSignals } from "@/data/customers";
 
@@ -5,14 +6,13 @@ interface Props {
   signals: InternalSignals;
   conversationStarters?: string[];
 }
-
 const urgencyColors: Record<string, string> = {
   "Emerging": "rgb(96,165,250)",
   "Active": "rgb(251,191,36)",
   "High Momentum": "rgb(239,68,68)",
 };
 
-export default function InternalSignalSummary({ signals, conversationStarters }: Props) {
+const InternalSignalSummary = forwardRef<HTMLElement, Props>(function InternalSignalSummary({ signals, conversationStarters }, _ref) {
   return (
     <section className="max-w-5xl mx-auto px-6 py-12">
       <div className="rounded-xl p-6" style={{ border: "1px dashed var(--story-border)", background: "var(--story-surface)" }}>
@@ -117,4 +117,6 @@ export default function InternalSignalSummary({ signals, conversationStarters }:
       </div>
     </section>
   );
-}
+});
+
+export default InternalSignalSummary;
