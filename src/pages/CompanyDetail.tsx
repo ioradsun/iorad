@@ -1441,18 +1441,20 @@ export default function CompanyDetail() {
                 <ContactMetaLine contact={effectiveContact} />
               </div>
               <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5"
-                  onClick={generateStory}
-                  disabled={generatingStory || contactEnsureSteps.length > 0}
-                >
-                  {generatingStory
-                    ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating Story…</>
-                    : <><Sparkles className="w-3.5 h-3.5" /> Generate Story</>}
-                </Button>
-                {storyBaseUrl && (
+                {!hasContactStory && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5"
+                    onClick={generateStory}
+                    disabled={generatingStory || contactEnsureSteps.length > 0}
+                  >
+                    {generatingStory
+                      ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating Story…</>
+                      : <><Sparkles className="w-3.5 h-3.5" /> Generate Story</>}
+                  </Button>
+                )}
+                {hasContactStory && storyBaseUrl && (
                   <a href={storyBaseUrl} target="_blank" rel="noopener noreferrer">
                     <Button size="sm" variant="outline" className="gap-1.5">
                       <ExternalLink className="w-3.5 h-3.5" /> View Story
