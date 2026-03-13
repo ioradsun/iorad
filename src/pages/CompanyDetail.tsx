@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ExternalLink, Loader2, ChevronRight, Plus, Sparkles } from "lucide-react";
+import { ExternalLink, Loader2, ChevronRight, Plus, Sparkles, X, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
 import { Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 
@@ -44,8 +44,14 @@ export default function CompanyDetail() {
   const [regenerating, setRegenerating] = useState(false);
   const [deleteContactId, setDeleteContactId] = useState<string | null>(null);
   const [deletingContact, setDeletingContact] = useState(false);
-  const ensuredRef = useRef(false);
-  const [loadingSteps, setLoadingSteps] = useState<string[]>([]);
+  // Setup overlay
+  type StepStatus = "pending" | "running" | "done" | "failed";
+  const [showSetupOverlay, setShowSetupOverlay] = useState(false);
+  const [setupSteps, setSetupSteps] = useState<
+    { label: string; status: StepStatus }[]
+  >([]);
+  const setupRanRef = useRef(false);
+  const hubspotSyncedRef = useRef(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedContactId = searchParams.get("contact") || "";
   const viewMode = selectedContactId ? "contact" : "company";
@@ -56,6 +62,7 @@ export default function CompanyDetail() {
   const [analyzingMeeting, setAnalyzingMeeting] = useState<string | null>(null);
   const [generatingContactId, setGeneratingContactId] = useState<string | null>(null);
   const [regeneratingSection, setRegeneratingSection] = useState<string | null>(null);
+  const [refreshingAnalysis, setRefreshingAnalysis] = useState(false);
   // extractingProfiles state removed — extraction is now part of the generate pipeline
 
   // Auto-generate AI summary for creator contacts on load (every time contacts change)
@@ -336,180 +343,173 @@ export default function CompanyDetail() {
     finally { setAnalyzingMeeting(null); }
   };
 
-  // Utility: invoke with timeout
-  const invokeWithTimeout = useCallback(async (
-    fnName: string,
-    body: any,
-    timeoutMs = 15_000,
-  ) => {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const { data, error } = await supabase.functions.invoke(fnName, {
-        body,
-        // Note: supabase-js doesn't support AbortSignal directly,
-        // so we use Promise.race as a fallback
-      });
-      clearTimeout(timer);
-      if (error) throw error;
-      return data;
-    } catch (e: any) {
-      clearTimeout(timer);
-      if (e.name === "AbortError") {
-        console.warn(`${fnName} timed out after ${timeoutMs}ms`);
-      } else {
-        console.warn(`${fnName} failed:`, e.message);
-      }
-      return null;
-    }
-  }, []);
+  useEffect(() => {
+    if (!id || !company || isLoading || hubspotSyncedRef.current) return;
+    hubspotSyncedRef.current = true;
 
-  // Timeout wrapper using Promise.race
-  const withTimeout = useCallback(<T,>(
-    promise: Promise<T>,
-    ms: number,
-    label: string,
-  ): Promise<T | null> => {
-    return Promise.race([
-      promise,
-      new Promise<null>((resolve) =>
-        setTimeout(() => {
-          console.warn(`${label} timed out after ${ms}ms`);
-          resolve(null);
-        }, ms)
-      ),
-    ]);
-  }, []);
+    // Fire and forget — no await, no UI
+    (async () => {
+      try {
+        if (companyAny?.domain || companyAny?.hubspot_object_id) {
+          await supabase.functions.invoke("import-from-hubspot", {
+            body: { action: "sync_company", domain: companyAny.domain, company_id: id },
+          });
+          queryClient.invalidateQueries({ queryKey: ["company", id] });
+          queryClient.invalidateQueries({ queryKey: ["contacts", id] });
+        }
+      } catch (e: any) {
+        console.warn("Silent HubSpot sync failed:", e.message);
+      }
+    })();
+  }, [id, company, isLoading, companyAny?.domain, companyAny?.hubspot_object_id, queryClient]);
 
   useEffect(() => {
-    if (!company || isLoading || ensuredRef.current) return;
-    ensuredRef.current = true;
+    if (!id || !company || isLoading || setupRanRef.current) return;
 
-    const run = async () => {
-      const steps: string[] = [];
-      const addStep = (step: string) => {
-        steps.push(step);
-        setLoadingSteps([...steps]);
-      };
-      const removeStep = (step: string) => {
-        const idx = steps.indexOf(step);
-        if (idx >= 0) steps.splice(idx, 1);
-        setLoadingSteps([...steps]);
-      };
+    const hasCompanyCards = !!companyCards?.account_json;
+    const hasScore = company.scout_score != null;
 
-      const hasSignals = signals.length > 0;
-      const hasCompanyCards = !!companyCards?.account_json;
-      const hasScore = company.scout_score != null;
-      const hasContacts = contacts.length > 0;
-      const hasContactProfiles = contacts.some(
-        (c: any) => c.contact_profile?.account_narrative,
-      );
+    // If essential AI data exists, don't show overlay
+    if (hasCompanyCards && hasScore) return;
 
-      if (hasSignals && hasCompanyCards && hasScore && hasContacts && hasContactProfiles) {
-        return;
-      }
+    setupRanRef.current = true;
+    setShowSetupOverlay(true);
 
-      // ════════════════════════════════════════════
-      // PHASE 1: Fast essentials (parallel, 15s timeout each)
-      // These run simultaneously. User sees content ASAP.
-      // ════════════════════════════════════════════
-      const phase1: Promise<any>[] = [];
-
-      if (companyAny?.domain || companyAny?.hubspot_object_id) {
-        addStep("Syncing from HubSpot");
-        phase1.push(
-          withTimeout(
-            supabase.functions.invoke("import-from-hubspot", {
-              body: { action: "sync_company", domain: companyAny.domain, company_id: id },
-            }).then(() => {
-              queryClient.invalidateQueries({ queryKey: ["company", id] });
-              queryClient.invalidateQueries({ queryKey: ["contacts", id] });
-              removeStep("Syncing from HubSpot");
-            }),
-            15_000,
-            "HubSpot sync",
-          ),
-        );
-      }
-
-      if (!companyCards?.account_json) {
-        addStep("Analyzing company");
-        phase1.push(
-          withTimeout(
-            supabase.functions.invoke("generate-cards", {
-              body: { company_id: id, tab: "company" },
-            }).then(() => {
-              queryClient.invalidateQueries({ queryKey: ["company_cards", id], exact: false });
-              removeStep("Analyzing company");
-            }),
-            30_000,
-            "Company intel",
-          ),
-        );
-      }
-
-      if (company.scout_score == null) {
-        addStep("Computing score");
-        phase1.push(
-          withTimeout(
-            supabase.functions.invoke("score-companies", {
-              body: { action: "score_one", company_id: id },
-            }).then(() => {
-              queryClient.invalidateQueries({ queryKey: ["company", id] });
-              queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
-              removeStep("Computing score");
-            }),
-            20_000,
-            "Score",
-          ),
-        );
-      }
-
-      if (phase1.length > 0) {
-        await Promise.allSettled(phase1);
-      }
-
-      // ════════════════════════════════════════════
-      // PHASE 2: Background enrichment (sequential, non-blocking)
-      // User already has usable data. These run silently.
-      // ════════════════════════════════════════════
-      const freshContacts = queryClient.getQueryData(["contacts", id]) as any[] || contacts;
-      const needsProfiles = freshContacts.length > 0 &&
-        !freshContacts.some((c: any) => c.contact_profile?.account_narrative);
-      if (needsProfiles) {
-        try {
-          await invokeWithTimeout("extract-contact-profile", { company_id: id }, 20_000);
+    // Define steps
+    const steps: { label: string; needed: boolean; fn: () => Promise<void> }[] = [
+      {
+        label: "Syncing from HubSpot",
+        needed: !!(companyAny?.domain || companyAny?.hubspot_object_id),
+        fn: async () => {
+          await supabase.functions.invoke("import-from-hubspot", {
+            body: { action: "sync_company", domain: companyAny.domain, company_id: id },
+          });
+          queryClient.invalidateQueries({ queryKey: ["company", id] });
           queryClient.invalidateQueries({ queryKey: ["contacts", id] });
-        } catch {}
-      }
-
-      if (companyAny?.domain && meetings.length === 0) {
-        try {
-          await invokeWithTimeout("sync-fathom", { domain: companyAny.domain, company_id: id }, 15_000);
-          queryClient.invalidateQueries({ queryKey: ["meetings", id] });
-        } catch {}
-      }
-
-      if (signals.length === 0 && snapshots.length === 0) {
-        try {
-          await invokeWithTimeout("run-signals", { company_id: id, mode: "signals_only" }, 20_000);
+        },
+      },
+      {
+        label: "Analyzing company",
+        needed: !hasCompanyCards,
+        fn: async () => {
+          await supabase.functions.invoke("generate-cards", {
+            body: { company_id: id, tab: "company" },
+          });
+          queryClient.invalidateQueries({ queryKey: ["company_cards", id], exact: false });
+        },
+      },
+      {
+        label: "Computing score",
+        needed: !hasScore,
+        fn: async () => {
+          await supabase.functions.invoke("score-companies", {
+            body: { action: "score_one", company_id: id },
+          });
+          queryClient.invalidateQueries({ queryKey: ["company", id] });
+          queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
+        },
+      },
+      {
+        label: "Building contact profiles",
+        needed: contacts.length > 0 && !contacts.some((c: any) => c.contact_profile?.account_narrative),
+        fn: async () => {
+          await supabase.functions.invoke("extract-contact-profile", {
+            body: { company_id: id },
+          });
+          queryClient.invalidateQueries({ queryKey: ["contacts", id] });
+        },
+      },
+      {
+        label: "Searching for signals",
+        needed: signals.length === 0 && snapshots.length === 0,
+        fn: async () => {
+          await supabase.functions.invoke("run-signals", {
+            body: { company_id: id, mode: "signals_only" },
+          });
           queryClient.invalidateQueries({ queryKey: ["signals", id] });
-        } catch {}
+        },
+      },
+    ];
+
+    const activeSteps = steps.filter((step) => step.needed);
+    if (activeSteps.length === 0) {
+      setShowSetupOverlay(false);
+      return;
+    }
+
+    // Initialize step statuses
+    setSetupSteps(activeSteps.map((step) => ({ label: step.label, status: "pending" as StepStatus })));
+
+    // Run sequentially
+    (async () => {
+      for (let i = 0; i < activeSteps.length; i++) {
+        setSetupSteps((prev) => prev.map((step, idx) => (
+          idx === i ? { ...step, status: "running" } : step
+        )));
+
+        try {
+          await Promise.race([
+            activeSteps[i].fn(),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error("timeout")), 30_000)
+            ),
+          ]);
+          setSetupSteps((prev) => prev.map((step, idx) => (
+            idx === i ? { ...step, status: "done" } : step
+          )));
+        } catch (e: any) {
+          console.warn(`Setup "${activeSteps[i].label}" failed:`, e.message);
+          setSetupSteps((prev) => prev.map((step, idx) => (
+            idx === i ? { ...step, status: "failed" } : step
+          )));
+        }
       }
 
-      setLoadingSteps([]);
+      // Auto-close overlay when done
+      setTimeout(() => setShowSetupOverlay(false), 800);
 
+      // Mark processed
       try {
         await updateCompany.mutateAsync({
           id: id!,
           updates: { last_processed_at: new Date().toISOString() },
         });
       } catch {}
-    };
+    })();
+  }, [id, company, isLoading, companyCards, signals.length, snapshots.length, contacts, companyAny?.domain, companyAny?.hubspot_object_id, queryClient, updateCompany]);
 
-    const timer = setTimeout(run, 300);
-    return () => clearTimeout(timer);
-  }, [company, isLoading, signals.length, companyCards, contacts, snapshots.length, meetings.length, companyAny?.domain, companyAny?.hubspot_object_id, company?.scout_score, id, queryClient, updateCompany, withTimeout, invokeWithTimeout]);
+  const refreshAnalysis = async () => {
+    if (!id || refreshingAnalysis) return;
+    setRefreshingAnalysis(true);
+    try {
+      // Clear cached AI data so it regenerates
+      await supabase.from("company_cards").delete().eq("company_id", id).is("contact_id", null);
+      queryClient.removeQueries({ queryKey: ["company_cards", id] });
+
+      // Re-run AI pipeline
+      await supabase.functions.invoke("generate-cards", {
+        body: { company_id: id, tab: "company" },
+      });
+      queryClient.invalidateQueries({ queryKey: ["company_cards", id], exact: false });
+
+      await supabase.functions.invoke("score-companies", {
+        body: { action: "score_one", company_id: id },
+      });
+      queryClient.invalidateQueries({ queryKey: ["company", id] });
+      queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
+
+      await supabase.functions.invoke("run-signals", {
+        body: { company_id: id, mode: "full" },
+      });
+      queryClient.invalidateQueries({ queryKey: ["signals", id] });
+
+      toast.success("Analysis refreshed");
+    } catch (e: any) {
+      toast.error("Refresh failed: " + (e.message || "Unknown error"));
+    } finally {
+      setRefreshingAnalysis(false);
+    }
+  };
 
   const generateForContact = async (contactId: string) => {
     if (!id) return;
@@ -611,16 +611,51 @@ export default function CompanyDetail() {
 
   return (
     <div>
-      {loadingSteps.length > 0 && (
-        <div className="flex items-center gap-2 py-2 mb-4">
-          <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />
-          <div className="flex items-center gap-2 text-caption text-foreground/40">
-            {loadingSteps.map((step, i) => (
-              <span key={step}>
-                {i > 0 && <span className="text-foreground/15 mx-1">·</span>}
-                {step}
-              </span>
-            ))}
+      {/* Setup overlay — dismissable, non-blocking */}
+      {showSetupOverlay && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="relative bg-card border border-border/40 rounded-lg shadow-lg p-8 max-w-sm w-full mx-4">
+            {/* Close button */}
+            <button
+              onClick={() => setShowSetupOverlay(false)}
+              className="absolute top-3 right-3 text-foreground/20 hover:text-foreground/50 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <h2 className="text-title font-semibold text-foreground mb-1">
+              {company.name}
+            </h2>
+            <p className="text-caption text-foreground/30 mb-6">
+              Preparing company data
+            </p>
+
+            <div className="space-y-3">
+              {setupSteps.map((step, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  {step.status === "pending" && (
+                    <div className="w-4 h-4 rounded-full border border-border/40 shrink-0" />
+                  )}
+                  {step.status === "running" && (
+                    <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
+                  )}
+                  {step.status === "done" && (
+                    <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
+                  )}
+                  {step.status === "failed" && (
+                    <AlertCircle className="w-4 h-4 text-foreground/15 shrink-0" />
+                  )}
+                  <span className={`text-caption ${
+                    step.status === "running" ? "text-foreground"
+                      : step.status === "done" ? "text-foreground/40"
+                        : step.status === "failed" ? "text-foreground/20 line-through"
+                          : "text-foreground/25"
+                  }`}>
+                    {step.label}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -672,6 +707,16 @@ export default function CompanyDetail() {
                   <ScoreCell score={company.scout_score} size="sm" />
                 </>
               )}
+              <button
+                onClick={refreshAnalysis}
+                disabled={refreshingAnalysis}
+                className="inline-flex items-center gap-1.5 text-micro text-foreground/20 hover:text-foreground/40 disabled:opacity-50 transition-colors"
+              >
+                {refreshingAnalysis
+                  ? <Loader2 className="w-3 h-3 animate-spin" />
+                  : <RefreshCw className="w-3 h-3" />}
+                {refreshingAnalysis ? "Refreshing…" : "Refresh analysis"}
+              </button>
             </div>
           </div>
           <Tabs defaultValue="about" className="w-full">
@@ -1165,7 +1210,7 @@ export default function CompanyDetail() {
                 size="sm"
                 className="gap-1.5"
                 onClick={() => generateForContact(effectiveContactId)}
-                disabled={!!generatingContactId || loadingSteps.length > 0}
+                disabled={!!generatingContactId}
               >
                 {generatingContactId === effectiveContactId
                   ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating…</>
@@ -1198,7 +1243,7 @@ export default function CompanyDetail() {
             onSetDeleteContactId={setDeleteContactId}
             deletingContact={deletingContact}
             onConfirmDelete={() => deleteContactId && handleDeleteContact(deleteContactId)}
-            ensureRunning={loadingSteps.length > 0}
+            ensureRunning={false}
             companyCards={companyCards}
             cardsLoading={cardsLoading}
             regeneratingSection={regeneratingSection}
