@@ -900,6 +900,17 @@ export type Database = {
         }
         Returns: boolean
       }
+      merge_company_card: {
+        Args: {
+          p_account_json?: Json
+          p_assets_json?: Json
+          p_cards_json?: Json
+          p_company_id: string
+          p_contact_id: string
+          p_model_version?: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "user"
