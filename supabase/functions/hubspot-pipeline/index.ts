@@ -60,13 +60,15 @@ const CONTACT_BATCH = 15;   // companies whose contacts are fetched per Phase-2 
 const SCORE_BATCH   = 30;   // companies scored per Phase-3 invocation
 
 // ── Fire-and-forget self-chain ────────────────────────────────────────────────
-function chainSelf(payload: Record<string, unknown>) {
+function chainSelf(jobId: string) {
   const url  = Deno.env.get("SUPABASE_URL")!;
   const key  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  // Only send job_id — the next invocation reads snapshot from DB.
+  // Tiny payload = no size issues, no stale data.
   fetch(`${url}/functions/v1/hubspot-pipeline`, {
     method : "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body   : JSON.stringify(payload),
+    body   : JSON.stringify({ job_id: jobId }),
   }).catch(e => console.error("chain error:", e.message));
 }
 
@@ -91,7 +93,12 @@ async function listHubSpotPage(
 ): Promise<{ companies: any[]; nextAfter: string | null }> {
   const url = new URL("https://api.hubapi.com/crm/v3/objects/companies");
   url.searchParams.set("limit", String(COMPANY_BATCH));
-  url.searchParams.set("properties", properties);
+  // Cap properties to prevent URL overflow on GET requests.
+  // HubSpot GET URL limit is ~4096 chars. Keep properties under 2000 chars.
+  const safeProps = properties.length > 2000
+    ? "name,domain,industry,country,numberofemployees,lifecyclestage,hubspot_owner_id,hs_object_id,hs_lastmodifieddate,createdate"
+    : properties;
+  url.searchParams.set("properties", safeProps);
   if (after) url.searchParams.set("after", after);
 
   const res = await hubspotFetch(url.toString(), {
@@ -169,10 +176,16 @@ async function runPhase1(supabase: any, apiKey: string, jobId: string, snap: any
 
   console.log(`pipeline phase1: cursor=${after ?? "start"}, processed so far=${processed}`);
 
-  const allProps  = await getAllPropertyNames(apiKey);
-  const properties = allProps.length > 0
-    ? allProps.join(",")
-    : "name,domain,industry,country,numberofemployees,lifecyclestage";
+  // Cache property names in snapshot to avoid extra API call per batch
+  let properties: string;
+  if (snap._cached_properties) {
+    properties = snap._cached_properties;
+  } else {
+    const allProps = await getAllPropertyNames(apiKey);
+    properties = allProps.length > 0
+      ? allProps.join(",")
+      : "name,domain,industry,country,numberofemployees,lifecyclestage";
+  }
 
   const { companies, nextAfter } = await listHubSpotPage(apiKey, after, properties);
 
@@ -195,6 +208,7 @@ async function runPhase1(supabase: any, apiKey: string, jobId: string, snap: any
     phase: 1,
     phase1_cursor: nextAfter,
     phase1_processed: newProcessed,
+    _cached_properties: properties,
   };
 
   // Update job progress
@@ -207,14 +221,14 @@ async function runPhase1(supabase: any, apiKey: string, jobId: string, snap: any
 
   if (nextAfter) {
     // More pages in Phase 1 — chain to next page
-    chainSelf({ job_id: jobId, snapshot: newSnap });
+    chainSelf(jobId);
     console.log(`pipeline phase1: chaining next page, cursor=${nextAfter}`);
   } else {
     // Phase 1 complete — transition to Phase 2
     console.log(`pipeline phase1: DONE — ${newProcessed} companies upserted. Starting phase 2.`);
     const phase2Snap = { ...newSnap, phase: 2, phase2_offset: 0, phase2_processed: 0, phase2_failed: 0 };
     await supabase.from("processing_jobs").update({ settings_snapshot: phase2Snap }).eq("id", jobId);
-    chainSelf({ job_id: jobId, snapshot: phase2Snap });
+    chainSelf(jobId);
   }
 }
 
@@ -387,14 +401,14 @@ async function runPhase2(supabase: any, apiKey: string, jobId: string, snap: any
   }).eq("id", jobId);
 
   if (hasMore) {
-    chainSelf({ job_id: jobId, snapshot: newSnap });
+    chainSelf(jobId);
     console.log(`pipeline phase2: chaining next batch, offset=${newOffset}`);
   } else {
     // Phase 2 complete — transition to Phase 3
     console.log(`pipeline phase2: DONE — checked ${newProcessed} companies, imported ${newSnap.phase2_contacts_imported} contacts. Starting phase 3.`);
     const phase3Snap = { ...newSnap, phase: 3, phase3_offset: 0, phase3_scored: 0, phase3_failed: 0 };
     await supabase.from("processing_jobs").update({ settings_snapshot: phase3Snap }).eq("id", jobId);
-    chainSelf({ job_id: jobId, snapshot: phase3Snap });
+    chainSelf(jobId);
   }
 }
 
@@ -530,7 +544,7 @@ async function runPhase3(supabase: any, jobId: string, snap: any) {
 
   if (hasMore) {
     await supabase.from("processing_jobs").update({ settings_snapshot: newSnap }).eq("id", jobId);
-    chainSelf({ job_id: jobId, snapshot: newSnap });
+    chainSelf(jobId);
     console.log(`pipeline phase3: chaining next batch, offset=${newOffset}`);
   } else {
     console.log(`pipeline: COMPLETE — ${snap.phase1_processed ?? 0} companies upserted, ${snap.phase2_contacts_imported ?? 0} contacts imported, ${newScored} scored.`);
@@ -559,11 +573,16 @@ Deno.serve(async (req) => {
     let body: any = {};
     try { body = await req.json(); } catch { /* ignore */ }
 
-    let { job_id: jobId, snapshot } = body;
+    let jobId = body.job_id || null;
 
     // ── First call: create the job record ────────────────────────────────────
     if (!jobId) {
-      const initSnap = { phase: 1, phase1_cursor: null, phase1_processed: 0, pipeline_started_at: new Date().toISOString() };
+      const initSnap = {
+        phase: 1,
+        phase1_cursor: null,
+        phase1_processed: 0,
+        pipeline_started_at: new Date().toISOString(),
+      };
       const { data: job, error: jobErr } = await supabase
         .from("processing_jobs")
         .insert({
@@ -575,32 +594,34 @@ Deno.serve(async (req) => {
         .select("id")
         .single();
       if (jobErr) throw new Error(`Failed to create job: ${jobErr.message}`);
-      jobId   = job.id;
-      snapshot = initSnap;
+      jobId = job.id;
       console.log(`pipeline: started job ${jobId}`);
     }
 
-    const snap  = snapshot ?? {};
+    // ── ALWAYS read snapshot from DB — single source of truth ──────────────
+    const { data: jobRow, error: jobReadErr } = await supabase
+      .from("processing_jobs")
+      .select("status, settings_snapshot")
+      .eq("id", jobId)
+      .single();
+
+    if (jobReadErr || !jobRow) {
+      throw new Error(`Failed to read job ${jobId}: ${jobReadErr?.message || "not found"}`);
+    }
+
+    // Check for cancellation
+    if (jobRow.status === "canceled" || jobRow.status === "failed") {
+      console.log(`pipeline: job ${jobId} is ${jobRow.status} — stopping.`);
+      return new Response(
+        JSON.stringify({ status: "stopped", reason: jobRow.status, job_id: jobId }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const snap  = (jobRow.settings_snapshot as any) ?? {};
     const phase = snap.phase ?? 1;
 
     console.log(`pipeline: job=${jobId} phase=${phase}`);
-
-    // ── Canceled check: re-read job status from DB before every chained batch ──
-    // This is what actually stops the pipeline when the user hits "Cancel".
-    if (jobId) {
-      const { data: jobRow } = await supabase
-        .from("processing_jobs")
-        .select("status")
-        .eq("id", jobId)
-        .single();
-      if (jobRow?.status === "canceled" || jobRow?.status === "failed") {
-        console.log(`pipeline: job ${jobId} is ${jobRow.status} — stopping chain.`);
-        return new Response(
-          JSON.stringify({ status: "stopped", reason: jobRow.status, job_id: jobId }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    }
 
     if (phase === 1)             await runPhase1(supabase, apiKey, jobId, snap);
     else if (phase === 2)        await runPhase2(supabase, apiKey, jobId, snap);
