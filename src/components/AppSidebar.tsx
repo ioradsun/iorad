@@ -155,7 +155,11 @@ export default function AppSidebar() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
-                      onClick={() => navigate(`/company/${companyId}?addContact=true`)}
+                      onClick={() => {
+                        const params = new URLSearchParams(window.location.search);
+                        params.set("addContact", "true");
+                        navigate(`/company/${companyId}?${params.toString()}`);
+                      }}
                       className="text-foreground/25 hover:text-primary transition-colors p-0.5 rounded hover:bg-secondary/50"
                     >
                       <Plus className="w-3 h-3" />
