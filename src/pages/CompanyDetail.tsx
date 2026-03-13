@@ -66,7 +66,7 @@ export default function CompanyDetail() {
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [newContact, setNewContact] = useState({ name: "", title: "", email: "", linkedin: "" });
   const [savingContact, setSavingContact] = useState(false);
-  const [syncingFathom, setSyncingFathom] = useState(false);
+  
   const [analyzingMeeting, setAnalyzingMeeting] = useState<string | null>(null);
   const [generatingContactId, setGeneratingContactId] = useState<string | null>(null);
   const [regeneratingSection, setRegeneratingSection] = useState<string | null>(null);
