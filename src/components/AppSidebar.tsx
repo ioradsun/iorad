@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Building2, Signal, ChevronLeft,
-  LogOut, Shield, Briefcase, GraduationCap, Handshake, User, Info, Plus,
+  LogOut, Shield, Briefcase, GraduationCap, Handshake, Info, Plus,
 } from "lucide-react";
 import ioradLogoDark from "@/assets/iorad-logo-new.png";
 import ioradLogoLight from "@/assets/iorad-logo-light.png";
@@ -20,6 +20,7 @@ import {
 import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { scoreContact, sortContactsByActivity } from "@/lib/contactScore";
 
 const categoryItems = [
   { key: "business", label: "Business", icon: Briefcase },
@@ -175,23 +176,34 @@ export default function AppSidebar() {
             )}
 
             <div className="max-h-[320px] overflow-y-auto space-y-0.5 scrollbar-thin">
-              {filteredContacts.map((c: any) => {
+              {sortContactsByActivity(filteredContacts).map((c: any) => {
                 const isSelected = selectedContactId === c.id;
+                const activity = scoreContact((c.hubspot_properties as any) || null);
                 return (
                   <button
                     key={c.id}
                     onClick={() => navigate(`/company/${companyId}?contact=${c.id}`)}
-                    className={`w-full flex items-start gap-2.5 px-3 py-1.5 rounded-lg text-left transition-colors ${
+                    className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-left transition-colors ${
                       isSelected
                         ? "bg-secondary text-foreground"
                         : "text-foreground/40 hover:text-foreground/70 hover:bg-secondary/50"
                     }`}
                   >
-                    <User className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <div className="text-caption font-medium truncate">{c.name}</div>
                       {c.title && <div className="text-micro text-foreground/20 truncate">{c.title}</div>}
                     </div>
+                    {activity.tier !== "none" && (
+                      <span className={`shrink-0 text-micro font-medium px-1.5 py-0.5 rounded ${
+                        activity.tier === "active"
+                          ? "bg-success/10 text-success"
+                          : activity.tier === "engaged"
+                          ? "bg-primary/10 text-primary/70"
+                          : "bg-foreground/[0.06] text-foreground/30"
+                      }`}>
+                        {activity.label}
+                      </span>
+                    )}
                   </button>
                 );
               })}
