@@ -48,7 +48,7 @@ function Connector() {
   );
 }
 
-export default function StoryHero({ customer, pm }: StoryHeroProps) {
+const StoryHero = forwardRef<HTMLElement, StoryHeroProps>(function StoryHero({ customer, pm }, _ref) {
   const ctx = useStoryEdit();
   const isEditing = ctx?.isEditing;
 
