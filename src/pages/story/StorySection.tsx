@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { EditableText } from "./EditableText";
 import { useStoryEdit } from "./EditContext";
 import { useFadeIn } from "./useFadeIn";
@@ -13,7 +14,7 @@ interface StorySectionProps {
   annotation?: React.ReactNode;
 }
 
-export default function StorySection({ icon: Icon, label, labelField, title, titleField, children, annotation }: StorySectionProps) {
+const StorySection = forwardRef<HTMLElement, StorySectionProps>(function StorySection({ icon: Icon, label, labelField, title, titleField, children, annotation }: StorySectionProps, _ref) {
   const ctx = useStoryEdit();
   const isEditing = ctx?.isEditing;
   const ref = useFadeIn();
@@ -39,4 +40,7 @@ export default function StorySection({ icon: Icon, label, labelField, title, tit
       </div>
     </section>
   );
-}
+});
+
+
+export default StorySection;

@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { Clock } from "lucide-react";
 import { EditableText } from "./EditableText";
 import { useStoryEdit } from "./EditContext";
@@ -8,7 +9,7 @@ interface Props {
   text: string;
 }
 
-export default function WhyNowSection({ text }: Props) {
+const WhyNowSection = forwardRef<HTMLElement, Props>(function WhyNowSection({ text }: Props, _ref) {
   const ctx = useStoryEdit();
   const val = ctx?.isEditing ? ctx.editedCustomer.whyNow : text;
   const defaultLabel = "Why This Matters Now";
@@ -36,4 +37,7 @@ export default function WhyNowSection({ text }: Props) {
       </div>
     </section>
   );
-}
+});
+
+
+export default WhyNowSection;

@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { Mail } from "lucide-react";
 import type { Customer } from "@/data/customers";
 import type { PartnerMeta } from "@/data/partnerMeta";
@@ -10,7 +11,7 @@ interface Props {
   pm: PartnerMeta;
 }
 
-export default function StoryCTA({ customer, pm }: Props) {
+const StoryCTA = forwardRef<HTMLElement, Props>(function StoryCTA({ customer, pm }, _ref) {
   const ctx = useStoryEdit();
   const ref = useFadeIn();
 
@@ -50,4 +51,6 @@ export default function StoryCTA({ customer, pm }: Props) {
       </div>
     </section>
   );
-}
+});
+
+export default StoryCTA;

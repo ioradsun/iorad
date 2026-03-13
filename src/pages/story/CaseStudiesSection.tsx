@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { Users } from "lucide-react";
 import StorySection from "./StorySection";
 import type { CaseStudy } from "@/data/customers";
@@ -24,7 +25,7 @@ function FadeInItem({ children, delay }: { children: React.ReactNode; delay: num
   );
 }
 
-export default function CaseStudiesSection({ studies }: Props) {
+const CaseStudiesSection = forwardRef<HTMLElement, Props>(function CaseStudiesSection({ studies }: Props, _ref) {
   const ctx = useStoryEdit();
   const data = ctx?.isEditing ? ctx.editedCustomer.caseStudies : studies;
   const annotation = useSectionAnnotation("caseStudies");
@@ -64,4 +65,7 @@ export default function CaseStudiesSection({ studies }: Props) {
       </div>
     </StorySection>
   );
-}
+});
+
+
+export default CaseStudiesSection;

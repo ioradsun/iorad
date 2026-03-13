@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { Eye } from "lucide-react";
 import StorySection from "./StorySection";
 import { EditableText, EditableListItemWrapper } from "./EditableText";
@@ -23,7 +24,7 @@ function FadeInItem({ children, delay }: { children: React.ReactNode; delay: num
   );
 }
 
-export default function ExecutionFrictionSection({ items }: Props) {
+const ExecutionFrictionSection = forwardRef<HTMLElement, Props>(function ExecutionFrictionSection({ items }: Props, _ref) {
   const ctx = useStoryEdit();
   const data = ctx?.isEditing ? ctx.editedCustomer.executionFriction : items;
   const annotation = useSectionAnnotation("executionFriction");
@@ -54,4 +55,7 @@ export default function ExecutionFrictionSection({ items }: Props) {
       </div>
     </StorySection>
   );
-}
+});
+
+
+export default ExecutionFrictionSection;

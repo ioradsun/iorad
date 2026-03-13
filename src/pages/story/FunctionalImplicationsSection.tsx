@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { Target } from "lucide-react";
 import StorySection from "./StorySection";
 import { EditableText } from "./EditableText";
@@ -9,7 +10,7 @@ interface Props {
   contactName?: string;
 }
 
-export default function FunctionalImplicationsSection({ text, contactName }: Props) {
+const FunctionalImplicationsSection = forwardRef<HTMLElement, Props>(function FunctionalImplicationsSection({ text, contactName }: Props, _ref) {
   const ctx = useStoryEdit();
   const data = ctx?.isEditing ? ctx.editedCustomer.functionalImplications : text;
   const annotation = useSectionAnnotation("functionalImplications");
@@ -38,4 +39,7 @@ export default function FunctionalImplicationsSection({ text, contactName }: Pro
       </div>
     </StorySection>
   );
-}
+});
+
+
+export default FunctionalImplicationsSection;

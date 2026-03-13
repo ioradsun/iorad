@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { TrendingUp } from "lucide-react";
 import StorySection from "./StorySection";
 import type { InitiativeItem } from "@/data/customers";
@@ -25,7 +26,7 @@ function FadeInItem({ children, delay }: { children: React.ReactNode; delay: num
   );
 }
 
-export default function WhatsHappeningSection({ companyName, items }: Props) {
+const WhatsHappeningSection = forwardRef<HTMLElement, Props>(function WhatsHappeningSection({ companyName, items }: Props, _ref) {
   const ctx = useStoryEdit();
   const data = ctx?.isEditing ? ctx.editedCustomer.whatsHappening : items;
   const annotation = useSectionAnnotation("whatsHappening");
@@ -51,4 +52,7 @@ export default function WhatsHappeningSection({ companyName, items }: Props) {
       </div>
     </StorySection>
   );
-}
+});
+
+
+export default WhatsHappeningSection;

@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { HelpCircle } from "lucide-react";
 import StorySection from "./StorySection";
 import { EditableText, EditableListItemWrapper } from "./EditableText";
@@ -23,7 +24,7 @@ function FadeInQuote({ children, delay }: { children: React.ReactNode; delay: nu
   );
 }
 
-export default function AccountabilityPressureSection({ items }: Props) {
+const AccountabilityPressureSection = forwardRef<HTMLElement, Props>(function AccountabilityPressureSection({ items }: Props, _ref) {
   const ctx = useStoryEdit();
   const data = ctx?.isEditing ? ctx.editedCustomer.accountabilityPressure : items;
   const annotation = useSectionAnnotation("accountabilityPressure");
@@ -48,4 +49,7 @@ export default function AccountabilityPressureSection({ items }: Props) {
       </div>
     </StorySection>
   );
-}
+});
+
+
+export default AccountabilityPressureSection;
