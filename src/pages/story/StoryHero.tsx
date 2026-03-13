@@ -84,30 +84,64 @@ const StoryHero = forwardRef<HTMLElement, StoryHeroProps>(function StoryHero({ c
             </div>
           </div>
 
-          <span
-            className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-[0.2em] px-3 py-1 rounded-full border mb-6"
-            style={{ borderColor: pm.color + "50", color: pm.color, background: pm.color + "10" }}
-          >
-            Prepared for {customer.name}
-          </span>
+          {isEditing ? (
+            <EditableText
+              value={customer.overrides?.["hero.badge"] ?? `Prepared for ${customer.name}`}
+              field="overrides.hero.badge"
+              as="span"
+              className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-[0.2em] px-3 py-1 rounded-full border mb-6"
+              style={{ borderColor: pm.color + "50", color: pm.color, background: pm.color + "10" }}
+            />
+          ) : (
+            <span
+              className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-[0.2em] px-3 py-1 rounded-full border mb-6"
+              style={{ borderColor: pm.color + "50", color: pm.color, background: pm.color + "10" }}
+            >
+              {customer.overrides?.["hero.badge"] ?? `Prepared for ${customer.name}`}
+            </span>
+          )}
 
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight leading-[1.15] mb-6 max-w-3xl">
-            {customer.contactName ? (
-              <>
-                {customer.contactName}, here's what we're seeing at{" "}
-                <span style={{ backgroundImage: `linear-gradient(to right, var(--story-gradient-from), var(--story-gradient-to))`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                  {customer.name}
-                </span>
-              </>
-            ) : (
-              <>
-                An operating brief for{" "}
-                <span style={{ backgroundImage: `linear-gradient(to right, var(--story-gradient-from), var(--story-gradient-to))`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                  {customer.name}
-                </span>
-              </>
-            )}
-          </h1>
+          {(() => {
+            const defaultHeading = customer.contactName
+              ? `${customer.contactName}, here's what we're seeing at ${customer.name}`
+              : `An operating brief for ${customer.name}`;
+            const headingValue = customer.overrides?.["hero.heading"] ?? defaultHeading;
+
+            if (isEditing) {
+              return (
+                <EditableText
+                  value={headingValue}
+                  field="overrides.hero.heading"
+                  as="h1"
+                  className="text-4xl md:text-5xl font-bold tracking-tight leading-[1.15] mb-6 max-w-3xl"
+                  style={{ backgroundImage: `linear-gradient(to right, var(--story-gradient-from), var(--story-gradient-to))`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}
+                />
+              );
+            }
+
+            // Non-edit mode: use gradient on company name only
+            return (
+              <h1 className="text-4xl md:text-5xl font-bold tracking-tight leading-[1.15] mb-6 max-w-3xl">
+                {customer.overrides?.["hero.heading"] ? (
+                  customer.overrides["hero.heading"]
+                ) : customer.contactName ? (
+                  <>
+                    {customer.contactName}, here's what we're seeing at{" "}
+                    <span style={{ backgroundImage: `linear-gradient(to right, var(--story-gradient-from), var(--story-gradient-to))`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                      {customer.name}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    An operating brief for{" "}
+                    <span style={{ backgroundImage: `linear-gradient(to right, var(--story-gradient-from), var(--story-gradient-to))`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                      {customer.name}
+                    </span>
+                  </>
+                )}
+              </h1>
+            );
+          })()}
 
           {isEditing ? (
             <EditableText
