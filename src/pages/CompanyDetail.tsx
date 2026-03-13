@@ -11,19 +11,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, Eye, Building2, Users, DollarSign, ChevronRight, PhoneCall, UserSearch } from "lucide-react";
+import { ArrowLeft, RefreshCw, ExternalLink, Briefcase, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, Building2, Users, DollarSign, ChevronRight, PhoneCall } from "lucide-react";
 import { Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 
 // Sub-components
-import { parseJson, toArray, toLoomEmbedUrl, toIoradEmbedUrl } from "./company/types";
-import type { SnapshotJSON, DashboardCard, EmailTouch, LinkedInStep, StoryAssets } from "./company/types";
+import { parseJson, toArray } from "./company/types";
+import type { SnapshotJSON } from "./company/types";
 import OnboardingTab from "./company/OnboardingTab";
-import StrategyTab from "./company/StrategyTab";
-import OutreachTab from "./company/OutreachTab";
-import StoryTab from "./company/StoryTab";
-import ContactsSection from "./company/ContactsSection";
 import CompanySignalsSection from "./company/CompanySignalsSection";
+import ContactDetailView from "./company/ContactDetailView";
 
 export default function CompanyDetail() {
   const { id } = useParams<{ id: string }>();
@@ -45,13 +42,8 @@ export default function CompanyDetail() {
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [newContact, setNewContact] = useState({ name: "", title: "", email: "", linkedin: "" });
   const [savingContact, setSavingContact] = useState(false);
-  const [loomUrl, setLoomUrl] = useState<string | null>(null);
-  const [ioradUrl, setIoradUrl] = useState<string | null>(null);
-  const [findingContacts, setFindingContacts] = useState(false);
   const [syncingFathom, setSyncingFathom] = useState(false);
-  const [fixingDomain, setFixingDomain] = useState(false);
   const [analyzingMeeting, setAnalyzingMeeting] = useState<string | null>(null);
-  const [contactSearch, setContactSearch] = useState("");
   const [syncingHubspot, setSyncingHubspot] = useState(false);
   const [generatingContactId, setGeneratingContactId] = useState<string | null>(null);
   const [regeneratingSection, setRegeneratingSection] = useState<string | null>(null);
@@ -87,17 +79,15 @@ export default function CompanyDetail() {
     runExtraction();
   }, [id, contacts, queryClient]);
 
+
+  useEffect(() => {
+    if (contacts.length > 0 && activeTab === "company") {
+      setActiveTab("contacts");
+    }
+  }, [contacts.length, activeTab]);
+
   const effectiveContactId = selectedContactId || contacts[0]?.id || "";
   const { data: companyCards, isLoading: cardsLoading } = useCompanyCards(id, effectiveContactId || undefined);
-
-  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const autosaveUrls = useCallback((loom: string, iorad: string) => {
-    if (!id) return;
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    autosaveTimer.current = setTimeout(() => {
-      updateCompany.mutate({ id, updates: { loom_url: loom || null, iorad_url: iorad || null } });
-    }, 800);
-  }, [id, updateCompany]);
 
   const regenerateSection = useCallback(async (section: "contacts" | "strategy" | "outreach" | "story" | "signals" | "company") => {
     if (!id) return;
@@ -127,8 +117,6 @@ export default function CompanyDetail() {
   const companyAny = company as any;
   const companyCategory = companyAny?.category || (companyAny?.source_type === "inbound" ? "business" : companyAny?.partner ? "partner" : "business");
   const isPartnerCategory = companyCategory === "partner";
-  const effectiveLoomUrl = loomUrl ?? companyAny?.loom_url ?? "";
-  const effectiveIoradUrl = ioradUrl ?? companyAny?.iorad_url ?? "";
 
   const handleAddContact = async () => {
     if (!id || !newContact.name.trim()) return;
@@ -218,7 +206,6 @@ export default function CompanyDetail() {
       // Step 3: Find contacts via Apollo (skip for partner companies — contacts come from HubSpot)
       if (companyAny?.category === "partner" || (!companyAny?.category && companyAny?.source_type !== "inbound")) {
         toast.info("Step 3/3 — Finding contacts via Apollo…");
-        setFindingContacts(true);
         try {
           const { data: contactData, error: contactErr } = await supabase.functions.invoke("find-contacts", { body: { company_id: id } });
           if (contactErr) throw contactErr;
@@ -232,7 +219,6 @@ export default function CompanyDetail() {
           console.error("Contact enrichment failed:", ce);
           toast.error("Contact enrichment failed: " + (ce.message || "Unknown error"));
         } finally {
-          setFindingContacts(false);
         }
       }
 
@@ -311,7 +297,7 @@ export default function CompanyDetail() {
           setAnalyzingMeeting(null);
           toast.success("Transcript analysis complete — check the Onboarding tab");
           queryClient.invalidateQueries({ queryKey: ["meetings", id] });
-          setActiveTab("onboarding");
+          setActiveTab("company");
         }
       }
     } catch (e: any) { toast.error(e.message || "Fathom sync failed"); }
@@ -331,27 +317,6 @@ export default function CompanyDetail() {
       queryClient.invalidateQueries({ queryKey: ["meetings", id] });
     } catch (e: any) { toast.error(e.message || "Analysis failed"); }
     finally { setAnalyzingMeeting(null); }
-  };
-
-  const fixDomain = async () => {
-    if (!id) return;
-    setFixingDomain(true);
-    toast.info("AI is checking the domain…");
-    try {
-      const { data, error } = await supabase.functions.invoke("fix-domain", {
-        body: { company_id: id },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      const result = data.results?.[0];
-      if (result && result.old_domain !== result.new_domain) {
-        toast.success(`Domain fixed: ${result.old_domain} → ${result.new_domain}`);
-        queryClient.invalidateQueries({ queryKey: ["company", id] });
-      } else {
-        toast.info("Domain looks correct — no changes needed");
-      }
-    } catch (e: any) { toast.error(e.message || "Domain fix failed"); }
-    finally { setFixingDomain(false); }
   };
 
   const runCompanySetup = async () => {
@@ -551,41 +516,9 @@ export default function CompanyDetail() {
   const latestSnapshot = snapshots[0];
   const snap = latestSnapshot ? parseJson<SnapshotJSON>(latestSnapshot.snapshot_json) : null;
 
-  const cards = (companyCards?.cards_json as unknown as DashboardCard[] | null) || [];
-  const assets = parseJson<{ email_sequence?: Record<string, EmailTouch>; linkedin_sequence?: LinkedInStep[]; story_assets?: StoryAssets }>(companyCards?.assets_json as Json) || {};
-  const rawAccountJson = parseJson<Record<string, unknown>>(companyCards?.account_json as Json) || {};
-  // Strategy data: check dedicated _strategy namespace first, then fall back to root-level fields
-  // (root-level exists when data was generated before the namespacing fix)
-  const inboundStrategyData: Record<string, unknown> | null = (() => {
-    const namespaced = rawAccountJson?._strategy as Record<string, unknown> | undefined;
-    if (namespaced && (namespaced.momentum_observed || namespaced.initiative_translation || namespaced.opening_paragraph || namespaced.subject_line || namespaced.observed_behavior)) {
-      return namespaced;
-    }
-    // Fallback: root-level fields (legacy data)
-    if (rawAccountJson?.momentum_observed || rawAccountJson?.initiative_translation || rawAccountJson?.opening_paragraph || rawAccountJson?.subject_line) {
-      return rawAccountJson;
-    }
-    return null;
-  })();
-  const isInboundStrategyResponse = !!(inboundStrategyData?.momentum_observed || inboundStrategyData?.initiative_translation || inboundStrategyData?.observed_behavior || inboundStrategyData?.subject_line || inboundStrategyData?.opening_paragraph);
-  // Story data is stored at root with _type: inbound_story
-  const isInboundStoryResponse = !!(rawAccountJson?._type === "inbound_story" || rawAccountJson?.behavior_acknowledged);
-  const inboundStrategyFields: { label: string; key: string }[] = [
-    { label: "Momentum Observed", key: "momentum_observed" },
-    { label: "Initiative Translation", key: "initiative_translation" },
-    { label: "Scale Risk", key: "scale_risk" },
-    { label: "Institutionalization Gap", key: "institutionalization_gap" },
-    { label: "Executive Translation", key: "executive_translation" },
-    { label: "Real Cost If Stalled", key: "real_cost_if_stalled" },
-    { label: "Upside If Executed", key: "upside_if_executed" },
-    { label: "Why Now", key: "why_now" },
-    // Legacy fields (old prompt format)
-    { label: "Observed Behavior", key: "observed_behavior" },
-    { label: "Inferred Initiative", key: "inferred_initiative" },
-    { label: "Execution Gap", key: "execution_gap" },
-    { label: "Institutionalization Play", key: "institutionalization_play" },
-    { label: "ROI Expansion Path", key: "roi_expansion_path" },
-  ];
+  const companyStage = companyAny?.stage || "prospect";
+  const companyNameSlug = company.name.toLowerCase().replace(/\s+/g, "-");
+
   const accountData = parseJson<{
     name?: string; about?: { text?: string; status?: string };
     industry?: { value?: string; status?: string };
@@ -594,23 +527,6 @@ export default function CompanyDetail() {
     revenue_range?: { value?: string; status?: string };
     products_services?: { name: string; status?: string }[];
   }>(companyCards?.account_json as Json);
-
-  const loomEmbedUrl = toLoomEmbedUrl(effectiveLoomUrl);
-  const ioradEmbedUrl = toIoradEmbedUrl(effectiveIoradUrl);
-
-  const activeContact = contacts.find((c: any) => c.id === effectiveContactId)
-    || contacts[0]
-    || (companyAny?.buyer_name ? { name: companyAny.buyer_name } : null);
-  const activeContactName = activeContact?.name?.split(" ")[0] || null;
-  // category determines story URL type: non-partner (school/business) uses company_cards.id; partner uses slug
-  const companyStage = companyAny?.stage || "prospect";
-  const companyNameSlug = company.name.toLowerCase().replace(/\s+/g, "-");
-  const contactSlug = activeContact ? activeContact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "") : null;
-  const storyBaseUrl = !isPartnerCategory
-    ? contactSlug ? `/stories/${companyNameSlug}/${contactSlug}` : `/stories/${companyNameSlug}`
-    : activeContact && company.partner
-      ? `/${company.partner}/${companyNameSlug}/stories/${activeContact.name.split(" ")[0].toLowerCase().replace(/[^a-z]/g, "")}`
-      : null;
 
   // Small ghost regen button for individual sections
   const RegenerateBtn = ({ section, label }: { section: Parameters<typeof regenerateSection>[0]; label: string }) => (
@@ -695,58 +611,20 @@ export default function CompanyDetail() {
         </div>
       )}
 
-      {contacts.length > 0 && (
-        <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-secondary/30 border border-border/40">
-          <div className="flex items-center gap-2 text-caption text-foreground/45">
-            <UserSearch className="w-3.5 h-3.5" />
-            <span className="font-medium">Contact</span>
-          </div>
-          <Select value={selectedContactId || contacts[0]?.id || ""} onValueChange={setSelectedContactId}>
-            <SelectTrigger className="h-8 min-w-[220px] max-w-[320px] py-1 px-3 text-xs bg-background border-border/30">
-              <SelectValue placeholder="Select contact">
-                {(() => {
-                  const c = contacts.find((c: any) => c.id === effectiveContactId);
-                  if (!c) return null;
-                  return (
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-caption">{c.name}</span>
-                      {c.title && <span className="text-foreground/45 text-micro">· {c.title}</span>}
-                    </div>
-                  );
-                })()}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent className="bg-background z-50 min-w-[280px]">
-              {contacts.map((c: any) => (
-                <SelectItem key={c.id} value={c.id} className="py-2">
-                  <div className="flex flex-col items-start">
-                    <span className="font-medium text-caption leading-tight">{c.name}</span>
-                    {c.title && <span className="text-foreground/45 text-micro leading-tight">{c.title}</span>}
-                    {(c as any).role_focus && <span className="text-primary/70 text-micro leading-tight">{(c as any).role_focus}</span>}
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <span className="text-micro text-foreground/25 ml-auto">
-            Strategy, Outreach & Story are generated for this contact
-          </span>
-        </div>
-      )}
-
-      <Tabs defaultValue="company" className="w-full" onValueChange={setActiveTab}>
+      <Tabs defaultValue={contacts.length > 0 ? "contacts" : "company"} className="w-full" onValueChange={setActiveTab}>
         <div className="flex items-center justify-between gap-3 mb-4">
-          <TabsList className="justify-start gap-0">
+          <TabsList>
             <TabsTrigger value="company" className="text-sm">Company</TabsTrigger>
-            <TabsTrigger value="onboarding" className="text-sm">Onboarding</TabsTrigger>
-            <div className="w-px h-5 bg-border/60 mx-1.5" />
-            <TabsTrigger value="strategy" className="text-sm">Strategy</TabsTrigger>
-            <TabsTrigger value="outreach" className="text-sm">Outreach</TabsTrigger>
-            <TabsTrigger value="story" className="text-sm">Story</TabsTrigger>
+            <TabsTrigger value="contacts" className="text-sm">
+              Contacts
+              {contacts.length > 0 && (
+                <span className="ml-1.5 text-micro text-foreground/25 tabular-nums">{contacts.length}</span>
+              )}
+            </TabsTrigger>
           </TabsList>
 
           {/* Tab action bar */}
-          {activeTab === "company" || activeTab === "onboarding" ? (
+          {activeTab === "company" ? (
             <Button
               size="sm"
               variant="outline"
@@ -759,17 +637,7 @@ export default function CompanyDetail() {
                 : <RefreshCw className="w-3.5 h-3.5" />}
               {setupRunning ? (setupStep || "Setting up…") : "Refresh Company Data"}
             </Button>
-          ) : (
-            <div className="flex items-center gap-2">
-              {storyBaseUrl && (
-                <a href={storyBaseUrl} target="_blank" rel="noopener noreferrer">
-                  <Button size="sm" variant="outline" className="gap-1.5 text-caption">
-                    <Eye className="w-3.5 h-3.5" /> View Story
-                  </Button>
-                </a>
-              )}
-            </div>
-          )}
+          ) : null}
         </div>
 
         {/* ============ TAB 1: COMPANY ============ */}
@@ -860,40 +728,6 @@ export default function CompanyDetail() {
               </CollapsibleContent>
             </Collapsible>
           )}
-
-          <ContactsSection
-            companyId={id!}
-            contacts={contacts}
-            snapshots={snapshots}
-            company={company}
-            isPartnerCategory={isPartnerCategory}
-            companyNameSlug={companyNameSlug}
-            findingContacts={findingContacts}
-            generatingContactId={generatingContactId}
-            editingContactId={editingContactId}
-            editRoleFocus={editRoleFocus}
-            editUserNotes={editUserNotes}
-            onSetEditingContactId={setEditingContactId}
-            onSetEditRoleFocus={setEditRoleFocus}
-            onSetEditUserNotes={setEditUserNotes}
-            onGenerateForContact={generateForContact}
-            onDeleteContact={(cid) => setDeleteContactId(cid)}
-            addContactOpen={addContactOpen}
-            onSetAddContactOpen={setAddContactOpen}
-            newContact={newContact}
-            onSetNewContact={setNewContact}
-            onAddContact={handleAddContact}
-            savingContact={savingContact}
-            contactSearch={contactSearch}
-            onSetContactSearch={setContactSearch}
-            onRegenerateContacts={() => regenerateSection("contacts")}
-            regeneratingSection={regeneratingSection}
-            setupRunning={setupRunning}
-            deleteContactId={deleteContactId}
-            onSetDeleteContactId={setDeleteContactId}
-            deletingContact={deletingContact}
-            onConfirmDelete={() => deleteContactId && handleDeleteContact(deleteContactId)}
-          />
 
           {/* Meetings (Fathom) */}
           <Card className="bg-secondary/30">
@@ -1144,6 +978,20 @@ export default function CompanyDetail() {
 
           <div className="glow-line" />
 
+          <Collapsible>
+            <CollapsibleTrigger className="flex items-center justify-between w-full py-3">
+              <h3 className="text-body font-medium">Onboarding</h3>
+              <ChevronRight className="w-4 h-4 text-foreground/25 transition-transform data-[state=open]:rotate-90" />
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <OnboardingTab
+                meetings={meetings}
+                analyzingMeeting={analyzingMeeting}
+                onAnalyze={analyzeTranscript}
+              />
+            </CollapsibleContent>
+          </Collapsible>
+
           <CompanySignalsSection
             signals={signals}
             snapshots={snapshots}
@@ -1153,60 +1001,38 @@ export default function CompanyDetail() {
           />
         </TabsContent>
 
-        {/* ============ TAB 2: ONBOARDING ============ */}
-        <TabsContent value="onboarding">
-          <OnboardingTab
-            meetings={meetings}
-            analyzingMeeting={analyzingMeeting}
-            onAnalyze={analyzeTranscript}
-          />
-        </TabsContent>
-
-        {/* ============ TAB 3: STRATEGY ============ */}
-        <TabsContent value="strategy" className="space-y-8 mt-6">
-          <StrategyTab
-            contactName={activeContactName}
+        <TabsContent value="contacts" className="mt-6">
+          <ContactDetailView
+            companyId={id!}
+            company={company}
+            companyNameSlug={companyNameSlug}
+            isPartnerCategory={isPartnerCategory}
+            contacts={contacts}
+            selectedContactId={selectedContactId || contacts[0]?.id || ""}
+            onSelectContact={setSelectedContactId}
+            editingContactId={editingContactId}
+            editRoleFocus={editRoleFocus}
+            editUserNotes={editUserNotes}
+            onSetEditingContactId={setEditingContactId}
+            onSetEditRoleFocus={setEditRoleFocus}
+            onSetEditUserNotes={setEditUserNotes}
+            addContactOpen={addContactOpen}
+            onSetAddContactOpen={setAddContactOpen}
+            newContact={newContact}
+            onSetNewContact={setNewContact}
+            onAddContact={handleAddContact}
+            savingContact={savingContact}
+            deleteContactId={deleteContactId}
+            onSetDeleteContactId={setDeleteContactId}
+            deletingContact={deletingContact}
+            onConfirmDelete={() => deleteContactId && handleDeleteContact(deleteContactId)}
+            generatingContactId={generatingContactId}
+            onGenerateForContact={generateForContact}
+            setupRunning={setupRunning}
+            companyCards={companyCards}
             cardsLoading={cardsLoading}
-            isInboundStrategyResponse={isInboundStrategyResponse}
-            inboundStrategyData={inboundStrategyData}
-            inboundStrategyFields={inboundStrategyFields}
-            cards={cards}
             regeneratingSection={regeneratingSection}
-            setupRunning={setupRunning}
-            onRegenerate={() => regenerateSection("strategy")}
-          />
-        </TabsContent>
-
-        {/* ============ TAB 4: OUTREACH ============ */}
-        <TabsContent value="outreach" className="space-y-8 mt-6">
-          <OutreachTab
-            contactName={activeContactName}
-            cardsLoading={cardsLoading}
-            rawAccountJson={rawAccountJson}
-            emailSequence={assets.email_sequence}
-            linkedinSequence={assets.linkedin_sequence}
-            regeneratingSection={regeneratingSection}
-            setupRunning={setupRunning}
-            onRegenerate={() => regenerateSection("outreach")}
-          />
-        </TabsContent>
-
-        {/* ============ TAB 5: STORY ============ */}
-        <TabsContent value="story" className="space-y-8 mt-6">
-          <StoryTab
-            contactName={activeContactName}
-            isInboundStoryResponse={isInboundStoryResponse}
-            rawAccountJson={rawAccountJson}
-            storyBaseUrl={storyBaseUrl}
-            loomUrl={effectiveLoomUrl}
-            ioradUrl={effectiveIoradUrl}
-            loomEmbedUrl={loomEmbedUrl}
-            ioradEmbedUrl={ioradEmbedUrl}
-            onLoomUrlChange={(v) => { setLoomUrl(v); autosaveUrls(v, effectiveIoradUrl); }}
-            onIoradUrlChange={(v) => { setIoradUrl(v); autosaveUrls(effectiveLoomUrl, v); }}
-            regeneratingSection={regeneratingSection}
-            setupRunning={setupRunning}
-            onRegenerate={() => regenerateSection("story")}
+            onRegenerateSection={(section) => regenerateSection(section as any)}
           />
         </TabsContent>
 
