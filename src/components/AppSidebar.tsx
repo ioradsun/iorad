@@ -178,7 +178,7 @@ export default function AppSidebar() {
             <div className="max-h-[320px] overflow-y-auto space-y-0.5 scrollbar-thin">
               {sortContactsByActivity(filteredContacts).map((c: any) => {
                 const isSelected = selectedContactId === c.id;
-                const activity = scoreContact((c.hubspot_properties as any) || null);
+                const activity = getContactActivity((c.hubspot_properties as any) || null);
                 return (
                   <button
                     key={c.id}
