@@ -117,7 +117,7 @@ export default function CompanyDetail() {
     }
   }, [id, effectiveContactId, queryClient]);
 
-  const companyAny = company as any;
+  // companyAny declared above
   const companyCategory = companyAny?.category || (companyAny?.source_type === "inbound" ? "business" : companyAny?.partner ? "partner" : "business");
   const isPartnerCategory = companyCategory === "partner";
 
