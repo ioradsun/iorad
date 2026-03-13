@@ -79,12 +79,14 @@ export default function CompanyDetail() {
 
   const companyAny = company as any;
 
-  // Auto-switch to contacts when contacts load and company is set up
+  // Auto-switch to contacts on first load only
+  const hasAutoSwitched = useRef(false);
   useEffect(() => {
-    if (contacts.length > 0 && companyAny?.last_processed_at && activeTab === "company") {
+    if (!hasAutoSwitched.current && contacts.length > 0 && companyAny?.last_processed_at) {
+      hasAutoSwitched.current = true;
       setActiveTab("contacts");
     }
-  }, [contacts.length, companyAny?.last_processed_at, activeTab]);
+  }, [contacts.length, companyAny?.last_processed_at]);
 
   const regenerateSection = useCallback(async (section: "contacts" | "strategy" | "outreach" | "story" | "signals" | "company") => {
     if (!id) return;
