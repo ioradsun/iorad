@@ -671,10 +671,6 @@ export default function CompanyDetail() {
                 </>
               )}
             </div>
-          ) : activeTab === "contacts" && contacts.find((c: any) => c.id === effectiveContactId)?.title ? (
-            <div className="pl-8 text-caption text-foreground/35">
-              {contacts.find((c: any) => c.id === effectiveContactId)?.title}
-            </div>
           ) : null}
         </div>
 
