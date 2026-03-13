@@ -440,24 +440,46 @@ export default function ContactDetailView({
 
         {/* ═══ SECTION 2: AI CONTEXT + GENERATE BRIEFING ═══ */}
         <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="field-label">AI Context</div>
-              <p className="text-micro text-foreground/20 mt-0.5">Powers strategy, outreach & story</p>
+          <div className="relative pl-4 border-l-[3px] border-primary/40 bg-primary/[0.03] rounded-r-lg py-4 pr-4 -ml-1">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="text-caption font-semibold text-foreground/70">AI Context</div>
+                <p className="text-micro text-foreground/25 mt-0.5">
+                  Fill in before generating — powers strategy, outreach &amp; story
+                </p>
+              </div>
+              <span className={`text-micro transition-opacity duration-300 ${
+                saveStatus === "saving" ? "text-foreground/40 opacity-100"
+                : saveStatus === "saved" ? "text-success opacity-100"
+                : "opacity-0"
+              }`}>
+                {saveStatus === "saving" ? "Saving…" : "✓ Saved"}
+              </span>
             </div>
-            <span className={`text-micro transition-opacity duration-300 ${
-              saveStatus === "saving" ? "text-foreground/40 opacity-100"
-              : saveStatus === "saved" ? "text-success opacity-100"
-              : "opacity-0"
-            }`}>{saveStatus === "saving" ? "Saving…" : "✓ Saved"}</span>
-          </div>
-          <div>
-            <label className="field-label block mb-1.5">Role / Focus</label>
-            <input type="text" value={localRoleFocus} onChange={(e) => handleRoleFocusChange(e.target.value)} onBlur={handleFieldBlur} placeholder="e.g. Instructional Design, Training Ops" className="field-editable" />
-          </div>
-          <div>
-            <label className="field-label block mb-1.5">Notes</label>
-            <textarea value={localUserNotes} onChange={(e) => handleUserNotesChange(e.target.value)} onBlur={handleFieldBlur} placeholder="Context that improves AI output — role details, priorities, recent conversations" rows={3} className="field-editable-area" />
+            <div className="space-y-3">
+              <div>
+                <label className="text-micro font-medium text-foreground/35 block mb-1">Role / Focus</label>
+                <input
+                  type="text"
+                  value={localRoleFocus}
+                  onChange={(e) => handleRoleFocusChange(e.target.value)}
+                  onBlur={handleFieldBlur}
+                  placeholder="e.g. Instructional Design, Training Ops"
+                  className="w-full bg-transparent border border-border/30 rounded px-3 py-2 text-body text-foreground placeholder:text-foreground/15 placeholder:italic outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/10 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="text-micro font-medium text-foreground/35 block mb-1">Notes</label>
+                <textarea
+                  value={localUserNotes}
+                  onChange={(e) => handleUserNotesChange(e.target.value)}
+                  onBlur={handleFieldBlur}
+                  placeholder="Context that improves AI output — role details, priorities, recent conversations"
+                  rows={3}
+                  className="w-full bg-transparent border border-border/30 rounded px-3 py-2 text-body text-foreground placeholder:text-foreground/15 placeholder:italic outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/10 transition-colors resize-none leading-relaxed"
+                />
+              </div>
+            </div>
           </div>
 
           {!hasStrategy && !generatingBriefing && briefingSteps.length === 0 && (
