@@ -46,7 +46,7 @@ export default function InternalSignals() {
   };
 
   return (
-    <div className="max-w-xl mx-auto">
+    <div>
       {/* Compose box */}
       <div className="border rounded-xl bg-card mb-4 overflow-hidden">
         {!composeOpen ? (

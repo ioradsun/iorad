@@ -116,7 +116,7 @@ export default function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="max-w-5xl mx-auto px-1 space-y-5">
+      <div className="space-y-5">
         <div className="flex items-center gap-3 pt-1">
           <div className="h-9 w-72 rounded-md bg-foreground/[0.05] animate-pulse" />
           <div className="h-9 flex-1 max-w-sm rounded-md bg-foreground/[0.05] animate-pulse" />
@@ -140,7 +140,7 @@ export default function Dashboard() {
   const hasMore = activeList.length > visibleCount;
 
   return (
-    <div className="max-w-5xl mx-auto px-1 space-y-5">
+    <div className="space-y-5">
       <div className="flex items-center gap-3 pt-1">
         <div className="flex items-center bg-secondary rounded-md p-0.5 gap-0.5">
           {(["school", "business", "partner"] as CategoryTab[]).map(tab => (
