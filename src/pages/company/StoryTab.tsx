@@ -13,7 +13,7 @@ interface StoryTabProps {
   onLoomUrlChange: (url: string) => void;
   onIoradUrlChange: (url: string) => void;
   regeneratingSection: string | null;
-  setupRunning: boolean;
+  ensureRunning: boolean;
   onRegenerate: () => void;
 }
 
@@ -27,7 +27,7 @@ export default function StoryTab({
   onLoomUrlChange,
   onIoradUrlChange,
   regeneratingSection,
-  setupRunning,
+  ensureRunning,
   onRegenerate,
 }: StoryTabProps) {
   return (
@@ -166,7 +166,7 @@ export default function StoryTab({
       <div className="flex justify-end mt-6">
         <button
           className="text-micro text-foreground/20 hover:text-foreground/50 transition-colors flex items-center gap-1"
-          disabled={regeneratingSection === "story" || setupRunning}
+          disabled={regeneratingSection === "story" || ensureRunning}
           onClick={onRegenerate}
         >
           {regeneratingSection === "story"
