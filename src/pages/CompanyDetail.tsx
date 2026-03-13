@@ -672,6 +672,9 @@ export default function CompanyDetail() {
   }, [id, effectiveContactId, viewMode, company, isLoading, contacts, companyCards, queryClient]);
 
 
+  const rawAccountJson = parseJson<Record<string, unknown>>(companyCards?.account_json as Json) || {};
+  const hasContactStory = !!(rawAccountJson as any)?._type || !!(rawAccountJson as any)?.opening_hook || !!(rawAccountJson as any)?.behavior_acknowledged;
+
 
   useEffect(() => {
     if (viewMode !== "contact") return;
@@ -1438,18 +1441,20 @@ export default function CompanyDetail() {
                 <ContactMetaLine contact={effectiveContact} />
               </div>
               <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5"
-                  onClick={generateStory}
-                  disabled={generatingStory || contactEnsureSteps.length > 0}
-                >
-                  {generatingStory
-                    ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating Story…</>
-                    : <><Sparkles className="w-3.5 h-3.5" /> Generate Story</>}
-                </Button>
-                {storyBaseUrl && (
+                {!hasContactStory && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5"
+                    onClick={generateStory}
+                    disabled={generatingStory || contactEnsureSteps.length > 0}
+                  >
+                    {generatingStory
+                      ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating Story…</>
+                      : <><Sparkles className="w-3.5 h-3.5" /> Generate Story</>}
+                  </Button>
+                )}
+                {hasContactStory && storyBaseUrl && (
                   <a href={storyBaseUrl} target="_blank" rel="noopener noreferrer">
                     <Button size="sm" variant="outline" className="gap-1.5">
                       <ExternalLink className="w-3.5 h-3.5" /> View Story
