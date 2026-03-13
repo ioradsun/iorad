@@ -176,14 +176,12 @@ async function runPhase1(supabase: any, apiKey: string, jobId: string, snap: any
 
   const { companies, nextAfter } = await listHubSpotPage(apiKey, after, properties);
 
-  const touchedIds: string[] = [...(snap.touched_ids ?? [])];
   let upserted = 0;
   let failed   = 0;
 
   for (const hs of companies) {
     try {
-      const id = await upsertCompany(supabase, hs);
-      touchedIds.push(id);
+      await upsertCompany(supabase, hs);
       upserted++;
     } catch (e: any) {
       console.error(`phase1: failed to upsert ${hs.id}: ${e.message}`);
@@ -197,7 +195,6 @@ async function runPhase1(supabase: any, apiKey: string, jobId: string, snap: any
     phase: 1,
     phase1_cursor: nextAfter,
     phase1_processed: newProcessed,
-    touched_ids: touchedIds,
   };
 
   // Update job progress
@@ -355,8 +352,6 @@ async function runPhase2(supabase: any, apiKey: string, jobId: string, snap: any
 
   let contactsImported = 0;
   let failed = 0;
-  const touchedIds: string[] = [...(snap.touched_ids ?? [])];
-
   for (const company of noContactCompanies) {
     const hsProps = (company.hubspot_properties as any) || {};
     const hubspotId = hsProps.hs_object_id || hsProps.id;
@@ -368,7 +363,6 @@ async function runPhase2(supabase: any, apiKey: string, jobId: string, snap: any
       const n = await importContactsForCompany(supabase, String(hubspotId), company.id, apiKey);
       if (n > 0) {
         contactsImported += n;
-        if (!touchedIds.includes(company.id)) touchedIds.push(company.id);
       }
     } catch (e: any) {
       console.error(`phase2: contacts failed for ${company.name}: ${e.message}`);
@@ -386,7 +380,6 @@ async function runPhase2(supabase: any, apiKey: string, jobId: string, snap: any
     phase2_processed: newProcessed,
     phase2_contacts_imported: (snap.phase2_contacts_imported ?? 0) + contactsImported,
     phase2_failed: (snap.phase2_failed ?? 0) + failed,
-    touched_ids: touchedIds,
   };
 
   await supabase.from("processing_jobs").update({
@@ -478,20 +471,42 @@ async function scoreOneCompany(supabase: any, companyId: string): Promise<boolea
   return true;
 }
 
-// ── Phase-3: score companies touched in phases 1 & 2 ─────────────────────────
+// ── Phase-3: score companies (DB query, no touched_ids) ──────────────────────
 async function runPhase3(supabase: any, jobId: string, snap: any) {
-  const touchedIds: string[] = snap.touched_ids ?? [];
-  const offset    = snap.phase3_offset ?? 0;
+  const offset = snap.phase3_offset ?? 0;
   const totalScored = snap.phase3_scored ?? 0;
 
-  // Process a slice of touched IDs
-  const slice = touchedIds.slice(offset, offset + SCORE_BATCH);
-  console.log(`pipeline phase3: scoring ${slice.length} companies (offset=${offset}/${touchedIds.length})`);
+  // Query companies that need scoring: never scored, or scored before
+  // this pipeline job started. Replaces the in-memory touched_ids approach.
+  const { data: companies, error } = await supabase
+    .from("companies")
+    .select("id")
+    .or("scout_scored_at.is.null,scout_scored_at.lt." + (snap.pipeline_started_at || new Date().toISOString()))
+    .order("created_at", { ascending: false })
+    .range(offset, offset + SCORE_BATCH - 1);
+
+  if (error) throw new Error(`phase3 query failed: ${error.message}`);
+
+  const slice = companies || [];
+  console.log(`pipeline phase3: scoring ${slice.length} companies (offset=${offset})`);
+
+  if (slice.length === 0) {
+    // All done
+    console.log(`pipeline: COMPLETE — ${snap.phase1_processed ?? 0} companies upserted, ${snap.phase2_contacts_imported ?? 0} contacts imported, ${totalScored} scored.`);
+    await supabase.from("processing_jobs").update({
+      status: "completed",
+      finished_at: new Date().toISOString(),
+      companies_succeeded: snap.phase1_processed ?? 0,
+      companies_processed: snap.phase1_processed ?? 0,
+      settings_snapshot: { ...snap, phase: "done" },
+    }).eq("id", jobId);
+    return;
+  }
 
   let scored = 0;
   let failed = 0;
 
-  for (const id of slice) {
+  for (const { id } of slice) {
     try {
       const ok = await scoreOneCompany(supabase, id);
       if (ok) scored++;
@@ -501,21 +516,27 @@ async function runPhase3(supabase: any, jobId: string, snap: any) {
     }
   }
 
-  const newOffset  = offset + SCORE_BATCH;
-  const newScored  = totalScored + scored;
-  const hasMore    = newOffset < touchedIds.length;
-  const newSnap    = { ...snap, phase: 3, phase3_offset: newOffset, phase3_scored: newScored, phase3_failed: (snap.phase3_failed ?? 0) + failed };
+  const newOffset = offset + SCORE_BATCH;
+  const newScored = totalScored + scored;
+  const hasMore = slice.length === SCORE_BATCH;
+
+  const newSnap = {
+    ...snap,
+    phase: 3,
+    phase3_offset: newOffset,
+    phase3_scored: newScored,
+    phase3_failed: (snap.phase3_failed ?? 0) + failed,
+  };
 
   if (hasMore) {
     await supabase.from("processing_jobs").update({ settings_snapshot: newSnap }).eq("id", jobId);
     chainSelf({ job_id: jobId, snapshot: newSnap });
     console.log(`pipeline phase3: chaining next batch, offset=${newOffset}`);
   } else {
-    // All done!
     console.log(`pipeline: COMPLETE — ${snap.phase1_processed ?? 0} companies upserted, ${snap.phase2_contacts_imported ?? 0} contacts imported, ${newScored} scored.`);
     await supabase.from("processing_jobs").update({
-      status       : "completed",
-      finished_at  : new Date().toISOString(),
+      status: "completed",
+      finished_at: new Date().toISOString(),
       companies_succeeded: snap.phase1_processed ?? 0,
       companies_processed: snap.phase1_processed ?? 0,
       settings_snapshot: { ...newSnap, phase: "done" },
@@ -542,7 +563,7 @@ Deno.serve(async (req) => {
 
     // ── First call: create the job record ────────────────────────────────────
     if (!jobId) {
-      const initSnap = { phase: 1, phase1_cursor: null, phase1_processed: 0, touched_ids: [] };
+      const initSnap = { phase: 1, phase1_cursor: null, phase1_processed: 0, pipeline_started_at: new Date().toISOString() };
       const { data: job, error: jobErr } = await supabase
         .from("processing_jobs")
         .insert({

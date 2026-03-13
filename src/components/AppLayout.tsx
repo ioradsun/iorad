@@ -46,7 +46,7 @@ function useLastHubspotSync() {
       });
       return syncs[0] ?? null;
     },
-    refetchInterval: 60_000,
+    refetchInterval: 15_000,
   });
 }
 
@@ -70,7 +70,7 @@ function ActiveJobBanner() {
         .maybeSingle();
       return data;
     },
-    refetchInterval: 5_000,
+    refetchInterval: 3_000,
   });
 
   const currentCompany =

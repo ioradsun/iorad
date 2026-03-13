@@ -54,6 +54,7 @@ export default function CompanyDetail() {
   const [contactSearch, setContactSearch] = useState("");
   const [syncingHubspot, setSyncingHubspot] = useState(false);
   const [generatingContactId, setGeneratingContactId] = useState<string | null>(null);
+  const [regeneratingSection, setRegeneratingSection] = useState<string | null>(null);
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const [editRoleFocus, setEditRoleFocus] = useState("");
   const [editUserNotes, setEditUserNotes] = useState("");
@@ -97,6 +98,31 @@ export default function CompanyDetail() {
       updateCompany.mutate({ id, updates: { loom_url: loom || null, iorad_url: iorad || null } });
     }, 800);
   }, [id, updateCompany]);
+
+  const regenerateSection = useCallback(async (section: "contacts" | "strategy" | "outreach" | "story" | "signals" | "company") => {
+    if (!id) return;
+    setRegeneratingSection(section);
+    try {
+      if (section === "contacts") {
+        await supabase.functions.invoke("find-contacts", { body: { company_id: id } });
+        queryClient.invalidateQueries({ queryKey: ["contacts", id] });
+      } else if (section === "signals") {
+        await supabase.functions.invoke("run-signals", { body: { company_id: id, mode: "full" } });
+        queryClient.invalidateQueries({ queryKey: ["signals", id] });
+        queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
+      } else {
+        await supabase.functions.invoke("generate-cards", {
+          body: { company_id: id, tab: section, contact_id: section !== "company" ? (effectiveContactId || undefined) : undefined },
+        });
+        queryClient.invalidateQueries({ queryKey: ["company_cards", id], exact: false });
+      }
+      toast.success(`${section} regenerated`);
+    } catch (e: any) {
+      toast.error(e.message || `Failed to regenerate ${section}`);
+    } finally {
+      setRegeneratingSection(null);
+    }
+  }, [id, effectiveContactId, queryClient]);
 
   const companyAny = company as any;
   const companyCategory = companyAny?.category || (companyAny?.source_type === "inbound" ? "business" : companyAny?.partner ? "partner" : "business");

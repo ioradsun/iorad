@@ -235,11 +235,7 @@ export function useUnreadNotifications() {
         { event: "INSERT", schema: "public", table: "signal_notifications", filter: `user_id=eq.${user.id}` },
         () => qc.invalidateQueries({ queryKey: ["signal_notifications_unread"] })
       )
-      .subscribe((status) => {
-        if (status === "CHANNEL_ERROR") {
-          console.warn("Realtime subscription error — will retry automatically");
-        }
-      });
+      .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user?.id, qc]);
 
@@ -257,7 +253,7 @@ export function useUnreadNotifications() {
       if (error) throw error;
       return data || [];
     },
-    refetchInterval: 60_000,
+    refetchInterval: 30_000,
   });
 }
 
