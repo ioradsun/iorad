@@ -336,9 +336,11 @@ export type Database = {
           name: string
           profile_extracted_at: string | null
           reasoning: string | null
+          role_focus: string | null
           source: string | null
           title: string | null
           updated_at: string
+          user_notes: string | null
         }
         Insert: {
           company_id: string
@@ -352,9 +354,11 @@ export type Database = {
           name: string
           profile_extracted_at?: string | null
           reasoning?: string | null
+          role_focus?: string | null
           source?: string | null
           title?: string | null
           updated_at?: string
+          user_notes?: string | null
         }
         Update: {
           company_id?: string
@@ -368,9 +372,11 @@ export type Database = {
           name?: string
           profile_extracted_at?: string | null
           reasoning?: string | null
+          role_focus?: string | null
           source?: string | null
           title?: string | null
           updated_at?: string
+          user_notes?: string | null
         }
         Relationships: [
           {
@@ -893,6 +899,17 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      merge_company_card: {
+        Args: {
+          p_account_json?: Json
+          p_assets_json?: Json
+          p_cards_json?: Json
+          p_company_id: string
+          p_contact_id: string
+          p_model_version?: string
+        }
+        Returns: undefined
       }
     }
     Enums: {
