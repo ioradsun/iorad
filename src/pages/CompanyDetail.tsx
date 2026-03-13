@@ -856,20 +856,13 @@ export default function CompanyDetail() {
                   </details>
                 )}
 
-                <div className="flex items-center justify-between py-3 border-t border-border/10">
+                <div className="py-3 border-t border-border/10">
                   <span className="text-caption text-foreground/40">
                     {meetings.length} meeting{meetings.length !== 1 ? "s" : ""} synced
                     {meetings.filter((m: any) => m.transcript_analysis).length > 0 && (
                       <span> · {meetings.filter((m: any) => m.transcript_analysis).length} analyzed</span>
                     )}
                   </span>
-                  <button
-                    onClick={syncFathom}
-                    disabled={syncingFathom || !!analyzingMeeting}
-                    className="text-micro text-primary hover:text-primary/80 font-medium disabled:opacity-40"
-                  >
-                    {syncingFathom ? "Syncing…" : "Sync Fathom"}
-                  </button>
                 </div>
 
                 {meetings.length > 0 && (
