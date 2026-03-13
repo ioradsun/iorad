@@ -26,8 +26,9 @@ const AVAILABLE_MODELS = [
 
 export default function AdminSettings() {
   return (
-    <div className="max-w-4xl mx-auto">
-      <Tabs defaultValue="people" className="space-y-8">
+    <div>
+      <div className="max-w-3xl">
+        <Tabs defaultValue="people" className="space-y-8">
         <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="people">People</TabsTrigger>
           <TabsTrigger value="appearance">Appearance</TabsTrigger>
@@ -43,8 +44,9 @@ export default function AdminSettings() {
         <TabsContent value="events"><CompellingEventsTab /></TabsContent>
         <TabsContent value="partners"><PartnersTab /></TabsContent>
         <TabsContent value="processing"><ProcessingTab /></TabsContent>
-        <TabsContent value="scout"><ScoutTab /></TabsContent>
-      </Tabs>
+          <TabsContent value="scout"><ScoutTab /></TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }

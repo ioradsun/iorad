@@ -175,7 +175,7 @@ export default function UploadPage() {
   const industries = new Set(rows.map(r => r.industry).filter(Boolean));
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8">
+    <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link to="/" className="text-foreground/45 hover:text-foreground transition-colors"><ArrowLeft className="w-5 h-5" /></Link>
@@ -188,7 +188,8 @@ export default function UploadPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="manual" className="space-y-8">
+      <div className="max-w-2xl">
+        <Tabs defaultValue="manual" className="space-y-8">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="manual">Add Manually</TabsTrigger>
           <TabsTrigger value="upload">CSV Upload</TabsTrigger>
@@ -322,7 +323,8 @@ export default function UploadPage() {
         </motion.div>
       )}
         </TabsContent>
-      </Tabs>
+        </Tabs>
+      </div>
     </div>
   );
 }

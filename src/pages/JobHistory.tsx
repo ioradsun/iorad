@@ -98,14 +98,14 @@ export default function JobHistory() {
 
   if (isLoading) {
     return (
-      <div className="max-w-2xl mx-auto flex items-center justify-center py-32">
+      <div className="flex items-center justify-center py-32">
         <Loader2 className="w-5 h-5 animate-spin text-foreground/25" />
       </div>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-8">
+    <div className="space-y-8">
       <h1 className="text-display font-semibold tracking-tight">HubSpot Sync</h1>
 
       <div
