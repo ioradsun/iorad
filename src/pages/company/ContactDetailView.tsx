@@ -32,7 +32,7 @@ interface ContactDetailViewProps {
   onSetDeleteContactId: (id: string | null) => void;
   deletingContact: boolean;
   onConfirmDelete: () => void;
-  setupRunning: boolean;
+  ensureRunning: boolean;
   companyCards: any;
   cardsLoading: boolean;
   regeneratingSection: string | null;
@@ -56,7 +56,7 @@ export default function ContactDetailView({
   onSetDeleteContactId,
   deletingContact,
   onConfirmDelete,
-  setupRunning,
+  ensureRunning,
   companyCards,
   cardsLoading,
   regeneratingSection,
@@ -410,7 +410,7 @@ export default function ContactDetailView({
             inboundStrategyFields={inboundStrategyFields}
             cards={cards}
             regeneratingSection={regeneratingSection}
-            setupRunning={setupRunning}
+            ensureRunning={ensureRunning}
             onRegenerate={() => onRegenerateSection("strategy")}
           />
         </TabsContent>
@@ -423,7 +423,7 @@ export default function ContactDetailView({
             emailSequence={assets.email_sequence}
             linkedinSequence={assets.linkedin_sequence}
             regeneratingSection={regeneratingSection}
-            setupRunning={setupRunning}
+            ensureRunning={ensureRunning}
             onRegenerate={() => onRegenerateSection("outreach")}
           />
         </TabsContent>
@@ -441,7 +441,7 @@ export default function ContactDetailView({
             onLoomUrlChange={() => {}}
             onIoradUrlChange={() => {}}
             regeneratingSection={regeneratingSection}
-            setupRunning={setupRunning}
+            ensureRunning={ensureRunning}
             onRegenerate={() => onRegenerateSection("story")}
           />
         </TabsContent>

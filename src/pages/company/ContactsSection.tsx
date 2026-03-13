@@ -36,7 +36,7 @@ interface ContactsSectionProps {
   onSetContactSearch: (val: string) => void;
   onRegenerateContacts: () => void;
   regeneratingSection: string | null;
-  setupRunning: boolean;
+  ensureRunning: boolean;
   deleteContactId: string | null;
   onSetDeleteContactId: (id: string | null) => void;
   deletingContact: boolean;
@@ -70,7 +70,7 @@ export default function ContactsSection({
   onSetContactSearch,
   onRegenerateContacts,
   regeneratingSection,
-  setupRunning,
+  ensureRunning,
   deleteContactId,
   onSetDeleteContactId,
   deletingContact,
@@ -130,9 +130,9 @@ export default function ContactsSection({
                 size="sm"
                 className="h-7 text-xs gap-1"
                 onClick={onRegenerateContacts}
-                disabled={regeneratingSection === "contacts" || setupRunning}
+                disabled={regeneratingSection === "contacts" || ensureRunning}
               >
-                {(regeneratingSection === "contacts" || setupRunning) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                {(regeneratingSection === "contacts" || ensureRunning) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                 Find Contacts
               </Button>
             )}
@@ -240,7 +240,7 @@ export default function ContactsSection({
                         className="w-full gap-1.5 text-micro mt-2"
                         variant={isGenerating ? "secondary" : "default"}
                         onClick={() => onGenerateForContact(contact.id)}
-                        disabled={isGenerating || !!generatingContactId || setupRunning}
+                        disabled={isGenerating || !!generatingContactId || ensureRunning}
                       >
                         {isGenerating
                           ? <><Loader2 className="w-3 h-3 animate-spin" /> Generating…</>

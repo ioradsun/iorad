@@ -10,7 +10,7 @@ interface StrategyTabProps {
   inboundStrategyFields: { label: string; key: string }[];
   cards: DashboardCard[];
   regeneratingSection: string | null;
-  setupRunning: boolean;
+  ensureRunning: boolean;
   onRegenerate: () => void;
 }
 
@@ -21,7 +21,7 @@ export default function StrategyTab({
   inboundStrategyFields,
   cards,
   regeneratingSection,
-  setupRunning,
+  ensureRunning,
   onRegenerate,
 }: StrategyTabProps) {
   return (
@@ -85,7 +85,7 @@ export default function StrategyTab({
         <div className="flex justify-end mt-6">
           <button
             className="text-micro text-foreground/20 hover:text-foreground/50 transition-colors flex items-center gap-1"
-            disabled={regeneratingSection === "strategy" || setupRunning}
+            disabled={regeneratingSection === "strategy" || ensureRunning}
             onClick={onRegenerate}
           >
             {regeneratingSection === "strategy"
