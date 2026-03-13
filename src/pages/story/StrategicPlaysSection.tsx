@@ -11,19 +11,21 @@ interface Props {
   plays: StrategicPlay[];
 }
 
-function FadeInItem({ children, delay }: { children: React.ReactNode; delay: number }) {
-  const ref = useFadeIn();
+const FadeInItem = forwardRef<HTMLDivElement, { children: React.ReactNode; delay: number }>(
+  function FadeInItem({ children, delay }, _ref) {
+    const ref = useFadeIn();
 
-  return (
-    <div
-      ref={ref}
-      className="fade-in rounded-xl p-6"
-      style={{ border: "1px solid var(--story-border)", background: "var(--story-surface)", transitionDelay: `${delay}s` }}
-    >
-      {children}
-    </div>
-  );
-}
+    return (
+      <div
+        ref={ref}
+        className="fade-in rounded-xl p-6"
+        style={{ border: "1px solid var(--story-border)", background: "var(--story-surface)", transitionDelay: `${delay}s` }}
+      >
+        {children}
+      </div>
+    );
+  }
+);
 
 const StrategicPlaysSection = forwardRef<HTMLElement, Props>(function StrategicPlaysSection({ plays }: Props, _ref) {
   const ctx = useStoryEdit();

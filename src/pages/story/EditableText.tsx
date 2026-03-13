@@ -60,22 +60,24 @@ interface EditableListItemProps {
   children: React.ReactNode;
 }
 
-export function EditableListItemWrapper({ arrayPath, index, children }: EditableListItemProps) {
-  const ctx = useStoryEdit();
+export const EditableListItemWrapper = forwardRef<HTMLDivElement, EditableListItemProps>(
+  function EditableListItemWrapper({ arrayPath, index, children }, _ref) {
+    const ctx = useStoryEdit();
 
-  if (!ctx?.isEditing) return <>{children}</>;
+    if (!ctx?.isEditing) return <>{children}</>;
 
-  return (
-    <div className="relative group">
-      {children}
-      <button
-        onClick={() => ctx.removeFromArray(arrayPath, index)}
-        className="absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-md"
-        style={{ background: "#ef4444", color: "#fff" }}
-        title="Remove item"
-      >
-        <X className="w-3.5 h-3.5" />
-      </button>
-    </div>
-  );
-}
+    return (
+      <div className="relative group">
+        {children}
+        <button
+          onClick={() => ctx.removeFromArray(arrayPath, index)}
+          className="absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-md"
+          style={{ background: "#ef4444", color: "#fff" }}
+          title="Remove item"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    );
+  }
+);
