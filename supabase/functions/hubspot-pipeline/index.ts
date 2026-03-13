@@ -354,8 +354,6 @@ async function runPhase2(supabase: any, apiKey: string, jobId: string, snap: any
 
   let contactsImported = 0;
   let failed = 0;
-  const touchedIds: string[] = [...(snap.touched_ids ?? [])];
-
   for (const company of noContactCompanies) {
     const hsProps = (company.hubspot_properties as any) || {};
     const hubspotId = hsProps.hs_object_id || hsProps.id;
@@ -367,7 +365,6 @@ async function runPhase2(supabase: any, apiKey: string, jobId: string, snap: any
       const n = await importContactsForCompany(supabase, String(hubspotId), company.id, apiKey);
       if (n > 0) {
         contactsImported += n;
-        if (!touchedIds.includes(company.id)) touchedIds.push(company.id);
       }
     } catch (e: any) {
       console.error(`phase2: contacts failed for ${company.name}: ${e.message}`);
