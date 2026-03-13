@@ -1064,56 +1064,22 @@ export default function CompanyDetail() {
 }
 
 function ContactMetaLine({ contact }: { contact: any }) {
-  const hp = (contact.hubspot_properties as any) || {};
-  const isCreator = !!hp.first_tutorial_create_date;
-  const isViewer = !!(hp.first_tutorial_view_date || hp.first_tutorial_learn_date);
-  const hasExtension = parseInt(hp.extension_connections || "0", 10) > 0;
-
   return (
-    <div className="pl-8 space-y-1">
+    <div className="pl-8">
       <div className="flex items-center gap-3 text-caption text-foreground/40">
-        {contact.email && (
-          <a href={`mailto:${contact.email}`} className="hover:text-primary transition-colors">
-            {contact.email}
-          </a>
-        )}
+        {contact.title && <span>{contact.title}</span>}
         {contact.linkedin && (
-          <a
-            href={contact.linkedin}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-primary transition-colors inline-flex items-center gap-1"
-          >
-            LinkedIn
-          </a>
-        )}
-        {contact.title && (
           <>
-            <span className="text-foreground/15">·</span>
-            <span>{contact.title}</span>
+            {contact.title && <span className="text-foreground/15">·</span>}
+            <a
+              href={contact.linkedin}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-primary transition-colors inline-flex items-center gap-1"
+            >
+              LinkedIn
+            </a>
           </>
-        )}
-      </div>
-      <div className="flex items-center gap-1.5 pl-0">
-        {isCreator && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-micro font-medium bg-primary/10 text-primary border border-primary/20">
-            Creator
-          </span>
-        )}
-        {isViewer && !isCreator && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-micro font-medium bg-secondary text-foreground/50 border border-border/40">
-            Viewer
-          </span>
-        )}
-        {hasExtension && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-micro font-medium bg-secondary text-foreground/50 border border-border/40">
-            Extension
-          </span>
-        )}
-        {!isCreator && !isViewer && !hasExtension && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-micro font-medium text-foreground/25 border border-border/30 border-dashed">
-            No product usage
-          </span>
         )}
       </div>
     </div>
