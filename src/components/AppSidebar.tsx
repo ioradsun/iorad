@@ -28,6 +28,7 @@ const categoryItems = [
 
 export default function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const [contactSearch, setContactSearch] = useState("");
   const { user, signOut } = useAuth();
   const isAdmin = useIsAdmin();
   const { theme } = useTheme();
@@ -39,6 +40,14 @@ export default function AppSidebar() {
   const companyId = companyMatch ? companyMatch[1] : null;
   const { data: companyContacts = [] } = useContacts(companyId || undefined);
   const currentCompany = recents.find((r) => r.company_id === companyId);
+
+  const filteredContacts = companyContacts
+    .filter((c: any) => {
+      if (!contactSearch) return true;
+      const q = contactSearch.toLowerCase();
+      return c.name?.toLowerCase().includes(q) || c.title?.toLowerCase().includes(q);
+    })
+    .slice(0, 10);
 
   const displayName =
     user?.user_metadata?.full_name ||
