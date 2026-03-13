@@ -20,7 +20,7 @@ import {
 import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { scoreContact, sortContactsByActivity } from "@/lib/contactScore";
+import { getContactActivity, sortContactsByActivity } from "@/lib/contactScore";
 
 const categoryItems = [
   { key: "business", label: "Business", icon: Briefcase },
