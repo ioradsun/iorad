@@ -24,9 +24,9 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks(id: string) {
           // Vendor chunks — split heavy libraries into stable cached chunks
+          // Note: @tanstack and @radix-ui depend on React internals and must NOT
+          // be separated into their own chunks to avoid duplicate-React / MIME errors.
           if (id.includes("node_modules/@supabase")) return "supabase";
-          if (id.includes("node_modules/@tanstack")) return "query";
-          if (id.includes("node_modules/@radix-ui")) return "radix";
           if (id.includes("node_modules/lucide-react")) return "lucide";
           if (id.includes("node_modules/framer-motion")) return "framer";
 
