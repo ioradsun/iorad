@@ -176,14 +176,12 @@ async function runPhase1(supabase: any, apiKey: string, jobId: string, snap: any
 
   const { companies, nextAfter } = await listHubSpotPage(apiKey, after, properties);
 
-  const touchedIds: string[] = [...(snap.touched_ids ?? [])];
   let upserted = 0;
   let failed   = 0;
 
   for (const hs of companies) {
     try {
-      const id = await upsertCompany(supabase, hs);
-      touchedIds.push(id);
+      await upsertCompany(supabase, hs);
       upserted++;
     } catch (e: any) {
       console.error(`phase1: failed to upsert ${hs.id}: ${e.message}`);
