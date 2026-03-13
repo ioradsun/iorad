@@ -627,13 +627,7 @@ export default function CompanyDetail() {
                       ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating…</>
                       : <><Sparkles className="w-3.5 h-3.5" /> Generate</>}
                   </Button>
-                  {storyBaseUrl && (
-                    <a href={storyBaseUrl} target="_blank" rel="noopener noreferrer">
-                      <Button size="sm" variant="outline" className="gap-1.5">
-                        <ExternalLink className="w-3.5 h-3.5" /> Story
-                      </Button>
-                    </a>
-                  )}
+                  {/* Story link moved to ContactDetailView */}
                 </>
               )}
               {activeTab === "company" && (
