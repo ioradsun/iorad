@@ -66,7 +66,7 @@ export default function CompanyDetail() {
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [newContact, setNewContact] = useState({ name: "", title: "", email: "", linkedin: "" });
   const [savingContact, setSavingContact] = useState(false);
-  const [syncingFathom, setSyncingFathom] = useState(false);
+  
   const [analyzingMeeting, setAnalyzingMeeting] = useState<string | null>(null);
   const [generatingContactId, setGeneratingContactId] = useState<string | null>(null);
   const [regeneratingSection, setRegeneratingSection] = useState<string | null>(null);
@@ -264,52 +264,6 @@ export default function CompanyDetail() {
     finally { setRegenerating(false); }
   };
 
-  const syncFathom = async () => {
-    if (!company?.domain) { toast.error("Company needs a domain to sync Fathom meetings"); return; }
-    setSyncingFathom(true);
-    toast.info(`Syncing Fathom meetings for ${company.domain}…`);
-    try {
-      const { data, error } = await supabase.functions.invoke("sync-fathom", {
-        body: { domain: company.domain, company_id: id },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      const synced = data.meetings_synced || 0;
-      toast.success(`Synced ${synced} meetings`);
-      await queryClient.invalidateQueries({ queryKey: ["meetings", id] });
-
-      // Auto-analyze: get meetings with transcripts but no analysis yet
-      if (synced > 0) {
-        toast.info("Auto-analyzing transcripts…");
-        const { data: freshMeetings } = await supabase
-          .from("meetings")
-          .select("id, transcript, transcript_analysis")
-          .eq("company_id", id!)
-          .not("transcript", "is", null)
-          .is("transcript_analysis", null);
-
-        if (freshMeetings && freshMeetings.length > 0) {
-          for (const m of freshMeetings) {
-            setAnalyzingMeeting(m.id);
-            try {
-              const { data: aData, error: aErr } = await supabase.functions.invoke("analyze-transcript", {
-                body: { meeting_id: m.id },
-              });
-              if (aErr) throw aErr;
-              if (aData?.error) throw new Error(aData.error);
-            } catch (ae: any) {
-              console.error(`Analysis failed for meeting ${m.id}:`, ae);
-              toast.error(`Analysis failed for a meeting: ${ae.message}`);
-            }
-          }
-          setAnalyzingMeeting(null);
-          toast.success("Transcript analysis complete — check the Onboarding tab");
-          queryClient.invalidateQueries({ queryKey: ["meetings", id] });
-        }
-      }
-    } catch (e: any) { toast.error(e.message || "Fathom sync failed"); }
-    finally { setSyncingFathom(false); setAnalyzingMeeting(null); }
-  };
 
   const analyzeTranscript = async (meetingId: string) => {
     setAnalyzingMeeting(meetingId);
@@ -902,20 +856,13 @@ export default function CompanyDetail() {
                   </details>
                 )}
 
-                <div className="flex items-center justify-between py-3 border-t border-border/10">
+                <div className="py-3 border-t border-border/10">
                   <span className="text-caption text-foreground/40">
                     {meetings.length} meeting{meetings.length !== 1 ? "s" : ""} synced
                     {meetings.filter((m: any) => m.transcript_analysis).length > 0 && (
                       <span> · {meetings.filter((m: any) => m.transcript_analysis).length} analyzed</span>
                     )}
                   </span>
-                  <button
-                    onClick={syncFathom}
-                    disabled={syncingFathom || !!analyzingMeeting}
-                    className="text-micro text-primary hover:text-primary/80 font-medium disabled:opacity-40"
-                  >
-                    {syncingFathom ? "Syncing…" : "Sync Fathom"}
-                  </button>
                 </div>
 
                 {meetings.length > 0 && (
