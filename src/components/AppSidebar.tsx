@@ -173,7 +173,11 @@ export default function AppSidebar() {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    onClick={() => navigate(`/company/${companyId}?addContact=true`)}
+                    onClick={() => {
+                      const params = new URLSearchParams(window.location.search);
+                      params.set("addContact", "true");
+                      navigate(`/company/${companyId}?${params.toString()}`);
+                    }}
                     className="w-full flex items-center justify-center px-3 py-1.5 text-foreground/25 hover:text-primary transition-colors"
                   >
                     <Plus className="w-3.5 h-3.5" />
