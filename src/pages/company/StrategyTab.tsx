@@ -1,7 +1,4 @@
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import { DashboardCardUI } from "./DashboardCardUI";
 import type { DashboardCard } from "./types";
 
@@ -18,7 +15,6 @@ interface StrategyTabProps {
 }
 
 export default function StrategyTab({
-  contactName,
   cardsLoading,
   isInboundStrategyResponse,
   inboundStrategyData,
@@ -29,70 +25,76 @@ export default function StrategyTab({
   onRegenerate,
 }: StrategyTabProps) {
   return (
-    <>
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="section-label">
-          Strategy & Cards
-        </h3>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-6 gap-1 text-micro text-foreground/45 hover:text-foreground px-2"
-          disabled={regeneratingSection === "strategy" || setupRunning}
-          onClick={onRegenerate}
-        >
-          {regeneratingSection === "strategy"
-            ? <Loader2 className="w-3 h-3 animate-spin" />
-            : <RefreshCw className="w-3 h-3" />}
-          Strategy
-        </Button>
-      </div>
+    <div className="max-w-2xl">
       {cardsLoading ? (
-        <div className="flex items-center gap-2 py-4">
+        <div className="flex items-center gap-2 py-8">
           <Loader2 className="w-4 h-4 animate-spin text-primary" />
-          <span className="ml-2 text-body text-foreground/45">Loading cards…</span>
+          <span className="text-caption text-foreground/40">Loading strategy…</span>
         </div>
       ) : isInboundStrategyResponse ? (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {inboundStrategyFields.map(({ label, key }) =>
             inboundStrategyData?.[key] ? (
-              <Card key={key} className="panel p-5 rounded-lg">
-                <div className="section-label mb-1">{label}</div>
-                <p className="text-body leading-relaxed text-foreground/65">{String(inboundStrategyData[key])}</p>
-              </Card>
+              <div key={key}>
+                <div className="field-label mb-1.5">{label}</div>
+                <p className="text-body text-foreground/65 leading-[1.7]">{String(inboundStrategyData[key])}</p>
+              </div>
             ) : null,
           )}
           {Array.isArray(inboundStrategyData?.strategic_plays) && (inboundStrategyData.strategic_plays as any[]).length > 0 && (
-            <Card className="panel p-5 rounded-lg space-y-4">
-              <div className="section-label mb-2">Strategic Plays</div>
-              {(inboundStrategyData.strategic_plays as any[]).map((play: any, i: number) => (
-                <div key={i} className="border-l border-primary/20 pl-3 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5">Play {i + 1}</Badge>
+            <div>
+              <div className="field-label mb-3">Strategic Plays</div>
+              <div className="space-y-4">
+                {(inboundStrategyData.strategic_plays as any[]).map((play: any, i: number) => (
+                  <div key={i} className="pl-4 border-l-2 border-primary/15 space-y-1.5">
                     <div className="text-body font-semibold text-foreground">{play.name}</div>
+                    {play.objective && <p className="text-caption text-foreground/50">{play.objective}</p>}
+                    {play.why_now && (
+                      <p className="text-caption text-foreground/65">
+                        <span className="field-label inline mr-1.5 normal-case tracking-normal">Why now:</span>{play.why_now}
+                      </p>
+                    )}
+                    {play.what_it_looks_like && (
+                      <p className="text-caption text-foreground/65">
+                        <span className="field-label inline mr-1.5 normal-case tracking-normal">Looks like:</span>{play.what_it_looks_like}
+                      </p>
+                    )}
+                    {play.expected_impact && (
+                      <p className="text-caption text-primary/80 font-medium">{play.expected_impact}</p>
+                    )}
                   </div>
-                  {play.objective && <div className="text-caption text-foreground/45">{play.objective}</div>}
-                  {play.why_now && <div className="text-caption text-foreground/65"><span className="font-medium">Why now: </span>{play.why_now}</div>}
-                  {play.what_it_looks_like && <div className="text-caption text-foreground/65"><span className="font-medium">Looks like: </span>{play.what_it_looks_like}</div>}
-                  {play.expected_impact && <div className="text-caption text-primary font-medium">{play.expected_impact}</div>}
-                </div>
-              ))}
-            </Card>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       ) : cards.length > 0 ? (
-        <div className="space-y-4">
+        <div className="space-y-5">
           {cards.map((card) => <DashboardCardUI key={card.id} card={card} />)}
         </div>
       ) : (
-        <Card className="panel text-center py-8">
-          <Sparkles className="w-8 h-8 text-foreground/25 mx-auto mb-3" />
-          <p className="text-body text-foreground/45 mb-1">No strategy yet</p>
-          <p className="text-caption text-foreground/25">
-            Select a contact and click "Generate" on their card to create a personalized strategy.
+        <div className="py-12 text-center">
+          <p className="text-body text-foreground/40 mb-1">No strategy yet</p>
+          <p className="text-caption text-foreground/20">
+            Click Generate to create a personalized strategy.
           </p>
-        </Card>
+        </div>
       )}
-    </>
+
+      {(isInboundStrategyResponse || cards.length > 0) && (
+        <div className="flex justify-end mt-6">
+          <button
+            className="text-micro text-foreground/20 hover:text-foreground/50 transition-colors flex items-center gap-1"
+            disabled={regeneratingSection === "strategy" || setupRunning}
+            onClick={onRegenerate}
+          >
+            {regeneratingSection === "strategy"
+              ? <Loader2 className="w-3 h-3 animate-spin" />
+              : <RefreshCw className="w-3 h-3" />}
+            Regenerate
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

@@ -1,16 +1,10 @@
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { BookOpen, Eye, Loader2, RefreshCw, Sparkles, Video } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 
 interface StoryTabProps {
   contactName: string | null;
-  // Story narrative data
   isInboundStoryResponse: boolean;
   rawAccountJson: Record<string, unknown>;
-  // URL management
   storyBaseUrl: string | null;
   loomUrl: string;
   ioradUrl: string;
@@ -18,17 +12,14 @@ interface StoryTabProps {
   ioradEmbedUrl: string | null;
   onLoomUrlChange: (url: string) => void;
   onIoradUrlChange: (url: string) => void;
-  // Regeneration
   regeneratingSection: string | null;
   setupRunning: boolean;
   onRegenerate: () => void;
 }
 
 export default function StoryTab({
-  contactName,
   isInboundStoryResponse,
   rawAccountJson,
-  storyBaseUrl,
   loomUrl,
   ioradUrl,
   loomEmbedUrl,
@@ -40,49 +31,9 @@ export default function StoryTab({
   onRegenerate,
 }: StoryTabProps) {
   return (
-    <>
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="section-label">
-          Story Configuration
-        </h3>
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 gap-1 text-micro text-foreground/45 hover:text-foreground px-2"
-            disabled={regeneratingSection === "story" || setupRunning}
-            onClick={onRegenerate}
-          >
-            {regeneratingSection === "story"
-              ? <Loader2 className="w-3 h-3 animate-spin" />
-              : <RefreshCw className="w-3 h-3" />}
-            Story
-          </Button>
-          {storyBaseUrl && (
-            <a href={storyBaseUrl} target="_blank" rel="noopener noreferrer">
-              <Button size="sm" variant="outline" className="gap-1.5 text-caption">
-                <Eye className="w-3.5 h-3.5" /> View Story
-              </Button>
-            </a>
-          )}
-        </div>
-      </div>
-
+    <div className="max-w-2xl space-y-6">
       {isInboundStoryResponse && (
-        <div className="space-y-5">
-          <div className="glow-line" />
-          <div className="flex flex-wrap items-center gap-2">
-            {rawAccountJson.intent_tier && (
-              <Badge variant="outline" className="text-micro">Tier: {String(rawAccountJson.intent_tier)}</Badge>
-            )}
-            {rawAccountJson.momentum_score !== undefined && (
-              <Badge variant="outline" className="text-micro">Momentum Score: {String(rawAccountJson.momentum_score)}</Badge>
-            )}
-            {rawAccountJson.persona && (
-              <Badge variant="secondary" className="text-micro">{String(rawAccountJson.persona)}</Badge>
-            )}
-          </div>
-
+        <div className="space-y-6">
           {[
             { label: "Behavior Acknowledged", key: "behavior_acknowledged" },
             { label: "Momentum Observed", key: "momentum_observed" },
@@ -97,24 +48,40 @@ export default function StoryTab({
             { label: "CTA", key: "cta" },
           ].map(({ label, key }) =>
             rawAccountJson[key] ? (
-              <div key={key} className="panel p-5 rounded-lg space-y-1">
-                <div className="section-label">{label}</div>
-                <p className="text-body leading-relaxed text-foreground/65 whitespace-pre-line">{String(rawAccountJson[key])}</p>
+              <div key={key}>
+                <div className="field-label mb-1.5">{label}</div>
+                <p className="text-body text-foreground/65 leading-[1.7] whitespace-pre-line">{String(rawAccountJson[key])}</p>
               </div>
             ) : null,
           )}
 
           {Array.isArray(rawAccountJson.strategic_plays) && (rawAccountJson.strategic_plays as any[]).length > 0 && (
-            <div className="space-y-4">
-              <div className="section-label">Strategic Expansion Plays</div>
-              <div className="grid grid-cols-1 gap-4">
+            <div>
+              <div className="field-label mb-3">Strategic Expansion Plays</div>
+              <div className="space-y-4">
                 {(rawAccountJson.strategic_plays as any[]).map((play: any, i: number) => (
-                  <div key={i} className="panel p-5 rounded-lg border border-border/30 space-y-2">
-                    <div className="font-semibold text-body text-foreground">{play.name}</div>
-                    {play.objective && <p className="text-caption text-foreground/45"><span className="section-label inline text-micro">Objective:</span> {play.objective}</p>}
-                    {play.why_now && <p className="text-caption text-foreground/45"><span className="section-label inline text-micro">Why Now:</span> {play.why_now}</p>}
-                    {play.what_it_looks_like && <p className="text-caption text-foreground/65 leading-relaxed"><span className="section-label inline text-micro">What It Looks Like:</span> {play.what_it_looks_like}</p>}
-                    {play.expected_impact && <p className="text-caption text-primary/90"><span className="section-label inline text-micro">Expected Impact:</span> {play.expected_impact}</p>}
+                  <div key={i} className="pl-4 border-l-2 border-primary/15 space-y-1.5">
+                    <div className="text-body font-semibold text-foreground">{play.name}</div>
+                    {play.objective && (
+                      <p className="text-caption text-foreground/65">
+                        <span className="field-label inline mr-1.5 normal-case tracking-normal">Objective:</span>{play.objective}
+                      </p>
+                    )}
+                    {play.why_now && (
+                      <p className="text-caption text-foreground/65">
+                        <span className="field-label inline mr-1.5 normal-case tracking-normal">Why Now:</span>{play.why_now}
+                      </p>
+                    )}
+                    {play.what_it_looks_like && (
+                      <p className="text-caption text-foreground/65 leading-[1.7]">
+                        <span className="field-label inline mr-1.5 normal-case tracking-normal">What It Looks Like:</span>{play.what_it_looks_like}
+                      </p>
+                    )}
+                    {play.expected_impact && (
+                      <p className="text-caption text-primary/90">
+                        <span className="field-label inline mr-1.5 normal-case tracking-normal">Expected Impact:</span>{play.expected_impact}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
@@ -122,10 +89,10 @@ export default function StoryTab({
           )}
 
           {rawAccountJson.reinforcement_preview && typeof rawAccountJson.reinforcement_preview === "object" && (
-            <div className="panel p-5 rounded-lg space-y-2">
-              <div className="section-label">Reinforcement Preview</div>
+            <div className="space-y-2">
+              <div className="field-label mb-1.5">Reinforcement Preview</div>
               {(rawAccountJson.reinforcement_preview as any).detected_tool && (
-                <p className="text-body"><span className="text-foreground/45 text-micro">Detected Tool:</span> {(rawAccountJson.reinforcement_preview as any).detected_tool}</p>
+                <p className="text-body text-foreground/65 leading-[1.7]"><span className="field-label inline mr-1.5 normal-case tracking-normal">Detected Tool:</span>{(rawAccountJson.reinforcement_preview as any).detected_tool}</p>
               )}
               {(rawAccountJson.reinforcement_preview as any).library_url && (
                 <a href={(rawAccountJson.reinforcement_preview as any).library_url} target="_blank" rel="noopener noreferrer" className="text-primary text-body underline">
@@ -133,65 +100,47 @@ export default function StoryTab({
                 </a>
               )}
               {(rawAccountJson.reinforcement_preview as any).description && (
-                <p className="text-body text-foreground/65 leading-relaxed">{(rawAccountJson.reinforcement_preview as any).description}</p>
+                <p className="text-body text-foreground/65 leading-[1.7]">{(rawAccountJson.reinforcement_preview as any).description}</p>
               )}
             </div>
           )}
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Video className="w-4 h-4 text-primary" /> Loom Video
-              <Badge variant="outline" className="text-micro ml-auto">{loomUrl ? "Ready" : "Not Set"}</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label className="text-xs">Loom Share URL</Label>
-              <Input
-                placeholder="https://www.loom.com/share/abc123..."
-                value={loomUrl}
-                onChange={(e) => onLoomUrlChange(e.target.value)}
-                className="mt-1"
-              />
-              <p className="text-micro text-foreground/45 mt-1">Paste your Loom share link. It will embed automatically at the top of the story page.</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-primary" /> iorad Tutorial
-              <Badge variant="outline" className="text-micro ml-auto">{ioradUrl ? "Ready" : "Not Set"}</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label className="text-xs">iorad Tutorial URL</Label>
-              <Input
-                placeholder="https://ior.ad/..."
-                value={ioradUrl}
-                onChange={(e) => onIoradUrlChange(e.target.value)}
-                className="mt-1"
-              />
-              <p className="text-micro text-foreground/45 mt-1">Replaces the default tutorial in the customer story page.</p>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-6 pt-6 border-t border-border/15">
+        <div>
+          <div className="field-label mb-1.5">Loom Video URL</div>
+          <Input
+            placeholder="https://www.loom.com/share/..."
+            value={loomUrl}
+            onChange={(e) => onLoomUrlChange(e.target.value)}
+            className="h-9 text-body"
+          />
+          <p className="text-micro text-foreground/20 mt-1.5">
+            Embeds at the top of the story page
+          </p>
+        </div>
+        <div>
+          <div className="field-label mb-1.5">iorad Tutorial URL</div>
+          <Input
+            placeholder="https://ior.ad/..."
+            value={ioradUrl}
+            onChange={(e) => onIoradUrlChange(e.target.value)}
+            className="h-9 text-body"
+          />
+          <p className="text-micro text-foreground/20 mt-1.5">
+            Replaces the default tutorial on the story page
+          </p>
+        </div>
       </div>
 
       {(loomEmbedUrl || ioradEmbedUrl) && (
         <div className="space-y-5">
-          <div className="glow-line" />
-          <h3 className="section-label">Preview</h3>
+          <h3 className="field-label">Preview</h3>
 
           {loomEmbedUrl && (
             <div className="space-y-2">
-              <h4 className="text-sm font-medium flex items-center gap-2"><Video className="w-4 h-4 text-primary" /> Loom Video</h4>
+              <h4 className="text-title font-semibold text-foreground">Loom Video</h4>
               <div className="rounded-xl overflow-hidden border">
                 <iframe src={loomEmbedUrl} width="100%" height="400" frameBorder="0" allowFullScreen allow="autoplay; fullscreen" title="Loom video preview" />
               </div>
@@ -200,7 +149,7 @@ export default function StoryTab({
 
           {ioradEmbedUrl && (
             <div className="space-y-2">
-              <h4 className="text-sm font-medium flex items-center gap-2"><BookOpen className="w-4 h-4 text-primary" /> iorad Tutorial</h4>
+              <h4 className="text-title font-semibold text-foreground">iorad Tutorial</h4>
               <div className="rounded-xl overflow-hidden border">
                 <iframe
                   src={ioradEmbedUrl} width="100%" height="500" frameBorder="0" allowFullScreen
@@ -213,6 +162,19 @@ export default function StoryTab({
           )}
         </div>
       )}
-    </>
+
+      <div className="flex justify-end mt-6">
+        <button
+          className="text-micro text-foreground/20 hover:text-foreground/50 transition-colors flex items-center gap-1"
+          disabled={regeneratingSection === "story" || setupRunning}
+          onClick={onRegenerate}
+        >
+          {regeneratingSection === "story"
+            ? <Loader2 className="w-3 h-3 animate-spin" />
+            : <RefreshCw className="w-3 h-3" />}
+          Regenerate
+        </button>
+      </div>
+    </div>
   );
 }
