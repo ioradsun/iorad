@@ -1086,9 +1086,7 @@ export default function CompanyDetail() {
                               {(Array.isArray(snap.executive_narrative)
                                 ? snap.executive_narrative
                                 : typeof snap.executive_narrative === "string"
-                                  ? snap.executive_narrative.split("
-
-")
+                                  ? snap.executive_narrative.split("\n\n")
                                   : []
                               ).map((p: string, i: number) => (
                                 <p key={i} className="text-body text-foreground/60 leading-relaxed mb-4">{p}</p>
