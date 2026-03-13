@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  Building2, Signal, Clock, ChevronLeft, ChevronRight,
+  Building2, Signal, ChevronLeft, ChevronRight,
   LogOut, Shield, Briefcase, GraduationCap, Handshake, User, Info, Plus,
 } from "lucide-react";
 import ioradLogoDark from "@/assets/iorad-logo-new.png";
@@ -267,7 +267,6 @@ export default function AppSidebar() {
             <div className="my-3 border-t border-border/20" />
 
             <NavItem to="/signals" icon={Signal} label="Signals" active={isActive("/signals")} />
-            <NavItem to="/jobs" icon={Clock} label="HubSpot" active={isActive("/jobs")} />
 
             {recents.length > 0 && (
               <>
