@@ -8,15 +8,18 @@ export type DbAppSettings = Tables<"app_settings">;
 export function useCompanies() {
   return useQuery({
     queryKey: ["companies"],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       // Fetch all companies — paginate past the default 1000-row limit
+      // Dashboard-optimized: only columns needed for the list view.
+      // CompanyDetail uses useCompany(id) which still loads SELECT *.
       const PAGE = 1000;
       let allData: Tables<"companies">[] = [];
       let from = 0;
       while (true) {
         const { data, error } = await supabase
           .from("companies")
-          .select("*")
+          .select("id, name, domain, partner, partner_rep_email, partner_rep_name, snapshot_status, created_at, category, stage, scout_score, source_type, last_score_total, industry, headcount")
           .order("last_score_total", { ascending: false, nullsFirst: false })
           .range(from, from + PAGE - 1);
         if (error) throw error;
@@ -175,7 +178,7 @@ export function useActiveJob() {
       if (error) throw error;
       return data as Tables<"processing_jobs"> | null;
     },
-    refetchInterval: 5000,
+    refetchInterval: 15_000,
   });
 }
 
