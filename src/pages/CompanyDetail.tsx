@@ -106,9 +106,13 @@ export default function CompanyDetail() {
       if (section === "contacts") {
         await supabase.functions.invoke("find-contacts", { body: { company_id: id } });
         queryClient.invalidateQueries({ queryKey: ["contacts", id] });
+      } else if (section === "signals") {
+        await supabase.functions.invoke("run-signals", { body: { company_id: id, mode: "full" } });
+        queryClient.invalidateQueries({ queryKey: ["signals", id] });
+        queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
       } else {
         await supabase.functions.invoke("generate-cards", {
-          body: { company_id: id, tab: section, contact_id: effectiveContactId || undefined },
+          body: { company_id: id, tab: section, contact_id: section !== "company" ? (effectiveContactId || undefined) : undefined },
         });
         queryClient.invalidateQueries({ queryKey: ["company_cards", id], exact: false });
       }
