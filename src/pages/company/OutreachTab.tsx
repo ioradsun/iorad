@@ -1,5 +1,4 @@
-import { Button } from "@/components/ui/button";
-import { Loader2, Linkedin, Mail, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import { EmailSequenceUI, LinkedInSequenceUI } from "./OutreachSequences";
 import type { EmailTouch, LinkedInStep } from "./types";
 
@@ -15,7 +14,6 @@ interface OutreachTabProps {
 }
 
 export default function OutreachTab({
-  contactName,
   cardsLoading,
   rawAccountJson,
   emailSequence,
@@ -25,28 +23,11 @@ export default function OutreachTab({
   onRegenerate,
 }: OutreachTabProps) {
   return (
-    <>
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="section-label">
-          Outreach Assets
-        </h3>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-6 gap-1 text-micro text-foreground/45 hover:text-foreground px-2"
-          disabled={regeneratingSection === "outreach" || setupRunning}
-          onClick={onRegenerate}
-        >
-          {regeneratingSection === "outreach"
-            ? <Loader2 className="w-3 h-3 animate-spin" />
-            : <RefreshCw className="w-3 h-3" />}
-          Outreach
-        </Button>
-      </div>
+    <div className="max-w-2xl">
       {cardsLoading ? (
-        <div className="flex items-center justify-center py-10">
-          <Loader2 className="w-5 h-5 animate-spin text-primary" />
-          <span className="ml-2 text-body text-foreground/45">Loading…</span>
+        <div className="flex items-center gap-2 py-8">
+          <Loader2 className="w-4 h-4 animate-spin text-primary" />
+          <span className="text-caption text-foreground/40">Loading outreach…</span>
         </div>
       ) : (emailSequence || linkedinSequence) ? (
         <div className="space-y-8">
@@ -63,40 +44,54 @@ export default function OutreachTab({
             const hasAny = metaFields.some(({ key }) => meta[key]);
             if (!hasAny) return null;
             return (
-              <div className="space-y-4">
+              <div className="space-y-5">
                 {metaFields.map(({ label, key }) =>
                   meta[key] ? (
-                    <div key={key} className="panel p-5 rounded-lg">
-                      <div className="section-label mb-1">{label}</div>
-                      <p className="text-body leading-relaxed text-foreground/65">{String(meta[key])}</p>
+                    <div key={key}>
+                      <div className="field-label mb-1.5">{label}</div>
+                      <p className="text-body text-foreground/65 leading-[1.7]">{String(meta[key])}</p>
                     </div>
                   ) : null,
                 )}
               </div>
             );
           })()}
+
           {emailSequence && (
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium flex items-center gap-2"><Mail className="w-4 h-4 text-primary" /> Email Sequence</h4>
+            <div>
+              <div className="field-label mb-3">Email Sequence</div>
               <EmailSequenceUI emails={emailSequence} />
             </div>
           )}
+
           {linkedinSequence && (
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium flex items-center gap-2"><Linkedin className="w-4 h-4 text-primary" /> LinkedIn Sequence</h4>
+            <div>
+              <div className="field-label mb-3">LinkedIn Sequence</div>
               <LinkedInSequenceUI steps={linkedinSequence} />
             </div>
           )}
+
+          <div className="flex justify-end">
+            <button
+              className="text-micro text-foreground/20 hover:text-foreground/50 transition-colors flex items-center gap-1"
+              disabled={regeneratingSection === "outreach" || setupRunning}
+              onClick={onRegenerate}
+            >
+              {regeneratingSection === "outreach"
+                ? <Loader2 className="w-3 h-3 animate-spin" />
+                : <RefreshCw className="w-3 h-3" />}
+              Regenerate
+            </button>
+          </div>
         </div>
       ) : (
-        <div className="panel text-center py-8">
-          <Mail className="w-8 h-8 text-foreground/25 mx-auto mb-3" />
-          <p className="text-body text-foreground/45 mb-1">No outreach yet</p>
-          <p className="text-caption text-foreground/25">
-            Generate content for a contact to get personalized email and LinkedIn sequences.
+        <div className="py-12 text-center">
+          <p className="text-body text-foreground/40 mb-1">No outreach yet</p>
+          <p className="text-caption text-foreground/20">
+            Click Generate to create personalized email and LinkedIn sequences.
           </p>
         </div>
       )}
-    </>
+    </div>
   );
 }
