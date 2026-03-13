@@ -101,7 +101,7 @@ function useStoryGenerationData() {
         failed: Array.from(failedMap.values()),
       };
     },
-    refetchInterval: 5_000,
+    refetchInterval: 10_000,
   });
 }
 
@@ -133,7 +133,7 @@ function useHubspotJobs() {
         );
       });
     },
-    refetchInterval: 5_000,
+    refetchInterval: 10_000,
   });
 }
 
@@ -144,7 +144,7 @@ function useRecentlyImported() {
       const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(); // last 7 days
       const { data: companies } = await supabase
         .from("companies")
-        .select("id, name, domain, industry, headcount, category, stage, source_type, created_at, updated_at, snapshot_status, scout_score, scout_scored_at, scout_summary, hubspot_properties, scout_synced_at")
+        .select("id, name, domain, industry, headcount, category, stage, source_type, created_at, updated_at, snapshot_status, scout_score, scout_scored_at, scout_synced_at")
         .gte("created_at", cutoff)
         .order("created_at", { ascending: false })
         .limit(200);
@@ -167,7 +167,7 @@ function useRecentlyImported() {
         contact_count: contactCounts[c.id] || 0,
       }));
     },
-    refetchInterval: 8_000,
+    refetchInterval: 15_000,
   });
 }
 
@@ -220,12 +220,12 @@ function useJobStats(job: any) {
         .select("id", { count: "exact", head: true })
         .gte("updated_at", since);
 
-      // Of those, how many have at least one contact
-      const { data: companiesWithContacts } = await supabase
+      // Count contacts imported since job started (head-only count avoids row loads)
+      const { count: contactCount } = await supabase
         .from("contacts")
-        .select("company_id")
+        .select("id", { count: "exact", head: true })
         .gte("created_at", since);
-      const withContacts = new Set((companiesWithContacts || []).map((c: any) => c.company_id)).size;
+      const withContacts = contactCount ?? 0;
 
       // Of those, how many have a scout score recorded since job started
       const { count: scored } = await supabase
@@ -241,7 +241,7 @@ function useJobStats(job: any) {
         failed: job.companies_failed ?? 0,
       };
     },
-    refetchInterval: 5_000,
+    refetchInterval: 10_000,
   });
 }
 
@@ -425,9 +425,6 @@ function ScoutScoreBadge({ score }: { score: number | null | undefined }) {
 
 function ImportedCompanyRow({ company }: { company: any }) {
   const [open, setOpen] = useState(false);
-  const hsProps = company.hubspot_properties as any || {};
-  const hasHsData = Object.keys(hsProps).length > 0;
-
   const stageColor: Record<string, string> = {
     prospect: "bg-muted text-foreground/45",
     active_opp: "bg-info/10 text-info",
@@ -511,45 +508,6 @@ function ImportedCompanyRow({ company }: { company: any }) {
       {/* Expanded detail */}
       {open && (
         <div className="ml-6 mb-3 space-y-3">
-          {/* Scout summary */}
-          {company.scout_summary && (
-            <div className="rounded-md bg-primary/5 border border-primary/10 px-3 py-2">
-              <div className="text-micro font-medium uppercase tracking-wide text-primary mb-1 flex items-center gap-1">
-                <Zap className="w-3 h-3" /> Scout AI Summary
-              </div>
-              <p className="text-xs text-foreground leading-relaxed">{company.scout_summary}</p>
-            </div>
-          )}
-          {!company.scout_summary && !company.scout_scored_at && (
-            <div className="text-xs text-foreground/45 italic">Scout scoring not yet run for this company.</div>
-          )}
-
-          {/* HubSpot properties snapshot */}
-          {hasHsData && (
-            <div className="rounded-md bg-muted/40 px-3 py-2 space-y-1.5">
-              <div className="text-micro font-medium uppercase tracking-wide text-foreground/45 mb-1">
-                HubSpot Data
-              </div>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                {[
-                  ["Lifecycle Stage", hsProps.lifecyclestage],
-                  ["HubSpot Owner", hsProps.hubspot_owner_id],
-                  ["Create Date", hsProps.createdate ? fmt(hsProps.createdate) : null],
-                  ["Modified", hsProps.hs_lastmodifieddate ? fmt(hsProps.hs_lastmodifieddate) : null],
-                  ["Employees", hsProps.numberofemployees],
-                  ["Country", hsProps.country],
-                  ["Industry", hsProps.industry],
-                  ["Deal Count", hsProps.num_associated_deals],
-                ].filter(([, v]) => v != null && v !== "").map(([label, value]) => (
-                  <div key={label as string} className="flex gap-1">
-                    <span className="text-foreground/45 shrink-0">{label}:</span>
-                    <span className="font-medium truncate">{String(value)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Timestamps */}
           <div className="text-micro text-foreground/45 flex flex-wrap gap-x-4 gap-y-0.5">
             <span>Imported: {fmt(company.created_at)}</span>

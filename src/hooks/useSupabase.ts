@@ -45,7 +45,7 @@ export function useCompanies() {
       while (true) {
         const { data, error } = await supabase
           .from("companies")
-          .select(COMPANY_LIST_COLUMNS)
+          .select("id, name, domain, partner, partner_rep_email, partner_rep_name, snapshot_status, created_at, category, stage, scout_score, source_type, last_score_total, industry, headcount")
           .order("last_score_total", { ascending: false, nullsFirst: false })
           .range(from, from + PAGE - 1);
         if (error) throw error;
@@ -206,7 +206,7 @@ export function useActiveJob() {
       if (error) throw error;
       return data as Tables<"processing_jobs"> | null;
     },
-    refetchInterval: 5000,
+    refetchInterval: 15_000,
   });
 }
 
