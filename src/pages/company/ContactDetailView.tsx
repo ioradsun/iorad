@@ -120,8 +120,10 @@ export default function ContactDetailView({
     };
   }, [effectiveContact?.id]);
 
-  // ── Autosave for role_focus and user_notes ──
-  // Saves on blur or 1.5s after typing stops. No save button.
+  // ── Autosave for name, role_focus and user_notes ──
+  const nameParts = (effectiveContact?.name || "").split(" ");
+  const [localFirstName, setLocalFirstName] = useState(nameParts[0] || "");
+  const [localLastName, setLocalLastName] = useState(nameParts.slice(1).join(" ") || "");
   const [localRoleFocus, setLocalRoleFocus] = useState((effectiveContact as any)?.role_focus || "");
   const [localUserNotes, setLocalUserNotes] = useState((effectiveContact as any)?.user_notes || "");
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -129,21 +131,30 @@ export default function ContactDetailView({
 
   // Reset local state when contact changes
   useEffect(() => {
+    const parts = (effectiveContact?.name || "").split(" ");
+    setLocalFirstName(parts[0] || "");
+    setLocalLastName(parts.slice(1).join(" ") || "");
     setLocalRoleFocus((effectiveContact as any)?.role_focus || "");
     setLocalUserNotes((effectiveContact as any)?.user_notes || "");
     setSaveStatus("idle");
   }, [effectiveContact?.id]);
 
-  const autosave = useCallback(async (roleFocus: string, userNotes: string) => {
+  const autosave = useCallback(async (fields: { firstName?: string; lastName?: string; roleFocus?: string; userNotes?: string }) => {
     if (!effectiveContact) return;
     setSaveStatus("saving");
     try {
+      const updates: Record<string, any> = {};
+      if (fields.firstName !== undefined || fields.lastName !== undefined) {
+        const first = fields.firstName ?? localFirstName;
+        const last = fields.lastName ?? localLastName;
+        updates.name = [first, last].filter(Boolean).join(" ") || effectiveContact.name;
+      }
+      if (fields.roleFocus !== undefined) updates.role_focus = fields.roleFocus || null;
+      if (fields.userNotes !== undefined) updates.user_notes = fields.userNotes || null;
+
       const { error } = await supabase
         .from("contacts")
-        .update({
-          role_focus: roleFocus || null,
-          user_notes: userNotes || null,
-        })
+        .update(updates)
         .eq("id", effectiveContact.id);
       if (error) {
         console.error("Autosave failed:", error.message);
@@ -152,32 +163,37 @@ export default function ContactDetailView({
       }
       setSaveStatus("saved");
       queryClient.invalidateQueries({ queryKey: ["contacts", companyId] });
-      // Reset "saved" indicator after 2s
       setTimeout(() => setSaveStatus("idle"), 2000);
     } catch {
       setSaveStatus("idle");
     }
-  }, [effectiveContact?.id, companyId, queryClient]);
+  }, [effectiveContact?.id, companyId, queryClient, localFirstName, localLastName]);
 
-  const debouncedSave = useCallback((roleFocus: string, userNotes: string) => {
+  const debouncedSave = useCallback((fields: { firstName?: string; lastName?: string; roleFocus?: string; userNotes?: string }) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => autosave(roleFocus, userNotes), 1500);
+    saveTimer.current = setTimeout(() => autosave(fields), 1500);
   }, [autosave]);
 
+  const handleFirstNameChange = (val: string) => {
+    setLocalFirstName(val);
+    debouncedSave({ firstName: val });
+  };
+  const handleLastNameChange = (val: string) => {
+    setLocalLastName(val);
+    debouncedSave({ lastName: val });
+  };
   const handleRoleFocusChange = (val: string) => {
     setLocalRoleFocus(val);
-    debouncedSave(val, localUserNotes);
+    debouncedSave({ roleFocus: val });
   };
-
   const handleUserNotesChange = (val: string) => {
     setLocalUserNotes(val);
-    debouncedSave(localRoleFocus, val);
+    debouncedSave({ userNotes: val });
   };
 
-  // Save on blur immediately (don't wait for debounce)
   const handleFieldBlur = () => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    autosave(localRoleFocus, localUserNotes);
+    autosave({ firstName: localFirstName, lastName: localLastName, roleFocus: localRoleFocus, userNotes: localUserNotes });
   };
 
   if (!contacts.length) {
