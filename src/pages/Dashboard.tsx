@@ -30,12 +30,14 @@ const STAGE_COLORS: Record<string, string> = {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [hubspotPickerOpen, setHubspotPickerOpen] = useState(false);
 
   const [sortKey, setSortKey] = useState<SortKey>("scout_score");
   const [sortAsc, setSortAsc] = useState(false);
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<CategoryTab>("business");
+  const categoryFromUrl = (searchParams.get("category") as CategoryTab) || "business";
+  const activeTab = categoryFromUrl;
   const [visibleCount, setVisibleCount] = useState(50);
 
   const { data: firstPage = [], isLoading: firstPageLoading } = useCompaniesPage(activeTab);
