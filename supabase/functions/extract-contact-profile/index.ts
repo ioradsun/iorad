@@ -383,7 +383,7 @@ Return ONLY the JSON profile object.`;
         success: true,
         profiles_extracted: extracted,
         failed,
-        total: contactIds.length,
+        total: contacts.length,
         errors: errors.slice(0, 10),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
