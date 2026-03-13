@@ -335,9 +335,7 @@ export type Database = {
           linkedin: string | null
           name: string
           profile_extracted_at: string | null
-          role_focus: string | null
           reasoning: string | null
-          user_notes: string | null
           source: string | null
           title: string | null
           updated_at: string
@@ -353,9 +351,7 @@ export type Database = {
           linkedin?: string | null
           name: string
           profile_extracted_at?: string | null
-          role_focus?: string | null
           reasoning?: string | null
-          user_notes?: string | null
           source?: string | null
           title?: string | null
           updated_at?: string
@@ -371,9 +367,7 @@ export type Database = {
           linkedin?: string | null
           name?: string
           profile_extracted_at?: string | null
-          role_focus?: string | null
           reasoning?: string | null
-          user_notes?: string | null
           source?: string | null
           title?: string | null
           updated_at?: string
