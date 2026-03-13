@@ -50,20 +50,22 @@ export default function AppSidebar() {
     }
   }, [selectedContactId, trackContact]);
 
+  // Sort contacts: recently visited first (by recency order), rest after
   const filteredContacts = companyContacts
     .filter((c: any) => {
       if (!contactSearch) return true;
       const q = contactSearch.toLowerCase();
       return c.name?.toLowerCase().includes(q) || c.title?.toLowerCase().includes(q);
+    })
+    .sort((a: any, b: any) => {
+      if (contactSearch) return 0;
+      const aIdx = recentContactIds.indexOf(a.id);
+      const bIdx = recentContactIds.indexOf(b.id);
+      if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+      if (aIdx !== -1) return -1;
+      if (bIdx !== -1) return 1;
+      return 0;
     });
-
-  // Separate recent contacts from the rest (only when not searching)
-  const recentContacts = contactSearch
-    ? []
-    : filteredContacts.filter((c: any) => isRecent(c.id) && c.id !== selectedContactId);
-  const otherContacts = contactSearch
-    ? filteredContacts
-    : filteredContacts.filter((c: any) => !isRecent(c.id) || c.id === selectedContactId);
 
   const displayName =
     user?.user_metadata?.full_name ||
