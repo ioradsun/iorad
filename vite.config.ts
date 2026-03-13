@@ -22,12 +22,15 @@ export default defineConfig(({ mode }) => ({
   build: {
     rollupOptions: {
       output: {
+        // Force JS chunk extensions so production always serves module chunks
+        // with a JavaScript MIME type (prevents .tsx module MIME failures).
+        entryFileNames: "assets/[name]-[hash].js",
+        chunkFileNames: "assets/[name]-[hash].js",
+        assetFileNames: "assets/[name]-[hash][extname]",
+
         manualChunks(id: string) {
-          // Vendor chunks — split heavy libraries into stable cached chunks
-          // Note: @tanstack and @radix-ui depend on React internals and must NOT
-          // be separated into their own chunks to avoid duplicate-React / MIME errors.
+          // Keep only safe vendor splits
           if (id.includes("node_modules/@supabase")) return "supabase";
-          if (id.includes("node_modules/lucide-react")) return "lucide";
           if (id.includes("node_modules/framer-motion")) return "framer";
 
           // App chunks
