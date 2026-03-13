@@ -1,3 +1,5 @@
+import { Loader2, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 
 interface StoryTabProps {
@@ -19,6 +21,9 @@ interface StoryTabProps {
 export default function StoryTab({
   isInboundStoryResponse,
   rawAccountJson,
+  regeneratingSection,
+  ensureRunning,
+  onRegenerate,
 }: StoryTabProps) {
   return (
     <div className="max-w-2xl space-y-6">
@@ -97,7 +102,22 @@ export default function StoryTab({
         </div>
       )}
 
-
+      {isInboundStoryResponse && (
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="gap-1.5 text-foreground/40 hover:text-foreground"
+            disabled={regeneratingSection === "story" || ensureRunning}
+            onClick={onRegenerate}
+          >
+            {regeneratingSection === "story"
+              ? <Loader2 className="w-3 h-3 animate-spin" />
+              : <RefreshCw className="w-3 h-3" />}
+            Regenerate
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

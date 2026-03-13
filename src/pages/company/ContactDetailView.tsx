@@ -265,7 +265,7 @@ export default function ContactDetailView({
           <p className="text-caption text-foreground/20 mb-4">
             Add a contact manually or sync from HubSpot.
           </p>
-          <Button onClick={() => onSetAddContactOpen(true)} className="gap-2">
+          <Button variant="outline" onClick={() => onSetAddContactOpen(true)} className="gap-2">
             <Plus className="w-4 h-4" /> Add Contact
           </Button>
         </div>
@@ -293,10 +293,11 @@ export default function ContactDetailView({
 
   return (
     <>
-      <div className="max-w-2xl space-y-10">
+      <div className="space-y-12">
 
         {/* ═══ SECTION 1: ABOUT ═══ */}
-        <section className="space-y-8">
+        <section id="section-about" className="scroll-mt-32">
+          <div className="max-w-2xl space-y-8">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-8 gap-y-5">
             <div>
               <label className="field-label block mb-1">First Name</label>
@@ -434,6 +435,7 @@ export default function ContactDetailView({
               </div>
             </details>
           )}
+          </div>
         </section>
 
         {/* ═══ SECTION 2: AI CONTEXT + GENERATE BRIEFING ═══ */}
@@ -460,7 +462,7 @@ export default function ContactDetailView({
 
           {!hasStrategy && !generatingBriefing && briefingSteps.length === 0 && (
             <div className="pt-2">
-              <Button onClick={generateBriefing} className="w-full gap-2">
+              <Button variant="outline" onClick={generateBriefing} className="w-full gap-2">
                 <Sparkles className="w-4 h-4" /> Generate Briefing
               </Button>
               <p className="text-micro text-foreground/15 text-center mt-2">Creates strategy & outreach based on the context above</p>
@@ -495,27 +497,29 @@ export default function ContactDetailView({
 
         {/* ═══ SECTION 3: STRATEGY ═══ */}
         {hasStrategy && (
-          <section>
-            <div className="field-label mb-4">Strategy</div>
-            <StrategyTab contactName={firstName} cardsLoading={cardsLoading} isInboundStrategyResponse={isInboundStrategyResponse} inboundStrategyData={inboundStrategyData} inboundStrategyFields={inboundStrategyFields} cards={cards} regeneratingSection={regeneratingSection} ensureRunning={false} onRegenerate={() => onRegenerateSection("strategy")} />
+          <section id="section-strategy" className="scroll-mt-32">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-title font-semibold text-foreground">Strategy</h2>
+            </div>
+            <StrategyTab contactName={firstName} cardsLoading={cardsLoading} isInboundStrategyResponse={isInboundStrategyResponse} inboundStrategyData={inboundStrategyData} inboundStrategyFields={inboundStrategyFields} cards={cards} regeneratingSection={regeneratingSection} ensureRunning={ensureRunning} onRegenerate={() => onRegenerateSection("strategy")} />
           </section>
         )}
 
         {/* ═══ SECTION 4: OUTREACH ═══ */}
         {hasOutreach && (
-          <section>
-            <div className="field-label mb-4">Outreach</div>
-            <OutreachTab contactName={firstName} cardsLoading={cardsLoading} rawAccountJson={rawAccountJson} emailSequence={assets.email_sequence} linkedinSequence={assets.linkedin_sequence} regeneratingSection={regeneratingSection} ensureRunning={false} onRegenerate={() => onRegenerateSection("outreach")} />
+          <section id="section-outreach" className="scroll-mt-32">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-title font-semibold text-foreground">Outreach</h2>
+            </div>
+            <OutreachTab contactName={firstName} cardsLoading={cardsLoading} rawAccountJson={rawAccountJson} emailSequence={assets.email_sequence} linkedinSequence={assets.linkedin_sequence} regeneratingSection={regeneratingSection} ensureRunning={ensureRunning} onRegenerate={() => onRegenerateSection("outreach")} />
           </section>
         )}
 
         {/* ═══ SECTION 5: STORY TIME ═══ */}
         {hasStrategy && (
-          <section className="pt-4">
-            <div className="flex items-center gap-4 mb-8">
-              <div className="flex-1 border-t border-border/20" />
-              <span className="text-micro font-medium uppercase tracking-wider text-foreground/20">Story Time</span>
-              <div className="flex-1 border-t border-border/20" />
+          <section id="section-story" className="scroll-mt-32">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-title font-semibold text-foreground">Story</h2>
             </div>
 
             <div className="space-y-6">
@@ -550,7 +554,7 @@ export default function ContactDetailView({
               {!hasStory ? (
                 <div className="py-6 text-center">
                   <p className="text-caption text-foreground/25 mb-4">Strategy & outreach are ready. Generate a story built on the strategic angle.</p>
-                  <Button onClick={onGenerateStory} disabled={generatingStory} className="gap-2">
+                  <Button onClick={onGenerateStory} disabled={generatingStory} variant="outline" className="gap-2">
                     {generatingStory
                       ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating Story…</>
                       : <><Sparkles className="w-4 h-4" /> Generate Story</>}
@@ -573,7 +577,7 @@ export default function ContactDetailView({
                       </button>
                     </div>
                   </div>
-                  <StoryTab contactName={firstName} isInboundStoryResponse={isInboundStoryResponse} rawAccountJson={rawAccountJson} storyBaseUrl={storyUrl} loomUrl={effectiveLoomUrl} ioradUrl={effectiveIoradUrl} loomEmbedUrl={loomEmbedUrl} ioradEmbedUrl={ioradEmbedUrl} onLoomUrlChange={() => {}} onIoradUrlChange={() => {}} regeneratingSection={regeneratingSection} ensureRunning={false} onRegenerate={() => onRegenerateSection("story")} />
+                  <StoryTab contactName={firstName} isInboundStoryResponse={isInboundStoryResponse} rawAccountJson={rawAccountJson} storyBaseUrl={storyUrl} loomUrl={effectiveLoomUrl} ioradUrl={effectiveIoradUrl} loomEmbedUrl={loomEmbedUrl} ioradEmbedUrl={ioradEmbedUrl} onLoomUrlChange={() => {}} onIoradUrlChange={() => {}} regeneratingSection={regeneratingSection} ensureRunning={ensureRunning} onRegenerate={() => onRegenerateSection("story")} />
                 </div>
               )}
             </div>

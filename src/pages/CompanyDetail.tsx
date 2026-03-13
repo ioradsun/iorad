@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ExternalLink, Loader2, ChevronRight, Plus, X, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
+import { ExternalLink, Loader2, ChevronRight, Plus, X, CheckCircle2, AlertCircle, RefreshCw, Sparkles } from "lucide-react";
 import { Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 import { getContactActivity } from "@/lib/contactScore";
@@ -88,6 +88,7 @@ export default function CompanyDetail() {
   const [generatingStory, setGeneratingStory] = useState(false);
   const [regeneratingSection, setRegeneratingSection] = useState<string | null>(null);
   const [refreshingAnalysis, setRefreshingAnalysis] = useState(false);
+  const [activeSection, setActiveSection] = useState("about");
   // extractingProfiles state removed — extraction is now part of the generate pipeline
 
   
@@ -669,6 +670,37 @@ export default function CompanyDetail() {
       setTimeout(() => setContactEnsureSteps([]), 1000);
     })();
   }, [id, effectiveContactId, viewMode, company, isLoading, contacts, companyCards, queryClient]);
+
+
+
+  useEffect(() => {
+    if (viewMode !== "contact") return;
+    const sections = ["about", "strategy", "outreach", "story"];
+    const observers: IntersectionObserver[] = [];
+
+    for (const sectionId of sections) {
+      const el = document.getElementById(`section-${sectionId}`);
+      if (!el) continue;
+
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) setActiveSection(sectionId);
+        },
+        { rootMargin: "-40% 0px -60% 0px" },
+      );
+
+      observer.observe(el);
+      observers.push(observer);
+    }
+
+    return () => observers.forEach((observer) => observer.disconnect());
+  }, [viewMode, effectiveContactId]);
+
+  useEffect(() => {
+    if (viewMode !== "contact") return;
+    setActiveSection("about");
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, [effectiveContactId, viewMode]);
 
   // Reset ensure ref when contact changes
   useEffect(() => {
@@ -1398,11 +1430,56 @@ export default function CompanyDetail() {
         </div>
       ) : (
         <div>
-          <div className="mb-6">
-            <h1 className="text-display font-semibold tracking-tight">
-              {effectiveContact?.name}
-            </h1>
-            <ContactMetaLine contact={effectiveContact} />
+          {/* ── Sticky contact header ── */}
+          <div className="sticky top-0 z-30 bg-background pb-4 -mx-6 px-6 pt-2">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h1 className="text-display font-semibold tracking-tight">{effectiveContact?.name}</h1>
+                <ContactMetaLine contact={effectiveContact} />
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={generateStory}
+                  disabled={generatingStory || contactEnsureSteps.length > 0}
+                >
+                  {generatingStory
+                    ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating Story…</>
+                    : <><Sparkles className="w-3.5 h-3.5" /> Generate Story</>}
+                </Button>
+                {storyBaseUrl && (
+                  <a href={storyBaseUrl} target="_blank" rel="noopener noreferrer">
+                    <Button size="sm" variant="outline" className="gap-1.5">
+                      <ExternalLink className="w-3.5 h-3.5" /> View Story
+                    </Button>
+                  </a>
+                )}
+              </div>
+            </div>
+
+            {/* Anchor nav */}
+            <nav className="flex items-center gap-5 border-b border-border/15 pb-2">
+              {["about", "strategy", "outreach", "story"].map((section) => (
+                <button
+                  key={section}
+                  onClick={() => {
+                    document.getElementById(`section-${section}`)?.scrollIntoView({
+                      behavior: "smooth",
+                      block: "start",
+                    });
+                  }}
+                  className={`text-caption font-medium transition-colors capitalize ${
+                    activeSection === section
+                      ? "text-foreground"
+                      : "text-foreground/30 hover:text-foreground/60"
+                  }`}
+                >
+                  {section}
+                </button>
+              ))}
+            </nav>
           </div>
 
           <ContactDetailView
