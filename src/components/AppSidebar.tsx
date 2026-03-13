@@ -226,7 +226,7 @@ export default function AppSidebar() {
 
             <div className="my-3 border-t border-border/20" />
 
-            <NavItem to="/signals" icon={Signal} label="Signals" active={isActive("/signals")} />
+            
 
             {recents.length > 0 && (
               <>
@@ -270,6 +270,12 @@ export default function AppSidebar() {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" side="top" className="w-48">
+              <DropdownMenuItem asChild>
+                <Link to="/signals" className="flex items-center gap-2 cursor-pointer">
+                  <Signal className="w-4 h-4" />
+                  Feedback
+                </Link>
+              </DropdownMenuItem>
               {isAdmin && (
                 <>
                   <DropdownMenuItem asChild>
@@ -278,9 +284,9 @@ export default function AppSidebar() {
                       Admin
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator />
                 </>
               )}
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={signOut} className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive">
                 <LogOut className="w-4 h-4" />
                 Sign out
