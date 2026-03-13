@@ -716,6 +716,7 @@ function StoryPageInner({
               <div className="rounded-2xl overflow-hidden" style={{ background: "var(--story-surface)" }}>
                 <iframe
                   src={embedUrl}
+                  loading="lazy"
                   width="100%"
                   height="450"
                   frameBorder="0"
