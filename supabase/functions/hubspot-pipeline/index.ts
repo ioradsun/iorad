@@ -382,7 +382,6 @@ async function runPhase2(supabase: any, apiKey: string, jobId: string, snap: any
     phase2_processed: newProcessed,
     phase2_contacts_imported: (snap.phase2_contacts_imported ?? 0) + contactsImported,
     phase2_failed: (snap.phase2_failed ?? 0) + failed,
-    touched_ids: touchedIds,
   };
 
   await supabase.from("processing_jobs").update({
