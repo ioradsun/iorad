@@ -1,4 +1,5 @@
 import { Loader2, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { DashboardCardUI } from "./DashboardCardUI";
 import type { DashboardCard } from "./types";
 
@@ -83,8 +84,10 @@ export default function StrategyTab({
 
       {(isInboundStrategyResponse || cards.length > 0) && (
         <div className="flex justify-end mt-6">
-          <button
-            className="text-micro text-foreground/20 hover:text-foreground/50 transition-colors flex items-center gap-1"
+          <Button
+            size="sm"
+            variant="ghost"
+            className="gap-1.5 text-foreground/40 hover:text-foreground"
             disabled={regeneratingSection === "strategy" || ensureRunning}
             onClick={onRegenerate}
           >
@@ -92,7 +95,7 @@ export default function StrategyTab({
               ? <Loader2 className="w-3 h-3 animate-spin" />
               : <RefreshCw className="w-3 h-3" />}
             Regenerate
-          </button>
+          </Button>
         </div>
       )}
     </div>
