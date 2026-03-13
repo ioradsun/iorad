@@ -193,17 +193,16 @@ export default function AppSidebar() {
                       <div className="text-caption font-medium truncate">{c.name}</div>
                       {c.title && <div className="text-micro text-foreground/20 truncate">{c.title}</div>}
                     </div>
-                    {activity.tier !== "none" && (
-                       <span className={`shrink-0 text-micro font-medium px-1.5 py-0.5 rounded ${
-                         activity.tier === "hot"
-                           ? "bg-success/10 text-success"
-                           : activity.tier === "warm"
-                           ? "bg-primary/10 text-primary/70"
-                           : "bg-foreground/[0.06] text-foreground/30"
-                       }`}>
-                         {activity.tier}
-                       </span>
-                     )}
+                    {activity.score > 0 && (
+                      <span className={`shrink-0 text-micro tabular-nums font-medium w-6 text-center ${
+                        activity.tier === "hot" ? "text-orange-400"
+                        : activity.tier === "warm" ? "text-amber-400"
+                        : activity.tier === "cool" ? "text-blue-400"
+                        : "text-foreground/20"
+                      }`}>
+                        {activity.score}
+                      </span>
+                    )}
                   </button>
                 );
               })}

@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ExternalLink, Loader2, ChevronRight, Plus, Sparkles, X, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
 import { Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
+import { getContactActivity } from "@/lib/contactScore";
 
 // Sub-components
 import { parseJson, toArray } from "./company/types";
@@ -23,9 +24,21 @@ import ContactDetailView from "./company/ContactDetailView";
 function ContactMetaLine({ contact }: { contact: any }) {
   if (!contact) return null;
 
+  const activity = getContactActivity((contact.hubspot_properties as any) || null);
+
   return (
-    <div className="text-caption text-foreground/40 mt-1">
-      {contact.email || contact.linkedin || contact.title || "No details available"}
+    <div className="text-caption text-foreground/40 mt-1 flex items-center gap-2">
+      {activity.score > 0 && (
+        <span className={`text-micro tabular-nums font-medium ${
+          activity.tier === "hot" ? "text-orange-400"
+          : activity.tier === "warm" ? "text-amber-400"
+          : activity.tier === "cool" ? "text-blue-400"
+          : "text-foreground/20"
+        }`}>
+          {activity.score}
+        </span>
+      )}
+      <span>{contact.email || contact.linkedin || contact.title || "No details available"}</span>
     </div>
   );
 }
@@ -305,11 +318,47 @@ export default function CompanyDetail() {
 
     const hasCompanyCards = !!companyCards?.account_json;
     const hasScore = company.scout_score != null;
+
+    // Fast path: data exists → skip everything
     if (hasCompanyCards && hasScore) {
       setSetupComplete(true);
       return;
     }
 
+    // Recent sync path: synced within 7 days → skip overlay, update silently in background
+    const lastProcessed = companyAny?.last_processed_at;
+    const daysSinceProcessed = lastProcessed
+      ? (Date.now() - new Date(lastProcessed).getTime()) / (1000 * 60 * 60 * 24)
+      : Infinity;
+
+    if (daysSinceProcessed < 7) {
+      setupRanRef.current = true;
+      setSetupComplete(true);
+
+      (async () => {
+        try {
+          if (!hasCompanyCards) {
+            await supabase.functions.invoke("generate-cards", {
+              body: { company_id: id, tab: "company" },
+            });
+            queryClient.invalidateQueries({ queryKey: ["company_cards", id], exact: false });
+          }
+
+          if (!hasScore) {
+            await supabase.functions.invoke("score-companies", {
+              body: { action: "score_one", company_id: id },
+            });
+            queryClient.invalidateQueries({ queryKey: ["company", id] });
+          }
+        } catch (e: any) {
+          console.warn("Background setup failed:", e.message);
+        }
+      })();
+
+      return;
+    }
+
+    // First visit path: never processed or >7 days old → show overlay
     setupRanRef.current = true;
     setShowSetupOverlay(true);
 
