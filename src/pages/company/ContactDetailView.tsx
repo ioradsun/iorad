@@ -1,6 +1,6 @@
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus, Save, UserSearch } from "lucide-react";
-import { toast } from "sonner";
+import { ChevronRight, Eye, Linkedin, Loader2, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Json } from "@/integrations/supabase/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -9,7 +9,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import OutreachTab from "./OutreachTab";
 import StoryTab from "./StoryTab";
 import StrategyTab from "./StrategyTab";
@@ -23,12 +22,6 @@ interface ContactDetailViewProps {
   isPartnerCategory: boolean;
   contacts: any[];
   selectedContactId: string;
-  editingContactId: string | null;
-  editRoleFocus: string;
-  editUserNotes: string;
-  onSetEditingContactId: (id: string | null) => void;
-  onSetEditRoleFocus: (val: string) => void;
-  onSetEditUserNotes: (val: string) => void;
   addContactOpen: boolean;
   onSetAddContactOpen: (open: boolean) => void;
   newContact: { name: string; title: string; email: string; linkedin: string };
@@ -53,12 +46,6 @@ export default function ContactDetailView({
   isPartnerCategory,
   contacts,
   selectedContactId,
-  editingContactId,
-  editRoleFocus,
-  editUserNotes,
-  onSetEditingContactId,
-  onSetEditRoleFocus,
-  onSetEditUserNotes,
   addContactOpen,
   onSetAddContactOpen,
   newContact,
@@ -122,14 +109,85 @@ export default function ContactDetailView({
   const effectiveIoradUrl = companyCards?.iorad_url || companyAny?.iorad_url || "";
   const loomEmbedUrl = toLoomEmbedUrl(effectiveLoomUrl);
   const ioradEmbedUrl = toIoradEmbedUrl(effectiveIoradUrl);
+  const ioradActivity = useMemo(() => {
+    const hp = ((effectiveContact as any)?.hubspot_properties as Record<string, any> | undefined) || {};
+    return {
+      isCreator: !!hp.first_tutorial_create_date,
+      isViewer: !!(hp.first_tutorial_view_date || hp.first_tutorial_learn_date),
+      hasExtension: parseInt(String(hp.extension_connections || "0"), 10) > 0,
+      monthAnswers: hp.month_answers != null ? Number(hp.month_answers) : null,
+      rank: hp.rank != null ? Number(hp.rank) : null,
+    };
+  }, [effectiveContact?.id]);
+
+  // ── Autosave for role_focus and user_notes ──
+  // Saves on blur or 1.5s after typing stops. No save button.
+  const [localRoleFocus, setLocalRoleFocus] = useState((effectiveContact as any)?.role_focus || "");
+  const [localUserNotes, setLocalUserNotes] = useState((effectiveContact as any)?.user_notes || "");
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Reset local state when contact changes
+  useEffect(() => {
+    setLocalRoleFocus((effectiveContact as any)?.role_focus || "");
+    setLocalUserNotes((effectiveContact as any)?.user_notes || "");
+    setSaveStatus("idle");
+  }, [effectiveContact?.id]);
+
+  const autosave = useCallback(async (roleFocus: string, userNotes: string) => {
+    if (!effectiveContact) return;
+    setSaveStatus("saving");
+    try {
+      const { error } = await supabase
+        .from("contacts")
+        .update({
+          role_focus: roleFocus || null,
+          user_notes: userNotes || null,
+        })
+        .eq("id", effectiveContact.id);
+      if (error) {
+        console.error("Autosave failed:", error.message);
+        setSaveStatus("idle");
+        return;
+      }
+      setSaveStatus("saved");
+      queryClient.invalidateQueries({ queryKey: ["contacts", companyId] });
+      // Reset "saved" indicator after 2s
+      setTimeout(() => setSaveStatus("idle"), 2000);
+    } catch {
+      setSaveStatus("idle");
+    }
+  }, [effectiveContact?.id, companyId, queryClient]);
+
+  const debouncedSave = useCallback((roleFocus: string, userNotes: string) => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => autosave(roleFocus, userNotes), 1500);
+  }, [autosave]);
+
+  const handleRoleFocusChange = (val: string) => {
+    setLocalRoleFocus(val);
+    debouncedSave(val, localUserNotes);
+  };
+
+  const handleUserNotesChange = (val: string) => {
+    setLocalUserNotes(val);
+    debouncedSave(localRoleFocus, val);
+  };
+
+  // Save on blur immediately (don't wait for debounce)
+  const handleFieldBlur = () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    autosave(localRoleFocus, localUserNotes);
+  };
 
   if (!contacts.length) {
     return (
       <>
         <div className="text-center py-16">
-          <UserSearch className="w-10 h-10 text-foreground/15 mx-auto mb-4" />
-          <p className="text-body text-foreground/45 mb-2">No contacts yet</p>
-          <p className="text-caption text-foreground/25 mb-4">Add a contact manually or sync from HubSpot to get started.</p>
+          <p className="text-body text-foreground/40 mb-1">No contacts yet</p>
+          <p className="text-caption text-foreground/20 mb-4">
+            Add a contact manually or sync from HubSpot.
+          </p>
           <Button onClick={() => onSetAddContactOpen(true)} className="gap-2">
             <Plus className="w-4 h-4" /> Add Contact
           </Button>
@@ -158,116 +216,193 @@ export default function ContactDetailView({
 
   return (
     <>
-      {effectiveContact && (
-        <>
-          {editingContactId === effectiveContact.id && (
-            <div className="space-y-3 mb-4">
+      <Tabs defaultValue="about" className="w-full">
+        <TabsList className="bg-transparent p-0 h-auto border-b border-border/15 w-full justify-start gap-0 rounded-none mb-6">
+          {["about", "strategy", "outreach", "story"].map(tab => (
+            <TabsTrigger
+              key={tab}
+              value={tab}
+              className="px-4 py-2.5 text-caption font-medium rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none text-foreground/30 hover:text-foreground/50 transition-colors capitalize"
+            >
+              {tab}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        <TabsContent value="about" className="mt-0">
+          <div className="max-w-2xl space-y-8">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-5">
               <div>
-                <Label className="text-xs text-muted-foreground">Role / Focus Area</Label>
-                <Input placeholder="e.g. Instructional Design" value={editRoleFocus} onChange={(e) => onSetEditRoleFocus(e.target.value)} className="mt-1" />
+                <div className="field-label">Email</div>
+                {effectiveContact?.email ? (
+                  <a href={`mailto:${effectiveContact.email}`} className="text-body text-foreground/80 hover:text-primary transition-colors">
+                    {effectiveContact.email}
+                  </a>
+                ) : <div className="field-value-empty">No email</div>}
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Notes for AI</Label>
-                <Textarea value={editUserNotes} onChange={(e) => onSetEditUserNotes(e.target.value)} rows={3} className="mt-1" />
+                <div className="field-label">Title</div>
+                {effectiveContact?.title ? <div className="field-value">{effectiveContact.title}</div> : <div className="field-value-empty">No title</div>}
               </div>
-              <div className="flex justify-end gap-2">
-                <Button size="sm" variant="ghost" onClick={() => onSetEditingContactId(null)}>Cancel</Button>
-                <Button
-                  size="sm"
-                  className="gap-1"
-                  onClick={async () => {
-                    const { error } = await supabase.from("contacts").update({ role_focus: editRoleFocus || null, user_notes: editUserNotes || null }).eq("id", effectiveContact.id);
-                    if (error) {
-                      toast.error("Failed to save");
-                      return;
-                    }
-                    toast.success("Contact updated");
-                    queryClient.invalidateQueries({ queryKey: ["contacts", companyId] });
-                    onSetEditingContactId(null);
-                  }}
-                >
-                  <Save className="w-3.5 h-3.5" /> Save
-                </Button>
+              <div>
+                <div className="field-label">LinkedIn</div>
+                {effectiveContact?.linkedin ? (
+                  <a href={effectiveContact.linkedin} target="_blank" rel="noopener noreferrer" className="text-body text-foreground/80 hover:text-primary transition-colors inline-flex items-center gap-1.5">
+                    <Linkedin className="w-3.5 h-3.5" /> Profile
+                  </a>
+                ) : <div className="field-value-empty">Not linked</div>}
               </div>
             </div>
-          )}
 
-          {(effectiveContact as any)?.contact_profile?.account_narrative && (
-            <p className="text-caption text-foreground/40 leading-relaxed italic max-w-2xl mb-4">
-              {(effectiveContact as any).contact_profile.account_narrative}
-            </p>
-          )}
+            <div>
+              <div className="field-label mb-3">Product Usage</div>
+              <div className="flex flex-wrap gap-2">
+                {ioradActivity?.isCreator && <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-caption font-medium bg-primary/8 text-primary border border-primary/15">Creator</span>}
+                {ioradActivity?.isViewer && <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-caption font-medium bg-secondary text-foreground/55 border border-border/30"><Eye className="w-3.5 h-3.5" /> Viewer</span>}
+                {ioradActivity?.hasExtension && <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-caption font-medium bg-secondary text-foreground/55 border border-border/30">Extension</span>}
+                {!ioradActivity?.isCreator && !ioradActivity?.isViewer && !ioradActivity?.hasExtension && (
+                  <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-caption text-foreground/20 border border-dashed border-border/25">No recorded product usage</span>
+                )}
+              </div>
 
-          {/* Sub-tabs: Strategy / Outreach / Story */}
-          <Tabs defaultValue="strategy" className="mt-6">
-            <TabsList className="bg-transparent p-0 h-auto border-b border-border/20 w-full justify-start gap-0 rounded-none">
-              <TabsTrigger
-                value="strategy"
-                className="px-4 py-2 text-caption font-medium rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none text-foreground/35 hover:text-foreground/50"
-              >
-                Strategy
-              </TabsTrigger>
-              <TabsTrigger
-                value="outreach"
-                className="px-4 py-2 text-caption font-medium rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none text-foreground/35 hover:text-foreground/50"
-              >
-                Outreach
-              </TabsTrigger>
-              <TabsTrigger
-                value="story"
-                className="px-4 py-2 text-caption font-medium rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none text-foreground/35 hover:text-foreground/50"
-              >
-                Story
-              </TabsTrigger>
-            </TabsList>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-8 gap-y-4 mt-5">
+                <div>
+                  <div className="field-label">Created</div>
+                  <div className="text-title font-semibold tabular-nums text-foreground">
+                    {(effectiveContact as any)?.contact_profile?.key_metrics?.tutorials_created ?? 0}
+                  </div>
+                </div>
+                <div>
+                  <div className="field-label">Viewed</div>
+                  <div className="text-title font-semibold tabular-nums text-foreground">
+                    {(effectiveContact as any)?.contact_profile?.key_metrics?.tutorials_viewed ?? 0}
+                  </div>
+                </div>
+                {ioradActivity?.monthAnswers != null && ioradActivity.monthAnswers > 0 && (
+                  <div>
+                    <div className="field-label">Answers / mo</div>
+                    <div className="text-title font-semibold tabular-nums text-foreground">{ioradActivity.monthAnswers}</div>
+                  </div>
+                )}
+                {ioradActivity?.rank != null && Number(ioradActivity.rank) > 0 && (
+                  <div>
+                    <div className="field-label">Rank</div>
+                    <div className="text-title font-semibold tabular-nums text-foreground">#{ioradActivity.rank}</div>
+                  </div>
+                )}
+              </div>
+            </div>
 
-            <TabsContent value="strategy" className="mt-4">
-              <StrategyTab
-                contactName={firstName}
-                cardsLoading={cardsLoading}
-                isInboundStrategyResponse={isInboundStrategyResponse}
-                inboundStrategyData={inboundStrategyData}
-                inboundStrategyFields={inboundStrategyFields}
-                cards={cards}
-                regeneratingSection={regeneratingSection}
-                setupRunning={setupRunning}
-                onRegenerate={() => onRegenerateSection("strategy")}
-              />
-            </TabsContent>
+            {(effectiveContact as any)?.contact_profile?.account_narrative && (
+              <div>
+                <div className="field-label mb-2">AI Profile</div>
+                <p className="text-body text-foreground/60 leading-[1.7]">{(effectiveContact as any).contact_profile.account_narrative}</p>
+              </div>
+            )}
 
-            <TabsContent value="outreach" className="mt-4">
-              <OutreachTab
-                contactName={firstName}
-                cardsLoading={cardsLoading}
-                rawAccountJson={rawAccountJson}
-                emailSequence={assets.email_sequence}
-                linkedinSequence={assets.linkedin_sequence}
-                regeneratingSection={regeneratingSection}
-                setupRunning={setupRunning}
-                onRegenerate={() => onRegenerateSection("outreach")}
-              />
-            </TabsContent>
+            <div className="space-y-5 pt-4 border-t border-border/10">
+              <div className="flex items-center justify-between">
+                <div className="field-label">Context for AI</div>
+                <span className={`text-micro transition-opacity duration-300 ${
+                  saveStatus === "saving" ? "text-foreground/30 opacity-100"
+                  : saveStatus === "saved" ? "text-primary/60 opacity-100"
+                  : "opacity-0"
+                }`}>
+                  {saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved" : ""}
+                </span>
+              </div>
+              <div>
+                <label className="text-micro text-foreground/25 block mb-1">Role / Focus Area</label>
+                <input
+                  type="text"
+                  value={localRoleFocus}
+                  onChange={(e) => handleRoleFocusChange(e.target.value)}
+                  onBlur={handleFieldBlur}
+                  placeholder="e.g. Instructional Design, Training Operations"
+                  className="w-full max-w-md bg-transparent border-0 border-b border-border/15 focus:border-primary/40 outline-none text-body text-foreground/80 placeholder:text-foreground/15 pb-1.5 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="text-micro text-foreground/25 block mb-1">Notes</label>
+                <textarea
+                  value={localUserNotes}
+                  onChange={(e) => handleUserNotesChange(e.target.value)}
+                  onBlur={handleFieldBlur}
+                  placeholder="Any context that helps generate better content — e.g. 'Recently promoted, scaling onboarding across 12 offices, prefers direct communication'"
+                  rows={3}
+                  className="w-full max-w-lg bg-transparent border-0 border-b border-border/15 focus:border-primary/40 outline-none text-body text-foreground/80 placeholder:text-foreground/15 pb-1.5 transition-colors resize-none leading-[1.7]"
+                />
+              </div>
+            </div>
 
-            <TabsContent value="story" className="mt-4">
-              <StoryTab
-                contactName={firstName}
-                isInboundStoryResponse={isInboundStoryResponse}
-                rawAccountJson={rawAccountJson}
-                storyBaseUrl={storyUrl}
-                loomUrl={effectiveLoomUrl}
-                ioradUrl={effectiveIoradUrl}
-                loomEmbedUrl={loomEmbedUrl}
-                ioradEmbedUrl={ioradEmbedUrl}
-                onLoomUrlChange={() => {}}
-                onIoradUrlChange={() => {}}
-                regeneratingSection={regeneratingSection}
-                setupRunning={setupRunning}
-                onRegenerate={() => onRegenerateSection("story")}
-              />
-            </TabsContent>
-          </Tabs>
-        </>
-      )}
+            {effectiveContact?.hubspot_properties && Object.keys(effectiveContact.hubspot_properties as Record<string, any>).length > 0 && (
+              <details className="group">
+                <summary className="text-micro text-foreground/20 hover:text-foreground/40 cursor-pointer transition-colors list-none flex items-center gap-1.5">
+                  <ChevronRight className="w-3 h-3 transition-transform group-open:rotate-90" />
+                  HubSpot data ({Object.entries(effectiveContact.hubspot_properties as Record<string, any>).filter(([_, v]) => v != null && v !== "").length} fields)
+                </summary>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 mt-4">
+                  {Object.entries(effectiveContact.hubspot_properties as Record<string, any>)
+                    .filter(([_, v]) => v != null && v !== "" && v !== 0)
+                    .filter(([k]) => !["rank"].includes(k))
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([key, value]) => (
+                      <div key={key}>
+                        <div className="field-label">{key.replace(/_/g, " ").replace(/^hs /, "")}</div>
+                        <div className="text-caption text-foreground/55 truncate" title={String(value)}>{String(value)}</div>
+                      </div>
+                    ))}
+                </div>
+              </details>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="strategy" className="mt-0">
+          <StrategyTab
+            contactName={firstName}
+            cardsLoading={cardsLoading}
+            isInboundStrategyResponse={isInboundStrategyResponse}
+            inboundStrategyData={inboundStrategyData}
+            inboundStrategyFields={inboundStrategyFields}
+            cards={cards}
+            regeneratingSection={regeneratingSection}
+            setupRunning={setupRunning}
+            onRegenerate={() => onRegenerateSection("strategy")}
+          />
+        </TabsContent>
+
+        <TabsContent value="outreach" className="mt-0">
+          <OutreachTab
+            contactName={firstName}
+            cardsLoading={cardsLoading}
+            rawAccountJson={rawAccountJson}
+            emailSequence={assets.email_sequence}
+            linkedinSequence={assets.linkedin_sequence}
+            regeneratingSection={regeneratingSection}
+            setupRunning={setupRunning}
+            onRegenerate={() => onRegenerateSection("outreach")}
+          />
+        </TabsContent>
+
+        <TabsContent value="story" className="mt-0">
+          <StoryTab
+            contactName={firstName}
+            isInboundStoryResponse={isInboundStoryResponse}
+            rawAccountJson={rawAccountJson}
+            storyBaseUrl={storyUrl}
+            loomUrl={effectiveLoomUrl}
+            ioradUrl={effectiveIoradUrl}
+            loomEmbedUrl={loomEmbedUrl}
+            ioradEmbedUrl={ioradEmbedUrl}
+            onLoomUrlChange={() => {}}
+            onIoradUrlChange={() => {}}
+            regeneratingSection={regeneratingSection}
+            setupRunning={setupRunning}
+            onRegenerate={() => onRegenerateSection("story")}
+          />
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={addContactOpen} onOpenChange={onSetAddContactOpen}>
         <DialogContent>

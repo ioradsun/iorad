@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, RefreshCw, ExternalLink, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, ChevronRight, ChevronDown, Plus, Pencil, Trash2, Linkedin, Sparkles } from "lucide-react";
+import { ArrowLeft, RefreshCw, ExternalLink, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, ChevronRight, ChevronDown, Plus, Trash2, Sparkles } from "lucide-react";
 import { Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 
@@ -47,9 +47,6 @@ export default function CompanyDetail() {
   const [analyzingMeeting, setAnalyzingMeeting] = useState<string | null>(null);
   const [generatingContactId, setGeneratingContactId] = useState<string | null>(null);
   const [regeneratingSection, setRegeneratingSection] = useState<string | null>(null);
-  const [editingContactId, setEditingContactId] = useState<string | null>(null);
-  const [editRoleFocus, setEditRoleFocus] = useState("");
-  const [editUserNotes, setEditUserNotes] = useState("");
   // extractingProfiles state removed — extraction is now part of the generate pipeline
 
   // Auto-generate AI summary for creator contacts on load (every time contacts change)
@@ -595,22 +592,6 @@ export default function CompanyDetail() {
               {activeTab === "contacts" && effectiveContactId && (
                 <>
                   <button
-                    onClick={() => {
-                      const c = contacts.find((c: any) => c.id === effectiveContactId);
-                      if (editingContactId === effectiveContactId) {
-                        setEditingContactId(null);
-                      } else {
-                        setEditingContactId(effectiveContactId);
-                        setEditRoleFocus((c as any)?.role_focus || "");
-                        setEditUserNotes((c as any)?.user_notes || "");
-                      }
-                    }}
-                    className="p-1.5 rounded text-foreground/20 hover:text-foreground hover:bg-secondary transition-colors"
-                    title="Edit contact"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                  <button
                     onClick={() => setDeleteContactId(effectiveContactId)}
                     className="p-1.5 rounded text-foreground/20 hover:text-destructive hover:bg-destructive/10 transition-colors"
                     title="Delete contact"
@@ -690,8 +671,10 @@ export default function CompanyDetail() {
                 </>
               )}
             </div>
-          ) : contacts.find((c: any) => c.id === effectiveContactId) ? (
-            <ContactMetaLine contact={contacts.find((c: any) => c.id === effectiveContactId)} />
+          ) : activeTab === "contacts" && contacts.find((c: any) => c.id === effectiveContactId)?.title ? (
+            <div className="pl-8 text-caption text-foreground/35">
+              {contacts.find((c: any) => c.id === effectiveContactId)?.title}
+            </div>
           ) : null}
         </div>
 
@@ -1052,12 +1035,6 @@ export default function CompanyDetail() {
             isPartnerCategory={isPartnerCategory}
             contacts={contacts}
             selectedContactId={selectedContactId || contacts[0]?.id || ""}
-            editingContactId={editingContactId}
-            editRoleFocus={editRoleFocus}
-            editUserNotes={editUserNotes}
-            onSetEditingContactId={setEditingContactId}
-            onSetEditRoleFocus={setEditRoleFocus}
-            onSetEditUserNotes={setEditUserNotes}
             addContactOpen={addContactOpen}
             onSetAddContactOpen={setAddContactOpen}
             newContact={newContact}
@@ -1076,70 +1053,6 @@ export default function CompanyDetail() {
           />
         </TabsContent>
       </Tabs>
-    </div>
-  );
-}
-
-function ContactMetaLine({ contact }: { contact: any }) {
-  const hp = (contact.hubspot_properties as any) || {};
-  const isCreator = !!hp.first_tutorial_create_date;
-  const isViewer = !!(hp.first_tutorial_view_date || hp.first_tutorial_learn_date);
-  const hasExtension = parseInt(hp.extension_connections || "0", 10) > 0;
-  const cp = contact.contact_profile || {};
-
-  return (
-    <div className="pl-8 space-y-1">
-      <div className="flex items-center gap-3 text-caption text-foreground/40">
-        {contact.email && (
-          <a href={`mailto:${contact.email}`} className="hover:text-primary transition-colors">
-            {contact.email}
-          </a>
-        )}
-        {contact.linkedin && (
-          <a href={contact.linkedin} target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors flex items-center gap-1">
-            <Linkedin className="w-3 h-3" /> LinkedIn
-          </a>
-        )}
-        {contact.title && (
-          <>
-            <span className="text-foreground/15">·</span>
-            <span>{contact.title}</span>
-          </>
-        )}
-      </div>
-
-      <div className="flex items-center gap-1.5 pl-0">
-        {isCreator && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-micro font-medium bg-primary/10 text-primary border border-primary/20">
-            Creator
-          </span>
-        )}
-        {isViewer && !isCreator && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-micro font-medium bg-secondary text-foreground/50 border border-border/40">
-            Viewer
-          </span>
-        )}
-        {hasExtension && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-micro font-medium bg-secondary text-foreground/50 border border-border/40">
-            Extension
-          </span>
-        )}
-        {!isCreator && !isViewer && !hasExtension && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-micro font-medium text-foreground/25 border border-border/30 border-dashed">
-            No product usage
-          </span>
-        )}
-        {cp.key_metrics?.tutorials_created !== undefined && (
-          <span className="text-micro text-foreground/30">
-            {cp.key_metrics.tutorials_created} created
-          </span>
-        )}
-        {cp.key_metrics?.tutorials_viewed !== undefined && (
-          <span className="text-micro text-foreground/30">
-            {cp.key_metrics.tutorials_viewed} viewed
-          </span>
-        )}
-      </div>
     </div>
   );
 }
