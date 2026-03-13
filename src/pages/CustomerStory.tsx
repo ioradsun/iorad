@@ -90,7 +90,7 @@ function useInboundStoryBySlug(companySlug?: string, contactSlug?: string) {
 
       const company = (companies || []).find(
         (c) => c.name.toLowerCase().replace(/\s+/g, "-") === normalizedCompanySlug
-      ) || (companies || []).[0];
+      ) || (companies || [])[0];
       if (!company) return null;
 
       let matchedContactIds: string[] = [];
