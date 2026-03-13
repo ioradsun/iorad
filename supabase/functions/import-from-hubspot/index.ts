@@ -107,6 +107,23 @@ Deno.serve(async (req) => {
       return await syncContactsIncremental(supabase);
     }
 
+    if (body.action === "sync_companies") {
+      return await syncCompaniesIncremental(supabase);
+    }
+
+    if (body.action === "sync_all") {
+      const compRes = await syncCompaniesIncremental(supabase);
+      const compData = await compRes.json();
+      const contRes = await syncContactsIncremental(supabase);
+      const contData = await contRes.json();
+
+      return new Response(JSON.stringify({
+        success: true,
+        companies: compData,
+        contacts: contData,
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // Contact-first backfill — pages through ALL HubSpot contacts
     if (body.action === "backfill_contacts") {
       return await backfillContacts(supabase, body.after || null, body.job_id || null, body.total || 0);
@@ -454,6 +471,18 @@ async function syncContactsIncremental(supabase: any) {
     if (!after) break; // No more pages
   }
 
+  await supabase.from("sync_checkpoints").upsert({
+    key: "last_contact_sync_result",
+    value: JSON.stringify({
+      processed: totalProcessed,
+      pages: pageCount,
+      checkpoint: latestModified,
+      has_more: !!after,
+      at: new Date().toISOString(),
+    }),
+    updated_at: new Date().toISOString(),
+  });
+
   console.log(`sync_contacts: processed ${totalProcessed} contacts across ${pageCount} pages, checkpoint=${latestModified}`);
 
   return new Response(
@@ -465,6 +494,177 @@ async function syncContactsIncremental(supabase: any) {
       has_more: !!after,
     }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+async function syncCompaniesIncremental(supabase: any) {
+  const apiKey = Deno.env.get("HUBSPOT_API_KEY");
+  if (!apiKey) throw new Error("HUBSPOT_API_KEY not configured");
+
+  const { data: cpRow } = await supabase
+    .from("sync_checkpoints")
+    .select("value")
+    .eq("key", "company_sync_cursor")
+    .maybeSingle();
+
+  const defaultLookback = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+  const checkpoint = cpRow?.value || defaultLookback;
+
+  const overlapMs = 5 * 60 * 1000;
+  const searchFrom = new Date(new Date(checkpoint).getTime() - overlapMs).toISOString();
+
+  const COMPANY_PROPS = [
+    "name", "domain", "industry", "country", "numberofemployees",
+    "lifecyclestage", "hs_object_id", "hs_lastmodifieddate",
+    "hubspot_owner_id", "createdate",
+  ];
+
+  const PAGE_SIZE = 100;
+  let totalProcessed = 0;
+  let latestModified = checkpoint;
+  let after: string | null = null;
+  let pageCount = 0;
+  const MAX_PAGES = 5;
+
+  while (pageCount < MAX_PAGES) {
+    const searchBody: any = {
+      filterGroups: [{
+        filters: [{
+          propertyName: "hs_lastmodifieddate",
+          operator: "GTE",
+          value: searchFrom,
+        }],
+      }],
+      properties: COMPANY_PROPS,
+      sorts: [{ propertyName: "hs_lastmodifieddate", direction: "ASCENDING" }],
+      limit: PAGE_SIZE,
+    };
+
+    if (after) searchBody.after = after;
+
+    const companyRes = await hubspotFetch("https://api.hubapi.com/crm/v3/objects/companies/search", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(searchBody),
+    });
+
+    if (!companyRes.ok) {
+      const text = await companyRes.text();
+      throw new Error(`HubSpot company search failed [${companyRes.status}]: ${text.slice(0, 300)}`);
+    }
+
+    const data = await companyRes.json();
+    const companies = data.results || [];
+
+    if (companies.length === 0) break;
+
+    let processed = 0;
+    let newest = checkpoint;
+
+    for (const hs of companies) {
+      try {
+        const p = hs.properties || {};
+        const name = p.name || "";
+        const domain = (p.domain || "").toLowerCase().replace(/^www\./, "").replace(/\/$/, "") || null;
+        const hubspotObjectId = String(hs.id || p.hs_object_id || "").trim();
+        const modified = p.hs_lastmodifieddate || "";
+
+        if (!name) continue;
+
+        const domainLow = (domain || "").toLowerCase();
+        const nameLow = name.toLowerCase();
+        const schoolKeys = ["university", "college", "school", "academy", "education", "institute", "district", "k12", "edu"];
+        const isSchool = domainLow.includes(".edu") || domainLow.includes(".k12.") || domainLow.includes(".school") ||
+          schoolKeys.some((k) => nameLow.includes(k)) ||
+          (p.industry || "").toLowerCase().includes("education");
+        const category = isSchool ? "school" : "business";
+
+        const lifecycle = (p.lifecyclestage || "").toLowerCase();
+        let stage = "prospect";
+        if (lifecycle === "customer") stage = "customer";
+        else if (lifecycle === "opportunity" || lifecycle === "salesqualifiedlead") stage = "active_opp";
+
+        const headcount = p.numberofemployees ? parseInt(p.numberofemployees, 10) || null : null;
+
+        if (hubspotObjectId) {
+          const { data: existing } = await supabase
+            .from("companies")
+            .select("id")
+            .eq("hubspot_object_id", hubspotObjectId)
+            .maybeSingle();
+
+          if (existing) {
+            await supabase.from("companies").update({
+              name,
+              domain,
+              category,
+              stage,
+              industry: p.industry || null,
+              hq_country: p.country || null,
+              headcount,
+              hubspot_properties: p,
+            }).eq("id", existing.id);
+          } else {
+            await supabase.from("companies").insert({
+              name,
+              domain,
+              category,
+              stage,
+              source_type: "hubspot",
+              industry: p.industry || null,
+              hq_country: p.country || null,
+              headcount,
+              hubspot_object_id: hubspotObjectId,
+              hubspot_properties: p,
+            });
+          }
+        }
+
+        if (modified > newest) newest = modified;
+        processed++;
+      } catch (e: any) {
+        console.warn(`sync_companies: failed to process ${hs.id}: ${e.message}`);
+      }
+    }
+
+    totalProcessed += processed;
+    if (newest > latestModified) latestModified = newest;
+
+    await supabase.from("sync_checkpoints").upsert({
+      key: "company_sync_cursor",
+      value: latestModified,
+      updated_at: new Date().toISOString(),
+    });
+
+    after = data.paging?.next?.after || null;
+    pageCount++;
+
+    if (!after) break;
+  }
+
+  await supabase.from("sync_checkpoints").upsert({
+    key: "last_company_sync_result",
+    value: JSON.stringify({
+      processed: totalProcessed,
+      pages: pageCount,
+      checkpoint: latestModified,
+      has_more: !!after,
+      at: new Date().toISOString(),
+    }),
+    updated_at: new Date().toISOString(),
+  });
+
+  console.log(`sync_companies: processed ${totalProcessed} across ${pageCount} pages, checkpoint=${latestModified}`);
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      companies_processed: totalProcessed,
+      pages: pageCount,
+      checkpoint: latestModified,
+      has_more: !!after,
+    }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 }
 

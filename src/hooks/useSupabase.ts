@@ -191,25 +191,6 @@ export function useProcessingJobs() {
   });
 }
 
-// ---- Active running job (for persistent banner across all pages) ----
-export function useActiveJob() {
-  return useQuery({
-    queryKey: ["active_job"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("processing_jobs")
-        .select("*")
-        .eq("status", "running")
-        .order("started_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error) throw error;
-      return data as Tables<"processing_jobs"> | null;
-    },
-    refetchInterval: 15_000,
-  });
-}
-
 // ---- Company Cards ----
 export function useCompanyCards(companyId: string | undefined, contactId?: string) {
   return useQuery({
