@@ -1,0 +1,1 @@
+ALTER TABLE public.company_cards DROP CONSTRAINT IF EXISTS company_cards_company_id_unique;
