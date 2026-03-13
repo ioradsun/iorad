@@ -5,6 +5,7 @@ import CommentPanel from "@/components/signals/CommentPanel";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function InternalSignals() {
   const [tab, setTab] = useState<"open" | "closed">("open");
@@ -36,12 +37,16 @@ export default function InternalSignals() {
     if (!title.trim() || !body.trim()) return;
     try {
       await create.mutateAsync({ title: title.trim(), description: body.trim() });
-      toast.success("Signal posted");
+      toast.success("Feedback posted");
       setTitle("");
       setBody("");
       setComposeOpen(false);
+      // Send email notification (fire-and-forget)
+      supabase.functions.invoke("notify-feedback", {
+        body: { title: title.trim(), description: body.trim(), author_name: displayName },
+      }).catch((err) => console.warn("Feedback notification failed:", err));
     } catch {
-      toast.error("Failed to post signal");
+      toast.error("Failed to post feedback");
     }
   };
 
