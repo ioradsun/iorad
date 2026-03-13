@@ -443,7 +443,7 @@ export default function CustomerStory() {
 
   // Inbound by slug: /stories/:companySlug/:contactSlug
   const isSlugRoute = !!companySlug;
-  const { data: slugData, isLoading: slugLoading } = useInboundStoryBySlug(
+  const { data: slugData, isLoading: slugLoading, error: slugError } = useInboundStoryBySlug(
     isSlugRoute ? companySlug : undefined,
     isSlugRoute ? contactSlug : undefined
   );
