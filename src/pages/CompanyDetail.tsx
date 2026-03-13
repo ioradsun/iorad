@@ -264,52 +264,6 @@ export default function CompanyDetail() {
     finally { setRegenerating(false); }
   };
 
-  const syncFathom = async () => {
-    if (!company?.domain) { toast.error("Company needs a domain to sync Fathom meetings"); return; }
-    setSyncingFathom(true);
-    toast.info(`Syncing Fathom meetings for ${company.domain}…`);
-    try {
-      const { data, error } = await supabase.functions.invoke("sync-fathom", {
-        body: { domain: company.domain, company_id: id },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      const synced = data.meetings_synced || 0;
-      toast.success(`Synced ${synced} meetings`);
-      await queryClient.invalidateQueries({ queryKey: ["meetings", id] });
-
-      // Auto-analyze: get meetings with transcripts but no analysis yet
-      if (synced > 0) {
-        toast.info("Auto-analyzing transcripts…");
-        const { data: freshMeetings } = await supabase
-          .from("meetings")
-          .select("id, transcript, transcript_analysis")
-          .eq("company_id", id!)
-          .not("transcript", "is", null)
-          .is("transcript_analysis", null);
-
-        if (freshMeetings && freshMeetings.length > 0) {
-          for (const m of freshMeetings) {
-            setAnalyzingMeeting(m.id);
-            try {
-              const { data: aData, error: aErr } = await supabase.functions.invoke("analyze-transcript", {
-                body: { meeting_id: m.id },
-              });
-              if (aErr) throw aErr;
-              if (aData?.error) throw new Error(aData.error);
-            } catch (ae: any) {
-              console.error(`Analysis failed for meeting ${m.id}:`, ae);
-              toast.error(`Analysis failed for a meeting: ${ae.message}`);
-            }
-          }
-          setAnalyzingMeeting(null);
-          toast.success("Transcript analysis complete — check the Onboarding tab");
-          queryClient.invalidateQueries({ queryKey: ["meetings", id] });
-        }
-      }
-    } catch (e: any) { toast.error(e.message || "Fathom sync failed"); }
-    finally { setSyncingFathom(false); setAnalyzingMeeting(null); }
-  };
 
   const analyzeTranscript = async (meetingId: string) => {
     setAnalyzingMeeting(meetingId);
