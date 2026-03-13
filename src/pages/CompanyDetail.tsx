@@ -690,8 +690,8 @@ export default function CompanyDetail() {
                 </>
               )}
             </div>
-          ) : effectiveContact ? (
-            <ContactMetaLine contact={effectiveContact} />
+          ) : contacts.find((c: any) => c.id === effectiveContactId) ? (
+            <ContactMetaLine contact={contacts.find((c: any) => c.id === effectiveContactId)} />
           ) : null}
         </div>
 
