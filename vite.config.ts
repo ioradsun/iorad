@@ -22,16 +22,24 @@ export default defineConfig(({ mode }) => ({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          story: ["src/pages/CustomerStory", "src/pages/story/*"],
-          admin: [
-            "src/pages/Dashboard",
-            "src/pages/Upload",
-            "src/pages/CompanyDetail",
-            "src/pages/AdminSettings",
-            "src/pages/JobHistory",
-            "src/pages/InternalSignals",
-          ],
+        manualChunks(id: string) {
+          // Vendor chunks — split heavy libraries into stable cached chunks
+          if (id.includes("node_modules/@supabase")) return "supabase";
+          if (id.includes("node_modules/@tanstack")) return "query";
+          if (id.includes("node_modules/@radix-ui")) return "radix";
+          if (id.includes("node_modules/lucide-react")) return "lucide";
+          if (id.includes("node_modules/framer-motion")) return "framer";
+
+          // App chunks
+          if (id.includes("/src/pages/story/") || id.includes("/src/pages/CustomerStory")) return "story";
+          if (
+            id.includes("/src/pages/Dashboard") ||
+            id.includes("/src/pages/Upload") ||
+            id.includes("/src/pages/CompanyDetail") ||
+            id.includes("/src/pages/AdminSettings") ||
+            id.includes("/src/pages/JobHistory") ||
+            id.includes("/src/pages/InternalSignals")
+          ) return "admin";
         },
       },
     },

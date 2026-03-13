@@ -35,6 +35,8 @@ function useDbStory(partner?: string, customerSlug?: string) {
   return useQuery({
     queryKey: ["story", partner, customerSlug],
     enabled: !!partner && !!customerSlug,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     queryFn: async () => {
       const { data: companies, error: compError } = await supabase
         .from("companies")
@@ -50,20 +52,23 @@ function useDbStory(partner?: string, customerSlug?: string) {
 
       if (!company) return null;
 
-      const { data: snapshots, error: snapError } = await supabase
-        .from("snapshots")
-        .select("*")
-        .eq("company_id", company.id)
-        .order("created_at", { ascending: false })
-        .limit(1);
+      const [snapshotsResult, partnerConfigResult] = await Promise.all([
+        supabase
+          .from("snapshots")
+          .select("*")
+          .eq("company_id", company.id)
+          .order("created_at", { ascending: false })
+          .limit(1),
+        supabase
+          .from("partner_config")
+          .select("*")
+          .ilike("id", partner!)
+          .maybeSingle(),
+      ]);
 
-      if (snapError) throw snapError;
-
-      const { data: partnerConfig } = await supabase
-        .from("partner_config")
-        .select("*")
-        .ilike("id", partner!)
-        .maybeSingle();
+      if (snapshotsResult.error) throw snapshotsResult.error;
+      const snapshots = snapshotsResult.data;
+      const partnerConfig = partnerConfigResult.data;
 
       return { company, snapshot: snapshots?.[0] || null, partnerConfig };
     },
@@ -75,6 +80,8 @@ function useInboundStoryBySlug(companySlug?: string, contactSlug?: string) {
   return useQuery({
     queryKey: ["inbound-story-slug", companySlug, contactSlug],
     enabled: !!companySlug,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     queryFn: async () => {
       const normalizedCompanySlug = companySlug!.trim().toLowerCase();
       const normalizedContactSlug = contactSlug?.trim().toLowerCase();
@@ -107,14 +114,28 @@ function useInboundStoryBySlug(companySlug?: string, contactSlug?: string) {
 
       const matchedContactIdsByCompany = new Map<string, Set<string>>();
 
-      if (normalizedContactSlug) {
-        const { data: contacts, error: contactsError } = await supabase
-          .from("contacts")
-          .select("id, company_id, name")
-          .in("company_id", candidateCompanyIds);
-        if (contactsError) throw contactsError;
+      const [contactsResult, cardsResult] = await Promise.all([
+        normalizedContactSlug
+          ? supabase
+              .from("contacts")
+              .select("id, company_id, name")
+              .in("company_id", candidateCompanyIds)
+          : Promise.resolve({ data: [] as any[], error: null }),
+        supabase
+          .from("company_cards")
+          .select("*")
+          .in("company_id", candidateCompanyIds)
+          .order("created_at", { ascending: false }),
+      ]);
 
-        for (const contact of contacts || []) {
+      if (contactsResult.error) throw contactsResult.error;
+      if (cardsResult.error) throw cardsResult.error;
+
+      const contacts = contactsResult.data || [];
+      const allCards = cardsResult.data || [];
+
+      if (normalizedContactSlug) {
+        for (const contact of contacts) {
           const fullNameSlug = toSlug(contact.name || "");
           const firstNameSlug = toSlug((contact.name || "").split(/\s+/)[0] || "");
 
@@ -128,14 +149,6 @@ function useInboundStoryBySlug(companySlug?: string, contactSlug?: string) {
         }
       }
 
-      const { data: cards, error: cardsError } = await supabase
-        .from("company_cards")
-        .select("*")
-        .in("company_id", candidateCompanyIds)
-        .order("created_at", { ascending: false });
-      if (cardsError) throw cardsError;
-
-      const allCards = cards || [];
       if (allCards.length === 0) return null;
 
       let selectedCard = null as (typeof allCards)[number] | null;
