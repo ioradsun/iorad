@@ -99,6 +99,27 @@ export default function CompanyDetail() {
     }, 800);
   }, [id, updateCompany]);
 
+  const regenerateSection = useCallback(async (section: "contacts" | "strategy" | "outreach" | "story") => {
+    if (!id) return;
+    setRegeneratingSection(section);
+    try {
+      if (section === "contacts") {
+        await supabase.functions.invoke("find-contacts", { body: { company_id: id } });
+        queryClient.invalidateQueries({ queryKey: ["contacts", id] });
+      } else {
+        await supabase.functions.invoke("generate-cards", {
+          body: { company_id: id, tab: section, contact_id: effectiveContactId || undefined },
+        });
+        queryClient.invalidateQueries({ queryKey: ["company_cards", id], exact: false });
+      }
+      toast.success(`${section} regenerated`);
+    } catch (e: any) {
+      toast.error(e.message || `Failed to regenerate ${section}`);
+    } finally {
+      setRegeneratingSection(null);
+    }
+  }, [id, effectiveContactId, queryClient]);
+
   const companyAny = company as any;
   const companyCategory = companyAny?.category || (companyAny?.source_type === "inbound" ? "business" : companyAny?.partner ? "partner" : "business");
   const isPartnerCategory = companyCategory === "partner";
