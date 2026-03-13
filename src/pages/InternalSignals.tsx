@@ -5,6 +5,7 @@ import CommentPanel from "@/components/signals/CommentPanel";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function InternalSignals() {
   const [tab, setTab] = useState<"open" | "closed">("open");
