@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from "react";
 import { EditableText } from "./EditableText";
 import { useStoryEdit } from "./EditContext";
 import { useStoryDebug } from "./StoryDebugContext";
@@ -10,8 +9,6 @@ export default function EmbedDemo({ ioradUrl }: { ioradUrl?: string | null }) {
   const debug = useStoryDebug();
   const annotation = useSectionAnnotation("embedDemo");
   const ref = useFadeIn();
-  const wrapperRef = useRef<HTMLDivElement | null>(null);
-  const [isVisible, setIsVisible] = useState(false);
 
   const HARDCODED_TUTORIAL = "https://ior.ad/b973?iframeHash=trysteps-1";
   const propUrl = ioradUrl || null;
@@ -19,24 +16,6 @@ export default function EmbedDemo({ ioradUrl }: { ioradUrl?: string | null }) {
   const iframeSrc = savedUrl
     ? `${savedUrl}${savedUrl.includes('?') ? '&' : '?'}oembed=1`
     : HARDCODED_TUTORIAL;
-
-  useEffect(() => {
-    if (isVisible || !wrapperRef.current) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: "200px" }
-    );
-
-    observer.observe(wrapperRef.current);
-
-    return () => observer.disconnect();
-  }, [isVisible]);
 
   const defaultLabel = "Try It Yourself";
   const defaultTitle = "This is what iorad feels like";
@@ -65,27 +44,19 @@ export default function EmbedDemo({ ioradUrl }: { ioradUrl?: string | null }) {
         ) : (
           <p className="max-w-2xl mb-8 leading-relaxed" style={{ color: "var(--story-muted)" }}>{desc}</p>
         )}
-        <div ref={wrapperRef} className="rounded-2xl overflow-hidden border border-border" style={{ background: "var(--story-surface)", minWidth: "100%" }}>
-          {isVisible ? (
-            <iframe
-              src={iframeSrc}
-              width="100%"
-              height="500px"
-              style={{ width: "100%", height: "500px" }}
-              referrerPolicy="strict-origin-when-cross-origin"
-              frameBorder="0"
-              allowFullScreen
-              allow="camera; microphone; clipboard-write"
-              sandbox="allow-scripts allow-forms allow-same-origin allow-presentation allow-downloads allow-modals allow-popups allow-popups-to-escape-sandbox allow-top-navigation allow-top-navigation-by-user-activation"
-              title="iorad interactive walkthrough"
-            />
-          ) : (
-            <div
-              style={{ height: 500, background: "var(--story-surface)" }}
-              className="rounded-2xl animate-pulse"
-              aria-hidden="true"
-            />
-          )}
+        <div className="rounded-2xl overflow-hidden border border-border" style={{ background: "var(--story-surface)", minWidth: "100%" }}>
+          <iframe
+            src={iframeSrc}
+            width="100%"
+            height="500px"
+            style={{ width: "100%", height: "500px" }}
+            referrerPolicy="strict-origin-when-cross-origin"
+            frameBorder="0"
+            allowFullScreen
+            allow="camera; microphone; clipboard-write"
+            sandbox="allow-scripts allow-forms allow-same-origin allow-presentation allow-downloads allow-modals allow-popups allow-popups-to-escape-sandbox allow-top-navigation allow-top-navigation-by-user-activation"
+            title="iorad interactive walkthrough"
+          />
         </div>
       </div>
     </section>

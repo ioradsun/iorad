@@ -19,21 +19,4 @@ export default defineConfig(({ mode }) => ({
     },
     dedupe: ["react", "react-dom", "react/jsx-runtime"],
   },
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          story: ["src/pages/CustomerStory", "src/pages/story/*"],
-          admin: [
-            "src/pages/Dashboard",
-            "src/pages/Upload",
-            "src/pages/CompanyDetail",
-            "src/pages/AdminSettings",
-            "src/pages/JobHistory",
-            "src/pages/InternalSignals",
-          ],
-        },
-      },
-    },
-  },
 }));

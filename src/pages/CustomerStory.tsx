@@ -35,6 +35,8 @@ function useDbStory(partner?: string, customerSlug?: string) {
   return useQuery({
     queryKey: ["story", partner, customerSlug],
     enabled: !!partner && !!customerSlug,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     queryFn: async () => {
       const { data: companies, error: compError } = await supabase
         .from("companies")
@@ -75,6 +77,8 @@ function useInboundStoryBySlug(companySlug?: string, contactSlug?: string) {
   return useQuery({
     queryKey: ["inbound-story-slug", companySlug, contactSlug],
     enabled: !!companySlug,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     queryFn: async () => {
       const normalizedCompanySlug = companySlug!.trim().toLowerCase();
       const normalizedContactSlug = contactSlug?.trim().toLowerCase();
@@ -107,14 +111,27 @@ function useInboundStoryBySlug(companySlug?: string, contactSlug?: string) {
 
       const matchedContactIdsByCompany = new Map<string, Set<string>>();
 
-      if (normalizedContactSlug) {
-        const { data: contacts, error: contactsError } = await supabase
-          .from("contacts")
-          .select("id, company_id, name")
-          .in("company_id", candidateCompanyIds);
-        if (contactsError) throw contactsError;
+      const [contactsResult, cardsResult] = await Promise.all([
+        normalizedContactSlug
+          ? supabase
+              .from("contacts")
+              .select("id, company_id, name")
+              .in("company_id", candidateCompanyIds)
+          : Promise.resolve({ data: [], error: null }),
+        supabase
+          .from("company_cards")
+          .select("*")
+          .in("company_id", candidateCompanyIds)
+          .order("created_at", { ascending: false }),
+      ]);
+      if (contactsResult.error) throw contactsResult.error;
+      if (cardsResult.error) throw cardsResult.error;
 
-        for (const contact of contacts || []) {
+      const contacts = contactsResult.data || [];
+      const allCards = cardsResult.data || [];
+
+      if (normalizedContactSlug) {
+        for (const contact of contacts) {
           const fullNameSlug = toSlug(contact.name || "");
           const firstNameSlug = toSlug((contact.name || "").split(/\s+/)[0] || "");
 
@@ -127,15 +144,6 @@ function useInboundStoryBySlug(companySlug?: string, contactSlug?: string) {
           matchedContactIdsByCompany.set(contact.company_id, existing);
         }
       }
-
-      const { data: cards, error: cardsError } = await supabase
-        .from("company_cards")
-        .select("*")
-        .in("company_id", candidateCompanyIds)
-        .order("created_at", { ascending: false });
-      if (cardsError) throw cardsError;
-
-      const allCards = cards || [];
       if (allCards.length === 0) return null;
 
       let selectedCard = null as (typeof allCards)[number] | null;
@@ -176,6 +184,8 @@ function useInboundStory(cardsId?: string) {
   return useQuery({
     queryKey: ["inbound-story", cardsId],
     enabled: !!cardsId,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     queryFn: async () => {
       // REFACTOR: (b) contact-scoped — safe here because lookup is by company_cards.id (already row-specific).
       const { data: card, error } = await supabase
@@ -716,7 +726,6 @@ function StoryPageInner({
               <div className="rounded-2xl overflow-hidden" style={{ background: "var(--story-surface)" }}>
                 <iframe
                   src={embedUrl}
-                  loading="lazy"
                   width="100%"
                   height="450"
                   frameBorder="0"

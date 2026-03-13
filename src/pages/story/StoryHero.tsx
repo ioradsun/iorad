@@ -28,7 +28,7 @@ function LogoPill({ src, alt, fallbackLabel }: { src?: string; alt: string; fall
       style={{ background: "var(--story-surface)", border: "1px solid var(--story-border)" }}
     >
       {src && !failed ? (
-        <img src={src} alt={alt} loading="lazy" className="h-7 w-7 md:h-8 md:w-8 object-contain" onError={() => setFailed(true)} />
+        <img src={src} alt={alt} className="h-7 w-7 md:h-8 md:w-8 object-contain" onError={() => setFailed(true)} />
       ) : (
         <span className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--story-muted)" }}>
           {fallbackLabel.slice(0, 2)}
@@ -71,7 +71,7 @@ export default function StoryHero({ customer, pm }: StoryHeroProps) {
           <div className="flex items-center gap-0 mb-10">
             <div className="inline-flex items-center gap-1 md:gap-2 px-2 py-2 rounded-[1.25rem]" style={{ background: "var(--story-surface)", border: "1px solid var(--story-border)" }}>
               <div className="h-12 w-12 md:h-14 md:w-14 rounded-2xl flex items-center justify-center overflow-hidden" style={{ background: "var(--story-bg)", border: "1px solid var(--story-border)" }}>
-                <img src={ioradLogo} alt="iorad" fetchPriority="high" className="h-5 md:h-6 object-contain" />
+                <img src={ioradLogo} alt="iorad" className="h-5 md:h-6 object-contain" />
               </div>
               {pm.key !== "inbound" && (
                 <>
