@@ -6,7 +6,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import ScoreCell from "@/components/ScoreCell";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, RefreshCw, ExternalLink, Loader2, ChevronRight, ChevronDown, Plus, Trash2, Sparkles } from "lucide-react";
@@ -36,7 +35,7 @@ export default function CompanyDetail() {
   const [setupRunning, setSetupRunning] = useState(false);
   const [setupStep, setSetupStep] = useState<string | null>(null);
   const [selectedContactId, setSelectedContactId] = useState<string>("");
-  const [activeTab, setActiveTab] = useState("company");
+  const [viewMode, setViewMode] = useState<"company" | "contact">("company");
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [newContact, setNewContact] = useState({ name: "", title: "", email: "", linkedin: "" });
   const [savingContact, setSavingContact] = useState(false);
@@ -84,7 +83,7 @@ export default function CompanyDetail() {
   useEffect(() => {
     if (!hasAutoSwitched.current && contacts.length > 0 && companyAny?.last_processed_at) {
       hasAutoSwitched.current = true;
-      setActiveTab("contacts");
+      setViewMode("contact");
     }
   }, [contacts.length, companyAny?.last_processed_at]);
 
@@ -296,7 +295,7 @@ export default function CompanyDetail() {
           setAnalyzingMeeting(null);
           toast.success("Transcript analysis complete — check the Onboarding tab");
           queryClient.invalidateQueries({ queryKey: ["meetings", id] });
-          setActiveTab("company");
+          setViewMode("company");
         }
       }
     } catch (e: any) { toast.error(e.message || "Fathom sync failed"); }
@@ -496,6 +495,14 @@ export default function CompanyDetail() {
 
   const companyStage = companyAny?.stage || "prospect";
   const companyNameSlug = company.name.toLowerCase().replace(/\s+/g, "-");
+  const effectiveContact = contacts.find((c: any) => c.id === effectiveContactId) || contacts[0] || null;
+  const storyBaseUrl = effectiveContact
+    ? (!isPartnerCategory
+      ? `/stories/${companyNameSlug}/${(effectiveContact?.name || "contact").split(" ")[0].toLowerCase().replace(/[^a-z]/g, "")}`
+      : company.partner
+        ? `/${company.partner}/${companyNameSlug}/stories/${(effectiveContact?.name || "contact").split(" ")[0].toLowerCase().replace(/[^a-z]/g, "")}`
+        : null)
+    : null;
 
   const accountData = parseJson<{
     name?: string; about?: { text?: string; status?: string };
@@ -508,12 +515,6 @@ export default function CompanyDetail() {
 
   return (
     <div>
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="hidden">
-          <TabsTrigger value="company">Company</TabsTrigger>
-          <TabsTrigger value="contacts">Contacts</TabsTrigger>
-        </TabsList>
-
         <div className="mb-6">
           <div className="flex items-center gap-0 mb-2">
             <Link to="/" className="text-foreground/20 hover:text-foreground transition-colors mr-3 shrink-0">
@@ -521,9 +522,9 @@ export default function CompanyDetail() {
             </Link>
 
             <button
-              onClick={() => setActiveTab("company")}
-              className={`text-title font-semibold tracking-tight px-0 py-0 h-auto rounded-none bg-transparent shadow-none border-0 transition-colors ${
-                activeTab === "company" ? "text-foreground" : "text-foreground/30 hover:text-foreground/50"
+              onClick={() => setViewMode("company")}
+              className={`text-title font-semibold tracking-tight transition-colors ${
+                viewMode === "company" ? "text-foreground" : "text-foreground/30 hover:text-foreground/50"
               }`}
             >
               {company.name}
@@ -536,11 +537,8 @@ export default function CompanyDetail() {
                 <PopoverTrigger asChild>
                   <button
                     className={`text-title font-semibold tracking-tight transition-colors inline-flex items-center gap-1.5 ${
-                      activeTab === "contacts" ? "text-foreground" : "text-foreground/30 hover:text-foreground/50"
+                      viewMode === "contact" ? "text-foreground" : "text-foreground/30 hover:text-foreground/50"
                     }`}
-                    onClick={() => {
-                      if (activeTab !== "contacts") setActiveTab("contacts");
-                    }}
                   >
                     {(contacts.find((c: any) => c.id === (selectedContactId || contacts[0]?.id))?.name || "Select contact")}
                     <ChevronDown className="w-3.5 h-3.5 opacity-40" />
@@ -555,7 +553,7 @@ export default function CompanyDetail() {
                           key={c.id}
                           onClick={() => {
                             setSelectedContactId(c.id);
-                            setActiveTab("contacts");
+                            setViewMode("contact");
                           }}
                           className={`w-full text-left px-3 py-2.5 rounded-md transition-colors ${
                             isActive ? "bg-primary/8 text-foreground" : "hover:bg-secondary text-foreground/65"
@@ -570,7 +568,7 @@ export default function CompanyDetail() {
                   </div>
                   <div className="border-t border-border/30 mt-1 pt-1">
                     <button
-                      onClick={() => { setActiveTab("contacts"); setAddContactOpen(true); }}
+                      onClick={() => { setViewMode("contact"); setAddContactOpen(true); }}
                       className="w-full flex items-center gap-2 px-3 py-2 text-caption text-primary hover:bg-accent rounded-md transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5" /> Add contact
@@ -580,7 +578,7 @@ export default function CompanyDetail() {
               </Popover>
             ) : (
               <button
-                onClick={() => { setActiveTab("contacts"); setAddContactOpen(true); }}
+                onClick={() => { setViewMode("contact"); setAddContactOpen(true); }}
                 className="text-title text-foreground/30 hover:text-foreground/50 transition-colors"
               >
                 + Add contact
@@ -588,7 +586,7 @@ export default function CompanyDetail() {
             )}
 
             <div className="ml-auto flex items-center gap-2">
-              {activeTab === "contacts" && effectiveContactId && (
+              {viewMode === "contact" && effectiveContactId && (
                 <>
                   <button
                     onClick={() => setDeleteContactId(effectiveContactId)}
@@ -607,10 +605,16 @@ export default function CompanyDetail() {
                       ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating…</>
                       : <><Sparkles className="w-3.5 h-3.5" /> Generate</>}
                   </Button>
-                  {/* Story link moved to ContactDetailView */}
+                  {storyBaseUrl && (
+                    <a href={storyBaseUrl} target="_blank" rel="noopener noreferrer">
+                      <Button size="sm" variant="outline" className="gap-1.5">
+                        <ExternalLink className="w-3.5 h-3.5" /> Story
+                      </Button>
+                    </a>
+                  )}
                 </>
               )}
-              {activeTab === "company" && (
+              {viewMode === "company" && (
                 <Button
                   size="sm"
                   variant="ghost"
@@ -625,7 +629,7 @@ export default function CompanyDetail() {
             </div>
           </div>
 
-          {activeTab === "company" ? (
+          {viewMode === "company" ? (
             <div className="flex items-center gap-2 pl-8 text-caption text-foreground/40">
               {company.domain && <span>{company.domain}</span>}
               {company.domain && <span className="text-foreground/15">·</span>}
@@ -670,10 +674,13 @@ export default function CompanyDetail() {
                 </>
               )}
             </div>
+          ) : effectiveContact ? (
+            <ContactMetaLine contact={effectiveContact} />
           ) : null}
         </div>
 
-        <TabsContent value="company" className="space-y-8 mt-0">
+      {viewMode === "company" ? (
+        <div className="space-y-8">
           {setupRunning && (
             <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-primary/[0.06] border border-primary/10">
               <Loader2 className="w-4 h-4 animate-spin text-primary flex-shrink-0" />
@@ -1026,10 +1033,9 @@ export default function CompanyDetail() {
           />
 
 
-        </TabsContent>
-
-        <TabsContent value="contacts" className="mt-0">
-          <ContactDetailView
+        </div>
+      ) : (
+        <ContactDetailView
             companyId={id!}
             company={company}
             companyNameSlug={companyNameSlug}
@@ -1052,8 +1058,64 @@ export default function CompanyDetail() {
             regeneratingSection={regeneratingSection}
             onRegenerateSection={(section) => regenerateSection(section as any)}
           />
-        </TabsContent>
-      </Tabs>
+      )}
+    </div>
+  );
+}
+
+function ContactMetaLine({ contact }: { contact: any }) {
+  const hp = (contact.hubspot_properties as any) || {};
+  const isCreator = !!hp.first_tutorial_create_date;
+  const isViewer = !!(hp.first_tutorial_view_date || hp.first_tutorial_learn_date);
+  const hasExtension = parseInt(hp.extension_connections || "0", 10) > 0;
+
+  return (
+    <div className="pl-8 space-y-1">
+      <div className="flex items-center gap-3 text-caption text-foreground/40">
+        {contact.email && (
+          <a href={`mailto:${contact.email}`} className="hover:text-primary transition-colors">
+            {contact.email}
+          </a>
+        )}
+        {contact.linkedin && (
+          <a
+            href={contact.linkedin}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-primary transition-colors inline-flex items-center gap-1"
+          >
+            LinkedIn
+          </a>
+        )}
+        {contact.title && (
+          <>
+            <span className="text-foreground/15">·</span>
+            <span>{contact.title}</span>
+          </>
+        )}
+      </div>
+      <div className="flex items-center gap-1.5 pl-0">
+        {isCreator && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-micro font-medium bg-primary/10 text-primary border border-primary/20">
+            Creator
+          </span>
+        )}
+        {isViewer && !isCreator && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-micro font-medium bg-secondary text-foreground/50 border border-border/40">
+            Viewer
+          </span>
+        )}
+        {hasExtension && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-micro font-medium bg-secondary text-foreground/50 border border-border/40">
+            Extension
+          </span>
+        )}
+        {!isCreator && !isViewer && !hasExtension && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-micro font-medium text-foreground/25 border border-border/30 border-dashed">
+            No product usage
+          </span>
+        )}
+      </div>
     </div>
   );
 }
