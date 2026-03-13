@@ -340,40 +340,37 @@ export default function ContactDetailView({
               </div>
             )}
 
-            <div className="rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40 p-5 space-y-4">
+            <div className="space-y-5 pt-4 border-t border-border/10">
               <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-body font-semibold text-amber-900 dark:text-amber-200">Context for AI</h3>
-                  <p className="text-micro text-amber-700/70 dark:text-amber-400/60 mt-0.5">Add details here before generating Strategy, Outreach & Story tabs</p>
-                </div>
+                <div className="field-label">Context for AI</div>
                 <span className={`text-micro transition-opacity duration-300 ${
-                  saveStatus === "saving" ? "text-amber-600/60 dark:text-amber-400/50 opacity-100"
-                  : saveStatus === "saved" ? "text-emerald-600 dark:text-emerald-400 opacity-100"
+                  saveStatus === "saving" ? "text-foreground/30 opacity-100"
+                  : saveStatus === "saved" ? "text-primary/60 opacity-100"
                   : "opacity-0"
                 }`}>
-                  {saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "✓ Saved" : ""}
+                  {saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved" : ""}
                 </span>
               </div>
               <div>
-                <label className="text-caption font-semibold text-amber-900/80 dark:text-amber-200/80 block mb-1.5">Role / Focus Area</label>
+                <label className="text-micro text-foreground/45 block mb-1">Role / Focus Area</label>
                 <input
                   type="text"
                   value={localRoleFocus}
                   onChange={(e) => handleRoleFocusChange(e.target.value)}
                   onBlur={handleFieldBlur}
                   placeholder="e.g. Instructional Design, Training Operations"
-                  className="w-full bg-white/60 dark:bg-white/5 border border-amber-200/80 dark:border-amber-700/40 rounded-lg px-3 py-2 text-body text-foreground placeholder:text-foreground/30 outline-none focus:ring-2 focus:ring-amber-300/50 dark:focus:ring-amber-600/40 focus:border-amber-300 dark:focus:border-amber-600 transition-all"
+                  className="w-full max-w-md bg-transparent border-0 border-b border-border/30 focus:border-primary/60 outline-none text-body text-foreground placeholder:text-foreground/25 pb-1.5 transition-colors"
                 />
               </div>
               <div>
-                <label className="text-caption font-semibold text-amber-900/80 dark:text-amber-200/80 block mb-1.5">Notes</label>
+                <label className="text-micro text-foreground/45 block mb-1">Notes</label>
                 <textarea
                   value={localUserNotes}
                   onChange={(e) => handleUserNotesChange(e.target.value)}
                   onBlur={handleFieldBlur}
                   placeholder="Any context that helps generate better content — e.g. 'Recently promoted, scaling onboarding across 12 offices, prefers direct communication'"
                   rows={3}
-                  className="w-full bg-white/60 dark:bg-white/5 border border-amber-200/80 dark:border-amber-700/40 rounded-lg px-3 py-2 text-body text-foreground placeholder:text-foreground/30 outline-none focus:ring-2 focus:ring-amber-300/50 dark:focus:ring-amber-600/40 focus:border-amber-300 dark:focus:border-amber-600 transition-all resize-none leading-[1.7]"
+                  className="w-full max-w-lg bg-transparent border-0 border-b border-border/30 focus:border-primary/60 outline-none text-body text-foreground placeholder:text-foreground/25 pb-1.5 transition-colors resize-none leading-[1.7]"
                 />
               </div>
             </div>
