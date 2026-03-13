@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useCompany, useSignals, useSnapshots, useContacts, useCompanyCards, useUpdateCompany, useMeetings, useCustomerActivity } from "@/hooks/useSupabase";
 import { supabase } from "@/integrations/supabase/client";
+import { useTrackRecent } from "@/hooks/useRecentCompanies";
 import { useQueryClient } from "@tanstack/react-query";
 import ScoreCell from "@/components/ScoreCell";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ export default function CompanyDetail() {
   const { data: meetings = [] } = useMeetings(id);
   const { data: activityEvents = [] } = useCustomerActivity(id);
   const updateCompany = useUpdateCompany();
+  const trackRecent = useTrackRecent();
   const queryClient = useQueryClient();
   const [regenerating, setRegenerating] = useState(false);
   const [deleteContactId, setDeleteContactId] = useState<string | null>(null);
@@ -76,6 +78,15 @@ export default function CompanyDetail() {
   const { data: companyCards, isLoading: cardsLoading } = useCompanyCards(id, effectiveContactId || undefined);
 
   const companyAny = company as any;
+
+  // Track recent visit
+  const hasTrackedRecent = useRef(false);
+  useEffect(() => {
+    if (id && company && !hasTrackedRecent.current) {
+      hasTrackedRecent.current = true;
+      trackRecent.mutate(id);
+    }
+  }, [id, company]);
 
   // Auto-switch to contacts on first load only
   const hasAutoSwitched = useRef(false);
