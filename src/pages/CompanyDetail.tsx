@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ExternalLink, Loader2, ChevronRight, Plus, Sparkles, X, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
+import { ExternalLink, Loader2, ChevronRight, Plus, X, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
 import { Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 import { getContactActivity } from "@/lib/contactScore";
@@ -1398,63 +1398,12 @@ export default function CompanyDetail() {
         </div>
       ) : (
         <div>
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-display font-semibold tracking-tight">{effectiveContact?.name}</h1>
-              <ContactMetaLine contact={effectiveContact} />
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                className="gap-1.5"
-                onClick={generateStory}
-                disabled={generatingStory || contactEnsureSteps.length > 0}
-              >
-                {generatingStory
-                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating Story…</>
-                  : <><Sparkles className="w-3.5 h-3.5" /> Generate Story</>}
-              </Button>
-              {storyBaseUrl && (
-                <a href={storyBaseUrl} target="_blank" rel="noopener noreferrer">
-                  <Button size="sm" variant="outline" className="gap-1.5">
-                    <ExternalLink className="w-3.5 h-3.5" /> View Story
-                  </Button>
-                </a>
-              )}
-            </div>
+          <div className="mb-6">
+            <h1 className="text-display font-semibold tracking-tight">
+              {effectiveContact?.name}
+            </h1>
+            <ContactMetaLine contact={effectiveContact} />
           </div>
-
-          {contactEnsureSteps.length > 0 && (
-            <div className="mb-6 space-y-2">
-              {contactEnsureSteps.map((step, i) => (
-                <div key={i} className="flex items-center gap-2.5">
-                  {step.status === "pending" && (
-                    <div className="w-3.5 h-3.5 rounded-full border border-border/40 shrink-0" />
-                  )}
-                  {step.status === "running" && (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />
-                  )}
-                  {step.status === "done" && (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" />
-                  )}
-                  {step.status === "failed" && (
-                    <AlertCircle className="w-3.5 h-3.5 text-destructive/50 shrink-0" />
-                  )}
-                  <span className={`text-caption ${
-                    step.status === "running" ? "text-foreground/60"
-                    : step.status === "done" ? "text-foreground/30"
-                    : step.status === "failed" ? "text-destructive/40"
-                    : "text-foreground/20"
-                  }`}>
-                    {step.label}
-                    {step.status === "failed" && step.detail && (
-                      <span className="text-micro ml-2 text-destructive/30">{step.detail}</span>
-                    )}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
 
           <ContactDetailView
             companyId={id!}
@@ -1478,6 +1427,8 @@ export default function CompanyDetail() {
             cardsLoading={cardsLoading}
             regeneratingSection={regeneratingSection}
             onRegenerateSection={(section) => regenerateSection(section as any)}
+            onGenerateStory={generateStory}
+            generatingStory={generatingStory}
           />
         </div>
       )}

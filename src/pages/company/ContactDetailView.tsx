@@ -1,13 +1,12 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, ExternalLink, Linkedin, Loader2, Plus, Sparkles } from "lucide-react";
+import { ChevronRight, ExternalLink, Linkedin, Loader2, Plus, Sparkles, CheckCircle2, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Json } from "@/integrations/supabase/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import OutreachTab from "./OutreachTab";
 import StoryTab from "./StoryTab";
@@ -38,6 +37,8 @@ interface ContactDetailViewProps {
   cardsLoading: boolean;
   regeneratingSection: string | null;
   onRegenerateSection: (section: string) => void;
+  onGenerateStory: () => void;
+  generatingStory: boolean;
 }
 
 export default function ContactDetailView({
@@ -62,6 +63,8 @@ export default function ContactDetailView({
   cardsLoading,
   regeneratingSection,
   onRegenerateSection,
+  onGenerateStory,
+  generatingStory,
 }: ContactDetailViewProps) {
   const queryClient = useQueryClient();
   const companyAny = company as any;
@@ -192,10 +195,44 @@ export default function ContactDetailView({
 
   const hasStrategy = cards.length > 0 || !!(rawAccountJson as any)?._strategy;
   const hasStory = !!(rawAccountJson as any)?._type || !!(rawAccountJson as any)?.opening_hook || !!(rawAccountJson as any)?.behavior_acknowledged;
-  const generatingStory = regeneratingSection === "story" || ensureRunning;
+  const hasOutreach = !!(assets.email_sequence || assets.linkedin_sequence);
+  const [generatingBriefing, setGeneratingBriefing] = useState(false);
+  const [briefingSteps, setBriefingSteps] = useState<
+    { label: string; status: "pending" | "running" | "done" | "failed" }[]
+  >([]);
 
-  const onGenerateStory = () => onRegenerateSection("story");
+  const generateBriefing = async () => {
+    if (!companyId || !effectiveContact?.id) return;
+    setGeneratingBriefing(true);
+    const tabs = ["strategy", "outreach"];
+    setBriefingSteps(tabs.map((t) => ({ label: `Generating ${t}`, status: "pending" })));
 
+    for (let i = 0; i < tabs.length; i++) {
+      setBriefingSteps((prev) => prev.map((s, idx) =>
+        idx === i ? { ...s, status: "running" } : s
+      ));
+      try {
+        await Promise.race([
+          supabase.functions.invoke("generate-cards", {
+            body: { company_id: companyId, tab: tabs[i], contact_id: effectiveContact.id },
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Timed out")), 55_000)
+          ),
+        ]);
+        setBriefingSteps((prev) => prev.map((s, idx) =>
+          idx === i ? { ...s, status: "done" } : s
+        ));
+      } catch {
+        setBriefingSteps((prev) => prev.map((s, idx) =>
+          idx === i ? { ...s, status: "failed" } : s
+        ));
+      }
+    }
+    queryClient.invalidateQueries({ queryKey: ["company_cards", companyId], exact: false });
+    setGeneratingBriefing(false);
+    setTimeout(() => setBriefingSteps([]), 1500);
+  };
   const handleLoomUrlChange = async (url: string) => {
     if (!companyId || !effectiveContact?.id) return;
     try {
@@ -256,403 +293,293 @@ export default function ContactDetailView({
 
   return (
     <>
-      <Tabs defaultValue="about" className="w-full">
-        <TabsList className="bg-transparent p-0 h-auto border-b border-border/15 w-full justify-start gap-0 rounded-none mb-6">
-          {["about", "strategy", "outreach", "story"].map(tab => (
-            <TabsTrigger
-              key={tab}
-              value={tab}
-              className="px-4 py-2.5 text-caption font-medium rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none text-foreground/30 hover:text-foreground/50 transition-colors capitalize"
-            >
-              {tab}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+      <div className="max-w-2xl space-y-10">
 
-        <TabsContent value="about" className="mt-0">
-          <div className="max-w-2xl space-y-8">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-8 gap-y-5">
-              <div>
-                <label className="field-label block mb-1">First Name</label>
-                <input
-                  type="text"
-                  value={localFirstName}
-                  onChange={(e) => handleFirstNameChange(e.target.value)}
-                  onBlur={handleFieldBlur}
-                  placeholder="First"
-                  className="field-editable"
-                />
-              </div>
-              <div>
-                <label className="field-label block mb-1">Last Name</label>
-                <input
-                  type="text"
-                  value={localLastName}
-                  onChange={(e) => handleLastNameChange(e.target.value)}
-                  onBlur={handleFieldBlur}
-                  placeholder="Last"
-                  className="field-editable"
-                />
-              </div>
+        {/* ═══ SECTION 1: ABOUT ═══ */}
+        <section className="space-y-8">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-8 gap-y-5">
+            <div>
+              <label className="field-label block mb-1">First Name</label>
+              <input type="text" value={localFirstName} onChange={(e) => handleFirstNameChange(e.target.value)} onBlur={handleFieldBlur} placeholder="First" className="field-editable" />
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-5">
-              <div>
-                <div className="field-label">Email</div>
-                {effectiveContact?.email ? (
-                  <a href={`mailto:${effectiveContact.email}`} className="text-body text-foreground/80 hover:text-primary transition-colors">
-                    {effectiveContact.email}
-                  </a>
-                ) : <div className="field-value-empty">No email</div>}
-              </div>
-              <div>
-                <div className="field-label">Title</div>
-                {effectiveContact?.title ? <div className="field-value">{effectiveContact.title}</div> : <div className="field-value-empty">No title</div>}
-              </div>
-              <div>
-                <div className="field-label">LinkedIn</div>
-                {effectiveContact?.linkedin ? (
-                  <a href={effectiveContact.linkedin} target="_blank" rel="noopener noreferrer" className="text-body text-foreground/80 hover:text-primary transition-colors inline-flex items-center gap-1.5">
-                    <Linkedin className="w-3.5 h-3.5" /> Profile
-                  </a>
-                ) : <div className="field-value-empty">Not linked</div>}
-              </div>
+            <div>
+              <label className="field-label block mb-1">Last Name</label>
+              <input type="text" value={localLastName} onChange={(e) => handleLastNameChange(e.target.value)} onBlur={handleFieldBlur} placeholder="Last" className="field-editable" />
             </div>
+          </div>
 
-            {/* ── Activity ── */}
-            <div className="space-y-4">
-              {/* Score + Recency */}
-              <div className="flex items-center gap-4">
-                {activity.score > 0 ? (
-                  <div className="flex items-baseline gap-1.5">
-                    <span className={`text-display font-semibold tabular-nums ${
-                      activity.tier === "hot" ? "text-orange-400"
-                      : activity.tier === "warm" ? "text-amber-400"
-                      : activity.tier === "cool" ? "text-blue-400"
-                      : "text-foreground/30"
-                    }`}>
-                      {activity.score}
-                    </span>
-                    <span className="text-micro text-foreground/15">/100</span>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-5">
+            <div>
+              <div className="field-label">Email</div>
+              {effectiveContact?.email ? (
+                <a href={`mailto:${effectiveContact.email}`} className="text-body text-foreground/80 hover:text-primary transition-colors">{effectiveContact.email}</a>
+              ) : <div className="field-value-empty">No email</div>}
+            </div>
+            <div>
+              <div className="field-label">Title</div>
+              {effectiveContact?.title ? <div className="field-value">{effectiveContact.title}</div> : <div className="field-value-empty">No title</div>}
+            </div>
+            <div>
+              <div className="field-label">LinkedIn</div>
+              {effectiveContact?.linkedin ? (
+                <a href={effectiveContact.linkedin} target="_blank" rel="noopener noreferrer" className="text-body text-foreground/80 hover:text-primary transition-colors inline-flex items-center gap-1.5">
+                  <Linkedin className="w-3.5 h-3.5" /> Profile
+                </a>
+              ) : <div className="field-value-empty">Not linked</div>}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              {activity.score > 0 ? (
+                <div className="flex items-baseline gap-1.5">
+                  <span className={`text-display font-semibold tabular-nums ${
+                    activity.tier === "hot" ? "text-orange-400"
+                    : activity.tier === "warm" ? "text-amber-400"
+                    : activity.tier === "cool" ? "text-blue-400"
+                    : "text-foreground/30"
+                  }`}>{activity.score}</span>
+                  <span className="text-micro text-foreground/15">/100</span>
+                </div>
+              ) : (
+                <span className="text-caption text-foreground/20 italic">No iorad activity</span>
+              )}
+              {activity.daysSinceActive !== null && (
+                <span className={`text-micro font-medium px-2 py-0.5 rounded ${
+                  activity.daysSinceActive <= 7 ? "bg-success/10 text-success"
+                  : activity.daysSinceActive <= 30 ? "bg-primary/10 text-primary/70"
+                  : activity.daysSinceActive <= 90 ? "bg-foreground/[0.05] text-foreground/35"
+                  : "bg-destructive/8 text-destructive/60"
+                }`}>
+                  {activity.daysSinceActive <= 7 ? "Active now"
+                    : activity.daysSinceActive <= 30 ? activity.recencyLabel
+                    : activity.daysSinceActive <= 90 ? `Cooling · ${activity.recencyLabel}`
+                    : `At risk · ${activity.recencyLabel}`}
+                </span>
+              )}
+            </div>
+            {activity.score > 0 && (
+              <div className="flex flex-wrap gap-x-8 gap-y-3">
+                {activity.lastActiveDate && (
+                  <div>
+                    <div className="field-label">Last Active</div>
+                    <div className="text-body font-semibold text-foreground">{activity.lastActiveDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
+                    <div className={`text-micro font-medium mt-0.5 ${
+                      activity.daysSinceActive !== null && activity.daysSinceActive <= 7 ? "text-orange-400"
+                      : activity.daysSinceActive !== null && activity.daysSinceActive <= 30 ? "text-amber-400"
+                      : activity.daysSinceActive !== null && activity.daysSinceActive <= 90 ? "text-blue-400"
+                      : "text-destructive/60"
+                    }`}>{activity.recencyLabel}</div>
                   </div>
-                ) : (
-                  <span className="text-caption text-foreground/20 italic">No iorad activity</span>
                 )}
-
-                {activity.daysSinceActive !== null && (
-                  <span className={`text-micro font-medium px-2 py-0.5 rounded ${
-                    activity.daysSinceActive <= 7
-                      ? "bg-success/10 text-success"
-                      : activity.daysSinceActive <= 30
-                      ? "bg-primary/10 text-primary/70"
-                      : activity.daysSinceActive <= 90
-                      ? "bg-foreground/[0.05] text-foreground/35"
-                      : "bg-destructive/8 text-destructive/60"
-                  }`}>
-                    {activity.daysSinceActive <= 7 ? "Active now"
-                      : activity.daysSinceActive <= 30 ? `${activity.recencyLabel}`
-                      : activity.daysSinceActive <= 90 ? `Cooling · ${activity.recencyLabel}`
-                      : `At risk · ${activity.recencyLabel}`}
-                  </span>
+                {activity.tutorialsCreated > 0 && (
+                  <div>
+                    <div className="field-label">Created</div>
+                    <div className="text-body font-semibold tabular-nums text-foreground">{activity.tutorialsCreated}</div>
+                    {activity.creatorSince && <div className="text-micro text-foreground/20">since {activity.creatorSince}</div>}
+                  </div>
+                )}
+                {activity.tutorialsViewed > 0 && (
+                  <div>
+                    <div className="field-label">Viewed</div>
+                    <div className="text-body font-semibold tabular-nums text-foreground">{activity.tutorialsViewed}</div>
+                  </div>
+                )}
+                {activity.monthlyAnswers > 0 && (
+                  <div>
+                    <div className="field-label">This month</div>
+                    <div className="text-body font-semibold tabular-nums text-foreground">{activity.monthlyAnswers}</div>
+                  </div>
+                )}
+                {activity.hasExtension && (
+                  <div>
+                    <div className="field-label">Extension</div>
+                    <div className="text-caption text-foreground/50">Installed</div>
+                  </div>
+                )}
+                {activity.plan && (
+                  <div>
+                    <div className="field-label">Plan</div>
+                    <div className="text-caption text-foreground/50">{activity.plan}</div>
+                  </div>
                 )}
               </div>
+            )}
+          </div>
 
-              {/* Metrics grid — only show fields with data */}
-              {activity.score > 0 && (
-                <div className="flex flex-wrap gap-x-8 gap-y-3">
-                  {/* Last Active Date — the most important signal */}
-                  {activity.lastActiveDate && (
-                    <div>
-                      <div className="field-label">Last Active</div>
-                      <div className="text-body font-semibold text-foreground">
-                        {activity.lastActiveDate.toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
-                      </div>
-                      <div className={`text-micro font-medium mt-0.5 ${
-                        activity.daysSinceActive !== null && activity.daysSinceActive <= 7
-                          ? "text-orange-400"
-                          : activity.daysSinceActive !== null && activity.daysSinceActive <= 30
-                          ? "text-amber-400"
-                          : activity.daysSinceActive !== null && activity.daysSinceActive <= 90
-                          ? "text-blue-400"
-                          : "text-destructive/60"
-                      }`}>
-                        {activity.recencyLabel}
-                      </div>
+          {(effectiveContact as any)?.contact_profile?.account_narrative && (
+            <div>
+              <div className="field-label mb-2">AI Profile</div>
+              <p className="text-body text-foreground/60 leading-[1.7]">{(effectiveContact as any).contact_profile.account_narrative}</p>
+            </div>
+          )}
+
+          {effectiveContact?.hubspot_properties && Object.keys(effectiveContact.hubspot_properties as Record<string, any>).length > 0 && (
+            <details className="group">
+              <summary className="text-micro text-foreground/20 hover:text-foreground/40 cursor-pointer transition-colors list-none flex items-center gap-1.5">
+                <ChevronRight className="w-3 h-3 transition-transform group-open:rotate-90" />
+                HubSpot data ({Object.entries(effectiveContact.hubspot_properties as Record<string, any>).filter(([_, v]) => v != null && v !== "").length} fields)
+              </summary>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 mt-4">
+                {Object.entries(effectiveContact.hubspot_properties as Record<string, any>)
+                  .filter(([_, v]) => v != null && v !== "" && v !== 0)
+                  .filter(([k]) => !["rank"].includes(k))
+                  .sort(([a], [b]) => a.localeCompare(b))
+                  .map(([key, value]) => (
+                    <div key={key}>
+                      <div className="field-label">{key.replace(/_/g, " ").replace(/^hs /, "")}</div>
+                      <div className="text-caption text-foreground/55 truncate" title={String(value)}>{String(value)}</div>
+                    </div>
+                  ))}
+              </div>
+            </details>
+          )}
+        </section>
+
+        {/* ═══ SECTION 2: AI CONTEXT + GENERATE BRIEFING ═══ */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="field-label">AI Context</div>
+              <p className="text-micro text-foreground/20 mt-0.5">Powers strategy, outreach & story</p>
+            </div>
+            <span className={`text-micro transition-opacity duration-300 ${
+              saveStatus === "saving" ? "text-foreground/40 opacity-100"
+              : saveStatus === "saved" ? "text-success opacity-100"
+              : "opacity-0"
+            }`}>{saveStatus === "saving" ? "Saving…" : "✓ Saved"}</span>
+          </div>
+          <div>
+            <label className="field-label block mb-1.5">Role / Focus</label>
+            <input type="text" value={localRoleFocus} onChange={(e) => handleRoleFocusChange(e.target.value)} onBlur={handleFieldBlur} placeholder="e.g. Instructional Design, Training Ops" className="field-editable" />
+          </div>
+          <div>
+            <label className="field-label block mb-1.5">Notes</label>
+            <textarea value={localUserNotes} onChange={(e) => handleUserNotesChange(e.target.value)} onBlur={handleFieldBlur} placeholder="Context that improves AI output — role details, priorities, recent conversations" rows={3} className="field-editable-area" />
+          </div>
+
+          {!hasStrategy && !generatingBriefing && briefingSteps.length === 0 && (
+            <div className="pt-2">
+              <Button onClick={generateBriefing} className="w-full gap-2">
+                <Sparkles className="w-4 h-4" /> Generate Briefing
+              </Button>
+              <p className="text-micro text-foreground/15 text-center mt-2">Creates strategy & outreach based on the context above</p>
+            </div>
+          )}
+
+          {briefingSteps.length > 0 && (
+            <div className="space-y-2.5 pt-2">
+              {briefingSteps.map((step, i) => (
+                <div key={i} className="flex items-center gap-2.5">
+                  {step.status === "pending" && <div className="w-3.5 h-3.5 rounded-full border border-border/40 shrink-0" />}
+                  {step.status === "running" && <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />}
+                  {step.status === "done" && <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" />}
+                  {step.status === "failed" && <AlertCircle className="w-3.5 h-3.5 text-destructive/50 shrink-0" />}
+                  <span className={`text-caption ${
+                    step.status === "running" ? "text-foreground/60"
+                    : step.status === "done" ? "text-foreground/30"
+                    : step.status === "failed" ? "text-destructive/40"
+                    : "text-foreground/20"
+                  }`}>{step.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {hasStrategy && !generatingBriefing && (
+            <button onClick={generateBriefing} className="text-micro text-foreground/15 hover:text-foreground/40 transition-colors">
+              Regenerate briefing
+            </button>
+          )}
+        </section>
+
+        {/* ═══ SECTION 3: STRATEGY ═══ */}
+        {hasStrategy && (
+          <section>
+            <div className="field-label mb-4">Strategy</div>
+            <StrategyTab contactName={firstName} cardsLoading={cardsLoading} isInboundStrategyResponse={isInboundStrategyResponse} inboundStrategyData={inboundStrategyData} inboundStrategyFields={inboundStrategyFields} cards={cards} regeneratingSection={regeneratingSection} ensureRunning={false} onRegenerate={() => onRegenerateSection("strategy")} />
+          </section>
+        )}
+
+        {/* ═══ SECTION 4: OUTREACH ═══ */}
+        {hasOutreach && (
+          <section>
+            <div className="field-label mb-4">Outreach</div>
+            <OutreachTab contactName={firstName} cardsLoading={cardsLoading} rawAccountJson={rawAccountJson} emailSequence={assets.email_sequence} linkedinSequence={assets.linkedin_sequence} regeneratingSection={regeneratingSection} ensureRunning={false} onRegenerate={() => onRegenerateSection("outreach")} />
+          </section>
+        )}
+
+        {/* ═══ SECTION 5: STORY TIME ═══ */}
+        {hasStrategy && (
+          <section className="pt-4">
+            <div className="flex items-center gap-4 mb-8">
+              <div className="flex-1 border-t border-border/20" />
+              <span className="text-micro font-medium uppercase tracking-wider text-foreground/20">Story Time</span>
+              <div className="flex-1 border-t border-border/20" />
+            </div>
+
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                  <label className="field-label block mb-1.5">Loom Video</label>
+                  <input type="text" value={effectiveLoomUrl} onChange={(e) => handleLoomUrlChange(e.target.value)} placeholder="https://www.loom.com/share/..." className="field-editable" />
+                  <p className="text-micro text-foreground/15 mt-1">Embeds at top of story page</p>
+                </div>
+                <div>
+                  <label className="field-label block mb-1.5">iorad Tutorial</label>
+                  <input type="text" value={effectiveIoradUrl} onChange={(e) => handleIoradUrlChange(e.target.value)} placeholder="https://ior.ad/..." className="field-editable" />
+                  <p className="text-micro text-foreground/15 mt-1">Replaces default tutorial embed</p>
+                </div>
+              </div>
+
+              {(loomEmbedUrl || ioradEmbedUrl) && (
+                <div className="space-y-4">
+                  {loomEmbedUrl && (
+                    <div className="rounded-lg overflow-hidden border border-border/20">
+                      <iframe src={loomEmbedUrl} width="100%" height="360" frameBorder="0" allowFullScreen allow="autoplay; fullscreen" title="Loom preview" />
                     </div>
                   )}
-                  {!activity.lastActiveDate && activity.score > 0 && (
-                    <div>
-                      <div className="field-label">Last Active</div>
-                      <div className="text-caption text-foreground/20 italic">Unknown</div>
-                    </div>
-                  )}
-                  {activity.tutorialsCreated > 0 && (
-                    <div>
-                      <div className="field-label">Created</div>
-                      <div className="text-body font-semibold tabular-nums text-foreground">{activity.tutorialsCreated}</div>
-                      {activity.creatorSince && <div className="text-micro text-foreground/20">since {activity.creatorSince}</div>}
-                    </div>
-                  )}
-                  {activity.tutorialsViewed > 0 && (
-                    <div>
-                      <div className="field-label">Viewed</div>
-                      <div className="text-body font-semibold tabular-nums text-foreground">{activity.tutorialsViewed}</div>
-                      {activity.viewerSince && <div className="text-micro text-foreground/20">since {activity.viewerSince}</div>}
-                    </div>
-                  )}
-                  {activity.monthlyAnswers > 0 && (
-                    <div>
-                      <div className="field-label">This month</div>
-                      <div className="text-body font-semibold tabular-nums text-foreground">{activity.monthlyAnswers}</div>
-                    </div>
-                  )}
-                  {activity.prevMonthAnswers > 0 && (
-                    <div>
-                      <div className="field-label">Last month</div>
-                      <div className="text-body font-semibold tabular-nums text-foreground">{activity.prevMonthAnswers}</div>
-                    </div>
-                  )}
-                  {activity.totalAnswers > 0 && (
-                    <div>
-                      <div className="field-label">All time</div>
-                      <div className="text-body font-semibold tabular-nums text-foreground">{activity.totalAnswers}</div>
-                    </div>
-                  )}
-                  {activity.hasExtension && (
-                    <div>
-                      <div className="field-label">Extension</div>
-                      <div className="text-caption text-foreground/50">Installed</div>
-                    </div>
-                  )}
-                  {activity.plan && (
-                    <div>
-                      <div className="field-label">Plan</div>
-                      <div className="text-caption text-foreground/50">{activity.plan}</div>
-                    </div>
-                  )}
-                  {activity.documentingProduct && (
-                    <div>
-                      <div className="field-label">Documenting</div>
-                      <div className="text-caption text-foreground/50">{activity.documentingProduct}</div>
+                  {ioradEmbedUrl && (
+                    <div className="rounded-lg overflow-hidden border border-border/20">
+                      <iframe src={ioradEmbedUrl} width="100%" height="400" frameBorder="0" allowFullScreen allow="camera; microphone; clipboard-write" sandbox="allow-scripts allow-forms allow-same-origin allow-presentation allow-downloads allow-modals allow-popups allow-popups-to-escape-sandbox allow-top-navigation allow-top-navigation-by-user-activation" title="iorad preview" />
                     </div>
                   )}
                 </div>
               )}
-            </div>
 
-            {(effectiveContact as any)?.contact_profile?.account_narrative && (
-              <div>
-                <div className="field-label mb-2">AI Profile</div>
-                <p className="text-body text-foreground/60 leading-[1.7]">{(effectiveContact as any).contact_profile.account_narrative}</p>
-              </div>
-            )}
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              {!hasStory ? (
+                <div className="py-6 text-center">
+                  <p className="text-caption text-foreground/25 mb-4">Strategy & outreach are ready. Generate a story built on the strategic angle.</p>
+                  <Button onClick={onGenerateStory} disabled={generatingStory} className="gap-2">
+                    {generatingStory
+                      ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating Story…</>
+                      : <><Sparkles className="w-4 h-4" /> Generate Story</>}
+                  </Button>
+                </div>
+              ) : (
                 <div>
-                  <div className="field-label">AI Context</div>
-                  <p className="text-micro text-foreground/20 mt-0.5">Powers strategy, outreach & story</p>
-                </div>
-                <span className={`text-micro transition-opacity duration-300 ${
-                  saveStatus === "saving" ? "text-foreground/40 opacity-100"
-                  : saveStatus === "saved" ? "text-success opacity-100"
-                  : "opacity-0"
-                }`}>
-                  {saveStatus === "saving" ? "Saving…" : "✓ Saved"}
-                </span>
-              </div>
-              <div>
-                <label className="field-label block mb-1.5">Role / Focus</label>
-                <input
-                  type="text"
-                  value={localRoleFocus}
-                  onChange={(e) => handleRoleFocusChange(e.target.value)}
-                  onBlur={handleFieldBlur}
-                  placeholder="e.g. Instructional Design, Training Ops"
-                  className="field-editable"
-                />
-              </div>
-              <div>
-                <label className="field-label block mb-1.5">Notes</label>
-                <textarea
-                  value={localUserNotes}
-                  onChange={(e) => handleUserNotesChange(e.target.value)}
-                  onBlur={handleFieldBlur}
-                  placeholder="Context that improves AI output — role details, priorities, recent conversations"
-                  rows={3}
-                  className="field-editable-area"
-                />
-              </div>
-            </div>
-
-            {effectiveContact?.hubspot_properties && Object.keys(effectiveContact.hubspot_properties as Record<string, any>).length > 0 && (
-              <details className="group">
-                <summary className="text-micro text-foreground/20 hover:text-foreground/40 cursor-pointer transition-colors list-none flex items-center gap-1.5">
-                  <ChevronRight className="w-3 h-3 transition-transform group-open:rotate-90" />
-                  HubSpot data ({Object.entries(effectiveContact.hubspot_properties as Record<string, any>).filter(([_, v]) => v != null && v !== "").length} fields)
-                </summary>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 mt-4">
-                  {Object.entries(effectiveContact.hubspot_properties as Record<string, any>)
-                    .filter(([_, v]) => v != null && v !== "" && v !== 0)
-                    .filter(([k]) => !["rank"].includes(k))
-                    .sort(([a], [b]) => a.localeCompare(b))
-                    .map(([key, value]) => (
-                      <div key={key}>
-                        <div className="field-label">{key.replace(/_/g, " ").replace(/^hs /, "")}</div>
-                        <div className="text-caption text-foreground/55 truncate" title={String(value)}>{String(value)}</div>
-                      </div>
-                    ))}
-                </div>
-              </details>
-            )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="strategy" className="mt-0">
-          <StrategyTab
-            contactName={firstName}
-            cardsLoading={cardsLoading}
-            isInboundStrategyResponse={isInboundStrategyResponse}
-            inboundStrategyData={inboundStrategyData}
-            inboundStrategyFields={inboundStrategyFields}
-            cards={cards}
-            regeneratingSection={regeneratingSection}
-            ensureRunning={ensureRunning}
-            onRegenerate={() => onRegenerateSection("strategy")}
-          />
-        </TabsContent>
-
-        <TabsContent value="outreach" className="mt-0">
-          <OutreachTab
-            contactName={firstName}
-            cardsLoading={cardsLoading}
-            rawAccountJson={rawAccountJson}
-            emailSequence={assets.email_sequence}
-            linkedinSequence={assets.linkedin_sequence}
-            regeneratingSection={regeneratingSection}
-            ensureRunning={ensureRunning}
-            onRegenerate={() => onRegenerateSection("outreach")}
-          />
-        </TabsContent>
-
-        <TabsContent value="story" className="mt-0">
-          {hasStrategy && (
-            <section className="pt-4 max-w-2xl">
-              <div className="flex items-center gap-4 mb-8">
-                <div className="flex-1 border-t border-border/20" />
-                <span className="text-micro font-medium uppercase tracking-wider text-foreground/20">
-                  Story Time
-                </span>
-                <div className="flex-1 border-t border-border/20" />
-              </div>
-
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div>
-                    <label className="field-label block mb-1.5">Loom Video</label>
-                    <input
-                      type="text"
-                      value={effectiveLoomUrl}
-                      onChange={(e) => handleLoomUrlChange(e.target.value)}
-                      placeholder="https://www.loom.com/share/..."
-                      className="field-editable"
-                    />
-                    <p className="text-micro text-foreground/15 mt-1">Embeds at the top of the story page</p>
-                  </div>
-                  <div>
-                    <label className="field-label block mb-1.5">iorad Tutorial</label>
-                    <input
-                      type="text"
-                      value={effectiveIoradUrl}
-                      onChange={(e) => handleIoradUrlChange(e.target.value)}
-                      placeholder="https://ior.ad/..."
-                      className="field-editable"
-                    />
-                    <p className="text-micro text-foreground/15 mt-1">Replaces the default tutorial embed</p>
-                  </div>
-                </div>
-
-                {(loomEmbedUrl || ioradEmbedUrl) && (
-                  <div className="space-y-4">
-                    {loomEmbedUrl && (
-                      <div className="rounded-lg overflow-hidden border border-border/20">
-                        <iframe src={loomEmbedUrl} width="100%" height="360" frameBorder="0" allowFullScreen allow="autoplay; fullscreen" title="Loom preview" />
-                      </div>
-                    )}
-                    {ioradEmbedUrl && (
-                      <div className="rounded-lg overflow-hidden border border-border/20">
-                        <iframe
-                          src={ioradEmbedUrl} width="100%" height="400" frameBorder="0" allowFullScreen
-                          allow="camera; microphone; clipboard-write"
-                          sandbox="allow-scripts allow-forms allow-same-origin allow-presentation allow-downloads allow-modals allow-popups allow-popups-to-escape-sandbox allow-top-navigation allow-top-navigation-by-user-activation"
-                          title="iorad preview"
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {!hasStory ? (
-                  <div className="py-6 text-center">
-                    <p className="text-caption text-foreground/25 mb-4">
-                      Strategy & outreach are ready. Generate a story built on the strategic angle.
-                    </p>
-                    <Button
-                      onClick={onGenerateStory}
-                      disabled={generatingStory}
-                      className="gap-2"
-                    >
-                      {generatingStory
-                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating Story…</>
-                        : <><Sparkles className="w-4 h-4" /> Generate Story</>}
-                    </Button>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="field-label">Story</div>
-                      <div className="flex items-center gap-3">
-                        {storyUrl && (
-                          <a href={storyUrl} target="_blank" rel="noopener noreferrer">
-                            <Button size="sm" variant="outline" className="gap-1.5 text-micro">
-                              <ExternalLink className="w-3 h-3" /> View Story
-                            </Button>
-                          </a>
-                        )}
-                        <button
-                          onClick={onGenerateStory}
-                          disabled={generatingStory}
-                          className="text-micro text-foreground/15 hover:text-foreground/40 transition-colors"
-                        >
-                          {generatingStory ? "Regenerating…" : "Regenerate"}
-                        </button>
-                      </div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="field-label">Story</div>
+                    <div className="flex items-center gap-3">
+                      {storyUrl && (
+                        <a href={storyUrl} target="_blank" rel="noopener noreferrer">
+                          <Button size="sm" variant="outline" className="gap-1.5 text-micro">
+                            <ExternalLink className="w-3 h-3" /> View Story
+                          </Button>
+                        </a>
+                      )}
+                      <button onClick={onGenerateStory} disabled={generatingStory} className="text-micro text-foreground/15 hover:text-foreground/40 transition-colors">
+                        {generatingStory ? "Regenerating…" : "Regenerate"}
+                      </button>
                     </div>
-                    <StoryTab
-                      contactName={firstName}
-                      isInboundStoryResponse={isInboundStoryResponse}
-                      rawAccountJson={rawAccountJson}
-                      storyBaseUrl={storyUrl}
-                      loomUrl={effectiveLoomUrl}
-                      ioradUrl={effectiveIoradUrl}
-                      loomEmbedUrl={loomEmbedUrl}
-                      ioradEmbedUrl={ioradEmbedUrl}
-                      onLoomUrlChange={() => {}}
-                      onIoradUrlChange={() => {}}
-                      regeneratingSection={regeneratingSection}
-                      ensureRunning={false}
-                      onRegenerate={() => onRegenerateSection("story")}
-                    />
                   </div>
-                )}
-              </div>
-            </section>
-          )}
-        </TabsContent>
-      </Tabs>
+                  <StoryTab contactName={firstName} isInboundStoryResponse={isInboundStoryResponse} rawAccountJson={rawAccountJson} storyBaseUrl={storyUrl} loomUrl={effectiveLoomUrl} ioradUrl={effectiveIoradUrl} loomEmbedUrl={loomEmbedUrl} ioradEmbedUrl={ioradEmbedUrl} onLoomUrlChange={() => {}} onIoradUrlChange={() => {}} regeneratingSection={regeneratingSection} ensureRunning={false} onRegenerate={() => onRegenerateSection("story")} />
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+      </div>
 
       <Dialog open={addContactOpen} onOpenChange={onSetAddContactOpen}>
         <DialogContent>
@@ -677,7 +604,7 @@ export default function ContactDetailView({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete contact?</AlertDialogTitle>
-            <AlertDialogDescription>This will permanently remove the contact. This action cannot be undone.</AlertDialogDescription>
+            <AlertDialogDescription>This will permanently remove the contact.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
