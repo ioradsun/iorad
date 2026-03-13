@@ -704,7 +704,7 @@ function StoryPageInner({
         refreshSnapshot,
       } : null
     }>
-      <div className="min-h-screen" style={{ background: "var(--story-bg)", color: "var(--story-fg)" }}>
+      <div className="min-h-screen story-page" style={{ background: "var(--story-bg)", color: "var(--story-fg)" }}>
         <StoryHero customer={displayCustomer} pm={pm} />
 
         {/* Loom Video Embed (from Story config) */}

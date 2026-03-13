@@ -306,6 +306,19 @@
     border-color: var(--story-accent);
     box-shadow: 0 0 0 3px var(--story-accent-dim);
   }
+
+
+  /* Story page: force all headings & body text to use story tokens */
+  .story-page h1,
+  .story-page h2,
+  .story-page h3,
+  .story-page h4,
+  .story-page h5,
+  .story-page p,
+  .story-page li,
+  .story-page span {
+    color: inherit;
+  }
 }
 
 /* Thin scrollbar utility */

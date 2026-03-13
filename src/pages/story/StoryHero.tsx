@@ -92,7 +92,7 @@ export default function StoryHero({ customer, pm }: StoryHeroProps) {
             Prepared for {customer.name}
           </span>
 
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight leading-[1.15] mb-6 max-w-3xl" style={{ color: "var(--story-fg)" }}>
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight leading-[1.15] mb-6 max-w-3xl">
             {customer.contactName ? (
               <>
                 {customer.contactName}, here's what we're seeing at{" "}
