@@ -79,6 +79,12 @@ serve(async (req) => {
     const latestSnapshot = snapshotRes.data?.[0] || null;
     const aiConfig = aiConfigRes.data;
 
+    // Voice layer — Don Draper personality applied to ALL generations
+    const isInbound = company.source_type === "inbound";
+    const voicePrompt = isInbound
+      ? (aiConfig?.inbound_system_prompt || aiConfig?.system_prompt || "You are an elite B2B strategist for iorad, a tutorial creation platform.")
+      : (aiConfig?.system_prompt || "You are an elite B2B strategist for iorad, a tutorial creation platform.");
+
     // Determine model
     const model = aiConfig?.model || "google/gemini-2.5-flash";
 
@@ -165,13 +171,13 @@ serve(async (req) => {
         : null,
     };
 
-    // When generating story, inject existing strategy so the narrative
-    // builds off the identified angle — not from scratch
+    // When generating story, inject existing strategy + outreach so the
+    // narrative builds on the identified angle — not from scratch
     if (activeTab === "story" && contact_id) {
       try {
         const { data: existingCards } = await sb
           .from("company_cards")
-          .select("cards_json, account_json")
+          .select("cards_json, account_json, assets_json")
           .eq("company_id", company_id)
           .eq("contact_id", contact_id)
           .maybeSingle();
@@ -181,30 +187,13 @@ serve(async (req) => {
             strategy_cards: existingCards.cards_json || null,
             strategy_analysis: (existingCards.account_json as any)?._strategy || null,
             outreach_meta: (existingCards.account_json as any)?._outreach_meta || null,
+            outreach_sequences: existingCards.assets_json || null,
           };
         }
       } catch (e: any) {
         console.warn("Could not load strategy for story:", e.message);
       }
     }
-
-    const strategyNote = (context as any).strategy_briefing
-      ? `\n\nA strategy briefing has already been generated for this contact.
-The story_briefing field in the context contains the strategic angle,
-outreach framing, and identified plays. BUILD YOUR STORY ON THIS FOUNDATION.
-The strategy identified the play — your job is to bring it to life as a
-narrative that the contact would actually want to read.`
-      : "";
-
-    const userPrompt = `Generate content for the "${activeTab}" tab.
-
-ACCOUNT CONTEXT:
-- role_focus: the contact's functional area — tailor the angle to their world.
-- user_notes: ground truth from the sales rep — override any assumptions.
-- strategy_briefing: if present, the pre-generated strategy analysis — align your narrative with it.${strategyNote}
-${JSON.stringify(context, null, 2)}
-
-Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
 
     // ── Built-in defaults — always work even when ai_config is empty ──
     const DEFAULTS: Record<string, string> = {
@@ -324,23 +313,40 @@ CRITICAL RULES:
 Return ONLY the JSON. No markdown fences. No commentary.`,
     };
 
-    const isInbound = company.source_type === "inbound";
-    const promptMap: Record<string, string> = {
+    // Instruction layer — tab-specific generation instructions
+    const instructionMap: Record<string, string> = {
       company: aiConfig?.company_prompt || DEFAULTS.company,
       strategy: isInbound
-        ? (aiConfig?.inbound_strategy_prompt || aiConfig?.strategy_prompt || aiConfig?.cards_prompt_template || DEFAULTS.strategy)
-        : (aiConfig?.strategy_prompt || aiConfig?.cards_prompt_template || DEFAULTS.strategy),
+        ? (aiConfig?.inbound_strategy_prompt || aiConfig?.strategy_prompt || DEFAULTS.strategy)
+        : (aiConfig?.strategy_prompt || DEFAULTS.strategy),
       outreach: isInbound
         ? (aiConfig?.inbound_outreach_prompt || aiConfig?.outreach_prompt || DEFAULTS.outreach)
         : (aiConfig?.outreach_prompt || DEFAULTS.outreach),
       story: isInbound
-        ? (aiConfig?.inbound_story_prompt || aiConfig?.story_prompt || DEFAULTS.story)
-        : (aiConfig?.story_prompt || DEFAULTS.story),
+        ? (aiConfig?.inbound_story_prompt || aiConfig?.prompt_template || DEFAULTS.story)
+        : (aiConfig?.prompt_template || aiConfig?.inbound_story_prompt || DEFAULTS.story),
     };
-    const systemPrompt = promptMap[activeTab];
+    const tabInstruction = instructionMap[activeTab];
     // Defaults guarantee this is never empty — no throw needed
 
-    console.log(`Generating cards for ${company.name} using ${model}`);
+    // Strategy context hint for story tab
+    const strategyHint = activeTab === "story" && (context as any).strategy_briefing
+      ? `
+
+IMPORTANT: A strategy briefing exists in the context under "strategy_briefing". The story MUST build on the strategic angle identified there. The strategy identified the plays — the story brings them to life as a narrative the reader would actually want to finish.`
+      : "";
+
+    const userMessage = `${tabInstruction}
+
+ACCOUNT CONTEXT:
+- role_focus: the contact's functional area — tailor messaging to their world.
+- user_notes: ground truth from the sales rep — overrides inferred assumptions.${strategyHint}
+
+${JSON.stringify(context, null, 2)}
+
+Return ONLY valid JSON matching the output schema. No markdown fences, no commentary.`;
+
+    console.log(`Generating ${activeTab} for ${company.name} using ${model} (voice: ${voicePrompt.slice(0, 50)}…)`);
 
     const ac = new AbortController();
     const timeout = setTimeout(() => ac.abort(), 45_000);
@@ -354,8 +360,8 @@ Return ONLY the JSON. No markdown fences. No commentary.`,
         model,
         max_tokens: 32768,
         messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
+          { role: "system", content: voicePrompt },
+          { role: "user", content: userMessage },
         ],
       }),
       signal: ac.signal,
