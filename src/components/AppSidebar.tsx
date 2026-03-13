@@ -46,8 +46,7 @@ export default function AppSidebar() {
       if (!contactSearch) return true;
       const q = contactSearch.toLowerCase();
       return c.name?.toLowerCase().includes(q) || c.title?.toLowerCase().includes(q);
-    })
-    .slice(0, 10);
+    });
 
   const displayName =
     user?.user_metadata?.full_name ||
