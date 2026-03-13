@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Building2, Search, Loader2, ArrowUpDown, ExternalLink, RefreshCw, Download, Zap, ChevronDown, RefreshCcw, Repeat2 } from "lucide-react";
-import { useCompanies, useSignalCounts, useProcessingJobs, useBulkImport, useScoreCompanies } from "@/hooks/useSupabase";
+import { useCompanies, useCompaniesPage, useSignalCounts, useCompanyStats, useProcessingJobs, useBulkImport, useScoreCompanies } from "@/hooks/useSupabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -123,9 +123,6 @@ function HubSpotSyncButton({
 }
 
 export default function Dashboard() {
-  const { data: companies = [], isLoading } = useCompanies();
-  const { data: signalCounts = {} } = useSignalCounts();
-  const { data: jobs = [] } = useProcessingJobs();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [syncingHubspot, setSyncingHubspot] = useState(false);
@@ -139,6 +136,22 @@ export default function Dashboard() {
   const [partnerFilter, setPartnerFilter] = useState<string>("all");
   const [activeTab, setActiveTab] = useState<CategoryTab>("business");
   const [stageFilter, setStageFilter] = useState<StageFilter>("all");
+
+  // Phase 1: fast first page (50 companies for current tab) — renders immediately
+  const { data: firstPage = [], isLoading: firstPageLoading } = useCompaniesPage(activeTab);
+
+  // Phase 2: full list (background) — enables search, accurate sort, full stats
+  const { data: fullList } = useCompanies();
+
+  // Merge: use full list when available, fall back to first page
+  const companies = fullList ?? firstPage;
+  const isLoading = firstPageLoading;
+  const isFullyLoaded = !!fullList;
+
+  // Signal counts + stats — non-blocking
+  const { data: signalCounts = {} } = useSignalCounts();
+  const { data: stats } = useCompanyStats();
+  const { data: jobs = [] } = useProcessingJobs();
 
   const handleHubspotSync = async () => {
     setSyncingHubspot(true);
@@ -229,23 +242,14 @@ export default function Dashboard() {
     return Array.from(set).sort();
   }, [companies]);
 
-  const stats = useMemo(() => {
-    const now = Date.now();
-    const oneWeekAgo = now - 7 * 24 * 60 * 60 * 1000;
-    let newThisWeek = 0;
-    for (const c of companies) {
-      const createdAt = new Date(c.created_at);
-      if (createdAt.getTime() >= oneWeekAgo) newThisWeek++;
-    }
-
-    // Stage breakdown across all companies
-    const stageCounts = { prospect: 0, active_opp: 0, customer: 0, expansion: 0 };
-    for (const c of companies) {
-      const stage = (c as any).stage || "prospect";
-      if (stage in stageCounts) stageCounts[stage as keyof typeof stageCounts]++;
-    }
-    return { total: companies.length, newThisWeek, stageCounts };
-  }, [companies]);
+  const effectiveStats = stats ?? {
+    total: companies.length,
+    school: 0,
+    business: 0,
+    partner: 0,
+    newThisWeek: 0,
+    stageCounts: { prospect: 0, active_opp: 0, customer: 0, expansion: 0 },
+  };
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -264,9 +268,27 @@ export default function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-32">
-        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-        <span className="ml-2.5 text-sm text-muted-foreground">Loading…</span>
+      <div className="max-w-6xl mx-auto px-1 space-y-8">
+        <div className="grid grid-cols-3 gap-3 pt-1">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="bg-card rounded-lg px-5 py-4 animate-pulse">
+              <div className="h-8 w-16 bg-foreground/[0.06] rounded mb-2" />
+              <div className="h-4 w-24 bg-foreground/[0.04] rounded" />
+            </div>
+          ))}
+        </div>
+        <div className="rounded-lg border bg-card overflow-hidden">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4 px-5 py-4 border-b border-border/30">
+              <div className="flex-1 space-y-2">
+                <div className="h-4 bg-foreground/[0.06] rounded w-48" />
+                <div className="h-3 bg-foreground/[0.04] rounded w-32" />
+              </div>
+              <div className="h-5 bg-foreground/[0.04] rounded w-16" />
+              <div className="h-5 bg-foreground/[0.04] rounded w-12" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -279,13 +301,13 @@ export default function Dashboard() {
       {/* ── KPI strip ── */}
       <div className="grid grid-cols-3 gap-3 pt-1">
         <KpiCard
-          value={stats.total}
+          value={effectiveStats.total}
           label="Total tracked"
           icon={<Building2 className="w-4 h-4 text-primary" />}
           iconBg="var(--stat-total-bg)"
         />
         <KpiCard
-          value={stats.newThisWeek}
+          value={effectiveStats.newThisWeek}
           label="New this week"
           icon={<Building2 className="w-4 h-4 text-primary" />}
           iconBg="var(--stat-inbound-bg)"
@@ -296,7 +318,7 @@ export default function Dashboard() {
         <div className="bg-card shadow-sm shadow-black/[0.04] rounded-lg px-5 py-4">
           <div className="text-caption font-medium text-foreground/45 mb-2.5 leading-tight">Pipeline stages</div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-            {(Object.entries(stats.stageCounts) as [string, number][]).map(([stage, count]) => (
+            {(Object.entries(effectiveStats.stageCounts) as [string, number][]).map(([stage, count]) => (
               <div key={stage} className="flex items-center justify-between gap-2">
                 <span className="text-micro text-foreground/45 capitalize">{stage.replace("_", " ")}</span>
                 <span className="text-caption font-semibold tabular-nums text-foreground">{count}</span>
@@ -323,8 +345,8 @@ export default function Dashboard() {
               }`}
             >
               {CATEGORY_LABELS[tab]}
-              <span className="ml-1.5 tabular-nums text-xs text-muted-foreground">
-                {byCategory[tab].length}
+              <span className="ml-1.5 tabular-nums text-xs text-foreground/25">
+                {isFullyLoaded ? byCategory[tab].length : (stats?.[tab] ?? "…")}
               </span>
             </button>
           ))}
@@ -333,10 +355,13 @@ export default function Dashboard() {
         <div className="relative flex-1 min-w-[180px] max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <Input
-            placeholder="Search…"
+            placeholder={isFullyLoaded ? "Search…" : "Loading all companies…"}
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="pl-8 h-8 text-sm bg-secondary border-0 focus-visible:ring-1 focus-visible:ring-ring/30"
+            disabled={!isFullyLoaded}
+            className={`pl-8 h-8 text-sm bg-secondary border-0 focus-visible:ring-1 focus-visible:ring-ring/30 ${
+              !isFullyLoaded ? "opacity-50" : ""
+            }`}
           />
         </div>
 
@@ -396,6 +421,13 @@ export default function Dashboard() {
               )}
             </button>
           ))}
+        </div>
+      )}
+
+      {!isFullyLoaded && !isLoading && (
+        <div className="flex items-center gap-2 text-micro text-foreground/25">
+          <Loader2 className="w-3 h-3 animate-spin" />
+          Loading all companies for search and stats…
         </div>
       )}
 

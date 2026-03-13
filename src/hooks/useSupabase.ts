@@ -3,29 +3,59 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tables, TablesInsert } from "@/integrations/supabase/types";
 
 export type DbAppSettings = Tables<"app_settings">;
+const COMPANY_LIST_COLUMNS = "id, name, domain, partner, partner_rep_email, partner_rep_name, snapshot_status, created_at, category, stage, scout_score, source_type, last_score_total, industry, headcount";
 
 // ---- Companies ----
+// Fast first page for immediate render — server-side category filter
+export function useCompaniesPage(category: string, limit = 50) {
+  return useQuery({
+    queryKey: ["companies_page", category, limit],
+    queryFn: async () => {
+      let query = supabase
+        .from("companies")
+        .select(COMPANY_LIST_COLUMNS)
+        .order("scout_score", { ascending: false, nullsFirst: false })
+        .limit(limit);
+
+      // Server-side category filter
+      if (category === "school") {
+        query = query.eq("category", "school");
+      } else if (category === "partner") {
+        query = query.eq("category", "partner");
+      } else {
+        // "business" is the default — includes null/missing category
+        query = query.or("category.eq.business,category.is.null");
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data || []) as any[];
+    },
+    staleTime: 60_000,
+  });
+}
+
 export function useCompanies() {
   return useQuery({
     queryKey: ["companies"],
     queryFn: async () => {
-      // Fetch all companies — paginate past the default 1000-row limit
       const PAGE = 1000;
-      let allData: Tables<"companies">[] = [];
+      let allData: any[] = [];
       let from = 0;
       while (true) {
         const { data, error } = await supabase
           .from("companies")
-          .select("*")
+          .select(COMPANY_LIST_COLUMNS)
           .order("last_score_total", { ascending: false, nullsFirst: false })
           .range(from, from + PAGE - 1);
         if (error) throw error;
-        allData = allData.concat(data as Tables<"companies">[]);
+        allData = allData.concat(data || []);
         if (!data || data.length < PAGE) break;
         from += PAGE;
       }
       return allData;
     },
+    staleTime: 2 * 60 * 1000,
   });
 }
 
@@ -157,6 +187,7 @@ export function useProcessingJobs() {
       if (error) throw error;
       return data as Tables<"processing_jobs">[];
     },
+    refetchInterval: 30_000,
   });
 }
 
@@ -229,7 +260,8 @@ export function useSignalCounts() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("signals")
-        .select("company_id");
+        .select("company_id")
+        .limit(5000);
       if (error) throw error;
       const counts: Record<string, number> = {};
       (data || []).forEach((s) => {
@@ -237,6 +269,43 @@ export function useSignalCounts() {
       });
       return counts;
     },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useCompanyStats() {
+  return useQuery({
+    queryKey: ["company_stats"],
+    queryFn: async () => {
+      const [totalRes, schoolRes, businessRes, partnerRes, recentRes, stagesRes] = await Promise.all([
+        supabase.from("companies").select("id", { count: "exact", head: true }),
+        supabase.from("companies").select("id", { count: "exact", head: true }).eq("category", "school"),
+        supabase.from("companies").select("id", { count: "exact", head: true }).or("category.eq.business,category.is.null"),
+        supabase.from("companies").select("id", { count: "exact", head: true }).eq("category", "partner"),
+        supabase.from("companies").select("id", { count: "exact", head: true }).gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
+        Promise.all([
+          supabase.from("companies").select("id", { count: "exact", head: true }).eq("stage", "prospect"),
+          supabase.from("companies").select("id", { count: "exact", head: true }).eq("stage", "active_opp"),
+          supabase.from("companies").select("id", { count: "exact", head: true }).eq("stage", "customer"),
+          supabase.from("companies").select("id", { count: "exact", head: true }).eq("stage", "expansion"),
+        ]),
+      ]);
+
+      return {
+        total: totalRes.count ?? 0,
+        school: schoolRes.count ?? 0,
+        business: businessRes.count ?? 0,
+        partner: partnerRes.count ?? 0,
+        newThisWeek: recentRes.count ?? 0,
+        stageCounts: {
+          prospect: stagesRes[0].count ?? 0,
+          active_opp: stagesRes[1].count ?? 0,
+          customer: stagesRes[2].count ?? 0,
+          expansion: stagesRes[3].count ?? 0,
+        },
+      };
+    },
+    staleTime: 60_000,
   });
 }
 
