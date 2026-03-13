@@ -9,7 +9,7 @@ function useSyncStatus() {
   return useQuery({
     queryKey: ["sync_status"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("sync_checkpoints")
         .select("key, value, updated_at")
         .in("key", [
