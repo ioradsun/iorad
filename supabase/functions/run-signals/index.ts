@@ -354,7 +354,12 @@ Deno.serve(async (req) => {
         if (company.domain && (mode === "full" || mode === "signals_only")) {
           try {
             console.log(`Inbound web signals: searching for ${company.name}`);
-            const webSignals = await searchSignals(company, firecrawlKey);
+            const webSignals = await Promise.race([
+              searchSignals(company, firecrawlKey),
+              new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error("Firecrawl timeout")), 15_000)
+              ),
+            ]);
             for (const sig of webSignals) {
               await supabase.from("signals").upsert(
                 {
@@ -372,7 +377,7 @@ Deno.serve(async (req) => {
             signalsCount += webSignals.length;
             console.log(`Inbound web signals: ${webSignals.length} found for ${company.name}`);
           } catch (sigErr: any) {
-            console.warn("Inbound web signal search failed:", sigErr.message);
+            console.warn(`Inbound Firecrawl failed/timed out: ${sigErr.message}. Continuing.`);
           }
         }
 
@@ -471,13 +476,34 @@ Deno.serve(async (req) => {
 
       // Step 1: Search signals
       if (mode === "full" || mode === "signals_only") {
-        signals = await searchSignals(company, firecrawlKey);
-        signalsCount = signals.length;
-        for (const sig of signals) {
-          await supabase.from("signals").upsert(
-            { company_id: company.id, title: sig.title, url: sig.url, type: sig.type, raw_excerpt: sig.excerpt, evidence_snippets: [], last_seen_at: new Date().toISOString() },
-            { onConflict: "company_id,url" }
-          );
+        try {
+          const firecrawlResult = await Promise.race([
+            searchSignals(company, firecrawlKey),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error("Firecrawl timeout")), 15_000)
+            ),
+          ]);
+          signals = firecrawlResult;
+          signalsCount = signals.length;
+          for (const sig of signals) {
+            await supabase.from("signals").upsert(
+              { company_id: company.id, title: sig.title, url: sig.url, type: sig.type, raw_excerpt: sig.excerpt, evidence_snippets: [], last_seen_at: new Date().toISOString() },
+              { onConflict: "company_id,url" }
+            );
+          }
+        } catch (firecrawlErr: any) {
+          console.warn(`Firecrawl failed/timed out for ${company.name}: ${firecrawlErr.message}. Continuing with 0 web signals.`);
+          const { data: dbSignals } = await supabase
+            .from("signals")
+            .select("title, url, type, raw_excerpt")
+            .eq("company_id", company.id);
+          signals = (dbSignals || []).map((s: any) => ({
+            title: s.title,
+            url: s.url,
+            type: s.type,
+            excerpt: s.raw_excerpt || "",
+          }));
+          signalsCount = signals.length;
         }
       }
 

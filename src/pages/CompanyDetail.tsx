@@ -389,6 +389,16 @@ export default function CompanyDetail() {
         },
       },
       {
+        label: "Computing score",
+        needed: !hasScore,
+        fn: async () => {
+          await supabase.functions.invoke("score-companies", {
+            body: { action: "score_one", company_id: id },
+          });
+          queryClient.invalidateQueries({ queryKey: ["company", id] });
+        },
+      },
+      {
         label: "Analyzing company",
         needed: !hasCompanyCards,
         fn: async () => {
@@ -399,13 +409,13 @@ export default function CompanyDetail() {
         },
       },
       {
-        label: "Computing score",
-        needed: !hasScore,
+        label: "Searching for signals",
+        needed: signals.length === 0 && snapshots.length === 0,
         fn: async () => {
-          await supabase.functions.invoke("score-companies", {
-            body: { action: "score_one", company_id: id },
+          await supabase.functions.invoke("run-signals", {
+            body: { company_id: id, mode: "full" },
           });
-          queryClient.invalidateQueries({ queryKey: ["company", id] });
+          queryClient.invalidateQueries({ queryKey: ["signals", id] });
           queryClient.invalidateQueries({ queryKey: ["snapshots", id] });
         },
       },
@@ -417,16 +427,6 @@ export default function CompanyDetail() {
             body: { company_id: id },
           });
           queryClient.invalidateQueries({ queryKey: ["contacts", id] });
-        },
-      },
-      {
-        label: "Searching for signals",
-        needed: signals.length === 0 && snapshots.length === 0,
-        fn: async () => {
-          await supabase.functions.invoke("run-signals", {
-            body: { company_id: id, mode: "signals_only" },
-          });
-          queryClient.invalidateQueries({ queryKey: ["signals", id] });
         },
       },
     ];
@@ -585,9 +585,7 @@ export default function CompanyDetail() {
 
   const latestSnapshot = snapshots[0];
   const snap = latestSnapshot ? parseJson<SnapshotJSON>(latestSnapshot.snapshot_json) : null;
-  const scoreBreakdown = latestSnapshot
-    ? parseJson<ScoreBreakdown>(latestSnapshot.score_breakdown)
-    : null;
+  const scoutBreakdown = parseJson<ScoreBreakdown>(companyAny?.scout_score_breakdown);
 
   const companyStage = companyAny?.stage || "prospect";
   const companyNameSlug = company.name.toLowerCase().replace(/\s+/g, "-");
@@ -831,10 +829,10 @@ export default function CompanyDetail() {
 
             <TabsContent value="score" className="mt-0">
               <div className="max-w-lg space-y-6">
-                {scoreBreakdown ? (
+                {scoutBreakdown ? (
                   <>
                     <div className="flex items-center gap-3 mb-4">
-                      <ScoreCell score={company.last_score_total} size="lg" />
+                      <ScoreCell score={company.scout_score} size="lg" />
                       {snap?.confidence_level && (
                         <span className="text-caption text-foreground/40">
                           {snap.confidence_level} confidence
@@ -845,9 +843,10 @@ export default function CompanyDetail() {
 
                     <div className="space-y-5">
                       {[
-                        { label: "Hiring", value: scoreBreakdown.relevance || scoreBreakdown.hiring || 0, max: 30 },
-                        { label: "News", value: scoreBreakdown.urgency || scoreBreakdown.news || 0, max: 40 },
-                        { label: "Expansion", value: scoreBreakdown.buyer_signal || scoreBreakdown.expansion || 0, max: 30 },
+                        { label: "Tutorial Activity", value: scoutBreakdown.tutorial || 0, max: 60 },
+                        { label: "Commercial Intent", value: scoutBreakdown.commercial || 0, max: 20 },
+                        { label: "Recency", value: scoutBreakdown.recency || 0, max: 10 },
+                        { label: "Intent Signals", value: scoutBreakdown.intent || 0, max: 10 },
                       ].map(({ label, value, max }) => (
                         <div key={label}>
                           <div className="flex justify-between mb-1.5">
