@@ -1,5 +1,4 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { supabase } from "@/integrations/supabase/client";
 
 type Theme = "dark" | "light";
 
@@ -36,64 +35,57 @@ function reapplySavedVars() {
 interface ThemeContextValue {
   theme: Theme;
   setTheme: (t: Theme) => void;
+  toggleTheme: () => void;
 }
 
-const ThemeContext = createContext<ThemeContextValue>({ theme: "dark", setTheme: () => {} });
+const ThemeContext = createContext<ThemeContextValue>({
+  theme: "dark",
+  setTheme: () => {},
+  toggleTheme: () => {},
+});
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  // Initialize from localStorage cache (instant, no network)
   const [theme, setThemeState] = useState<Theme>(() => {
     try {
       const cached = localStorage.getItem(THEME_CACHE_KEY);
       if (cached === "light" || cached === "dark") return cached;
+      const stored = localStorage.getItem("theme");
+      if (stored === "light" || stored === "dark") return stored;
     } catch {}
     return "dark";
   });
 
-  // Background sync from DB — updates cache if different
   useEffect(() => {
-    supabase
-      .from("app_settings")
-      .select("theme")
-      .eq("id", 1)
-      .single()
-      .then(({ data }) => {
-        const dbTheme = (data as any)?.theme as Theme | undefined;
-        if (dbTheme === "light" || dbTheme === "dark") {
-          setThemeState((current) => (current === dbTheme ? current : dbTheme));
-          try { localStorage.setItem(THEME_CACHE_KEY, dbTheme); } catch {}
-        }
-      });
+    // Apply stored theme on mount — no ref needed
+    const stored = localStorage.getItem("theme") as "dark" | "light" | null;
+    const initialTheme = stored || theme || "dark";
+    document.documentElement.classList.remove("light", "dark");
+    document.documentElement.classList.add(initialTheme);
+    reapplySavedVars();
+    if (initialTheme !== theme) {
+      setThemeState(initialTheme);
+    }
   }, []);
 
-  // Apply class to <html>, then reapply any custom var overrides on top
   useEffect(() => {
-    const root = document.documentElement;
-    if (theme === "light") {
-      root.classList.remove("dark");
-      root.classList.add("light");
-    } else {
-      root.classList.remove("light");
-      root.classList.add("dark");
-    }
-    // Re-stamp overrides after theme class change (theme class can override inline styles in some browsers)
+    document.documentElement.classList.remove("light", "dark");
+    document.documentElement.classList.add(theme);
+    try {
+      localStorage.setItem("theme", theme);
+      localStorage.setItem(THEME_CACHE_KEY, theme);
+    } catch {}
     reapplySavedVars();
   }, [theme]);
 
-  const setTheme = async (t: Theme) => {
+  const setTheme = (t: Theme) => {
     setThemeState(t);
-    try { localStorage.setItem(THEME_CACHE_KEY, t); } catch {}
-    await supabase
-      .from("app_settings")
-      .update({ theme: t } as any)
-      .eq("id", 1);
   };
 
-  return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
-      {children}
-    </ThemeContext.Provider>
-  );
+  const toggleTheme = () => {
+    setThemeState((current) => (current === "dark" ? "light" : "dark"));
+  };
+
+  return <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme() {
