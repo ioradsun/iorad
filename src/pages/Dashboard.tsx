@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Search, ArrowUpDown, ChevronRight } from "lucide-react";
 import { useCompanies, useCompaniesPage, useSignalCounts } from "@/hooks/useSupabase";
 import { Input } from "@/components/ui/input";
