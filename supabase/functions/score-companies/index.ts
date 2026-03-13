@@ -188,6 +188,8 @@ Contacts with iorad activity (${contactSummaries.length} of ${contacts.length} t
 ${JSON.stringify(contactSummaries, null, 2)}`;
 
   try {
+    const ac = new AbortController();
+    const timeout = setTimeout(() => ac.abort(), 30_000);
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -202,7 +204,8 @@ ${JSON.stringify(contactSummaries, null, 2)}`;
         ],
         max_tokens: 300,
       }),
-    });
+      signal: ac.signal,
+    }).finally(() => clearTimeout(timeout));
 
     if (!res.ok) {
       const text = await res.text();

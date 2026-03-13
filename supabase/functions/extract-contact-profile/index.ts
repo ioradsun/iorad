@@ -303,6 +303,8 @@ ${JSON.stringify(meaningful, null, 2)}
 
 Return ONLY the JSON profile object.`;
 
+        const ac = new AbortController();
+        const timeout = setTimeout(() => ac.abort(), 15_000);
         const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
           headers: {
@@ -316,7 +318,8 @@ Return ONLY the JSON profile object.`;
               { role: "user", content: userPrompt },
             ],
           }),
-        });
+          signal: ac.signal,
+        }).finally(() => clearTimeout(timeout));
 
         if (!aiResponse.ok) {
           const errText = await aiResponse.text();
