@@ -468,6 +468,7 @@ export default function CustomerStory() {
   // --- Slug route: /stories/:companySlug/:contactSlug ---
   const resolvedSlugData = isSlugRoute ? slugData : isSingleSlugRoute ? singleSlugData : null;
   const resolvedSlugLoading = isSlugRoute ? slugLoading : isSingleSlugRoute ? singleSlugLoading : false;
+  const resolvedSlugError = isSlugRoute ? slugError : isSingleSlugRoute ? singleSlugError : null;
 
   if (isSlugRoute || isSingleSlugRoute) {
     if (resolvedSlugLoading) {
@@ -478,7 +479,17 @@ export default function CustomerStory() {
       );
     }
     if (!resolvedSlugData?.card || !resolvedSlugData?.company) {
-      return <NotFoundStory />;
+      console.error("[CustomerStory] slug resolution failed", {
+        companySlug,
+        contactSlug,
+        isSlugRoute,
+        isSingleSlugRoute,
+        resolvedSlugData,
+        resolvedSlugError: resolvedSlugError?.message || resolvedSlugError,
+        slugData,
+        slugError: slugError?.message,
+      });
+      return <NotFoundStory debugInfo={`slug=${companySlug}/${contactSlug} err=${resolvedSlugError?.message || "no data"}`} />;
     }
     const accountJson = (resolvedSlugData.card.account_json as Record<string, any>) || {};
     const assetsJson = (resolvedSlugData.card.assets_json as Record<string, any>) || {};
