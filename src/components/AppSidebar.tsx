@@ -140,20 +140,58 @@ export default function AppSidebar() {
             <div className="my-2 border-t border-border/20" />
 
             {!collapsed && (
-              <div className="text-micro font-medium uppercase tracking-wider text-foreground/25 px-3 pb-1">
-                Contacts {companyContacts.length > 0 && `(${companyContacts.length})`}
+              <div className="flex items-center justify-between px-3 pb-1">
+                <span className="text-micro font-medium uppercase tracking-wider text-foreground/25">
+                  Contacts {companyContacts.length > 0 && `(${companyContacts.length})`}
+                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => navigate(`/company/${companyId}?addContact=true`)}
+                      className="text-foreground/25 hover:text-primary transition-colors p-0.5 rounded hover:bg-secondary/50"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="text-xs">Add contact</TooltipContent>
+                </Tooltip>
+              </div>
+            )}
+            {collapsed && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => navigate(`/company/${companyId}?addContact=true`)}
+                    className="w-full flex items-center justify-center px-3 py-1.5 text-foreground/25 hover:text-primary transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="text-xs">Add contact</TooltipContent>
+              </Tooltip>
+            )}
+
+            {!collapsed && companyContacts.length > 3 && (
+              <div className="px-3 pb-1">
+                <input
+                  type="text"
+                  placeholder="Search contacts…"
+                  value={contactSearch}
+                  onChange={(e) => setContactSearch(e.target.value)}
+                  className="w-full h-6 px-2 text-micro bg-secondary/50 border border-border/30 rounded text-foreground placeholder:text-foreground/25 focus:outline-none focus:ring-1 focus:ring-primary/30"
+                />
               </div>
             )}
 
-            <div className="space-y-0.5">
-              {companyContacts.map((c: any) => {
+            <div className="max-h-[320px] overflow-y-auto space-y-0.5 scrollbar-thin">
+              {filteredContacts.map((c: any) => {
                 const isSelected = location.search.includes(`contact=${c.id}`);
                 return (
                   <Tooltip key={c.id}>
                     <TooltipTrigger asChild>
                       <button
                         onClick={() => navigate(`/company/${companyId}?contact=${c.id}`)}
-                        className={`w-full flex items-start gap-2.5 px-3 py-2 rounded-lg text-left transition-colors ${
+                        className={`w-full flex items-start gap-2.5 px-3 py-1.5 rounded-lg text-left transition-colors ${
                           isSelected
                             ? "bg-secondary text-foreground"
                             : "text-foreground/40 hover:text-foreground/70 hover:bg-secondary/50"
@@ -163,7 +201,7 @@ export default function AppSidebar() {
                         {!collapsed && (
                           <div className="min-w-0">
                             <div className="text-caption font-medium truncate">{c.name}</div>
-                            {c.title && <div className="text-micro text-foreground/25 truncate">{c.title}</div>}
+                            {c.title && <div className="text-micro text-foreground/20 truncate">{c.title}</div>}
                           </div>
                         )}
                       </button>
@@ -173,16 +211,6 @@ export default function AppSidebar() {
                 );
               })}
             </div>
-
-            {!collapsed && (
-              <button
-                onClick={() => navigate(`/company/${companyId}?addContact=true`)}
-                className="flex items-center gap-2 px-3 py-1.5 text-caption text-primary/60 hover:text-primary transition-colors w-full"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Add contact
-              </button>
-            )}
 
             {recents.filter((r) => r.company_id !== companyId).length > 0 && (
               <>
