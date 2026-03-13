@@ -565,7 +565,7 @@ Deno.serve(async (req) => {
 
     // ── First call: create the job record ────────────────────────────────────
     if (!jobId) {
-      const initSnap = { phase: 1, phase1_cursor: null, phase1_processed: 0, touched_ids: [] };
+      const initSnap = { phase: 1, phase1_cursor: null, phase1_processed: 0, pipeline_started_at: new Date().toISOString() };
       const { data: job, error: jobErr } = await supabase
         .from("processing_jobs")
         .insert({
