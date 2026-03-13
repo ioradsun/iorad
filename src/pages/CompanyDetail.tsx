@@ -99,7 +99,7 @@ export default function CompanyDetail() {
     }, 800);
   }, [id, updateCompany]);
 
-  const regenerateSection = useCallback(async (section: "contacts" | "strategy" | "outreach" | "story") => {
+  const regenerateSection = useCallback(async (section: "contacts" | "strategy" | "outreach" | "story" | "signals" | "company") => {
     if (!id) return;
     setRegeneratingSection(section);
     try {
