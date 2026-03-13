@@ -8,15 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, RefreshCw, ExternalLink, Loader2, ChevronRight, ChevronDown, Plus, Trash2, Sparkles } from "lucide-react";
 import { Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 
 // Sub-components
 import { parseJson, toArray } from "./company/types";
-import type { SnapshotJSON } from "./company/types";
+import type { ScoreBreakdown, SnapshotJSON } from "./company/types";
 import OnboardingTab from "./company/OnboardingTab";
-import CompanySignalsSection from "./company/CompanySignalsSection";
 import ContactDetailView from "./company/ContactDetailView";
 
 export default function CompanyDetail() {
@@ -492,6 +492,9 @@ export default function CompanyDetail() {
 
   const latestSnapshot = snapshots[0];
   const snap = latestSnapshot ? parseJson<SnapshotJSON>(latestSnapshot.snapshot_json) : null;
+  const scoreBreakdown = latestSnapshot
+    ? parseJson<ScoreBreakdown>(latestSnapshot.score_breakdown)
+    : null;
 
   const companyStage = companyAny?.stage || "prospect";
   const companyNameSlug = company.name.toLowerCase().replace(/\s+/g, "-");
@@ -677,12 +680,11 @@ export default function CompanyDetail() {
           ) : effectiveContact ? (
             <ContactMetaLine contact={effectiveContact} />
           ) : null}
-        </div>
 
-      {viewMode === "company" ? (
-        <div className="space-y-8">
+          {viewMode === "company" ? (
+        <div>
           {setupRunning && (
-            <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-primary/[0.06] border border-primary/10">
+            <div className="flex items-center gap-3 px-4 py-3 mb-6 rounded-lg bg-primary/[0.06] border border-primary/10">
               <Loader2 className="w-4 h-4 animate-spin text-primary flex-shrink-0" />
               <div>
                 <div className="text-body font-medium text-foreground">Setting up {company.name}…</div>
@@ -691,348 +693,486 @@ export default function CompanyDetail() {
             </div>
           )}
 
-          {/* Company profile — flat, no cards */}
-          <div className="space-y-3">
-            {accountData?.about?.text && (
-              <p className="text-body text-foreground/65 leading-relaxed max-w-2xl">
-                {accountData.about.text}
-              </p>
-            )}
-            {company.scout_summary && (
-              <p className="text-caption text-foreground/45 leading-relaxed max-w-2xl italic">
-                {company.scout_summary}
-              </p>
-            )}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-8 gap-y-4">
-              {(accountData?.industry?.value || company.industry) && (
-                <div>
-                  <div className="field-label">Industry</div>
-                  <div className="field-value">{accountData?.industry?.value || company.industry?.replace(/_/g, " ")}</div>
-                </div>
-              )}
-              {(accountData?.employees?.value || company.headcount) && (
-                <div>
-                  <div className="field-label">Employees</div>
-                  <div className="field-value">{accountData?.employees?.value || `${company.headcount?.toLocaleString()}+`}</div>
-                </div>
-              )}
-              {accountData?.revenue_range?.value && accountData.revenue_range.value !== "Unknown" && (
-                <div>
-                  <div className="field-label">Revenue</div>
-                  <div className="field-value">{accountData.revenue_range.value}</div>
-                </div>
-              )}
-              {company.partner && (
-                <div>
-                  <div className="field-label">Partner</div>
-                  <div className="field-value">{company.partner}</div>
-                </div>
-              )}
-              {company.hq_country && (
-                <div>
-                  <div className="field-label">HQ</div>
-                  <div className="field-value">{company.hq_country}</div>
-                </div>
-              )}
-            </div>
-          </div>
+          <Tabs defaultValue="about" className="w-full">
+            <TabsList className="bg-transparent p-0 h-auto border-b border-border/15 w-full justify-start gap-0 rounded-none mb-6">
+              {["about", "score", "signals", "analysis"].map((tab) => (
+                <TabsTrigger
+                  key={tab}
+                  value={tab}
+                  className="px-4 py-2.5 text-caption font-medium rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none text-foreground/30 hover:text-foreground/50 transition-colors capitalize"
+                >
+                  {tab}
+                </TabsTrigger>
+              ))}
+            </TabsList>
 
-          {/* HubSpot Product Properties */}
-          {companyAny?.hubspot_properties && Object.keys(companyAny.hubspot_properties).length > 0 && (
-            <details className="group">
-              <summary className="text-micro text-foreground/20 hover:text-foreground/40 cursor-pointer transition-colors list-none flex items-center gap-1.5">
-                <ChevronRight className="w-3 h-3 transition-transform group-open:rotate-90" />
-                HubSpot data ({Object.entries(companyAny.hubspot_properties).filter(([_, v]) => v != null && v !== "").length} fields)
-              </summary>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 mt-4">
-                {Object.entries(companyAny.hubspot_properties as Record<string, any>)
-                  .filter(([_, v]) => v !== null && v !== "" && v !== undefined)
-                  .filter(([k]) => !["name", "domain", "industry", "country", "numberofemployees", "hs_object_id", "createdate", "hs_lastmodifieddate", "hs_pipeline"].includes(k))
-                  .sort(([a], [b]) => a.localeCompare(b))
-                  .map(([key, value]) => (
-                    <div key={key}>
-                      <div className="field-label">{key.replace(/_/g, " ").replace(/^hs /, "")}</div>
-                      <div className="text-caption text-foreground/55 truncate" title={String(value)}>{String(value)}</div>
+            <TabsContent value="about" className="mt-0">
+              <div className="max-w-2xl space-y-8">
+                {accountData?.about?.text && (
+                  <p className="text-body text-foreground/65 leading-relaxed">
+                    {accountData.about.text}
+                  </p>
+                )}
+                {company.scout_summary && (
+                  <p className="text-caption text-foreground/40 leading-relaxed italic">
+                    {company.scout_summary}
+                  </p>
+                )}
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-5">
+                  {(accountData?.industry?.value || company.industry) && (
+                    <div>
+                      <div className="field-label">Industry</div>
+                      <div className="field-value">{accountData?.industry?.value || company.industry?.replace(/_/g, " ")}</div>
                     </div>
-                  ))}
-              </div>
-            </details>
-          )}
-
-          {/* Meetings (Fathom) */}
-          <div className="flex items-center justify-between py-3 border-t border-border/20">
-            <span className="text-caption text-foreground/45">
-              {meetings.length} meeting{meetings.length !== 1 ? "s" : ""} synced
-              {meetings.filter((m: any) => m.transcript_analysis).length > 0 && (
-                <span> · {meetings.filter((m: any) => m.transcript_analysis).length} analyzed</span>
-              )}
-            </span>
-            <button
-              onClick={syncFathom}
-              disabled={syncingFathom || !!analyzingMeeting}
-              className="text-micro text-primary hover:text-primary/80 font-medium disabled:opacity-40"
-            >
-              {syncingFathom ? "Syncing…" : "Sync Fathom"}
-            </button>
-          </div>
-
-          {snap && latestSnapshot && (
-            <div className="space-y-1 pt-6 border-t border-border/10">
-              <div className="flex items-center justify-between mb-4">
-                <div className="field-label">Analysis</div>
-                <span className="text-micro text-foreground/20">
-                  {latestSnapshot.model_version} · {new Date(latestSnapshot.created_at).toLocaleDateString()}
-                </span>
-              </div>
-
-              {snap.why_now && toArray(snap.why_now).length > 0 && (
-                <div className="mb-6">
-                  <div className="field-label mb-2">Why Now</div>
-                  {toArray(snap.why_now).map((item, i) => (
-                    <p key={i} className="text-body text-foreground/60 leading-[1.7]">{item}</p>
-                  ))}
+                  )}
+                  {(accountData?.employees?.value || company.headcount) && (
+                    <div>
+                      <div className="field-label">Employees</div>
+                      <div className="field-value">{accountData?.employees?.value || `${company.headcount?.toLocaleString()}+`}</div>
+                    </div>
+                  )}
+                  {accountData?.revenue_range?.value && accountData.revenue_range.value !== "Unknown" && (
+                    <div>
+                      <div className="field-label">Revenue</div>
+                      <div className="field-value">{accountData.revenue_range.value}</div>
+                    </div>
+                  )}
+                  {company.partner && (
+                    <div>
+                      <div className="field-label">Partner</div>
+                      <div className="field-value">{company.partner}</div>
+                    </div>
+                  )}
+                  {company.hq_country && (
+                    <div>
+                      <div className="field-label">HQ</div>
+                      <div className="field-value">{company.hq_country}</div>
+                    </div>
+                  )}
                 </div>
-              )}
 
-              <Accordion type="multiple" defaultValue={["executive-narrative"]} className="space-y-2">
-                {snap.signal_deconstruction && (
-                  <AccordionItem value="signal-deconstruction" className="border-0 px-0">
-                    <AccordionTrigger className="text-body font-medium text-foreground/75 hover:text-foreground">
-                      Signal Deconstruction
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-4">
-                        {snap.signal_deconstruction.company_stage && (
-                          <div>
-                            <div className="field-label mb-1">Company Stage</div>
-                            <span className="text-sm bg-primary/10 text-primary px-2 py-0.5 rounded">{snap.signal_deconstruction.company_stage}</span>
-                          </div>
-                        )}
-                        {snap.signal_deconstruction.observable_facts?.length ? (
-                          <div>
-                            <div className="field-label mb-2">Observable Facts</div>
-                            <ul className="space-y-1">
-                              {snap.signal_deconstruction.observable_facts.map((f, i) => (
-                                <li key={i} className="text-body text-foreground/60 flex items-start gap-2"><span className="text-foreground/20 mt-0.5">·</span>{f}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        ) : null}
-                        {snap.signal_deconstruction.workflow_stress_indicators?.length ? (
-                          <div>
-                            <div className="field-label mb-2">Workflow Stress Indicators</div>
-                            <ul className="space-y-1">
-                              {snap.signal_deconstruction.workflow_stress_indicators.map((w, i) => (
-                                <li key={i} className="text-body text-foreground/60 flex items-start gap-2"><span className="text-foreground/20 mt-0.5">·</span>{w}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        ) : null}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                )}
-
-                {snap.operational_friction?.length ? (
-                  <AccordionItem value="operational-friction" className="border-0 px-0">
-                    <AccordionTrigger className="text-body font-medium text-foreground/75 hover:text-foreground">
-                      Operational Friction
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-1">
-                        {snap.operational_friction.map((f, i) => (
-                          <div key={i} className="space-y-1 py-3 border-b border-border/10 last:border-0">
-                            <div className="text-body text-foreground/60"><span className="field-label inline mr-2">Cause</span>{f.cause}</div>
-                            <div className="text-body text-foreground/60"><span className="field-label inline mr-2">Effect</span>{f.effect}</div>
-                            <div className="text-body text-foreground/60"><span className="field-label inline mr-2">Bottleneck</span>{f.bottleneck}</div>
+                {companyAny?.hubspot_properties && Object.keys(companyAny.hubspot_properties).length > 0 && (
+                  <details className="group">
+                    <summary className="text-micro text-foreground/20 hover:text-foreground/40 cursor-pointer transition-colors list-none flex items-center gap-1.5">
+                      <ChevronRight className="w-3 h-3 transition-transform group-open:rotate-90" />
+                      HubSpot data ({Object.entries(companyAny.hubspot_properties).filter(([_, v]) => v != null && v !== "").length} fields)
+                    </summary>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 mt-4">
+                      {Object.entries(companyAny.hubspot_properties as Record<string, any>)
+                        .filter(([_, v]) => v !== null && v !== "" && v !== undefined)
+                        .filter(([k]) => !["name", "domain", "industry", "country", "numberofemployees", "hs_object_id", "createdate", "hs_lastmodifieddate", "hs_pipeline"].includes(k))
+                        .sort(([a], [b]) => a.localeCompare(b))
+                        .map(([key, value]) => (
+                          <div key={key}>
+                            <div className="field-label">{key.replace(/_/g, " ").replace(/^hs /, "")}</div>
+                            <div className="text-caption text-foreground/55 truncate" title={String(value)}>{String(value)}</div>
                           </div>
                         ))}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                ) : null}
-
-                {snap.partner_platform_ceiling && (
-                  <AccordionItem value="partner-ceiling" className="border-0 px-0">
-                    <AccordionTrigger className="text-body font-medium text-foreground/75 hover:text-foreground">
-                      Partner Platform Ceiling
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-4">
-                        {snap.partner_platform_ceiling.platform_strengths?.length ? (
-                          <div>
-                            <div className="field-label mb-2">Platform Strengths</div>
-                            <div className="flex flex-wrap gap-1.5">{snap.partner_platform_ceiling.platform_strengths.map((s, i) => <span key={i} className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">{s}</span>)}</div>
-                          </div>
-                        ) : null}
-                        {snap.partner_platform_ceiling.execution_gaps?.length ? (
-                          <div>
-                            <div className="field-label mb-2">Execution Gaps</div>
-                            <ul className="space-y-1">{snap.partner_platform_ceiling.execution_gaps.map((g, i) => <li key={i} className="text-body text-foreground/60 flex items-start gap-2"><span className="text-foreground/20 mt-0.5">·</span>{g}</li>)}</ul>
-                          </div>
-                        ) : null}
-                        {snap.partner_platform_ceiling.key_insight && (
-                          <p className="text-body text-foreground/60 italic">{snap.partner_platform_ceiling.key_insight}</p>
-                        )}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
+                    </div>
+                  </details>
                 )}
 
-                {snap.embedded_leverage && (
-                  <AccordionItem value="embedded-leverage" className="border-0 px-0">
-                    <AccordionTrigger className="text-body font-medium text-foreground/75 hover:text-foreground">
-                      Embedded iorad Leverage
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {(["situation", "constraint", "intervention", "transformation"] as const).map(key => {
-                          const val = snap.embedded_leverage?.[key];
-                          if (!val) return null;
-                          const labels: Record<string, string> = { situation: "Situation", constraint: "Constraint", intervention: "Intervention", transformation: "Transformation" };
-                          return (
-                            <div key={key}>
-                              <div className="field-label">{labels[key]}</div>
-                              <p className="text-body text-foreground/60">{val}</p>
+                <div className="flex items-center justify-between py-3 border-t border-border/10">
+                  <span className="text-caption text-foreground/40">
+                    {meetings.length} meeting{meetings.length !== 1 ? "s" : ""} synced
+                    {meetings.filter((m: any) => m.transcript_analysis).length > 0 && (
+                      <span> · {meetings.filter((m: any) => m.transcript_analysis).length} analyzed</span>
+                    )}
+                  </span>
+                  <button
+                    onClick={syncFathom}
+                    disabled={syncingFathom || !!analyzingMeeting}
+                    className="text-micro text-primary hover:text-primary/80 font-medium disabled:opacity-40"
+                  >
+                    {syncingFathom ? "Syncing…" : "Sync Fathom"}
+                  </button>
+                </div>
+
+                {meetings.length > 0 && (
+                  <details className="group">
+                    <summary className="text-micro text-foreground/20 hover:text-foreground/40 cursor-pointer transition-colors list-none flex items-center gap-1.5">
+                      <ChevronRight className="w-3 h-3 transition-transform group-open:rotate-90" />
+                      Onboarding ({meetings.length} meetings)
+                    </summary>
+                    <div className="mt-4">
+                      <OnboardingTab meetings={meetings} analyzingMeeting={analyzingMeeting} onAnalyze={analyzeTranscript} />
+                    </div>
+                  </details>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="score" className="mt-0">
+              <div className="max-w-lg space-y-6">
+                {scoreBreakdown ? (
+                  <>
+                    <div className="flex items-center gap-3 mb-4">
+                      <ScoreCell score={company.last_score_total} size="lg" />
+                      {snap?.confidence_level && (
+                        <span className="text-caption text-foreground/40">
+                          {snap.confidence_level} confidence
+                          {snap.confidence_reason && ` — ${snap.confidence_reason}`}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-5">
+                      {[
+                        { label: "Hiring", value: scoreBreakdown.relevance || scoreBreakdown.hiring || 0, max: 30 },
+                        { label: "News", value: scoreBreakdown.urgency || scoreBreakdown.news || 0, max: 40 },
+                        { label: "Expansion", value: scoreBreakdown.buyer_signal || scoreBreakdown.expansion || 0, max: 30 },
+                      ].map(({ label, value, max }) => (
+                        <div key={label}>
+                          <div className="flex justify-between mb-1.5">
+                            <span className="field-label">{label}</span>
+                            <span className="text-caption font-medium tabular-nums text-foreground">{value}/{max}</span>
+                          </div>
+                          <div className="h-1.5 bg-foreground/[0.06] rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-primary rounded-full transition-all duration-700"
+                              style={{ width: `${(value / max) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {snapshots.length > 1 && (
+                      <details className="group pt-4">
+                        <summary className="text-micro text-foreground/20 hover:text-foreground/40 cursor-pointer transition-colors list-none flex items-center gap-1.5">
+                          <ChevronRight className="w-3 h-3 transition-transform group-open:rotate-90" />
+                          Score history ({snapshots.length} snapshots)
+                        </summary>
+                        <div className="space-y-2 mt-3">
+                          {snapshots.map((s: any) => (
+                            <div key={s.id} className="flex items-center justify-between text-caption py-1.5 border-b border-border/10 last:border-0">
+                              <div className="flex items-center gap-3">
+                                <ScoreCell score={s.score_total} size="sm" />
+                                <span className="text-foreground/30 font-mono text-micro">{s.model_version}</span>
+                              </div>
+                              <span className="text-foreground/30">{new Date(s.created_at).toLocaleDateString()}</span>
                             </div>
-                          );
-                        })}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                  </>
+                ) : (
+                  <div>
+                    <div className="field-label mb-2">Score</div>
+                    <p className="field-value-empty">No score computed yet.</p>
+                  </div>
                 )}
+              </div>
+            </TabsContent>
 
-                {snap.quantified_impact?.length ? (
-                  <AccordionItem value="quantified-impact" className="border-0 px-0">
-                    <AccordionTrigger className="text-body font-medium text-foreground/75 hover:text-foreground">
-                      Quantified Impact
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-1">
-                        {snap.quantified_impact.map((q, i) => (
-                          <div key={i} className="py-3 border-b border-border/10 last:border-0 space-y-1">
-                            <div className="text-body font-medium text-foreground">{q.metric}</div>
-                            <div className="text-caption text-foreground/40">{q.assumptions}</div>
-                            <div className="text-caption font-mono text-foreground/50">{q.calculation}</div>
-                            <div className="text-body font-semibold text-foreground">{q.result}</div>
+            <TabsContent value="signals" className="mt-0">
+              <div className="max-w-2xl space-y-4">
+                {signals.length === 0 ? (
+                  <p className="field-value-empty">No signals discovered yet.</p>
+                ) : (
+                  signals.map((signal: any) => {
+                    const snippets = (Array.isArray(signal.evidence_snippets) ? signal.evidence_snippets : []) as string[];
+                    return (
+                      <div key={signal.id} className="py-4 border-b border-border/10 last:border-0 space-y-2">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-body font-medium text-foreground">{signal.title}</div>
+                            <div className="text-micro text-foreground/30 mt-0.5">
+                              {signal.date || "No date"} · {signal.type}
+                            </div>
                           </div>
-                        ))}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                ) : null}
-
-                {snap.executive_narrative && (
-                  <AccordionItem value="executive-narrative" className="border-0 px-0">
-                    <AccordionTrigger className="text-body font-medium text-foreground/75 hover:text-foreground">
-                      Executive Narrative
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="prose prose-sm dark:prose-invert max-w-none">
-                        {(Array.isArray(snap.executive_narrative)
-                          ? snap.executive_narrative
-                          : typeof snap.executive_narrative === "string" ? snap.executive_narrative.split("\n\n") : []
-                        ).map((p: string, i: number) => (
-                          <p key={i} className="text-body text-foreground/60 leading-relaxed mb-4">{p}</p>
-                        ))}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                )}
-
-                {snap.outbound_positioning && (
-                  <AccordionItem value="outbound-positioning" className="border-0 px-0">
-                    <AccordionTrigger className="text-body font-medium text-foreground/75 hover:text-foreground">
-                      Outbound Positioning
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-3">
-                        {snap.outbound_positioning.executive_framing && (
-                          <div className="py-2">
-                            <div className="field-label">Executive Framing</div>
-                            <p className="text-body text-foreground/60 italic">{snap.outbound_positioning.executive_framing}</p>
-                          </div>
-                        )}
-                        {snap.outbound_positioning.efficiency_framing && (
-                          <div className="py-2">
-                            <div className="field-label">Efficiency / Revenue</div>
-                            <p className="text-body text-foreground/60 italic">{snap.outbound_positioning.efficiency_framing}</p>
-                          </div>
-                        )}
-                        {snap.outbound_positioning.risk_framing && (
-                          <div className="py-2">
-                            <div className="field-label">Risk Mitigation</div>
-                            <p className="text-body text-foreground/60 italic">{snap.outbound_positioning.risk_framing}</p>
-                          </div>
-                        )}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                )}
-
-                {snap.competitive_insulation?.length ? (
-                  <AccordionItem value="competitive-insulation" className="border-0 px-0">
-                    <AccordionTrigger className="text-body font-medium text-foreground/75 hover:text-foreground">
-                      Competitive Insulation
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <ul className="space-y-1.5">
-                        {snap.competitive_insulation.map((r, i) => (
-                          <li key={i} className="text-body text-foreground/60 flex items-start gap-2"><span className="text-foreground/20 mt-0.5">·</span>{r}</li>
-                        ))}
-                      </ul>
-                    </AccordionContent>
-                  </AccordionItem>
-                ) : null}
-
-                {snap.evidence?.length ? (
-                  <AccordionItem value="evidence" className="border-0 px-0">
-                    <AccordionTrigger className="text-body font-medium text-foreground/75 hover:text-foreground">
-                      Cited Evidence ({snap.evidence.length})
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-2">
-                        {snap.evidence.map((ev, i) => (
-                          <div key={i} className="py-2 border-b border-border/10 last:border-0">
-                            <p className="text-caption text-foreground/40 italic">{ev.snippet || ev.detail}</p>
-                            <a href={ev.source_url || ev.url || "#"} target="_blank" rel="noopener noreferrer" className="text-micro text-primary/60 hover:text-primary transition-colors mt-0.5 inline-flex items-center gap-1">
-                              <ExternalLink className="w-3 h-3" />
-                              {ev.source_type || ev.signal_type || "source"} · {ev.date || "no date"}
+                          {signal.url && (
+                            <a href={signal.url} target="_blank" rel="noopener noreferrer" className="text-foreground/20 hover:text-primary transition-colors shrink-0">
+                              <ExternalLink className="w-3.5 h-3.5" />
                             </a>
+                          )}
+                        </div>
+                        {signal.raw_excerpt && (
+                          <p className="text-caption text-foreground/50 leading-relaxed">{signal.raw_excerpt}</p>
+                        )}
+                        {snippets.length > 0 && (
+                          <div className="space-y-1.5 pt-2">
+                            <div className="field-label">Evidence</div>
+                            {snippets.map((snippet, i) => (
+                              <p key={i} className="text-caption text-foreground/40 italic pl-3 border-l border-border/20">
+                                {snippet}
+                              </p>
+                            ))}
                           </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+
+                {activityEvents.length > 0 && (
+                  <details className="group pt-4">
+                    <summary className="text-micro text-foreground/20 hover:text-foreground/40 cursor-pointer transition-colors list-none flex items-center gap-1.5">
+                      <ChevronRight className="w-3 h-3 transition-transform group-open:rotate-90" />
+                      HubSpot activity ({activityEvents.length} events)
+                    </summary>
+                    <div className="space-y-1.5 mt-3 max-h-[400px] overflow-y-auto">
+                      {activityEvents.map((evt: any) => (
+                        <div key={evt.id} className="flex items-center gap-3 py-2 border-b border-border/10 last:border-0">
+                          <span className="text-caption font-medium text-foreground truncate flex-1">{evt.title}</span>
+                          <span className="text-micro text-foreground/25 uppercase">{evt.activity_type?.replace(/_/g, " ")}</span>
+                          <span className="text-micro text-foreground/20 tabular-nums whitespace-nowrap">
+                            {new Date(evt.occurred_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="analysis" className="mt-0">
+              <div className="max-w-2xl">
+                {snap && latestSnapshot ? (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-micro text-foreground/20">
+                        {latestSnapshot.model_version} · {new Date(latestSnapshot.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+
+                    {snap.why_now && toArray(snap.why_now).length > 0 && (
+                      <div className="mb-6">
+                        <div className="field-label mb-2">Why Now</div>
+                        {toArray(snap.why_now).map((item, i) => (
+                          <p key={i} className="text-body text-foreground/60 leading-[1.7]">{item}</p>
                         ))}
                       </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                ) : null}
-              </Accordion>
-            </div>
-          )}
+                    )}
 
+                    <Accordion type="multiple" defaultValue={["executive-narrative"]} className="space-y-2">
+                      {snap.signal_deconstruction && (
+                        <AccordionItem value="signal-deconstruction" className="border-0 px-0">
+                          <AccordionTrigger className="text-body font-medium text-foreground/75 hover:text-foreground">
+                            Signal Deconstruction
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div className="space-y-4">
+                              {snap.signal_deconstruction.company_stage && (
+                                <div>
+                                  <div className="field-label mb-1">Company Stage</div>
+                                  <span className="text-sm bg-primary/10 text-primary px-2 py-0.5 rounded">{snap.signal_deconstruction.company_stage}</span>
+                                </div>
+                              )}
+                              {snap.signal_deconstruction.observable_facts?.length ? (
+                                <div>
+                                  <div className="field-label mb-2">Observable Facts</div>
+                                  <ul className="space-y-1">
+                                    {snap.signal_deconstruction.observable_facts.map((f, i) => (
+                                      <li key={i} className="text-body text-foreground/60 flex items-start gap-2"><span className="text-foreground/20 mt-0.5">·</span>{f}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ) : null}
+                              {snap.signal_deconstruction.workflow_stress_indicators?.length ? (
+                                <div>
+                                  <div className="field-label mb-2">Workflow Stress Indicators</div>
+                                  <ul className="space-y-1">
+                                    {snap.signal_deconstruction.workflow_stress_indicators.map((w, i) => (
+                                      <li key={i} className="text-body text-foreground/60 flex items-start gap-2"><span className="text-foreground/20 mt-0.5">·</span>{w}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ) : null}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      )}
 
-          <details className="group pt-6 border-t border-border/10">
-            <summary className="text-micro text-foreground/20 hover:text-foreground/40 cursor-pointer transition-colors list-none flex items-center gap-1.5">
-              <ChevronRight className="w-3 h-3 transition-transform group-open:rotate-90" />
-              Onboarding ({meetings.length} meetings)
-            </summary>
-            <div className="mt-4">
-              <OnboardingTab
-                meetings={meetings}
-                analyzingMeeting={analyzingMeeting}
-                onAnalyze={analyzeTranscript}
-              />
-            </div>
-          </details>
+                      {snap.operational_friction?.length ? (
+                        <AccordionItem value="operational-friction" className="border-0 px-0">
+                          <AccordionTrigger className="text-body font-medium text-foreground/75 hover:text-foreground">
+                            Operational Friction
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div className="space-y-1">
+                              {snap.operational_friction.map((f, i) => (
+                                <div key={i} className="space-y-1 py-3 border-b border-border/10 last:border-0">
+                                  <div className="text-body text-foreground/60"><span className="field-label inline mr-2">Cause</span>{f.cause}</div>
+                                  <div className="text-body text-foreground/60"><span className="field-label inline mr-2">Effect</span>{f.effect}</div>
+                                  <div className="text-body text-foreground/60"><span className="field-label inline mr-2">Bottleneck</span>{f.bottleneck}</div>
+                                </div>
+                              ))}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      ) : null}
 
-          <CompanySignalsSection
-            signals={signals}
-            snapshots={snapshots}
-            activityEvents={activityEvents}
-            meetings={meetings}
-            company={company}
-          />
+                      {snap.partner_platform_ceiling && (
+                        <AccordionItem value="partner-ceiling" className="border-0 px-0">
+                          <AccordionTrigger className="text-body font-medium text-foreground/75 hover:text-foreground">
+                            Partner Platform Ceiling
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div className="space-y-4">
+                              {snap.partner_platform_ceiling.platform_strengths?.length ? (
+                                <div>
+                                  <div className="field-label mb-2">Platform Strengths</div>
+                                  <div className="flex flex-wrap gap-1.5">{snap.partner_platform_ceiling.platform_strengths.map((s, i) => <span key={i} className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">{s}</span>)}</div>
+                                </div>
+                              ) : null}
+                              {snap.partner_platform_ceiling.execution_gaps?.length ? (
+                                <div>
+                                  <div className="field-label mb-2">Execution Gaps</div>
+                                  <ul className="space-y-1">{snap.partner_platform_ceiling.execution_gaps.map((g, i) => <li key={i} className="text-body text-foreground/60 flex items-start gap-2"><span className="text-foreground/20 mt-0.5">·</span>{g}</li>)}</ul>
+                                </div>
+                              ) : null}
+                              {snap.partner_platform_ceiling.key_insight && (
+                                <p className="text-body text-foreground/60 italic">{snap.partner_platform_ceiling.key_insight}</p>
+                              )}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      )}
 
+                      {snap.embedded_leverage && (
+                        <AccordionItem value="embedded-leverage" className="border-0 px-0">
+                          <AccordionTrigger className="text-body font-medium text-foreground/75 hover:text-foreground">
+                            Embedded iorad Leverage
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              {(["situation", "constraint", "intervention", "transformation"] as const).map((key) => {
+                                const val = snap.embedded_leverage?.[key];
+                                if (!val) return null;
+                                const labels: Record<string, string> = { situation: "Situation", constraint: "Constraint", intervention: "Intervention", transformation: "Transformation" };
+                                return (
+                                  <div key={key}>
+                                    <div className="field-label">{labels[key]}</div>
+                                    <p className="text-body text-foreground/60">{val}</p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      )}
 
+                      {snap.quantified_impact?.length ? (
+                        <AccordionItem value="quantified-impact" className="border-0 px-0">
+                          <AccordionTrigger className="text-body font-medium text-foreground/75 hover:text-foreground">
+                            Quantified Impact
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div className="space-y-1">
+                              {snap.quantified_impact.map((q, i) => (
+                                <div key={i} className="py-3 border-b border-border/10 last:border-0 space-y-1">
+                                  <div className="text-body font-medium text-foreground">{q.metric}</div>
+                                  <div className="text-caption text-foreground/40">{q.assumptions}</div>
+                                  <div className="text-caption font-mono text-foreground/50">{q.calculation}</div>
+                                  <div className="text-body font-semibold text-foreground">{q.result}</div>
+                                </div>
+                              ))}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      ) : null}
+
+                      {snap.executive_narrative && (
+                        <AccordionItem value="executive-narrative" className="border-0 px-0">
+                          <AccordionTrigger className="text-body font-medium text-foreground/75 hover:text-foreground">
+                            Executive Narrative
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div className="prose prose-sm dark:prose-invert max-w-none">
+                              {(Array.isArray(snap.executive_narrative)
+                                ? snap.executive_narrative
+                                : typeof snap.executive_narrative === "string"
+                                  ? snap.executive_narrative.split("
+
+")
+                                  : []
+                              ).map((p: string, i: number) => (
+                                <p key={i} className="text-body text-foreground/60 leading-relaxed mb-4">{p}</p>
+                              ))}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      )}
+
+                      {snap.outbound_positioning && (
+                        <AccordionItem value="outbound-positioning" className="border-0 px-0">
+                          <AccordionTrigger className="text-body font-medium text-foreground/75 hover:text-foreground">
+                            Outbound Positioning
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div className="space-y-3">
+                              {snap.outbound_positioning.executive_framing && (
+                                <div className="py-2">
+                                  <div className="field-label">Executive Framing</div>
+                                  <p className="text-body text-foreground/60 italic">{snap.outbound_positioning.executive_framing}</p>
+                                </div>
+                              )}
+                              {snap.outbound_positioning.efficiency_framing && (
+                                <div className="py-2">
+                                  <div className="field-label">Efficiency / Revenue</div>
+                                  <p className="text-body text-foreground/60 italic">{snap.outbound_positioning.efficiency_framing}</p>
+                                </div>
+                              )}
+                              {snap.outbound_positioning.risk_framing && (
+                                <div className="py-2">
+                                  <div className="field-label">Risk Mitigation</div>
+                                  <p className="text-body text-foreground/60 italic">{snap.outbound_positioning.risk_framing}</p>
+                                </div>
+                              )}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      )}
+
+                      {snap.competitive_insulation?.length ? (
+                        <AccordionItem value="competitive-insulation" className="border-0 px-0">
+                          <AccordionTrigger className="text-body font-medium text-foreground/75 hover:text-foreground">
+                            Competitive Insulation
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <ul className="space-y-1.5">
+                              {snap.competitive_insulation.map((r, i) => (
+                                <li key={i} className="text-body text-foreground/60 flex items-start gap-2"><span className="text-foreground/20 mt-0.5">·</span>{r}</li>
+                              ))}
+                            </ul>
+                          </AccordionContent>
+                        </AccordionItem>
+                      ) : null}
+
+                      {snap.evidence?.length ? (
+                        <AccordionItem value="evidence" className="border-0 px-0">
+                          <AccordionTrigger className="text-body font-medium text-foreground/75 hover:text-foreground">
+                            Cited Evidence ({snap.evidence.length})
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div className="space-y-2">
+                              {snap.evidence.map((ev, i) => (
+                                <div key={i} className="py-2 border-b border-border/10 last:border-0">
+                                  <p className="text-caption text-foreground/40 italic">{ev.snippet || ev.detail}</p>
+                                  <a href={ev.source_url || ev.url || "#"} target="_blank" rel="noopener noreferrer" className="text-micro text-primary/60 hover:text-primary transition-colors mt-0.5 inline-flex items-center gap-1">
+                                    <ExternalLink className="w-3 h-3" />
+                                    {ev.source_type || ev.signal_type || "source"} · {ev.date || "no date"}
+                                  </a>
+                                </div>
+                              ))}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      ) : null}
+                    </Accordion>
+                  </div>
+                ) : (
+                  <p className="field-value-empty">
+                    No analysis generated yet. Click Refresh to run company setup.
+                  </p>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
       ) : (
         <ContactDetailView
