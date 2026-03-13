@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Linkedin, Loader2, Pencil, Plus, Save, Sparkles, Trash2, UserSearch, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
@@ -10,7 +10,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import OutreachTab from "./OutreachTab";
 import StoryTab from "./StoryTab";
@@ -25,7 +24,6 @@ interface ContactDetailViewProps {
   isPartnerCategory: boolean;
   contacts: any[];
   selectedContactId: string;
-  onSelectContact: (id: string) => void;
   editingContactId: string | null;
   editRoleFocus: string;
   editUserNotes: string;
@@ -58,7 +56,6 @@ export default function ContactDetailView({
   isPartnerCategory,
   contacts,
   selectedContactId,
-  onSelectContact,
   editingContactId,
   editRoleFocus,
   editUserNotes,
@@ -84,7 +81,6 @@ export default function ContactDetailView({
   onRegenerateSection,
 }: ContactDetailViewProps) {
   const queryClient = useQueryClient();
-  const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
   const companyAny = company as any;
 
   const effectiveContact = contacts.find((c: any) => c.id === selectedContactId) || contacts[0] || null;
@@ -186,49 +182,6 @@ export default function ContactDetailView({
             <div className="flex items-baseline justify-between gap-4">
               <div className="flex items-baseline gap-3">
                 <h2 className="text-title font-semibold">{effectiveContact.name}</h2>
-                {contacts.length > 1 && (
-                  <Popover open={isSwitcherOpen} onOpenChange={setIsSwitcherOpen}>
-                    <PopoverTrigger asChild>
-                      <button className="text-micro text-foreground/25 hover:text-primary transition-colors">
-                        Switch ▾
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent align="start" className="w-80 p-1">
-                      <div className="max-h-[300px] overflow-y-auto">
-                        {contacts.map((c: any) => (
-                          <button
-                            key={c.id}
-                            onClick={() => {
-                              onSelectContact(c.id);
-                              setIsSwitcherOpen(false);
-                            }}
-                            className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
-                              c.id === effectiveContact.id
-                                ? "bg-primary/10 text-foreground"
-                                : "hover:bg-secondary text-foreground/65"
-                            }`}
-                          >
-                            <div className="text-caption font-medium leading-tight">{c.name}</div>
-                            {c.title && (
-                              <div className="text-micro text-foreground/45 leading-tight">{c.title}</div>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="border-t border-border/30 mt-1 pt-1">
-                        <button
-                          onClick={() => {
-                            setIsSwitcherOpen(false);
-                            onSetAddContactOpen(true);
-                          }}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-caption text-primary hover:bg-accent rounded-md transition-colors"
-                        >
-                          <Plus className="w-3.5 h-3.5" /> Add contact
-                        </button>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                )}
               </div>
 
               <div className="flex items-center gap-1 opacity-0 group-hover/contact:opacity-100 transition-opacity">
