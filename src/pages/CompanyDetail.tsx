@@ -672,6 +672,9 @@ export default function CompanyDetail() {
   }, [id, effectiveContactId, viewMode, company, isLoading, contacts, companyCards, queryClient]);
 
 
+  const rawAccountJson = parseJson<Record<string, unknown>>(companyCards?.account_json as Json) || {};
+  const hasContactStory = !!(rawAccountJson as any)?._type || !!(rawAccountJson as any)?.opening_hook || !!(rawAccountJson as any)?.behavior_acknowledged;
+
 
   useEffect(() => {
     if (viewMode !== "contact") return;
