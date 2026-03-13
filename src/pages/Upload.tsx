@@ -175,20 +175,20 @@ export default function UploadPage() {
   const industries = new Set(rows.map(r => r.industry).filter(Boolean));
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-8">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors"><ArrowLeft className="w-5 h-5" /></Link>
+          <Link to="/" className="text-foreground/45 hover:text-foreground transition-colors"><ArrowLeft className="w-5 h-5" /></Link>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Add Companies</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-sm text-foreground/45 mt-1">
               Add manually or upload a CSV.
             </p>
           </div>
         </div>
       </div>
 
-      <Tabs defaultValue="manual" className="space-y-6">
+      <Tabs defaultValue="manual" className="space-y-8">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="manual">Add Manually</TabsTrigger>
           <TabsTrigger value="upload">CSV Upload</TabsTrigger>
@@ -198,7 +198,7 @@ export default function UploadPage() {
           <ManualAddForm />
         </TabsContent>
 
-        <TabsContent value="upload" className="space-y-6">
+        <TabsContent value="upload" className="space-y-8">
 
       <div
         onDrop={handleDrop}
@@ -211,8 +211,8 @@ export default function UploadPage() {
           input.click();
         }}
       >
-        <UploadIcon className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-        <p className="text-sm text-muted-foreground">Drag & drop a CSV file here, or <span className="text-primary">click to browse</span></p>
+        <UploadIcon className="w-10 h-10 text-foreground/45 mx-auto mb-3" />
+        <p className="text-sm text-foreground/45">Drag & drop a CSV file here, or <span className="text-primary">click to browse</span></p>
       </div>
 
       <AnimatePresence>
@@ -223,10 +223,10 @@ export default function UploadPage() {
                 <FileText className="w-5 h-5 text-primary" />
                 <div>
                   <div className="text-sm font-medium">{file.name}</div>
-                  <div className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(1)} KB</div>
+                  <div className="text-xs text-foreground/45">{(file.size / 1024).toFixed(1)} KB</div>
                 </div>
               </div>
-              <button onClick={() => { setFile(null); setParsed(false); setRows([]); setErrors([]); }} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+              <button onClick={() => { setFile(null); setParsed(false); setRows([]); setErrors([]); }} className="text-foreground/45 hover:text-foreground"><X className="w-4 h-4" /></button>
             </div>
           </motion.div>
         )}
@@ -241,39 +241,39 @@ export default function UploadPage() {
                 const key = h.toLowerCase().trim();
                 const mapped = COLUMN_MAP[key];
                 return (
-                  <span key={h} className={`text-xs px-2 py-0.5 rounded border ${mapped ? "border-primary/30 bg-primary/10 text-primary" : "border-border text-muted-foreground"}`}>
+                  <span key={h} className={`text-xs px-2 py-0.5 rounded border ${mapped ? "border-primary/30 bg-primary/10 text-primary" : "border-border text-foreground/45"}`}>
                     {h} {mapped ? `→ ${mapped}` : "(ignored)"}
                   </span>
                 );
               })}
             </div>
-            {unmappedColumns.length > 0 && <p className="text-xs text-muted-foreground mt-2">{unmappedColumns.length} column(s) not mapped.</p>}
+            {unmappedColumns.length > 0 && <p className="text-xs text-foreground/45 mt-2">{unmappedColumns.length} column(s) not mapped.</p>}
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="panel text-center"><div className="text-2xl font-display font-bold text-primary">{validCount}</div><div className="text-xs text-muted-foreground mt-1">Valid companies</div></div>
-            <div className="panel text-center"><div className="text-2xl font-display font-bold text-warning">{duplicates}</div><div className="text-xs text-muted-foreground mt-1">Duplicates removed</div></div>
-            <div className="panel text-center"><div className="text-2xl font-display font-bold text-destructive">{errors.length}</div><div className="text-xs text-muted-foreground mt-1">Validation errors</div></div>
-            <div className="panel text-center"><div className="text-2xl font-display font-bold text-info">{partners.size}</div><div className="text-xs text-muted-foreground mt-1">Partners</div></div>
+            <div className="panel text-center"><div className="text-2xl font-display font-bold text-primary">{validCount}</div><div className="text-xs text-foreground/45 mt-1">Valid companies</div></div>
+            <div className="panel text-center"><div className="text-2xl font-display font-bold text-warning">{duplicates}</div><div className="text-xs text-foreground/45 mt-1">Duplicates removed</div></div>
+            <div className="panel text-center"><div className="text-2xl font-display font-bold text-destructive">{errors.length}</div><div className="text-xs text-foreground/45 mt-1">Validation errors</div></div>
+            <div className="panel text-center"><div className="text-2xl font-display font-bold text-info">{partners.size}</div><div className="text-xs text-foreground/45 mt-1">Partners</div></div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="panel">
-              <div className="flex items-center gap-2 mb-2"><Globe className="w-3.5 h-3.5 text-muted-foreground" /><span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Countries</span></div>
+              <div className="flex items-center gap-2 mb-2"><Globe className="w-3.5 h-3.5 text-foreground/45" /><span className="section-label">Countries</span></div>
               <div className="flex flex-wrap gap-1">
                 {Array.from(countries).slice(0, 8).map(c => <span key={c} className="text-xs bg-secondary px-1.5 py-0.5 rounded text-secondary-foreground">{c}</span>)}
-                {countries.size > 8 && <span className="text-xs text-muted-foreground">+{countries.size - 8} more</span>}
+                {countries.size > 8 && <span className="text-xs text-foreground/45">+{countries.size - 8} more</span>}
               </div>
             </div>
             <div className="panel">
-              <div className="flex items-center gap-2 mb-2"><Building2 className="w-3.5 h-3.5 text-muted-foreground" /><span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Top Industries</span></div>
+              <div className="flex items-center gap-2 mb-2"><Building2 className="w-3.5 h-3.5 text-foreground/45" /><span className="section-label">Top Industries</span></div>
               <div className="flex flex-wrap gap-1">
                 {Array.from(industries).slice(0, 5).map(ind => <span key={ind} className="text-xs bg-secondary px-1.5 py-0.5 rounded text-secondary-foreground">{(ind || "").replace(/_/g, " ").toLowerCase()}</span>)}
-                {industries.size > 5 && <span className="text-xs text-muted-foreground">+{industries.size - 5} more</span>}
+                {industries.size > 5 && <span className="text-xs text-foreground/45">+{industries.size - 5} more</span>}
               </div>
             </div>
             <div className="panel">
-              <div className="flex items-center gap-2 mb-2"><Users className="w-3.5 h-3.5 text-muted-foreground" /><span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Personas</span></div>
+              <div className="flex items-center gap-2 mb-2"><Users className="w-3.5 h-3.5 text-foreground/45" /><span className="section-label">Personas</span></div>
               <div className="flex flex-wrap gap-1">
                 {Array.from(new Set(rows.map(r => r.persona).filter(Boolean))).slice(0, 5).map(p => <span key={p} className="text-xs bg-secondary px-1.5 py-0.5 rounded text-secondary-foreground">{p}</span>)}
               </div>
@@ -284,7 +284,7 @@ export default function UploadPage() {
             <div className="panel max-h-48 overflow-y-auto space-y-1">
               <div className="panel-header flex items-center gap-2"><AlertTriangle className="w-3.5 h-3.5" /> Validation Errors</div>
               {errors.slice(0, 20).map((err, i) => <div key={i} className="text-xs text-destructive/80 font-mono">Row {err.row}: [{err.field}] {err.message}</div>)}
-              {errors.length > 20 && <div className="text-xs text-muted-foreground">...and {errors.length - 20} more</div>}
+              {errors.length > 20 && <div className="text-xs text-foreground/45">...and {errors.length - 20} more</div>}
             </div>
           )}
 
@@ -294,20 +294,20 @@ export default function UploadPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead><tr className="border-b">
-                    <th className="text-left py-1.5 px-2 text-xs font-mono uppercase tracking-wider text-muted-foreground">Company</th>
-                    <th className="text-left py-1.5 px-2 text-xs font-mono uppercase tracking-wider text-muted-foreground">Domain</th>
-                    <th className="text-left py-1.5 px-2 text-xs font-mono uppercase tracking-wider text-muted-foreground hidden sm:table-cell">Partner</th>
-                    <th className="text-left py-1.5 px-2 text-xs font-mono uppercase tracking-wider text-muted-foreground hidden md:table-cell">Country</th>
-                    <th className="text-left py-1.5 px-2 text-xs font-mono uppercase tracking-wider text-muted-foreground hidden md:table-cell">Industry</th>
+                    <th className="text-left py-1.5 px-2 text-micro font-medium uppercase tracking-wide text-foreground/45">Company</th>
+                    <th className="text-left py-1.5 px-2 text-micro font-medium uppercase tracking-wide text-foreground/45">Domain</th>
+                    <th className="text-left py-1.5 px-2 text-micro font-medium uppercase tracking-wide text-foreground/45 hidden sm:table-cell">Partner</th>
+                    <th className="text-left py-1.5 px-2 text-micro font-medium uppercase tracking-wide text-foreground/45 hidden md:table-cell">Country</th>
+                    <th className="text-left py-1.5 px-2 text-micro font-medium uppercase tracking-wide text-foreground/45 hidden md:table-cell">Industry</th>
                   </tr></thead>
                   <tbody>
                     {rows.slice(0, 10).map((r, i) => (
                       <tr key={i} className="border-b border-border/30">
                         <td className="py-1.5 px-2 font-medium">{r.company_name}</td>
-                        <td className="py-1.5 px-2 text-xs text-muted-foreground font-mono">{r.domain || "—"}</td>
-                        <td className="py-1.5 px-2 text-xs text-muted-foreground hidden sm:table-cell">{r.partner || "—"}</td>
-                        <td className="py-1.5 px-2 text-xs text-muted-foreground hidden md:table-cell">{r.hq_country || "—"}</td>
-                        <td className="py-1.5 px-2 text-xs text-muted-foreground hidden md:table-cell">{r.industry?.replace(/_/g, " ").toLowerCase() || "—"}</td>
+                        <td className="py-1.5 px-2 text-xs text-foreground/45 font-mono">{r.domain || "—"}</td>
+                        <td className="py-1.5 px-2 text-xs text-foreground/45 hidden sm:table-cell">{r.partner || "—"}</td>
+                        <td className="py-1.5 px-2 text-xs text-foreground/45 hidden md:table-cell">{r.hq_country || "—"}</td>
+                        <td className="py-1.5 px-2 text-xs text-foreground/45 hidden md:table-cell">{r.industry?.replace(/_/g, " ").toLowerCase() || "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -400,14 +400,14 @@ function ManualAddForm() {
               className={`px-4 py-1.5 rounded text-xs font-medium transition-all ${
                 form.category === cat.value
                   ? "bg-card text-foreground shadow-sm shadow-black/[0.06]"
-                  : "text-muted-foreground hover:text-foreground"
+                  : "text-foreground/45 hover:text-foreground"
               }`}
             >
               {cat.value === "school" ? "School" : cat.value === "business" ? "Business" : "Partner"}
             </button>
           ))}
         </div>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-micro text-foreground/45">
           {form.category === "school" && "EDU institution or university"}
           {form.category === "business" && "Corporate / B2B prospect or customer"}
           {form.category === "partner" && "LMS reseller (Seismic, Docebo, etc.)"}
@@ -426,7 +426,7 @@ function ManualAddForm() {
               className={`px-3.5 py-1.5 rounded text-xs font-medium transition-all ${
                 form.stage === s.value
                   ? "bg-card text-foreground shadow-sm shadow-black/[0.06]"
-                  : "text-muted-foreground hover:text-foreground"
+                  : "text-foreground/45 hover:text-foreground"
               }`}
             >
               {s.label}

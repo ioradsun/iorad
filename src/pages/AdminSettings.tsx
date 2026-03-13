@@ -27,7 +27,7 @@ const AVAILABLE_MODELS = [
 export default function AdminSettings() {
   return (
     <div className="max-w-4xl mx-auto">
-      <Tabs defaultValue="people" className="space-y-6">
+      <Tabs defaultValue="people" className="space-y-8">
         <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="people">People</TabsTrigger>
           <TabsTrigger value="appearance">Appearance</TabsTrigger>
@@ -110,7 +110,7 @@ function PeopleTab() {
     <div className="space-y-4">
       <div className="panel space-y-4">
         <div className="panel-header">Team Members</div>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-foreground/45">
           All @iorad.com users who have signed in. Admins have access to this settings page.
         </p>
         <div className="space-y-2">
@@ -127,10 +127,10 @@ function PeopleTab() {
               </Avatar>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium truncate">{u.name}</div>
-                <div className="text-xs text-muted-foreground truncate">{u.email}</div>
+                <div className="text-xs text-foreground/45 truncate">{u.email}</div>
               </div>
               {u.last_sign_in && (
-                <span className="text-xs text-muted-foreground hidden sm:block">
+                <span className="text-xs text-foreground/45 hidden sm:block">
                   Last sign-in: {new Date(u.last_sign_in).toLocaleDateString()}
                 </span>
               )}
@@ -145,7 +145,7 @@ function PeopleTab() {
                 className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-medium transition-colors ${
                   u.role === "admin"
                     ? "bg-primary/15 text-primary border border-primary/30"
-                    : "bg-muted text-muted-foreground border border-border hover:border-primary/30"
+                    : "bg-muted text-foreground/45 border border-border hover:border-primary/30"
                 }`}
               >
                 {u.role === "admin" ? (
@@ -158,7 +158,7 @@ function PeopleTab() {
             </div>
           ))}
           {users?.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-8">
+            <p className="text-sm text-foreground/45 text-center py-8">
               No @iorad.com users have signed in yet.
             </p>
           )}
@@ -397,7 +397,7 @@ function TokenRow({
   return (
     <div className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-secondary/50 group">
       <ColorSwatch varName={name} />
-      <span className="font-mono text-xs text-muted-foreground flex-1 truncate" title={name}>{name}</span>
+      <span className="font-mono text-xs text-foreground/45 flex-1 truncate" title={name}>{name}</span>
       {editing ? (
         <>
           <Input
@@ -418,7 +418,7 @@ function TokenRow({
             onClick={startEdit}
             title="Edit"
           >
-            <Pencil className="w-3 h-3 text-muted-foreground" />
+            <Pencil className="w-3 h-3 text-foreground/45" />
           </button>
         </>
       )}
@@ -447,7 +447,7 @@ function TokenGroup({
       >
         <span className="text-xs font-mono font-medium">{label}</span>
         <span className="flex items-center gap-2">
-          <span className="text-[10px] text-muted-foreground">{tokens.length} tokens</span>
+          <span className="text-micro text-foreground/45">{tokens.length} tokens</span>
           {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
         </span>
       </button>
@@ -532,12 +532,12 @@ function StylesheetCard({
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium">{title}</p>
           {hasOverride && (
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+            <span className="text-micro font-mono px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
               custom
             </span>
           )}
         </div>
-        <p className="text-xs text-muted-foreground">{description}</p>
+        <p className="text-xs text-foreground/45">{description}</p>
       </div>
 
       {/* Actions */}
@@ -567,7 +567,7 @@ function StylesheetCard({
         <Button
           variant="outline"
           size="sm"
-          className="gap-1.5 text-muted-foreground"
+          className="gap-1.5 text-foreground/45"
           onClick={handleReset}
           disabled={!hasOverride}
           title="Remove custom overrides and restore defaults"
@@ -580,7 +580,7 @@ function StylesheetCard({
       {/* Paste CSS panel */}
       {pasteOpen && (
         <div className="space-y-2">
-          <p className="text-[11px] text-muted-foreground">Paste a CSS block with <code>--variable: value;</code> declarations:</p>
+          <p className="text-micro text-foreground/45">Paste a CSS block with <code>--variable: value;</code> declarations:</p>
           <Textarea
             className="font-mono text-xs min-h-[140px] resize-y"
             placeholder={`:root {\n  --primary: 308 100% 42%;\n  --story-bg: #ffffff;\n  /* ... */\n}`}
@@ -598,7 +598,7 @@ function StylesheetCard({
       {/* Inline token editor */}
       {editorOpen && (
         <div className="space-y-2">
-          <p className="text-[11px] text-muted-foreground">Click any token row to edit its value. Changes apply instantly.</p>
+          <p className="text-micro text-foreground/45">Click any token row to edit its value. Changes apply instantly.</p>
           <div className="space-y-1.5">
             {tokenGroups.map(g => (
               <TokenGroup
@@ -619,10 +619,10 @@ function StylesheetCard({
 function AppearanceTab() {
   const { theme, setTheme } = useTheme();
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="panel space-y-4">
         <div className="panel-header">Theme</div>
-        <p className="text-xs text-muted-foreground">Choose between iorad dark theme and the clean light theme.</p>
+        <p className="text-xs text-foreground/45">Choose between iorad dark theme and the clean light theme.</p>
         <div className="grid grid-cols-2 gap-4">
           <button
             onClick={() => setTheme("dark")}
@@ -634,7 +634,7 @@ function AppearanceTab() {
           >
             <Moon className="w-8 h-8 text-primary" />
             <span className="text-sm font-medium">iorad Dark</span>
-            <span className="text-xs text-muted-foreground">Default dark theme</span>
+            <span className="text-xs text-foreground/45">Default dark theme</span>
           </button>
           <button
             onClick={() => setTheme("light")}
@@ -646,14 +646,14 @@ function AppearanceTab() {
           >
             <Sun className="w-8 h-8 text-primary" />
             <span className="text-sm font-medium">Clean Light</span>
-            <span className="text-xs text-muted-foreground">Light, corporate theme</span>
+            <span className="text-xs text-foreground/45">Light, corporate theme</span>
           </button>
         </div>
       </div>
 
       <div className="panel space-y-4">
         <div className="panel-header">Stylesheets</div>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-foreground/45">
           Export theme tokens as CSS, edit individual tokens inline, or paste a full CSS override block.
           Changes apply instantly and persist across reloads.
         </p>
@@ -818,7 +818,7 @@ function AIConfigTab() {
 
   return (
     <div className="space-y-4">
-      <Tabs defaultValue="inbound" className="space-y-6">
+      <Tabs defaultValue="inbound" className="space-y-8">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="inbound">Inbound Prompt</TabsTrigger>
           <TabsTrigger value="outbound">Outbound Prompt</TabsTrigger>
@@ -826,10 +826,10 @@ function AIConfigTab() {
         </TabsList>
 
         {/* ── INBOUND ── */}
-        <TabsContent value="inbound" className="space-y-6">
+        <TabsContent value="inbound" className="space-y-8">
           <div className="panel space-y-4 border-l-2 border-primary/40">
             <div className="panel-header">System Prompt</div>
-            <p className="text-xs text-muted-foreground">High-level system instruction prepended to every inbound generation.</p>
+            <p className="text-xs text-foreground/45">High-level system instruction prepended to every inbound generation.</p>
             <Textarea
               value={inboundSystemPrompt}
               onChange={e => setInboundSystemPrompt(e.target.value)}
@@ -840,7 +840,7 @@ function AIConfigTab() {
           {inboundSections.map(({ key, label, description, value, setter }) => (
             <div key={key} className="panel space-y-4 border-l-2 border-primary/40">
               <div className="panel-header">{label}</div>
-              <p className="text-xs text-muted-foreground">{description}</p>
+              <p className="text-xs text-foreground/45">{description}</p>
               <Textarea
                 value={value}
                 onChange={e => setter(e.target.value)}
@@ -853,10 +853,10 @@ function AIConfigTab() {
         </TabsContent>
 
         {/* ── OUTBOUND ── */}
-        <TabsContent value="outbound" className="space-y-6">
+        <TabsContent value="outbound" className="space-y-8">
           <div className="panel space-y-4">
             <div className="panel-header">System Prompt</div>
-            <p className="text-xs text-muted-foreground">High-level system instruction prepended to every outbound generation.</p>
+            <p className="text-xs text-foreground/45">High-level system instruction prepended to every outbound generation.</p>
             <Textarea
               value={outboundSystemPrompt}
               onChange={e => setOutboundSystemPrompt(e.target.value)}
@@ -866,7 +866,7 @@ function AIConfigTab() {
           </div>
           <div className="panel space-y-4">
             <div className="panel-header">Story Mega Prompt Template</div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-foreground/45">
               Full prompt template with JSON schema for story microsites. Placeholders: <code className="text-primary">{"{{company_name}}"}</code>, <code className="text-primary">{"{{signals}}"}</code>, etc.
             </p>
             <Textarea
@@ -879,7 +879,7 @@ function AIConfigTab() {
           {outboundSections.map(({ key, label, description, value, setter }) => (
             <div key={key} className="panel space-y-4">
               <div className="panel-header">{label}</div>
-              <p className="text-xs text-muted-foreground">{description}</p>
+              <p className="text-xs text-foreground/45">{description}</p>
               <Textarea
                 value={value}
                 onChange={e => setter(e.target.value)}
@@ -892,10 +892,10 @@ function AIConfigTab() {
         </TabsContent>
 
         {/* ── AI ── */}
-        <TabsContent value="ai" className="space-y-6">
+        <TabsContent value="ai" className="space-y-8">
           <div className="panel space-y-4">
             <div className="panel-header">Model Selection</div>
-            <p className="text-xs text-muted-foreground">The AI model used for all content generation.</p>
+            <p className="text-xs text-foreground/45">The AI model used for all content generation.</p>
             <Select value={model} onValueChange={setModel}>
               <SelectTrigger className="bg-secondary"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -967,26 +967,26 @@ function CompellingEventsTab() {
     <div className="space-y-4">
       <div className="panel space-y-4">
         <div className="panel-header">Compelling Event Taxonomy</div>
-        <p className="text-xs text-muted-foreground">These events are injected into the AI prompt and used to categorize buyer signals.</p>
+        <p className="text-xs text-foreground/45">These events are injected into the AI prompt and used to categorize buyer signals.</p>
         <div className="space-y-2">
           {events?.map(event => (
             <div
               key={event.id}
               className={`flex items-center gap-3 px-3 py-2 rounded-lg border text-sm ${
-                event.is_active ? "border-border bg-secondary" : "border-border/50 bg-muted/30 opacity-60"
+                event.is_active ? "border-border bg-secondary" : "border-border/30 bg-muted/30 opacity-60"
               }`}
             >
-              <GripVertical className="w-4 h-4 text-muted-foreground shrink-0" />
+              <GripVertical className="w-4 h-4 text-foreground/45 shrink-0" />
               <span className="flex-1">{event.label}</span>
               <button
                 onClick={() => toggleMutation.mutate({ id: event.id, active: !event.is_active })}
-                className={`text-xs px-2 py-0.5 rounded ${event.is_active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}
+                className={`text-xs px-2 py-0.5 rounded ${event.is_active ? "bg-primary/10 text-primary" : "bg-muted text-foreground/45"}`}
               >
                 {event.is_active ? "Active" : "Inactive"}
               </button>
               <button
                 onClick={() => deleteMutation.mutate(event.id)}
-                className="text-muted-foreground hover:text-destructive transition-colors"
+                className="text-foreground/45 hover:text-destructive transition-colors"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -1060,7 +1060,7 @@ function PartnersTab() {
     <div className="space-y-4">
       <div className="panel space-y-4">
         <div className="panel-header">Partner Platforms</div>
-        <p className="text-xs text-muted-foreground">Configure partner branding, positioning, and embed bullets used in story pages and AI prompts.</p>
+        <p className="text-xs text-foreground/45">Configure partner branding, positioning, and embed bullets used in story pages and AI prompts.</p>
         <div className="space-y-3">
           {partners?.map(p => (
             <div key={p.id} className="border border-border rounded-lg overflow-hidden">
@@ -1070,7 +1070,7 @@ function PartnersTab() {
               >
                 <div className="w-4 h-4 rounded-full shrink-0" style={{ background: p.color }} />
                 <span className="font-medium text-sm flex-1">{p.label}</span>
-                <span className="text-xs text-muted-foreground">{p.id}</span>
+                <span className="text-xs text-foreground/45">{p.id}</span>
               </div>
               {editing === p.id && (
                 <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
@@ -1298,9 +1298,9 @@ function BulkGeneratePanel() {
     <div className="panel space-y-4">
       <div className="panel-header flex items-center justify-between">
         <span>Generate All Missing Stories</span>
-        <span className="text-[11px] font-normal text-muted-foreground font-mono">Runs inbound + outbound</span>
+        <span className="text-micro font-normal text-foreground/45 font-mono">Runs inbound + outbound</span>
       </div>
-      <p className="text-xs text-muted-foreground leading-relaxed">
+      <p className="text-xs text-foreground/45 leading-relaxed">
         Finds every company with no story generated yet and runs the full pipeline one at a time with a 1-minute delay between each.
       </p>
 
@@ -1325,7 +1325,7 @@ function BulkGeneratePanel() {
       {/* Progress */}
       {(running || results.length > 0) && (
         <div className="space-y-2">
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-4 text-xs text-foreground/45">
             <span className="text-foreground font-medium">{done + errors} / {total}</span>
             {done > 0 && <span className="text-primary flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" />{done} done</span>}
             {errors > 0 && <span className="text-destructive flex items-center gap-1"><XCircle className="w-3.5 h-3.5" />{errors} failed</span>}
@@ -1339,7 +1339,7 @@ function BulkGeneratePanel() {
           </div>
 
           {current && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2 text-xs text-foreground/45">
               <Loader2 className="w-3.5 h-3.5 animate-spin text-primary flex-shrink-0" />
               <span className="truncate">
                 <span className="text-foreground font-medium">{current}</span>
@@ -1351,12 +1351,12 @@ function BulkGeneratePanel() {
           {results.length > 0 && (
             <div className="max-h-[200px] overflow-y-auto space-y-1 mt-1 pr-1">
               {[...results].reverse().map(r => (
-                <div key={r.id} className="flex items-start gap-2 text-[12px]">
+                <div key={r.id} className="flex items-start gap-2 text-caption">
                   {r.status === "done"
                     ? <CheckCircle2 className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
                     : <XCircle className="w-3.5 h-3.5 text-destructive mt-0.5 flex-shrink-0" />}
                   <span className={r.status === "error" ? "text-destructive" : "text-foreground"}>
-                    {r.name}{r.message && <span className="text-muted-foreground"> — {r.message}</span>}
+                    {r.name}{r.message && <span className="text-foreground/45"> — {r.message}</span>}
                   </span>
                 </div>
               ))}
@@ -1397,7 +1397,7 @@ function ProcessingTab() {
   if (isLoading) return <Loader />;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="panel space-y-4">
         <div className="panel-header">Scheduling</div>
         <div className="grid grid-cols-2 gap-4">
@@ -1579,11 +1579,11 @@ SELECT cron.schedule(
   if (isLoading) return <Loader />;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Actions */}
       <div className="panel space-y-4">
         <div className="panel-header">Scout Score Actions</div>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-foreground/45">
           Scout Score (0–100) ranks companies by tutorial creation activity, commercial stage, recency, and HubSpot intent.
           Scores are sorted: Hot (75+), Warm (50–74), Lukewarm (25–49), Cold (0–24).
         </p>
@@ -1605,9 +1605,9 @@ SELECT cron.schedule(
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-border">
-              <th className="text-left py-2 text-muted-foreground font-medium">Component</th>
-              <th className="text-right py-2 text-muted-foreground font-medium">Max pts</th>
-              <th className="text-left py-2 pl-4 text-muted-foreground font-medium">Key signals</th>
+              <th className="text-left py-2 text-foreground/65 font-medium">Component</th>
+              <th className="text-right py-2 text-foreground/65 font-medium">Max pts</th>
+              <th className="text-left py-2 pl-4 text-foreground/65 font-medium">Key signals</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/50">
@@ -1620,7 +1620,7 @@ SELECT cron.schedule(
               <tr key={row.name}>
                 <td className="py-2 font-medium text-foreground">{row.name}</td>
                 <td className="py-2 text-right tabular-nums font-semibold text-primary">{row.max}</td>
-                <td className="py-2 pl-4 text-muted-foreground">{row.signals}</td>
+                <td className="py-2 pl-4 text-foreground/45">{row.signals}</td>
               </tr>
             ))}
             <tr className="border-t border-border">
@@ -1635,7 +1635,7 @@ SELECT cron.schedule(
       {/* Scoring Prompt */}
       <div className="panel space-y-4">
         <div className="panel-header">AI Summary Prompt</div>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-foreground/45">
           This prompt is used by Gemini to generate a 2–3 sentence activity narrative when a company's score changes by ≥5 points.
         </p>
         <Textarea
@@ -1653,7 +1653,7 @@ SELECT cron.schedule(
       {/* Auto-sync setup */}
       <div className="panel space-y-4">
         <div className="panel-header">Auto-Sync (12-hour schedule)</div>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-foreground/45">
           Run this SQL in your backend SQL console to enable automatic 12-hour syncing. Requires <code className="bg-secondary px-1 rounded">pg_cron</code> and <code className="bg-secondary px-1 rounded">pg_net</code> extensions to be enabled.
         </p>
         <div className="relative">

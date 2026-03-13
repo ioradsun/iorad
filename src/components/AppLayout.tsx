@@ -84,12 +84,7 @@ function ActiveJobBanner() {
     // Active job — spinning banner
     return (
       <div
-        className="w-full px-6 py-2 flex items-center gap-3 text-xs font-medium cursor-pointer"
-        style={{
-          background: "hsl(var(--primary) / 0.08)",
-          borderBottom: "1px solid hsl(var(--primary) / 0.15)",
-          color: "hsl(var(--primary))",
-        }}
+        className="w-full px-6 py-2 flex items-center gap-3 text-xs font-medium cursor-pointer bg-primary/[0.08] border-b border-primary/15 text-primary"
         onClick={handleClick}
       >
         <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
@@ -129,19 +124,15 @@ function ActiveJobBanner() {
   return (
     <button
       onClick={handleClick}
-      className="w-full px-6 py-1.5 flex items-center gap-2 text-xs transition-colors hover:bg-muted/30"
-      style={{
-        borderBottom: "1px solid hsl(var(--border) / 0.6)",
-        color: "hsl(var(--muted-foreground))",
-      }}
+      className="w-full px-6 py-1.5 flex items-center gap-2 text-xs transition-colors hover:bg-muted/30 border-b border-border/60 text-foreground/45"
     >
       <Download className="w-3 h-3 flex-shrink-0" />
       <span className="flex items-center gap-1.5">
-        <span className="font-medium" style={{ color: "hsl(var(--foreground))" }}>HubSpot</span>
+        <span className="font-medium text-foreground">HubSpot</span>
         {lastSyncAgo
           ? <>
               <span>·</span>
-              <CheckCircle2 className="w-3 h-3" style={{ color: "hsl(var(--success, 142 71% 45%))" }} />
+              <CheckCircle2 className="w-3 h-3 text-success" />
               <span>Last sync {lastSyncAgo}{lastSyncLabel ? ` · ${lastSyncLabel}` : ""}</span>
             </>
           : <span>· No syncs recorded</span>}
@@ -210,7 +201,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   >
                     {label}
                     {to === "/signals" && unread.length > 0 && (
-                      <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">
+                      <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full bg-destructive text-destructive-foreground text-micro font-bold flex items-center justify-center">
                         {unread.length > 9 ? "9+" : unread.length}
                       </span>
                     )}

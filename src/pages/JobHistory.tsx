@@ -175,7 +175,7 @@ function useRecentlyImported() {
 
 function CompanyList({ companies, emptyMessage }: { companies: any[]; emptyMessage: string }) {
   if (companies.length === 0) {
-    return <div className="text-sm text-muted-foreground py-10 text-center">{emptyMessage}</div>;
+    return <div className="text-sm text-foreground/45 py-10 text-center">{emptyMessage}</div>;
   }
   return (
     <div className="divide-y divide-border/40">
@@ -185,7 +185,7 @@ function CompanyList({ companies, emptyMessage }: { companies: any[]; emptyMessa
             <div className="text-sm font-medium truncate">
               {c.name ?? (c.companies as any)?.name ?? "—"}
             </div>
-            {c.domain && <div className="text-xs text-muted-foreground">{c.domain}</div>}
+            {c.domain && <div className="text-xs text-foreground/45">{c.domain}</div>}
             {c.error_message && (
               <div className="text-xs text-destructive mt-0.5 truncate">{c.error_message}</div>
             )}
@@ -324,12 +324,12 @@ function SyncJobSummary({ job, onCancel }: { job: any; onCancel?: () => void }) 
         <div className="rounded-md bg-primary/5 border border-primary/15 px-3 py-2">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-xs font-semibold text-primary">{phaseInfo.label}</span>
-            <span className="text-xs text-muted-foreground">Phase {phaseNum} of 3</span>
+            <span className="text-xs text-foreground/45">Phase {phaseNum} of 3</span>
           </div>
           <div className="h-1.5 rounded-full bg-muted overflow-hidden mb-1">
             <div className="h-full rounded-full bg-primary transition-all duration-700" style={{ width: `${phasePct}%` }} />
           </div>
-          <p className="text-[11px] text-muted-foreground">{phaseInfo.detail}</p>
+          <p className="text-micro text-foreground/45">{phaseInfo.detail}</p>
         </div>
       )}
 
@@ -342,7 +342,7 @@ function SyncJobSummary({ job, onCancel }: { job: any; onCancel?: () => void }) 
           <span className="text-sm font-semibold capitalize">
             {isStalled ? "Stalled" : isRunning ? (isPipeline ? "Pipeline running…" : "Syncing…") : job.status}
           </span>
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs text-foreground/45">
             {job.trigger === "hubspot_pipeline"
               ? "Full 3-phase sync"
               : job.trigger === "hubspot_backfill"
@@ -360,12 +360,12 @@ function SyncJobSummary({ job, onCancel }: { job: any; onCancel?: () => void }) 
           {isRunning && !isStalled && onCancel && (
             <button
               onClick={onCancel}
-              className="text-xs px-2 py-0.5 rounded border border-border text-muted-foreground hover:text-destructive hover:border-destructive/50 transition-colors"
+              className="text-xs px-2 py-0.5 rounded border border-border text-foreground/45 hover:text-destructive hover:border-destructive/50 transition-colors"
             >
               Cancel
             </button>
           )}
-          <span className="text-xs text-muted-foreground tabular-nums">
+          <span className="text-xs text-foreground/45 tabular-nums">
             {fmt(job.started_at)}
             {job.finished_at && ` · ${elapsed(job.started_at)} total`}
             {isRunning && ` · ${elapsed(job.started_at)} elapsed`}
@@ -380,14 +380,11 @@ function SyncJobSummary({ job, onCancel }: { job: any; onCancel?: () => void }) 
           <div className="space-y-1">
             <div className="h-1.5 rounded-full bg-muted overflow-hidden">
               <div
-                className="h-full rounded-full transition-all duration-700"
-                style={{
-                  width: `${barPct ?? 0}%`,
-                  background: isCompleted ? "hsl(var(--success))" : "hsl(var(--primary))",
-                }}
+                className={`h-full rounded-full transition-all duration-700 ${isCompleted ? "bg-success" : "bg-primary"}`}
+                style={{ width: `${barPct ?? 0}%` }}
               />
             </div>
-            <div className="flex justify-between text-[11px] text-muted-foreground tabular-nums">
+            <div className="flex justify-between text-micro text-foreground/45 tabular-nums">
               <span>{job.companies_processed} / {job.total_companies_targeted} companies</span>
               <span>{barPct}%</span>
             </div>
@@ -399,13 +396,13 @@ function SyncJobSummary({ job, onCancel }: { job: any; onCancel?: () => void }) 
       <div className="grid grid-cols-4 gap-2 pt-1">
         {statCells.map(({ label, value, icon, warn }) => (
           <div key={label} className="rounded-md bg-muted/40 px-3 py-2 text-center">
-            <div className={`flex justify-center mb-1 ${warn ? "text-destructive" : "text-muted-foreground"}`}>
+            <div className={`flex justify-center mb-1 ${warn ? "text-destructive" : "text-foreground/45"}`}>
               {icon}
             </div>
             <div className={`text-base font-bold tabular-nums ${warn && value > 0 ? "text-destructive" : "text-foreground"}`}>
               {value}
             </div>
-            <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{label}</div>
+            <div className="text-micro text-foreground/45 mt-0.5 leading-tight">{label}</div>
           </div>
         ))}
       </div>
@@ -421,8 +418,8 @@ function SyncJobSummary({ job, onCancel }: { job: any; onCancel?: () => void }) 
 }
 
 function ScoutScoreBadge({ score }: { score: number | null | undefined }) {
-  if (score == null) return <span className="text-xs text-muted-foreground">—</span>;
-  const color = score >= 70 ? "text-success" : score >= 40 ? "text-warning" : "text-muted-foreground";
+  if (score == null) return <span className="text-xs text-foreground/45">—</span>;
+  const color = score >= 70 ? "text-success" : score >= 40 ? "text-warning" : "text-foreground/45";
   return <span className={`text-sm font-bold tabular-nums ${color}`}>{score}</span>;
 }
 
@@ -432,7 +429,7 @@ function ImportedCompanyRow({ company }: { company: any }) {
   const hasHsData = Object.keys(hsProps).length > 0;
 
   const stageColor: Record<string, string> = {
-    prospect: "bg-muted text-muted-foreground",
+    prospect: "bg-muted text-foreground/45",
     active_opp: "bg-info/10 text-info",
     customer: "bg-success/10 text-success",
     expansion: "bg-primary/10 text-primary",
@@ -446,7 +443,7 @@ function ImportedCompanyRow({ company }: { company: any }) {
         className="w-full flex items-center gap-3 py-3 px-1 text-left hover:bg-muted/30 transition-colors rounded"
       >
         {/* Expand toggle */}
-        <span className="text-muted-foreground shrink-0">
+        <span className="text-foreground/45 shrink-0">
           {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
         </span>
 
@@ -455,13 +452,13 @@ function ImportedCompanyRow({ company }: { company: any }) {
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-medium truncate">{company.name}</span>
             {company.domain && (
-              <span className="text-xs text-muted-foreground truncate">{company.domain}</span>
+              <span className="text-xs text-foreground/45 truncate">{company.domain}</span>
             )}
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${stageColor[company.stage] ?? "bg-muted text-muted-foreground"}`}>
+            <span className={`text-micro px-1.5 py-0.5 rounded-full font-medium ${stageColor[company.stage] ?? "bg-muted text-foreground/45"}`}>
               {company.stage ?? "prospect"}
             </span>
           </div>
-          <div className="flex items-center gap-3 mt-0.5 text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-3 mt-0.5 text-micro text-foreground/45">
             {company.industry && <span>{company.industry.replace(/_/g, " ")}</span>}
             {company.headcount && <span>{company.headcount.toLocaleString()} employees</span>}
             <span className="flex items-center gap-1">
@@ -475,27 +472,27 @@ function ImportedCompanyRow({ company }: { company: any }) {
         <div className="text-right shrink-0 w-16">
           <ScoutScoreBadge score={company.scout_score} />
           {company.scout_scored_at && (
-            <div className="text-[10px] text-muted-foreground mt-0.5">scored</div>
+            <div className="text-micro text-foreground/45 mt-0.5">scored</div>
           )}
         </div>
 
         {/* Sync status indicators */}
         <div className="flex flex-col items-end gap-1 shrink-0 w-20">
           {/* Contacts synced */}
-          <div className="flex items-center gap-1 text-[10px]">
+          <div className="flex items-center gap-1 text-micro">
             {company.contact_count > 0
               ? <CheckCheck className="w-3 h-3 text-success" />
-              : <Circle className="w-3 h-3 text-muted-foreground/40" />}
-            <span className={company.contact_count > 0 ? "text-success" : "text-muted-foreground"}>
+              : <Circle className="w-3 h-3 text-foreground/25" />}
+            <span className={company.contact_count > 0 ? "text-success" : "text-foreground/45"}>
               contacts
             </span>
           </div>
           {/* Scout scored */}
-          <div className="flex items-center gap-1 text-[10px]">
+          <div className="flex items-center gap-1 text-micro">
             {company.scout_score != null
               ? <CheckCheck className="w-3 h-3 text-success" />
-              : <Circle className="w-3 h-3 text-muted-foreground/40" />}
-            <span className={company.scout_score != null ? "text-success" : "text-muted-foreground"}>
+              : <Circle className="w-3 h-3 text-foreground/25" />}
+            <span className={company.scout_score != null ? "text-success" : "text-foreground/45"}>
               scored
             </span>
           </div>
@@ -517,20 +514,20 @@ function ImportedCompanyRow({ company }: { company: any }) {
           {/* Scout summary */}
           {company.scout_summary && (
             <div className="rounded-md bg-primary/5 border border-primary/10 px-3 py-2">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-primary mb-1 flex items-center gap-1">
+              <div className="text-micro font-medium uppercase tracking-wide text-primary mb-1 flex items-center gap-1">
                 <Zap className="w-3 h-3" /> Scout AI Summary
               </div>
               <p className="text-xs text-foreground leading-relaxed">{company.scout_summary}</p>
             </div>
           )}
           {!company.scout_summary && !company.scout_scored_at && (
-            <div className="text-xs text-muted-foreground italic">Scout scoring not yet run for this company.</div>
+            <div className="text-xs text-foreground/45 italic">Scout scoring not yet run for this company.</div>
           )}
 
           {/* HubSpot properties snapshot */}
           {hasHsData && (
             <div className="rounded-md bg-muted/40 px-3 py-2 space-y-1.5">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+              <div className="text-micro font-medium uppercase tracking-wide text-foreground/45 mb-1">
                 HubSpot Data
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
@@ -545,7 +542,7 @@ function ImportedCompanyRow({ company }: { company: any }) {
                   ["Deal Count", hsProps.num_associated_deals],
                 ].filter(([, v]) => v != null && v !== "").map(([label, value]) => (
                   <div key={label as string} className="flex gap-1">
-                    <span className="text-muted-foreground shrink-0">{label}:</span>
+                    <span className="text-foreground/45 shrink-0">{label}:</span>
                     <span className="font-medium truncate">{String(value)}</span>
                   </div>
                 ))}
@@ -554,7 +551,7 @@ function ImportedCompanyRow({ company }: { company: any }) {
           )}
 
           {/* Timestamps */}
-          <div className="text-[10px] text-muted-foreground flex flex-wrap gap-x-4 gap-y-0.5">
+          <div className="text-micro text-foreground/45 flex flex-wrap gap-x-4 gap-y-0.5">
             <span>Imported: {fmt(company.created_at)}</span>
             {company.scout_synced_at && <span>HS Synced: {fmt(company.scout_synced_at)}</span>}
             {company.scout_scored_at && <span>Scored: {fmt(company.scout_scored_at)}</span>}
@@ -625,7 +622,7 @@ function HubSpotSyncTab() {
   if (loadingJobs && loadingCompanies) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+        <Loader2 className="w-5 h-5 animate-spin text-foreground/45" />
       </div>
     );
   }
@@ -635,8 +632,8 @@ function HubSpotSyncTab() {
       {/* Header row — single pipeline button */}
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">HubSpot Sync</h2>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
+          <h2 className="text-sm font-semibold text-foreground/45 uppercase tracking-wider">HubSpot Sync</h2>
+          <p className="text-micro text-foreground/45 mt-0.5">
             Runs sequentially: Phase 1 companies → Phase 2 contacts → Phase 3 scoring
           </p>
         </div>
@@ -658,7 +655,7 @@ function HubSpotSyncTab() {
       {activeJob ? (
         <SyncJobSummary job={activeJob} onCancel={() => cancelJob.mutate(activeJob.id)} />
       ) : (
-        <div className="rounded-lg border border-border bg-card/50 px-4 py-3 flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="rounded-lg border border-border bg-card/50 px-4 py-3 flex items-center gap-2 text-sm text-foreground/45">
           <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
           No HubSpot sync currently running.
           {recentJobs.length > 0 && (
@@ -670,7 +667,7 @@ function HubSpotSyncTab() {
       {/* Recent job history */}
       {recentJobs.length > 1 && (
         <div>
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Recent Sync Runs</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground/45 mb-2">Recent Sync Runs</h3>
           <div className="space-y-1.5">
             {recentJobs.filter((j: any) => j.id !== activeJob?.id).slice(0, 4).map((job: any) => {
               const snap = job.settings_snapshot as any || {};
@@ -683,7 +680,7 @@ function HubSpotSyncTab() {
               return (
                 <div key={job.id} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded-md hover:bg-muted/40">
                   {icon}
-                  <span className="text-muted-foreground">{fmt(job.started_at)}</span>
+                  <span className="text-foreground/45">{fmt(job.started_at)}</span>
                   <span className="text-foreground">
                     {job.trigger === "hubspot_pipeline"
                       ? "Full pipeline (3 phases)"
@@ -695,7 +692,7 @@ function HubSpotSyncTab() {
                       ? "Full backfill"
                       : snap.action ?? job.trigger}
                   </span>
-                  <span className="ml-auto text-muted-foreground tabular-nums">
+                  <span className="ml-auto text-foreground/45 tabular-nums">
                     {job.companies_processed} processed · {job.companies_succeeded} ok · {job.companies_failed} err
                   </span>
                 </div>
@@ -708,7 +705,7 @@ function HubSpotSyncTab() {
       {/* Summary stats */}
       {companies.length > 0 && (
         <div>
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground/45 mb-2">
             Last 7 Days — {companies.length} Companies Imported
           </h3>
           <div className="grid grid-cols-4 gap-2">
@@ -719,9 +716,9 @@ function HubSpotSyncTab() {
               { label: "Missing contacts", value: noContacts.length, icon: <AlertCircle className="w-3.5 h-3.5" />, warn: noContacts.length > 0 },
             ].map(({ label, value, icon, warn }) => (
               <div key={label} className="rounded-lg border border-border bg-card/50 p-3 text-center">
-                <div className={`flex justify-center mb-1 ${warn ? "text-warning" : "text-muted-foreground"}`}>{icon}</div>
+                <div className={`flex justify-center mb-1 ${warn ? "text-warning" : "text-foreground/45"}`}>{icon}</div>
                 <div className={`text-xl font-bold tabular-nums ${warn && value > 0 ? "text-warning" : "text-foreground"}`}>{value}</div>
-                <div className="text-[10px] text-muted-foreground mt-0.5">{label}</div>
+                <div className="text-micro text-foreground/45 mt-0.5">{label}</div>
               </div>
             ))}
           </div>
@@ -733,7 +730,7 @@ function HubSpotSyncTab() {
         <div>
           {/* Sub-filter pills */}
           <div className="flex items-center gap-2 mb-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mr-1">Companies</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground/45 mr-1">Companies</h3>
             {(["all", "scored", "no_contacts"] as const).map(tab => (
               <button
                 key={tab}
@@ -741,7 +738,7 @@ function HubSpotSyncTab() {
                 className={`text-xs px-2.5 py-1 rounded-full border transition-all ${
                   companyTab === tab
                     ? "bg-primary text-primary-foreground border-primary"
-                    : "border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/40"
+                    : "border-border text-foreground/45 hover:text-foreground hover:border-muted-foreground/40"
                 }`}
               >
                 {tab === "all" ? `All (${companies.length})`
@@ -753,7 +750,7 @@ function HubSpotSyncTab() {
 
           <div className="rounded-lg border border-border bg-card/30 px-3 max-h-[55vh] overflow-y-auto">
             {displayCompanies.length === 0 ? (
-              <div className="py-8 text-center text-sm text-muted-foreground">No companies in this view.</div>
+              <div className="py-8 text-center text-sm text-foreground/45">No companies in this view.</div>
             ) : (
               displayCompanies.map((c: any) => (
                 <ImportedCompanyRow key={c.id} company={c} />
@@ -764,7 +761,7 @@ function HubSpotSyncTab() {
       )}
 
       {companies.length === 0 && !loadingCompanies && (
-        <div className="py-10 text-center text-sm text-muted-foreground">
+        <div className="py-10 text-center text-sm text-foreground/45">
           No companies imported in the last 7 days.
         </div>
       )}
@@ -785,7 +782,7 @@ function StoryGenerationTab() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+        <Loader2 className="w-5 h-5 animate-spin text-foreground/45" />
       </div>
     );
   }
@@ -793,7 +790,7 @@ function StoryGenerationTab() {
   return (
     <div className="space-y-5">
       {/* Info banner */}
-      <div className="rounded-lg border border-border bg-card/50 px-4 py-3 flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="rounded-lg border border-border bg-card/50 px-4 py-3 flex items-center gap-2 text-sm text-foreground/45">
         <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
         Stories are generated per-company from the company detail page. No bulk generation.
       </div>
@@ -801,7 +798,7 @@ function StoryGenerationTab() {
       {/* Waiting — only shown when a job is actively running */}
       {activeJob && (
         <div>
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Waiting</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground/45 mb-2">Waiting</h3>
           <div className="rounded-lg border border-border bg-card/50 p-4 flex items-center gap-3">
             <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
             <div className="flex-1 min-w-0">
@@ -813,9 +810,9 @@ function StoryGenerationTab() {
                   {activeCompany.name}
                 </Link>
               ) : (
-                <span className="text-sm font-medium text-muted-foreground">Generating story…</span>
+                <span className="text-sm font-medium text-foreground/45">Generating story…</span>
               )}
-              <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+              <div className="flex items-center gap-3 mt-0.5 text-xs text-foreground/45">
                 {activeJob.triggered_by && (
                   <span className="flex items-center gap-1">
                     <User className="w-3 h-3" />
@@ -856,10 +853,10 @@ function StoryGenerationTab() {
 
 export default function JobHistory() {
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-8">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Processing Status</h1>
-        <p className="text-sm text-muted-foreground mt-1">Monitor story generation and HubSpot sync activity</p>
+        <p className="text-sm text-foreground/45 mt-1">Monitor story generation and HubSpot sync activity</p>
       </div>
 
       <Tabs defaultValue="hubspot">
