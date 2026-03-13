@@ -443,14 +443,14 @@ export default function CustomerStory() {
 
   // Inbound by slug: /stories/:companySlug/:contactSlug
   const isSlugRoute = !!companySlug;
-  const { data: slugData, isLoading: slugLoading } = useInboundStoryBySlug(
+  const { data: slugData, isLoading: slugLoading, error: slugError } = useInboundStoryBySlug(
     isSlugRoute ? companySlug : undefined,
     isSlugRoute ? contactSlug : undefined
   );
 
   // Also handle /stories/:id where id is a non-UUID slug (single segment)
   const isSingleSlugRoute = !!id && !isUuid && !partner && !legacyCustomer;
-  const { data: singleSlugData, isLoading: singleSlugLoading } = useInboundStoryBySlug(
+  const { data: singleSlugData, isLoading: singleSlugLoading, error: singleSlugError } = useInboundStoryBySlug(
     isSingleSlugRoute ? id : undefined,
     undefined
   );
@@ -468,6 +468,7 @@ export default function CustomerStory() {
   // --- Slug route: /stories/:companySlug/:contactSlug ---
   const resolvedSlugData = isSlugRoute ? slugData : isSingleSlugRoute ? singleSlugData : null;
   const resolvedSlugLoading = isSlugRoute ? slugLoading : isSingleSlugRoute ? singleSlugLoading : false;
+  const resolvedSlugError = isSlugRoute ? slugError : isSingleSlugRoute ? singleSlugError : null;
 
   if (isSlugRoute || isSingleSlugRoute) {
     if (resolvedSlugLoading) {
@@ -478,7 +479,17 @@ export default function CustomerStory() {
       );
     }
     if (!resolvedSlugData?.card || !resolvedSlugData?.company) {
-      return <NotFoundStory />;
+      console.error("[CustomerStory] slug resolution failed", {
+        companySlug,
+        contactSlug,
+        isSlugRoute,
+        isSingleSlugRoute,
+        resolvedSlugData,
+        resolvedSlugError: resolvedSlugError?.message || resolvedSlugError,
+        slugData,
+        slugError: slugError?.message,
+      });
+      return <NotFoundStory debugInfo={`slug=${companySlug}/${contactSlug} err=${resolvedSlugError?.message || "no data"}`} />;
     }
     const accountJson = (resolvedSlugData.card.account_json as Record<string, any>) || {};
     const assetsJson = (resolvedSlugData.card.assets_json as Record<string, any>) || {};
@@ -775,12 +786,13 @@ function StoryPageInner({
   );
 }
 
-function NotFoundStory() {
+function NotFoundStory({ debugInfo }: { debugInfo?: string }) {
   return (
     <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
       <div className="text-center">
         <h1 className="text-3xl font-bold mb-4">Customer not found</h1>
         <p className="text-muted-foreground mb-4">No operating brief has been generated for this customer yet.</p>
+        {debugInfo && <p className="text-xs text-muted-foreground/50 mb-4 font-mono">{debugInfo}</p>}
         <Link to="/stories" className="text-primary hover:underline">Back to customers</Link>
       </div>
     </div>
