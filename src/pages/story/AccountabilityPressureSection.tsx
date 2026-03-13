@@ -1,13 +1,26 @@
 import { HelpCircle } from "lucide-react";
-import { motion } from "framer-motion";
-import { fade } from "./StorySection";
 import StorySection from "./StorySection";
 import { EditableText, EditableListItemWrapper } from "./EditableText";
 import { useStoryEdit } from "./EditContext";
 import { useSectionAnnotation } from "./sectionAnnotations";
+import { useFadeIn } from "./useFadeIn";
 
 interface Props {
   items: string[];
+}
+
+function FadeInQuote({ children, delay }: { children: React.ReactNode; delay: number }) {
+  const ref = useFadeIn<HTMLParagraphElement>();
+
+  return (
+    <p
+      ref={ref}
+      className="fade-in text-sm italic pl-4 leading-relaxed"
+      style={{ color: "var(--story-muted)", borderLeft: "2px solid var(--story-accent-border)", transitionDelay: `${delay}s` }}
+    >
+      {children}
+    </p>
+  );
 }
 
 export default function AccountabilityPressureSection({ items }: Props) {
@@ -27,14 +40,9 @@ export default function AccountabilityPressureSection({ items }: Props) {
       <div className="space-y-3 max-w-3xl">
         {data.map((item, i) => (
           <EditableListItemWrapper key={i} arrayPath="accountabilityPressure" index={i}>
-            <motion.p
-              {...fade}
-              transition={{ ...fade.transition, delay: i * 0.1 }}
-              className="text-sm italic pl-4 leading-relaxed"
-              style={{ color: "var(--story-muted)", borderLeft: "2px solid var(--story-accent-border)" }}
-            >
+            <FadeInQuote delay={i * 0.1}>
               "<EditableText value={item} field={`accountabilityPressure.${i}`} as="span" />"
-            </motion.p>
+            </FadeInQuote>
           </EditableListItemWrapper>
         ))}
       </div>

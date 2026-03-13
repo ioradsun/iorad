@@ -1,9 +1,8 @@
 import { Lightbulb } from "lucide-react";
-import { motion } from "framer-motion";
-import { fade } from "./StorySection";
 import { EditableText } from "./EditableText";
 import { useStoryEdit } from "./EditContext";
 import { useSectionAnnotation } from "./sectionAnnotations";
+import { useFadeIn } from "./useFadeIn";
 
 interface Props {
   text: string;
@@ -15,13 +14,14 @@ export default function BlindSpotSection({ text }: Props) {
   const defaultLabel = "A Common Blind Spot";
   const label = ctx?.editedCustomer.overrides?.["blindspot.label"] || defaultLabel;
   const annotation = useSectionAnnotation("blindSpot");
+  const ref = useFadeIn();
 
   return (
     <section className="max-w-5xl mx-auto px-6 py-16">
       {annotation && <div className="mb-1">{annotation.element}</div>}
-      <motion.div
-        {...fade}
-        className="rounded-2xl p-8 md:p-10"
+      <div
+        ref={ref}
+        className="fade-in rounded-2xl p-8 md:p-10"
         style={{ border: "1px solid var(--story-accent-border)", background: "var(--story-accent-dim)" }}
       >
         <div className="flex items-center gap-2 mb-4">
@@ -33,7 +33,7 @@ export default function BlindSpotSection({ text }: Props) {
           )}
         </div>
         <EditableText value={val} field="blindSpot" as="p" className="text-base md:text-lg leading-relaxed max-w-3xl" style={{ color: "var(--story-muted)" }} />
-      </motion.div>
+      </div>
     </section>
   );
 }

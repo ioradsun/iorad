@@ -1,10 +1,9 @@
-import { motion } from "framer-motion";
 import { Mail } from "lucide-react";
-import { fade } from "./StorySection";
 import type { Customer } from "@/data/customers";
 import type { PartnerMeta } from "@/data/partnerMeta";
 import { EditableText } from "./EditableText";
 import { useStoryEdit } from "./EditContext";
+import { useFadeIn } from "./useFadeIn";
 
 interface Props {
   customer: Customer;
@@ -13,6 +12,7 @@ interface Props {
 
 export default function StoryCTA({ customer, pm }: Props) {
   const ctx = useStoryEdit();
+  const ref = useFadeIn();
 
   const mailSubject = encodeURIComponent(`Following up — ${customer.name} operating brief`);
   const mailBody = encodeURIComponent(
@@ -28,7 +28,7 @@ export default function StoryCTA({ customer, pm }: Props) {
 
   return (
     <section className="max-w-5xl mx-auto px-6 py-24" id="cta">
-      <motion.div {...fade} className="text-center">
+      <div ref={ref} className="fade-in text-center">
         {ctx?.isEditing ? (
           <EditableText value={title} field="overrides.cta.title" as="h2" className="text-2xl md:text-3xl font-bold tracking-tight mb-4" />
         ) : (
@@ -47,7 +47,7 @@ export default function StoryCTA({ customer, pm }: Props) {
           <Mail className="w-5 h-5" />
           Let's find 15 minutes
         </a>
-      </motion.div>
+      </div>
     </section>
   );
 }
