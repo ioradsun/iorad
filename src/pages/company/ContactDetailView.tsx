@@ -1,14 +1,13 @@
-import { useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Linkedin, Loader2, Pencil, Plus, Save, Sparkles, Trash2, UserSearch, ChevronRight } from "lucide-react";
+import { Loader2, Plus, Save, UserSearch } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Json } from "@/integrations/supabase/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import OutreachTab from "./OutreachTab";
@@ -40,8 +39,6 @@ interface ContactDetailViewProps {
   onSetDeleteContactId: (id: string | null) => void;
   deletingContact: boolean;
   onConfirmDelete: () => void;
-  generatingContactId: string | null;
-  onGenerateForContact: (contactId: string) => void;
   setupRunning: boolean;
   companyCards: any;
   cardsLoading: boolean;
@@ -72,8 +69,6 @@ export default function ContactDetailView({
   onSetDeleteContactId,
   deletingContact,
   onConfirmDelete,
-  generatingContactId,
-  onGenerateForContact,
   setupRunning,
   companyCards,
   cardsLoading,
@@ -128,19 +123,6 @@ export default function ContactDetailView({
   const loomEmbedUrl = toLoomEmbedUrl(effectiveLoomUrl);
   const ioradEmbedUrl = toIoradEmbedUrl(effectiveIoradUrl);
 
-  const ioradActivity = useMemo(() => {
-    if (!effectiveContact) return null;
-    const hp = (effectiveContact.hubspot_properties as any) || {};
-    return {
-      isCreator: !!hp.first_tutorial_create_date,
-      isViewer: !!(hp.first_tutorial_view_date || hp.first_tutorial_learn_date),
-      hasExtension: parseInt(hp.extension_connections || "0", 10) > 0,
-      monthAnswers: parseInt(hp.answers_with_own_tutorial_month_count || "0", 10) || 0,
-      rank: hp.rank,
-      engagement: hp.engagement_segment,
-    };
-  }, [effectiveContact]);
-
   if (!contacts.length) {
     return (
       <>
@@ -178,138 +160,68 @@ export default function ContactDetailView({
     <>
       {effectiveContact && (
         <>
-          <div className="group/contact">
-            <div className="flex items-baseline justify-between gap-4">
-              <div className="flex items-baseline gap-3">
-                <h2 className="text-title font-semibold">{effectiveContact.name}</h2>
+          {editingContactId === effectiveContact.id && (
+            <div className="space-y-3 mb-4">
+              <div>
+                <Label className="text-xs text-muted-foreground">Role / Focus Area</Label>
+                <Input placeholder="e.g. Instructional Design" value={editRoleFocus} onChange={(e) => onSetEditRoleFocus(e.target.value)} className="mt-1" />
               </div>
-
-              <div className="flex items-center gap-1 opacity-0 group-hover/contact:opacity-100 transition-opacity">
-                <button
-                  onClick={() => {
-                    if (editingContactId === effectiveContact.id) {
-                      onSetEditingContactId(null);
+              <div>
+                <Label className="text-xs text-muted-foreground">Notes for AI</Label>
+                <Textarea value={editUserNotes} onChange={(e) => onSetEditUserNotes(e.target.value)} rows={3} className="mt-1" />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button size="sm" variant="ghost" onClick={() => onSetEditingContactId(null)}>Cancel</Button>
+                <Button
+                  size="sm"
+                  className="gap-1"
+                  onClick={async () => {
+                    const { error } = await supabase.from("contacts").update({ role_focus: editRoleFocus || null, user_notes: editUserNotes || null }).eq("id", effectiveContact.id);
+                    if (error) {
+                      toast.error("Failed to save");
                       return;
                     }
-                    onSetEditingContactId(effectiveContact.id);
-                    onSetEditRoleFocus((effectiveContact as any).role_focus || "");
-                    onSetEditUserNotes((effectiveContact as any).user_notes || "");
+                    toast.success("Contact updated");
+                    queryClient.invalidateQueries({ queryKey: ["contacts", companyId] });
+                    onSetEditingContactId(null);
                   }}
-                  className="p-1.5 rounded text-foreground/25 hover:text-foreground hover:bg-secondary transition-colors"
-                  title="Edit"
                 >
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => onSetDeleteContactId(effectiveContact.id)}
-                  className="p-1.5 rounded text-foreground/25 hover:text-destructive hover:bg-destructive/10 transition-colors"
-                  title="Delete"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                  <Save className="w-3.5 h-3.5" /> Save
+                </Button>
               </div>
-            </div>
-
-            {effectiveContact.title && (
-              <p className="text-body text-foreground/65 mt-0.5">{effectiveContact.title}</p>
-            )}
-
-            <div className="flex items-center gap-3 mt-1 text-caption text-foreground/45">
-              {effectiveContact.email && (
-                <a href={`mailto:${effectiveContact.email}`} className="hover:text-primary transition-colors">
-                  {effectiveContact.email}
-                </a>
-              )}
-              {effectiveContact.linkedin && (
-                <a href={effectiveContact.linkedin} target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors flex items-center gap-1">
-                  <Linkedin className="w-3 h-3" /> LinkedIn
-                </a>
-              )}
-              {(effectiveContact as any).role_focus && (
-                <>
-                  <span className="text-foreground/15">·</span>
-                  <span className="text-primary/70">{(effectiveContact as any).role_focus}</span>
-                </>
-              )}
-            </div>
-
-            {ioradActivity && (
-              <div className="flex flex-wrap items-center gap-1.5 mt-2 text-micro">
-                {ioradActivity.isCreator && <span className="px-2 py-0.5 rounded-full bg-primary/12 text-primary">Creator</span>}
-                {ioradActivity.isViewer && <span className="px-2 py-0.5 rounded-full bg-secondary text-foreground/70">Viewer</span>}
-                {ioradActivity.hasExtension && <span className="px-2 py-0.5 rounded-full bg-secondary text-foreground/70">Extension</span>}
-                {ioradActivity.monthAnswers > 0 && <span className="px-2 py-0.5 rounded-full bg-secondary text-foreground/70">{ioradActivity.monthAnswers} answers/mo</span>}
-              </div>
-            )}
-
-            {(effectiveContact as any)?.contact_profile?.key_metrics && (
-              <div className="flex items-center gap-3 mt-2 text-caption text-foreground/45">
-                {(effectiveContact as any).contact_profile.key_metrics.tutorials_created !== undefined && <span>{(effectiveContact as any).contact_profile.key_metrics.tutorials_created} created</span>}
-                {(effectiveContact as any).contact_profile.key_metrics.tutorials_viewed !== undefined && <span>{(effectiveContact as any).contact_profile.key_metrics.tutorials_viewed} viewed</span>}
-              </div>
-            )}
-
-            {(effectiveContact as any)?.contact_profile?.account_narrative && (
-              <p className="text-caption text-foreground/45 leading-relaxed mt-3 max-w-2xl italic">
-                {(effectiveContact as any).contact_profile.account_narrative}
-              </p>
-            )}
-          </div>
-
-          {editingContactId === effectiveContact.id && (
-            <div className="mt-4 pt-4 border-t border-border/20 space-y-3">
-                <div>
-                  <Label className="text-xs text-muted-foreground">Role / Focus Area</Label>
-                  <Input placeholder="e.g. Instructional Design" value={editRoleFocus} onChange={(e) => onSetEditRoleFocus(e.target.value)} className="mt-1" />
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Notes for AI</Label>
-                  <Textarea value={editUserNotes} onChange={(e) => onSetEditUserNotes(e.target.value)} rows={3} className="mt-1" />
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button size="sm" variant="ghost" onClick={() => onSetEditingContactId(null)}>Cancel</Button>
-                  <Button
-                    size="sm"
-                    className="gap-1"
-                    onClick={async () => {
-                      const { error } = await supabase.from("contacts").update({ role_focus: editRoleFocus || null, user_notes: editUserNotes || null }).eq("id", effectiveContact.id);
-                      if (error) {
-                        toast.error("Failed to save");
-                        return;
-                      }
-                      toast.success("Contact updated");
-                      queryClient.invalidateQueries({ queryKey: ["contacts", companyId] });
-                      onSetEditingContactId(null);
-                    }}
-                  >
-                    <Save className="w-3.5 h-3.5" /> Save
-                  </Button>
-                </div>
             </div>
           )}
 
-          <div className="flex items-center gap-3 py-5 mt-2 border-t border-border/20">
-            <Button className="gap-2" onClick={() => onGenerateForContact(effectiveContact.id)} disabled={!!generatingContactId || setupRunning}>
-              {generatingContactId === effectiveContact.id
-                ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating…</>
-                : <><Sparkles className="w-4 h-4" /> Generate for {firstName}</>}
-            </Button>
+          {(effectiveContact as any)?.contact_profile?.account_narrative && (
+            <p className="text-caption text-foreground/40 leading-relaxed italic max-w-2xl mb-4">
+              {(effectiveContact as any).contact_profile.account_narrative}
+            </p>
+          )}
 
-            {storyUrl && (
-              <a href={storyUrl} target="_blank" rel="noopener noreferrer">
-                <Button variant="outline" className="gap-2">
-                  <ExternalLink className="w-4 h-4" /> View {firstName}'s Story
-                </Button>
-              </a>
-            )}
-          </div>
+          {/* Sub-tabs: Strategy / Outreach / Story */}
+          <Tabs defaultValue="strategy" className="mt-6">
+            <TabsList className="bg-transparent p-0 h-auto border-b border-border/20 w-full justify-start gap-0 rounded-none">
+              <TabsTrigger
+                value="strategy"
+                className="px-4 py-2 text-caption font-medium rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none text-foreground/35 hover:text-foreground/50"
+              >
+                Strategy
+              </TabsTrigger>
+              <TabsTrigger
+                value="outreach"
+                className="px-4 py-2 text-caption font-medium rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none text-foreground/35 hover:text-foreground/50"
+              >
+                Outreach
+              </TabsTrigger>
+              <TabsTrigger
+                value="story"
+                className="px-4 py-2 text-caption font-medium rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none text-foreground/35 hover:text-foreground/50"
+              >
+                Story
+              </TabsTrigger>
+            </TabsList>
 
-          <Collapsible defaultOpen>
-            <CollapsibleTrigger className="flex items-center gap-2 w-full py-3 group/trigger">
-              <ChevronRight className="w-3.5 h-3.5 text-foreground/15 transition-transform data-[state=open]:rotate-90 group-hover/trigger:text-foreground/45" />
-              <span className="text-caption font-medium text-foreground/45 group-hover/trigger:text-foreground transition-colors">Strategy</span>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
+            <TabsContent value="strategy" className="mt-4">
               <StrategyTab
                 contactName={firstName}
                 cardsLoading={cardsLoading}
@@ -321,15 +233,9 @@ export default function ContactDetailView({
                 setupRunning={setupRunning}
                 onRegenerate={() => onRegenerateSection("strategy")}
               />
-            </CollapsibleContent>
-          </Collapsible>
+            </TabsContent>
 
-          <Collapsible>
-            <CollapsibleTrigger className="flex items-center gap-2 w-full py-3 group/trigger">
-              <ChevronRight className="w-3.5 h-3.5 text-foreground/15 transition-transform data-[state=open]:rotate-90 group-hover/trigger:text-foreground/45" />
-              <span className="text-caption font-medium text-foreground/45 group-hover/trigger:text-foreground transition-colors">Outreach</span>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
+            <TabsContent value="outreach" className="mt-4">
               <OutreachTab
                 contactName={firstName}
                 cardsLoading={cardsLoading}
@@ -340,15 +246,9 @@ export default function ContactDetailView({
                 setupRunning={setupRunning}
                 onRegenerate={() => onRegenerateSection("outreach")}
               />
-            </CollapsibleContent>
-          </Collapsible>
+            </TabsContent>
 
-          <Collapsible>
-            <CollapsibleTrigger className="flex items-center gap-2 w-full py-3 group/trigger">
-              <ChevronRight className="w-3.5 h-3.5 text-foreground/15 transition-transform data-[state=open]:rotate-90 group-hover/trigger:text-foreground/45" />
-              <span className="text-caption font-medium text-foreground/45 group-hover/trigger:text-foreground transition-colors">Story</span>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
+            <TabsContent value="story" className="mt-4">
               <StoryTab
                 contactName={firstName}
                 isInboundStoryResponse={isInboundStoryResponse}
@@ -364,8 +264,8 @@ export default function ContactDetailView({
                 setupRunning={setupRunning}
                 onRegenerate={() => onRegenerateSection("story")}
               />
-            </CollapsibleContent>
-          </Collapsible>
+            </TabsContent>
+          </Tabs>
         </>
       )}
 
