@@ -786,12 +786,13 @@ function StoryPageInner({
   );
 }
 
-function NotFoundStory() {
+function NotFoundStory({ debugInfo }: { debugInfo?: string }) {
   return (
     <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
       <div className="text-center">
         <h1 className="text-3xl font-bold mb-4">Customer not found</h1>
         <p className="text-muted-foreground mb-4">No operating brief has been generated for this customer yet.</p>
+        {debugInfo && <p className="text-xs text-muted-foreground/50 mb-4 font-mono">{debugInfo}</p>}
         <Link to="/stories" className="text-primary hover:underline">Back to customers</Link>
       </div>
     </div>
