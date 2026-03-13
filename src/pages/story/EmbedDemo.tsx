@@ -1,14 +1,14 @@
-import { motion } from "framer-motion";
-import { fade } from "./StorySection";
 import { EditableText } from "./EditableText";
 import { useStoryEdit } from "./EditContext";
 import { useStoryDebug } from "./StoryDebugContext";
 import { useSectionAnnotation } from "./sectionAnnotations";
+import { useFadeIn } from "./useFadeIn";
 
 export default function EmbedDemo({ ioradUrl }: { ioradUrl?: string | null }) {
   const ctx = useStoryEdit();
   const debug = useStoryDebug();
   const annotation = useSectionAnnotation("embedDemo");
+  const ref = useFadeIn();
 
   const HARDCODED_TUTORIAL = "https://ior.ad/b973?iframeHash=trysteps-1";
   const propUrl = ioradUrl || null;
@@ -27,7 +27,7 @@ export default function EmbedDemo({ ioradUrl }: { ioradUrl?: string | null }) {
 
   return (
     <section className="max-w-5xl mx-auto px-6 py-16">
-      <motion.div {...fade}>
+      <div ref={ref} className="fade-in">
         {annotation?.element}
         {ctx?.isEditing ? (
           <EditableText value={label} field="overrides.embed.label" as="p" className="text-xs font-mono uppercase tracking-[0.2em] mb-3" style={{ color: "var(--story-accent)" }} />
@@ -58,7 +58,7 @@ export default function EmbedDemo({ ioradUrl }: { ioradUrl?: string | null }) {
             title="iorad interactive walkthrough"
           />
         </div>
-      </motion.div>
+      </div>
     </section>
   );
 }

@@ -1,4 +1,3 @@
-import { motion } from "framer-motion";
 import { PartnerMeta } from "@/data/partnerMeta";
 import { Customer } from "@/data/customers";
 import ioradLogoDark from "@/assets/iorad-logo-new.png";
@@ -67,9 +66,9 @@ export default function StoryHero({ customer, pm }: StoryHeroProps) {
     <section className="relative overflow-hidden">
       <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, var(--story-accent-dim), transparent, transparent)" }} />
       <div className="max-w-5xl mx-auto px-6 pt-16 pb-20 relative">
-        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>
+        <div>
           {/* Logo lockup */}
-          <motion.div className="flex items-center gap-0 mb-10" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6, delay: 0.15 }}>
+          <div className="flex items-center gap-0 mb-10">
             <div className="inline-flex items-center gap-1 md:gap-2 px-2 py-2 rounded-[1.25rem]" style={{ background: "var(--story-surface)", border: "1px solid var(--story-border)" }}>
               <div className="h-12 w-12 md:h-14 md:w-14 rounded-2xl flex items-center justify-center overflow-hidden" style={{ background: "var(--story-bg)", border: "1px solid var(--story-border)" }}>
                 <img src={ioradLogo} alt="iorad" className="h-5 md:h-6 object-contain" />
@@ -83,7 +82,7 @@ export default function StoryHero({ customer, pm }: StoryHeroProps) {
               <Connector />
               <LogoPill src={customerLogoUrl} alt={customer.name} fallbackLabel={customer.name} />
             </div>
-          </motion.div>
+          </div>
 
           <span
             className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-[0.2em] px-3 py-1 rounded-full border mb-6"
@@ -121,7 +120,7 @@ export default function StoryHero({ customer, pm }: StoryHeroProps) {
           ) : (
             <p className="text-lg max-w-2xl leading-relaxed" style={{ color: "var(--story-muted)" }}>{subtitle}</p>
           )}
-        </motion.div>
+        </div>
       </div>
     </section>
   );

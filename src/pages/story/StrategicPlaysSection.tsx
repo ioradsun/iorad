@@ -1,14 +1,27 @@
 import { Layout } from "lucide-react";
-import { motion } from "framer-motion";
-import { fade } from "./StorySection";
 import StorySection from "./StorySection";
 import type { StrategicPlay } from "@/data/customers";
 import { EditableText, EditableListItemWrapper } from "./EditableText";
 import { useStoryEdit } from "./EditContext";
 import { useSectionAnnotation } from "./sectionAnnotations";
+import { useFadeIn } from "./useFadeIn";
 
 interface Props {
   plays: StrategicPlay[];
+}
+
+function FadeInItem({ children, delay }: { children: React.ReactNode; delay: number }) {
+  const ref = useFadeIn();
+
+  return (
+    <div
+      ref={ref}
+      className="fade-in rounded-xl p-6"
+      style={{ border: "1px solid var(--story-border)", background: "var(--story-surface)", transitionDelay: `${delay}s` }}
+    >
+      {children}
+    </div>
+  );
 }
 
 export default function StrategicPlaysSection({ plays }: Props) {
@@ -28,12 +41,7 @@ export default function StrategicPlaysSection({ plays }: Props) {
       <div className="space-y-6">
         {data.map((play, i) => (
           <EditableListItemWrapper key={i} arrayPath="plays" index={i}>
-            <motion.div
-              {...fade}
-              transition={{ ...fade.transition, delay: i * 0.15 }}
-              className="rounded-xl p-6"
-              style={{ border: "1px solid var(--story-border)", background: "var(--story-surface)" }}
-            >
+            <FadeInItem delay={i * 0.15}>
               <EditableText value={play.name} field={`plays.${i}.name`} as="h4" className="font-semibold text-lg mb-4" />
               <div className="grid md:grid-cols-2 gap-4 text-sm">
                 <div>
@@ -53,7 +61,7 @@ export default function StrategicPlaysSection({ plays }: Props) {
                   <EditableText value={play.expectedImpact} field={`plays.${i}.expectedImpact`} as="p" className="leading-relaxed" style={{ color: "var(--story-muted)" }} />
                 </div>
               </div>
-            </motion.div>
+            </FadeInItem>
           </EditableListItemWrapper>
         ))}
       </div>
