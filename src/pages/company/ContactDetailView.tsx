@@ -200,10 +200,9 @@ export default function ContactDetailView({
     if (!companyId || !effectiveContact?.id) return;
     try {
       const { error } = await supabase
-        .from("company_cards")
+        .from("companies")
         .update({ loom_url: url })
-        .eq("company_id", companyId)
-        .eq("contact_id", effectiveContact.id);
+        .eq("id", companyId);
       if (error) console.warn("Loom URL save failed:", error.message);
       queryClient.invalidateQueries({ queryKey: ["company_cards", companyId], exact: false });
     } catch {}
