@@ -87,11 +87,10 @@ export default function StrategyTab({
         </div>
       ) : (
         <Card className="panel text-center py-8">
-          <Sparkles className="w-8 h-8 text-foreground/45 mx-auto mb-3" />
-          <p className="text-body text-foreground/45 mb-3">
-            {contactName
-              ? `No strategy generated for ${contactName} yet.`
-              : "No strategy generated yet."}
+          <Sparkles className="w-8 h-8 text-foreground/25 mx-auto mb-3" />
+          <p className="text-body text-foreground/45 mb-1">No strategy yet</p>
+          <p className="text-caption text-foreground/25">
+            Select a contact and click "Generate" on their card to create a personalized strategy.
           </p>
         </Card>
       )}
