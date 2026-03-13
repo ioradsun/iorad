@@ -677,8 +677,6 @@ export default function CompanyDetail() {
                 </>
               )}
             </div>
-          ) : effectiveContact ? (
-            <ContactMetaLine contact={effectiveContact} />
           ) : null}
         </div>
 
@@ -1198,29 +1196,6 @@ export default function CompanyDetail() {
             onRegenerateSection={(section) => regenerateSection(section as any)}
           />
       )}
-    </div>
-  );
-}
-
-function ContactMetaLine({ contact }: { contact: any }) {
-  return (
-    <div className="pl-8">
-      <div className="flex items-center gap-3 text-caption text-foreground/40">
-        {contact.title && <span>{contact.title}</span>}
-        {contact.linkedin && (
-          <>
-            {contact.title && <span className="text-foreground/15">·</span>}
-            <a
-              href={contact.linkedin}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-primary transition-colors inline-flex items-center gap-1"
-            >
-              LinkedIn
-            </a>
-          </>
-        )}
-      </div>
     </div>
   );
 }
