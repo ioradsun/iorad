@@ -694,7 +694,7 @@ export default function CompanyDetail() {
     }
 
     return () => observers.forEach((observer) => observer.disconnect());
-  }, [viewMode, effectiveContactId]);
+  }, [viewMode, effectiveContactId, companyCards, cardsLoading]);
 
   useEffect(() => {
     if (viewMode !== "contact") return;
@@ -1459,15 +1459,19 @@ export default function CompanyDetail() {
               </div>
             </div>
 
-            {/* Anchor nav */}
+             {/* Anchor nav */}
             <nav className="flex items-center gap-5 border-b border-border/15 pb-2">
               {["about", "strategy", "outreach", "story"].map((section) => (
                 <button
                   key={section}
                   onClick={() => {
-                    document.getElementById(`section-${section}`)?.scrollIntoView({
-                      behavior: "smooth",
-                      block: "start",
+                    setActiveSection(section);
+                    // Use requestAnimationFrame to ensure DOM is painted before scrolling
+                    requestAnimationFrame(() => {
+                      const el = document.getElementById(`section-${section}`);
+                      if (el) {
+                        el.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }
                     });
                   }}
                   className={`text-caption font-medium transition-colors capitalize ${
