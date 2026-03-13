@@ -222,6 +222,8 @@ async function scoreSignals(
       libraryLinks
     );
 
+    const ac = new AbortController();
+    const timeout = setTimeout(() => ac.abort(), 30_000);
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -235,7 +237,8 @@ async function scoreSignals(
           { role: "user", content: prompt },
         ],
       }),
-    });
+      signal: ac.signal,
+    }).finally(() => clearTimeout(timeout));
 
     if (!resp.ok) {
       await resp.text();
@@ -335,21 +338,6 @@ Deno.serve(async (req) => {
 
       // ── INBOUND PATH: behavioral scoring from HubSpot properties ───────────
       if (isInbound) {
-        // Step 0: Run contact profile extraction first to ensure scores are fresh
-        try {
-          const extractUrl = `${supabaseUrl}/functions/v1/extract-contact-profile`;
-          await fetch(extractUrl, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${serviceRoleKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ company_id: company.id }),
-          });
-        } catch (extractErr: any) {
-          console.warn("Inbound profile extraction failed, using raw data:", extractErr.message);
-        }
-
         // Step 0b: Run Firecrawl web signal search (same as outbound) if domain is available
         if (company.domain && (mode === "full" || mode === "signals_only")) {
           try {

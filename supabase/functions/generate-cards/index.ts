@@ -66,37 +66,6 @@ serve(async (req) => {
       }
     }
 
-    // Step 0: Extract contact profiles (Pass 1) for any contacts with HubSpot data but no profile yet
-    const { data: unprofiledContacts } = await sb
-      .from("contacts")
-      .select("id")
-      .eq("company_id", company_id)
-      .not("hubspot_properties", "is", null)
-      .is("contact_profile", null);
-
-    if (unprofiledContacts && unprofiledContacts.length > 0) {
-      console.log(`Extracting profiles for ${unprofiledContacts.length} contacts before generation…`);
-      try {
-        const extractUrl = `${supabaseUrl}/functions/v1/extract-contact-profile`;
-        const extractRes = await fetch(extractUrl, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${supabaseKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ company_id }),
-        });
-        if (extractRes.ok) {
-          const extractData = await extractRes.json();
-          console.log(`Profile extraction: ${extractData.profiles_extracted} extracted`);
-        } else {
-          console.warn("Profile extraction failed, continuing with raw data:", await extractRes.text());
-        }
-      } catch (extractErr) {
-        console.warn("Profile extraction error, continuing:", extractErr);
-      }
-    }
-
     // Load contacts, signals, latest snapshot in parallel
     const [contactsRes, signalsRes, snapshotRes, aiConfigRes] = await Promise.all([
       sb.from("contacts").select("*").eq("company_id", company_id),
@@ -129,43 +98,56 @@ serve(async (req) => {
       contact_role: primaryContact?.title || company.buyer_title || null,
       contact_focus: primaryContact?.role_focus || null,
       contact_notes: primaryContact?.user_notes || null,
-      contacts: contacts.map((c: any) => {
-        // Use AI-extracted profile (Pass 1) if available, otherwise fall back to raw properties
-        const profile = c.contact_profile;
-        if (profile) {
-          return {
-            name: c.name,
-            title: c.title,
-            email: c.email,
-            linkedin: c.linkedin,
-            source: c.source,
-            confidence: c.confidence,
-            role_focus: c.role_focus || null,
-            user_notes: c.user_notes || null,
-            product_usage_profile: profile,
-          };
-        }
-        // Fallback: raw HubSpot properties (for contacts not yet profiled)
-        const hp = c.hubspot_properties || {};
-        return {
-          name: c.name,
-          title: c.title,
-          email: c.email,
-          linkedin: c.linkedin,
-          source: c.source,
-          confidence: c.confidence,
-          role_focus: c.role_focus || null,
-          user_notes: c.user_notes || null,
-          plan_name: hp.plan_name || null,
-          account_type: hp.account__type || null,
-          category: hp.account_type || null,
-          tutorials_created: hp.tutorials_created || null,
-          tutorials_views: hp.tutorials_views || null,
-          documenting_product: hp.first_embed_tutorial_base_domain_name || null,
-          embedded_in: hp.first_embed_base_domain_name || null,
-          last_active_date: hp.last_active_date || null,
-        };
-      }),
+      contacts: activeTab === "company"
+        ? undefined
+        : contacts.map((c: any) => {
+            const profile = c.contact_profile;
+            if (profile) {
+              return {
+                name: c.name,
+                title: c.title,
+                email: c.email,
+                linkedin: c.linkedin,
+                source: c.source,
+                confidence: c.confidence,
+                role_focus: c.role_focus || null,
+                user_notes: c.user_notes || null,
+                product_usage_profile: profile,
+              };
+            }
+            const hp = c.hubspot_properties || {};
+            return {
+              name: c.name,
+              title: c.title,
+              email: c.email,
+              linkedin: c.linkedin,
+              source: c.source,
+              confidence: c.confidence,
+              role_focus: c.role_focus || null,
+              user_notes: c.user_notes || null,
+              plan_name: hp.plan_name || null,
+              account_type: hp.account__type || null,
+              category: hp.account_type || null,
+              tutorials_created: hp.tutorials_created || null,
+              tutorials_views: hp.tutorials_views || null,
+              documenting_product: hp.first_embed_tutorial_base_domain_name || null,
+              embedded_in: hp.first_embed_base_domain_name || null,
+              last_active_date: hp.last_active_date || null,
+            };
+          }),
+      contacts_summary: activeTab === "company"
+        ? {
+            total: contacts.length,
+            with_tutorials: contacts.filter((c: any) => {
+              const hp = (c.hubspot_properties as any) || {};
+              return !!hp.first_tutorial_create_date;
+            }).length,
+            sample: contacts.slice(0, 5).map((c: any) => ({
+              name: c.name,
+              title: c.title,
+            })),
+          }
+        : undefined,
       signals: signals.map((s: any) => ({
         type: s.type,
         title: s.title,
@@ -213,6 +195,8 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
 
     console.log(`Generating cards for ${company.name} using ${model}`);
 
+    const ac = new AbortController();
+    const timeout = setTimeout(() => ac.abort(), 45_000);
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -227,7 +211,8 @@ Return ONLY valid JSON matching the output schema. No markdown, no commentary.`;
           { role: "user", content: userPrompt },
         ],
       }),
-    });
+      signal: ac.signal,
+    }).finally(() => clearTimeout(timeout));
 
     if (!aiResponse.ok) {
       const errText = await aiResponse.text();
