@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Linkedin, Loader2, Pencil, Plus, Save, Sparkles, Trash2, UserSearch, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
@@ -6,12 +6,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Json } from "@/integrations/supabase/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import OutreachTab from "./OutreachTab";
 import StoryTab from "./StoryTab";
@@ -85,6 +84,7 @@ export default function ContactDetailView({
   onRegenerateSection,
 }: ContactDetailViewProps) {
   const queryClient = useQueryClient();
+  const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
   const companyAny = company as any;
 
   const effectiveContact = contacts.find((c: any) => c.id === selectedContactId) || contacts[0] || null;
@@ -180,60 +180,58 @@ export default function ContactDetailView({
 
   return (
     <>
-      <div className="flex items-center gap-2">
-        <Select value={selectedContactId} onValueChange={onSelectContact}>
-          <SelectTrigger className="h-9 min-w-[260px] max-w-[420px]">
-            <SelectValue placeholder="Select contact" />
-          </SelectTrigger>
-          <SelectContent className="bg-background z-50 min-w-[320px]">
-            {contacts.map((c: any) => (
-              <SelectItem key={c.id} value={c.id} className="py-2">
-                <div className="flex flex-col items-start">
-                  <span className="font-medium text-caption leading-tight">{c.name}</span>
-                  {c.title && <span className="text-foreground/45 text-micro leading-tight">{c.title}</span>}
-                  {(c as any).role_focus && <span className="text-primary/70 text-micro leading-tight">{(c as any).role_focus}</span>}
-                </div>
-              </SelectItem>
-            ))}
-            <div className="border-t border-border/30 mt-1 pt-1">
-              <button
-                className="w-full flex items-center gap-2 px-2 py-2 text-caption text-primary hover:bg-accent rounded transition-colors"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onSetAddContactOpen(true);
-                }}
-              >
-                <Plus className="w-3.5 h-3.5" /> Add contact
-              </button>
-            </div>
-          </SelectContent>
-        </Select>
-
-      </div>
-
       {effectiveContact && (
         <>
-          <div className="mt-4 space-y-3 group/card">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className="text-title font-semibold">{effectiveContact.name}</h3>
-                {effectiveContact.title && <p className="text-body text-foreground/65">{effectiveContact.title}</p>}
-                {(effectiveContact as any).role_focus && <p className="text-caption text-primary/70 mt-1">Role: {(effectiveContact as any).role_focus}</p>}
-                <div className="flex items-center gap-3 text-caption text-foreground/45">
-                  {effectiveContact.email && (
-                    <a href={`mailto:${effectiveContact.email}`} className="hover:text-primary transition-colors">
-                      {effectiveContact.email}
-                    </a>
-                  )}
-                  {effectiveContact.linkedin && (
-                    <a href={effectiveContact.linkedin} target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors flex items-center gap-1">
-                      <Linkedin className="w-3 h-3" /> LinkedIn
-                    </a>
-                  )}
-                </div>
+          <div className="group/contact">
+            <div className="flex items-baseline justify-between gap-4">
+              <div className="flex items-baseline gap-3">
+                <h2 className="text-title font-semibold">{effectiveContact.name}</h2>
+                {contacts.length > 1 && (
+                  <Popover open={isSwitcherOpen} onOpenChange={setIsSwitcherOpen}>
+                    <PopoverTrigger asChild>
+                      <button className="text-micro text-foreground/25 hover:text-primary transition-colors">
+                        Switch ▾
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-80 p-1">
+                      <div className="max-h-[300px] overflow-y-auto">
+                        {contacts.map((c: any) => (
+                          <button
+                            key={c.id}
+                            onClick={() => {
+                              onSelectContact(c.id);
+                              setIsSwitcherOpen(false);
+                            }}
+                            className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
+                              c.id === effectiveContact.id
+                                ? "bg-primary/10 text-foreground"
+                                : "hover:bg-secondary text-foreground/65"
+                            }`}
+                          >
+                            <div className="text-caption font-medium leading-tight">{c.name}</div>
+                            {c.title && (
+                              <div className="text-micro text-foreground/45 leading-tight">{c.title}</div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="border-t border-border/30 mt-1 pt-1">
+                        <button
+                          onClick={() => {
+                            setIsSwitcherOpen(false);
+                            onSetAddContactOpen(true);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-caption text-primary hover:bg-accent rounded-md transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Add contact
+                        </button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                )}
               </div>
-              <div className="flex items-center gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity">
+
+              <div className="flex items-center gap-1 opacity-0 group-hover/contact:opacity-100 transition-opacity">
                 <button
                   onClick={() => {
                     if (editingContactId === effectiveContact.id) {
@@ -245,47 +243,68 @@ export default function ContactDetailView({
                     onSetEditUserNotes((effectiveContact as any).user_notes || "");
                   }}
                   className="p-1.5 rounded text-foreground/25 hover:text-foreground hover:bg-secondary transition-colors"
-                  title="Edit contact"
+                  title="Edit"
                 >
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={() => onSetDeleteContactId(effectiveContact.id)}
                   className="p-1.5 rounded text-foreground/25 hover:text-destructive hover:bg-destructive/10 transition-colors"
-                  title="Delete contact"
+                  title="Delete"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
 
+            {effectiveContact.title && (
+              <p className="text-body text-foreground/65 mt-0.5">{effectiveContact.title}</p>
+            )}
+
+            <div className="flex items-center gap-3 mt-1 text-caption text-foreground/45">
+              {effectiveContact.email && (
+                <a href={`mailto:${effectiveContact.email}`} className="hover:text-primary transition-colors">
+                  {effectiveContact.email}
+                </a>
+              )}
+              {effectiveContact.linkedin && (
+                <a href={effectiveContact.linkedin} target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors flex items-center gap-1">
+                  <Linkedin className="w-3 h-3" /> LinkedIn
+                </a>
+              )}
+              {(effectiveContact as any).role_focus && (
+                <>
+                  <span className="text-foreground/15">·</span>
+                  <span className="text-primary/70">{(effectiveContact as any).role_focus}</span>
+                </>
+              )}
+            </div>
+
             {ioradActivity && (
-              <div className="flex flex-wrap items-center gap-1.5 text-micro">
+              <div className="flex flex-wrap items-center gap-1.5 mt-2 text-micro">
                 {ioradActivity.isCreator && <span className="px-2 py-0.5 rounded-full bg-primary/12 text-primary">Creator</span>}
                 {ioradActivity.isViewer && <span className="px-2 py-0.5 rounded-full bg-secondary text-foreground/70">Viewer</span>}
                 {ioradActivity.hasExtension && <span className="px-2 py-0.5 rounded-full bg-secondary text-foreground/70">Extension</span>}
                 {ioradActivity.monthAnswers > 0 && <span className="px-2 py-0.5 rounded-full bg-secondary text-foreground/70">{ioradActivity.monthAnswers} answers/mo</span>}
-                {ioradActivity.rank && <span className="px-2 py-0.5 rounded-full bg-secondary text-foreground/70">Rank {ioradActivity.rank}</span>}
-                {ioradActivity.engagement && <span className="px-2 py-0.5 rounded-full bg-secondary text-foreground/70">{String(ioradActivity.engagement)}</span>}
               </div>
             )}
 
             {(effectiveContact as any)?.contact_profile?.key_metrics && (
-              <div className="flex items-center gap-3 text-caption text-foreground/65">
+              <div className="flex items-center gap-3 mt-2 text-caption text-foreground/45">
                 {(effectiveContact as any).contact_profile.key_metrics.tutorials_created !== undefined && <span>{(effectiveContact as any).contact_profile.key_metrics.tutorials_created} created</span>}
                 {(effectiveContact as any).contact_profile.key_metrics.tutorials_viewed !== undefined && <span>{(effectiveContact as any).contact_profile.key_metrics.tutorials_viewed} viewed</span>}
-                {(effectiveContact as any).contact_profile.key_metrics.plan && <span>{(effectiveContact as any).contact_profile.key_metrics.plan}</span>}
               </div>
             )}
 
             {(effectiveContact as any)?.contact_profile?.account_narrative && (
-              <p className="text-caption text-foreground/65 leading-relaxed">"{(effectiveContact as any).contact_profile.account_narrative}"</p>
+              <p className="text-caption text-foreground/45 leading-relaxed mt-3 max-w-2xl italic">
+                {(effectiveContact as any).contact_profile.account_narrative}
+              </p>
             )}
           </div>
 
           {editingContactId === effectiveContact.id && (
-            <Card className="mt-3">
-              <CardContent className="p-4 space-y-3">
+            <div className="mt-4 pt-4 border-t border-border/20 space-y-3">
                 <div>
                   <Label className="text-xs text-muted-foreground">Role / Focus Area</Label>
                   <Input placeholder="e.g. Instructional Design" value={editRoleFocus} onChange={(e) => onSetEditRoleFocus(e.target.value)} className="mt-1" />
@@ -313,8 +332,7 @@ export default function ContactDetailView({
                     <Save className="w-3.5 h-3.5" /> Save
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
+            </div>
           )}
 
           <div className="flex items-center gap-3 py-5 mt-2 border-t border-border/20">
