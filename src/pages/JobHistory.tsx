@@ -1,133 +1,100 @@
-import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Loader2, CheckCircle2, XCircle, AlertCircle, Download, RefreshCw,
-} from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { formatDistanceToNow, format } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 
-// ── Data ─────────────────────────────────────────────────────────────────────
-
-function useRecentJobs() {
+function useSyncStatus() {
   return useQuery({
-    queryKey: ["hubspot_sync_status"],
+    queryKey: ["sync_status"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("processing_jobs")
-        .select("id, status, started_at, finished_at, companies_processed, companies_failed, settings_snapshot, trigger")
-        .in("trigger", ["hubspot_pipeline", "manual", "hubspot_sync", "hubspot_backfill"])
-        .order("started_at", { ascending: false })
-        .limit(5);
+        .from("sync_checkpoints")
+        .select("key, value, updated_at")
+        .in("key", [
+          "company_sync_cursor",
+          "contact_sync_cursor",
+          "last_company_sync_result",
+          "last_contact_sync_result",
+        ]);
       if (error) throw error;
-      return (data || []) as any[];
+
+      const map: Record<string, any> = {};
+      for (const row of data || []) {
+        map[row.key] = { value: row.value, updated_at: row.updated_at };
+      }
+      return map;
     },
-    refetchInterval: 10_000,
+    refetchInterval: 15_000,
   });
 }
 
-// ── Stalled detection ────────────────────────────────────────────────────────
-// Compare companies_processed across polls. If the count hasn't increased
-// in 5 minutes, the job is stalled — regardless of how long it's been running.
-
-function useStallDetection(job: any) {
-  const lastProgress = useRef<{ count: number; at: number } | null>(null);
-  const [isStalled, setIsStalled] = useState(false);
-
-  useEffect(() => {
-    if (!job || job.status !== "running") {
-      lastProgress.current = null;
-      setIsStalled(false);
-      return;
-    }
-
-    const currentCount = job.companies_processed ?? 0;
-    const now = Date.now();
-
-    if (!lastProgress.current) {
-      // First observation
-      lastProgress.current = { count: currentCount, at: now };
-      setIsStalled(false);
-      return;
-    }
-
-    if (currentCount > lastProgress.current.count) {
-      // Progress! Reset the clock.
-      lastProgress.current = { count: currentCount, at: now };
-      setIsStalled(false);
-    } else {
-      // No progress — check how long
-      const stuckMs = now - lastProgress.current.at;
-      setIsStalled(stuckMs > 5 * 60 * 1000); // 5 minutes
-    }
-  }, [job?.id, job?.status, job?.companies_processed]);
-
-  return isStalled;
+function useCompanyContactCounts() {
+  return useQuery({
+    queryKey: ["sync_counts"],
+    queryFn: async () => {
+      const [compRes, contRes] = await Promise.all([
+        supabase.from("companies").select("id", { count: "exact", head: true }),
+        supabase.from("contacts").select("id", { count: "exact", head: true }),
+      ]);
+      return {
+        companies: compRes.count ?? 0,
+        contacts: contRes.count ?? 0,
+      };
+    },
+    staleTime: 60_000,
+  });
 }
-
-// ── Main page ────────────────────────────────────────────────────────────────
 
 export default function JobHistory() {
   const qc = useQueryClient();
-  const { data: jobs = [], isLoading } = useRecentJobs();
+  const { data: status, isLoading } = useSyncStatus();
+  const { data: counts } = useCompanyContactCounts();
 
-  const activeJob = jobs.find((j: any) => j.status === "running") || null;
-  const lastCompleted = jobs.find((j: any) => j.status === "completed") || null;
-  const recentHistory = jobs.slice(0, 3);
-
-  const isStalled = useStallDetection(activeJob);
-
-  // Derive current phase from snapshot
-  const snap = (activeJob?.settings_snapshot as any) ?? {};
-  const phase = snap.phase ?? 0;
-  const phaseLabel =
-    phase === 1 ? "Syncing companies" :
-    phase === 2 ? "Importing contacts" :
-    phase === 3 ? "Scoring companies" :
-    "Processing";
-  const processed = activeJob?.companies_processed ?? 0;
-
-  const runPipeline = useMutation({
+  const syncNow = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("hubspot-pipeline", { body: {} });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      return data;
-    },
-    onSuccess: () => {
-      toast.success("HubSpot sync started");
-      qc.invalidateQueries({ queryKey: ["hubspot_sync_status"] });
-    },
-    onError: (err: any) => toast.error(`Sync failed: ${err?.message}`),
-  });
-
-  const cancelJob = useMutation({
-    mutationFn: async (jobId: string) => {
-      await supabase
-        .from("processing_jobs")
-        .update({ status: "canceled", finished_at: new Date().toISOString() })
-        .eq("id", jobId);
-    },
-    onSuccess: () => {
-      toast.success("Sync canceled");
-      qc.invalidateQueries({ queryKey: ["hubspot_sync_status"] });
-    },
-  });
-
-  const resumeJob = useMutation({
-    mutationFn: async (jobId: string) => {
-      const { error } = await supabase.functions.invoke("hubspot-pipeline", {
-        body: { job_id: jobId },
+      const { error } = await supabase.functions.invoke("import-from-hubspot", {
+        body: { action: "sync_all" },
       });
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Sync resumed");
-      qc.invalidateQueries({ queryKey: ["hubspot_sync_status"] });
+      toast.success("Sync complete");
+      qc.invalidateQueries({ queryKey: ["sync_status"] });
+      qc.invalidateQueries({ queryKey: ["sync_counts"] });
     },
-    onError: (err: any) => toast.error(`Resume failed: ${err?.message}`),
+    onError: (err: any) => toast.error(`Sync failed: ${err?.message}`),
   });
+
+  const companyCursor = status?.company_sync_cursor;
+  const contactCursor = status?.contact_sync_cursor;
+  const lastCompanyResult = (() => {
+    try {
+      return JSON.parse(status?.last_company_sync_result?.value || "null");
+    } catch {
+      return null;
+    }
+  })();
+  const lastContactResult = (() => {
+    try {
+      return JSON.parse(status?.last_contact_sync_result?.value || "null");
+    } catch {
+      return null;
+    }
+  })();
+
+  const lastCompanySync = companyCursor?.updated_at ? new Date(companyCursor.updated_at) : null;
+  const lastContactSync = contactCursor?.updated_at ? new Date(contactCursor.updated_at) : null;
+  const lastSync = [lastCompanySync, lastContactSync]
+    .filter(Boolean)
+    .sort((a, b) => b!.getTime() - a!.getTime())[0] || null;
+
+  const minutesSinceSync = lastSync ? (Date.now() - lastSync.getTime()) / 60_000 : Infinity;
+  const isHealthy = minutesSinceSync < 150;
+  const isStale = minutesSinceSync >= 150 && minutesSinceSync < 720;
+  const isDown = minutesSinceSync >= 720;
+  const neverSynced = !lastSync;
 
   if (isLoading) {
     return (
@@ -139,145 +106,107 @@ export default function JobHistory() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
-      <div>
-        <h1 className="text-display font-semibold tracking-tight">HubSpot Sync</h1>
-      </div>
+      <h1 className="text-display font-semibold tracking-tight">HubSpot Sync</h1>
 
-      {/* ── Status card ───────────────────────────────────────────── */}
-      <div className={`rounded-xl border p-6 space-y-4 ${
-        isStalled
-          ? "border-warning/40 bg-warning/[0.04]"
-          : activeJob
-          ? "border-primary/30 bg-primary/[0.03]"
-          : "border-border bg-card"
-      }`}>
-
-        {/* Status headline */}
+      <div
+        className={`rounded-xl border p-6 ${
+          neverSynced ? "border-border bg-card" : isHealthy ? "border-border bg-card" : isStale ? "border-warning/30 bg-warning/[0.03]" : "border-destructive/30 bg-destructive/[0.03]"
+        }`}
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {activeJob && !isStalled && (
-              <Loader2 className="w-5 h-5 animate-spin text-primary" />
-            )}
-            {activeJob && isStalled && (
-              <AlertCircle className="w-5 h-5 text-warning" />
-            )}
-            {!activeJob && lastCompleted && (
-              <CheckCircle2 className="w-5 h-5 text-success" />
-            )}
-            {!activeJob && !lastCompleted && (
-              <Download className="w-5 h-5 text-foreground/25" />
-            )}
-
+            {neverSynced && <AlertCircle className="w-5 h-5 text-foreground/25" />}
+            {isHealthy && <CheckCircle2 className="w-5 h-5 text-success" />}
+            {isStale && <AlertCircle className="w-5 h-5 text-warning" />}
+            {isDown && <AlertCircle className="w-5 h-5 text-destructive" />}
             <div>
               <h2 className="text-title font-semibold">
-                {isStalled
-                  ? "Sync stalled"
-                  : activeJob
-                  ? phaseLabel
-                  : lastCompleted
-                  ? "In sync"
-                  : "Not synced yet"}
+                {neverSynced ? "Not synced yet" : isHealthy ? "In sync" : isStale ? "Sync overdue" : "Sync down"}
               </h2>
-              <p className="text-caption text-foreground/45 mt-0.5">
-                {isStalled
-                  ? "No progress in the last 5 minutes"
-                  : activeJob
-                  ? `${processed.toLocaleString()} companies processed`
-                  : lastCompleted
-                  ? `Last synced ${formatDistanceToNow(new Date(lastCompleted.finished_at!), { addSuffix: true })}`
-                  : "Run a full sync to import companies and contacts from HubSpot"}
+              <p className="text-caption text-foreground/40 mt-0.5">
+                {neverSynced
+                  ? "Run your first sync to import companies and contacts"
+                  : `Last data received ${formatDistanceToNow(lastSync!, { addSuffix: true })}`}
               </p>
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center gap-2">
-            {activeJob && isStalled && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5"
-                onClick={() => resumeJob.mutate(activeJob.id)}
-                disabled={resumeJob.isPending}
-              >
-                {resumeJob.isPending
-                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  : <RefreshCw className="w-3.5 h-3.5" />}
-                Resume
-              </Button>
+          <Button className="gap-1.5" onClick={() => syncNow.mutate()} disabled={syncNow.isPending}>
+            {syncNow.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" /> Syncing…
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4" /> Sync Now
+              </>
             )}
-            {activeJob && (
-              <Button
-                size="sm"
-                variant={isStalled ? "destructive" : "outline"}
-                className="gap-1.5"
-                onClick={() => cancelJob.mutate(activeJob.id)}
-                disabled={cancelJob.isPending}
-              >
-                Cancel
-              </Button>
-            )}
-            {!activeJob && (
-              <Button
-                className="gap-1.5"
-                onClick={() => runPipeline.mutate()}
-                disabled={runPipeline.isPending}
-              >
-                {runPipeline.isPending
-                  ? <Loader2 className="w-4 h-4 animate-spin" />
-                  : <Download className="w-4 h-4" />}
-                Run Full Sync
-              </Button>
-            )}
-          </div>
+          </Button>
         </div>
-
-        {/* Progress bar — only while syncing */}
-        {activeJob && !isStalled && (
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-micro text-foreground/25">
-              <span>{phaseLabel}</span>
-              <span>Phase {typeof phase === "number" ? phase : "?"} of 3</span>
-            </div>
-            <div className="h-1.5 rounded-full bg-foreground/[0.06] overflow-hidden">
-              <div
-                className="h-full rounded-full bg-primary transition-all duration-1000"
-                style={{ width: `${Math.round(((typeof phase === "number" ? phase - 1 : 0) / 3) * 100)}%` }}
-              />
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* ── Recent activity (compact) ─────────────────────────────── */}
-      {recentHistory.length > 0 && (
-        <div className="space-y-2">
-          <h3 className="text-caption text-foreground/45 font-medium">Recent activity</h3>
-          {recentHistory.map((job: any) => {
-            const isOk = job.status === "completed";
-            const isRunning = job.status === "running";
-            return (
-              <div key={job.id} className="flex items-center gap-2 text-caption">
-                {isOk && <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" />}
-                {isRunning && <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />}
-                {!isOk && !isRunning && <XCircle className="w-3.5 h-3.5 text-destructive shrink-0" />}
-                <span className="text-foreground/45">
-                  {format(new Date(job.started_at), "MMM d, h:mm a")}
-                </span>
-                <span className="text-foreground/65">
-                  {job.companies_processed?.toLocaleString() ?? 0} companies
-                  {job.companies_failed > 0 && ` · ${job.companies_failed} errors`}
-                </span>
-                {isOk && job.finished_at && (
-                  <span className="ml-auto text-foreground/25">
-                    {formatDistanceToNow(new Date(job.finished_at), { addSuffix: true })}
-                  </span>
-                )}
+      {counts && (
+        <div className="grid grid-cols-2 gap-6">
+          <div>
+            <div className="field-label">Companies</div>
+            <div className="text-display font-semibold tabular-nums mt-1">{counts.companies.toLocaleString()}</div>
+            {lastCompanyResult && (
+              <div className="text-micro text-foreground/25 mt-1">
+                {lastCompanyResult.processed} updated in last sync
+                {lastCompanyResult.has_more && " · more pending"}
               </div>
-            );
-          })}
+            )}
+          </div>
+          <div>
+            <div className="field-label">Contacts</div>
+            <div className="text-display font-semibold tabular-nums mt-1">{counts.contacts.toLocaleString()}</div>
+            {lastContactResult && (
+              <div className="text-micro text-foreground/25 mt-1">
+                {lastContactResult.processed} updated in last sync
+                {lastContactResult.has_more && " · more pending"}
+              </div>
+            )}
+          </div>
         </div>
       )}
+
+      <div className="space-y-3">
+        <div className="field-label">Sync details</div>
+
+        <div className="flex items-center justify-between text-caption">
+          <span className="text-foreground/40">Company checkpoint</span>
+          <span className="text-foreground/60">
+            {companyCursor?.updated_at
+              ? formatDistanceToNow(new Date(companyCursor.updated_at), { addSuffix: true })
+              : "Never"}
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between text-caption">
+          <span className="text-foreground/40">Contact checkpoint</span>
+          <span className="text-foreground/60">
+            {contactCursor?.updated_at
+              ? formatDistanceToNow(new Date(contactCursor.updated_at), { addSuffix: true })
+              : "Never"}
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between text-caption">
+          <span className="text-foreground/40">Schedule</span>
+          <span className="text-foreground/60">Every 2 hours (automatic)</span>
+        </div>
+
+        <div className="flex items-center justify-between text-caption">
+          <span className="text-foreground/40">Mode</span>
+          <span className="text-foreground/60">Incremental (changes only)</span>
+        </div>
+      </div>
+
+      <p className="text-micro text-foreground/20 leading-relaxed">
+        Sync runs automatically every 2 hours, importing only companies and contacts that changed since the
+        last sync. Individual companies are also synced on-demand when you visit them. To import a specific
+        company from HubSpot, search for it on the Dashboard.
+      </p>
     </div>
   );
 }
