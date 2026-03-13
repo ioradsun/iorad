@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { ShieldCheck, MessageCircle, Server, AlertOctagon } from "lucide-react";
 import type { InternalSignals } from "@/data/customers";
 
@@ -5,7 +6,6 @@ interface Props {
   signals: InternalSignals;
   conversationStarters?: string[];
 }
-
 const urgencyColors: Record<string, string> = {
   "Emerging": "rgb(96,165,250)",
   "Active": "rgb(251,191,36)",
