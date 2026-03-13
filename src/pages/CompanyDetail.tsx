@@ -83,6 +83,8 @@ export default function CompanyDetail() {
   const effectiveContactId = selectedContactId || contacts[0]?.id || "";
   const { data: companyCards, isLoading: cardsLoading } = useCompanyCards(id, effectiveContactId || undefined);
 
+  const companyAny = company as any;
+
   // Auto-switch to contacts when contacts load and company is set up
   useEffect(() => {
     if (contacts.length > 0 && companyAny?.last_processed_at && activeTab === "company") {
