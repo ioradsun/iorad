@@ -10,7 +10,7 @@ interface OutreachTabProps {
   emailSequence: Record<string, EmailTouch> | undefined;
   linkedinSequence: LinkedInStep[] | undefined;
   regeneratingSection: string | null;
-  generatingCards: boolean;
+  setupRunning: boolean;
   onRegenerate: () => void;
 }
 
@@ -21,7 +21,7 @@ export default function OutreachTab({
   emailSequence,
   linkedinSequence,
   regeneratingSection,
-  generatingCards,
+  setupRunning,
   onRegenerate,
 }: OutreachTabProps) {
   return (
@@ -35,7 +35,7 @@ export default function OutreachTab({
           size="sm"
           variant="ghost"
           className="h-6 gap-1 text-micro text-foreground/45 hover:text-foreground px-2"
-          disabled={regeneratingSection === "outreach" || generatingCards}
+          disabled={regeneratingSection === "outreach" || setupRunning}
           onClick={onRegenerate}
         >
           {regeneratingSection === "outreach"

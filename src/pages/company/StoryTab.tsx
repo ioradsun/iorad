@@ -20,7 +20,7 @@ interface StoryTabProps {
   onIoradUrlChange: (url: string) => void;
   // Regeneration
   regeneratingSection: string | null;
-  generatingCards: boolean;
+  setupRunning: boolean;
   onRegenerate: () => void;
 }
 
@@ -36,7 +36,7 @@ export default function StoryTab({
   onLoomUrlChange,
   onIoradUrlChange,
   regeneratingSection,
-  generatingCards,
+  setupRunning,
   onRegenerate,
 }: StoryTabProps) {
   return (
@@ -52,7 +52,7 @@ export default function StoryTab({
             size="sm"
             variant="ghost"
             className="h-6 gap-1 text-micro text-foreground/45 hover:text-foreground px-2"
-            disabled={regeneratingSection === "story" || generatingCards}
+            disabled={regeneratingSection === "story" || setupRunning}
             onClick={onRegenerate}
           >
             {regeneratingSection === "story"
