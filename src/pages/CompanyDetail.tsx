@@ -507,43 +507,46 @@ export default function CompanyDetail() {
   }>(companyCards?.account_json as Json);
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Link to="/" className="text-foreground/45 hover:text-foreground transition-colors"><ArrowLeft className="w-5 h-5" /></Link>
-          <div>
-            <h1 className="text-display font-bold tracking-tight leading-tight">{company.name}</h1>
-          </div>
-        </div>
-      </div>
-
-      {setupRunning && (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-primary/[0.06] border border-primary/10">
-          <Loader2 className="w-4 h-4 animate-spin text-primary flex-shrink-0" />
-          <div>
-            <div className="text-body font-medium text-foreground">Setting up {company.name}…</div>
-            {setupStep && <div className="text-caption text-foreground/45 mt-0.5">{setupStep}</div>}
-          </div>
-        </div>
-      )}
-
+    <div className="space-y-0">
       <Tabs defaultValue={contacts.length > 0 ? "contacts" : "company"} className="w-full" onValueChange={setActiveTab}>
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <TabsList>
-            <TabsTrigger value="company" className="text-sm">Company</TabsTrigger>
-            <TabsTrigger value="contacts" className="text-sm">
+        <div className="flex items-baseline gap-4 mb-6">
+          <Link to="/" className="text-foreground/25 hover:text-foreground transition-colors self-center">
+            <ArrowLeft className="w-5 h-5" />
+          </Link>
+          <h1 className="text-display font-semibold tracking-tight shrink-0">
+            {company.name}
+          </h1>
+          <TabsList className="bg-transparent p-0 h-auto ml-auto gap-1">
+            <TabsTrigger
+              value="company"
+              className="text-caption font-medium px-3 py-1.5 rounded-md data-[state=active]:bg-secondary data-[state=active]:text-foreground data-[state=active]:shadow-sm text-foreground/35"
+            >
+              Company
+            </TabsTrigger>
+            <TabsTrigger
+              value="contacts"
+              className="text-caption font-medium px-3 py-1.5 rounded-md data-[state=active]:bg-secondary data-[state=active]:text-foreground data-[state=active]:shadow-sm text-foreground/35"
+            >
               Contacts
               {contacts.length > 0 && (
-                <span className="ml-1.5 text-micro text-foreground/25 tabular-nums">{contacts.length}</span>
+                <span className="ml-1 text-micro tabular-nums opacity-50">{contacts.length}</span>
               )}
             </TabsTrigger>
           </TabsList>
-
         </div>
 
+        {setupRunning && (
+          <div className="flex items-center gap-3 px-4 py-3 mb-6 rounded-lg bg-primary/[0.06] border border-primary/10">
+            <Loader2 className="w-4 h-4 animate-spin text-primary flex-shrink-0" />
+            <div>
+              <div className="text-body font-medium text-foreground">Setting up {company.name}…</div>
+              {setupStep && <div className="text-caption text-foreground/45 mt-0.5">{setupStep}</div>}
+            </div>
+          </div>
+        )}
+
         {/* ============ TAB 1: COMPANY ============ */}
-        <TabsContent value="company" className="space-y-8 mt-6">
+        <TabsContent value="company" className="space-y-8 mt-0">
           <div className="flex items-center justify-between gap-3 pb-6">
             <div className="flex items-center gap-2 flex-wrap text-caption text-foreground/45">
               {company.domain && <span>{company.domain}</span>}
