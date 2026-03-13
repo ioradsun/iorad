@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, RefreshCw, ExternalLink, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, ChevronRight, ChevronDown, Plus } from "lucide-react";
+import { ArrowLeft, RefreshCw, ExternalLink, Newspaper, CheckCircle2, AlertCircle, Loader2, Target, TrendingUp, Shield, Zap, BarChart3, FileText, MessageSquareQuote, ChevronRight, ChevronDown, Plus, Pencil, Trash2, Linkedin, Sparkles } from "lucide-react";
 import { Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 
@@ -82,6 +82,13 @@ export default function CompanyDetail() {
 
   const effectiveContactId = selectedContactId || contacts[0]?.id || "";
   const { data: companyCards, isLoading: cardsLoading } = useCompanyCards(id, effectiveContactId || undefined);
+
+  // Auto-switch to contacts when contacts load and company is set up
+  useEffect(() => {
+    if (contacts.length > 0 && companyAny?.last_processed_at && activeTab === "company") {
+      setActiveTab("contacts");
+    }
+  }, [contacts.length, companyAny?.last_processed_at, activeTab]);
 
   const regenerateSection = useCallback(async (section: "contacts" | "strategy" | "outreach" | "story" | "signals" | "company") => {
     if (!id) return;
@@ -502,99 +509,148 @@ export default function CompanyDetail() {
   }>(companyCards?.account_json as Json);
 
   return (
-    <div className="space-y-0">
-      <Tabs value={activeTab} className="w-full" onValueChange={setActiveTab}>
-        <div className="flex items-baseline gap-1 mb-6">
-          <Link to="/" className="text-foreground/25 hover:text-foreground transition-colors self-center mr-2">
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <TabsList className="bg-transparent p-0 h-auto gap-0">
-            <TabsTrigger
-              value="company"
-              className="text-display font-semibold tracking-tight px-0 py-0 rounded-none bg-transparent shadow-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-foreground text-foreground/30 hover:text-foreground/50 transition-colors"
+    <div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="hidden">
+          <TabsTrigger value="company">Company</TabsTrigger>
+          <TabsTrigger value="contacts">Contacts</TabsTrigger>
+        </TabsList>
+
+        <div className="mb-6">
+          <div className="flex items-center gap-0 mb-2">
+            <Link to="/" className="text-foreground/20 hover:text-foreground transition-colors mr-3 shrink-0">
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+
+            <button
+              onClick={() => setActiveTab("company")}
+              className={`text-title font-semibold tracking-tight px-0 py-0 h-auto rounded-none bg-transparent shadow-none border-0 transition-colors ${
+                activeTab === "company" ? "text-foreground" : "text-foreground/30 hover:text-foreground/50"
+              }`}
             >
               {company.name}
-            </TabsTrigger>
-            <span className="text-foreground/15 mx-3 text-title font-light self-center select-none">/</span>
-          </TabsList>
+            </button>
 
-          {/* Contacts dropdown — switches tab AND picks a contact */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                className={`text-title font-medium transition-colors inline-flex items-baseline gap-1.5 ${
-                  activeTab === "contacts"
-                    ? "text-foreground"
-                    : "text-foreground/30 hover:text-foreground/50"
-                }`}
-              >
-                Contacts
-                {contacts.length > 0 && (
-                  <span className="text-micro tabular-nums opacity-50">{contacts.length}</span>
-                )}
-                <ChevronDown className="w-3.5 h-3.5 opacity-40 self-center" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-80 p-1">
-              <div className="max-h-[400px] overflow-y-auto">
-                {contacts.length === 0 ? (
-                  <div className="px-3 py-4 text-center text-caption text-foreground/45">
-                    No contacts yet
+            <span className="text-foreground/15 mx-2 text-title select-none">/</span>
+
+            {contacts.length > 0 ? (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    className={`text-title font-semibold tracking-tight transition-colors inline-flex items-center gap-1.5 ${
+                      activeTab === "contacts" ? "text-foreground" : "text-foreground/30 hover:text-foreground/50"
+                    }`}
+                    onClick={() => {
+                      if (activeTab !== "contacts") setActiveTab("contacts");
+                    }}
+                  >
+                    {(contacts.find((c: any) => c.id === (selectedContactId || contacts[0]?.id))?.name || "Select contact")}
+                    <ChevronDown className="w-3.5 h-3.5 opacity-40" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-80 p-1">
+                  <div className="max-h-[400px] overflow-y-auto">
+                    {contacts.map((c: any) => {
+                      const isActive = c.id === (selectedContactId || contacts[0]?.id);
+                      return (
+                        <button
+                          key={c.id}
+                          onClick={() => {
+                            setSelectedContactId(c.id);
+                            setActiveTab("contacts");
+                          }}
+                          className={`w-full text-left px-3 py-2.5 rounded-md transition-colors ${
+                            isActive ? "bg-primary/8 text-foreground" : "hover:bg-secondary text-foreground/65"
+                          }`}
+                        >
+                          <div className="font-medium text-caption">{c.name}</div>
+                          {c.title && <div className="text-micro text-foreground/40 mt-0.5">{c.title}</div>}
+                          {c.email && <div className="text-micro text-foreground/25 mt-0.5">{c.email}</div>}
+                        </button>
+                      );
+                    })}
                   </div>
-                ) : (
-                  contacts.map((c: any) => {
-                    const isSelected = c.id === (selectedContactId || contacts[0]?.id);
-                    return (
-                      <button
-                        key={c.id}
-                        onClick={() => {
-                          setSelectedContactId(c.id);
-                          setActiveTab("contacts");
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
-                          isSelected
-                            ? "bg-primary/10 text-foreground"
-                            : "hover:bg-secondary text-foreground/65"
-                        }`}
-                      >
-                        <div className="text-caption font-medium leading-tight">{c.name}</div>
-                        {c.title && (
-                          <div className="text-micro text-foreground/45 leading-tight">{c.title}</div>
-                        )}
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-              <div className="border-t border-border/30 mt-1 pt-1">
-                <button
-                  onClick={() => {
-                    setActiveTab("contacts");
-                    setAddContactOpen(true);
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-caption text-primary hover:bg-accent rounded-md transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Add contact
-                </button>
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
+                  <div className="border-t border-border/30 mt-1 pt-1">
+                    <button
+                      onClick={() => { setActiveTab("contacts"); setAddContactOpen(true); }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-caption text-primary hover:bg-accent rounded-md transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add contact
+                    </button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            ) : (
+              <button
+                onClick={() => { setActiveTab("contacts"); setAddContactOpen(true); }}
+                className="text-title text-foreground/30 hover:text-foreground/50 transition-colors"
+              >
+                + Add contact
+              </button>
+            )}
 
-        {setupRunning && (
-          <div className="flex items-center gap-3 px-4 py-3 mb-6 rounded-lg bg-primary/[0.06] border border-primary/10">
-            <Loader2 className="w-4 h-4 animate-spin text-primary flex-shrink-0" />
-            <div>
-              <div className="text-body font-medium text-foreground">Setting up {company.name}…</div>
-              {setupStep && <div className="text-caption text-foreground/45 mt-0.5">{setupStep}</div>}
+            <div className="ml-auto flex items-center gap-2">
+              {activeTab === "contacts" && effectiveContactId && (
+                <>
+                  <button
+                    onClick={() => {
+                      const c = contacts.find((c: any) => c.id === effectiveContactId);
+                      if (editingContactId === effectiveContactId) {
+                        setEditingContactId(null);
+                      } else {
+                        setEditingContactId(effectiveContactId);
+                        setEditRoleFocus((c as any)?.role_focus || "");
+                        setEditUserNotes((c as any)?.user_notes || "");
+                      }
+                    }}
+                    className="p-1.5 rounded text-foreground/20 hover:text-foreground hover:bg-secondary transition-colors"
+                    title="Edit contact"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setDeleteContactId(effectiveContactId)}
+                    className="p-1.5 rounded text-foreground/20 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                    title="Delete contact"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                  <Button
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => generateForContact(effectiveContactId)}
+                    disabled={!!generatingContactId || setupRunning}
+                  >
+                    {generatingContactId === effectiveContactId
+                      ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating…</>
+                      : <><Sparkles className="w-3.5 h-3.5" /> Generate</>}
+                  </Button>
+                  {storyBaseUrl && (
+                    <a href={storyBaseUrl} target="_blank" rel="noopener noreferrer">
+                      <Button size="sm" variant="outline" className="gap-1.5">
+                        <ExternalLink className="w-3.5 h-3.5" /> Story
+                      </Button>
+                    </a>
+                  )}
+                </>
+              )}
+              {activeTab === "company" && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="gap-1.5 text-foreground/30 hover:text-foreground"
+                  onClick={() => { setupRanRef.current = false; runCompanySetup(); }}
+                  disabled={setupRunning}
+                >
+                  {setupRunning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                  Refresh
+                </Button>
+              )}
             </div>
           </div>
-        )}
 
-        {/* ============ TAB 1: COMPANY ============ */}
-        <TabsContent value="company" className="space-y-8 mt-0">
-          <div className="flex items-center justify-between gap-3 pb-6">
-            <div className="flex items-center gap-2 flex-wrap text-caption text-foreground/45">
+          {activeTab === "company" ? (
+            <div className="flex items-center gap-2 pl-8 text-caption text-foreground/40">
               {company.domain && <span>{company.domain}</span>}
               {company.domain && <span className="text-foreground/15">·</span>}
               <Select
@@ -604,7 +660,7 @@ export default function CompanyDetail() {
                   queryClient.invalidateQueries({ queryKey: ["company", id] });
                 }}
               >
-                <SelectTrigger className="h-6 text-micro w-auto border-0 bg-transparent p-0 gap-1 text-foreground/45 hover:text-foreground [&>svg]:w-3 [&>svg]:h-3">
+                <SelectTrigger className="h-5 text-micro w-auto border-0 bg-transparent p-0 gap-1 text-foreground/40 hover:text-foreground [&>svg]:w-3 [&>svg]:h-3">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -621,7 +677,7 @@ export default function CompanyDetail() {
                   queryClient.invalidateQueries({ queryKey: ["company", id] });
                 }}
               >
-                <SelectTrigger className="h-6 text-micro w-auto border-0 bg-transparent p-0 gap-1 text-foreground/45 hover:text-foreground [&>svg]:w-3 [&>svg]:h-3">
+                <SelectTrigger className="h-5 text-micro w-auto border-0 bg-transparent p-0 gap-1 text-foreground/40 hover:text-foreground [&>svg]:w-3 [&>svg]:h-3">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -638,19 +694,21 @@ export default function CompanyDetail() {
                 </>
               )}
             </div>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 px-2 text-micro gap-1 text-foreground/25 hover:text-foreground"
-              onClick={() => { setupRanRef.current = false; runCompanySetup(); }}
-              disabled={setupRunning}
-            >
-              {setupRunning
-                ? <Loader2 className="w-3 h-3 animate-spin" />
-                : <RefreshCw className="w-3 h-3" />}
-              Refresh
-            </Button>
-          </div>
+          ) : effectiveContact ? (
+            <ContactMetaLine contact={effectiveContact} />
+          ) : null}
+        </div>
+
+        <TabsContent value="company" className="space-y-8 mt-0">
+          {setupRunning && (
+            <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-primary/[0.06] border border-primary/10">
+              <Loader2 className="w-4 h-4 animate-spin text-primary flex-shrink-0" />
+              <div>
+                <div className="text-body font-medium text-foreground">Setting up {company.name}…</div>
+                {setupStep && <div className="text-caption text-foreground/40 mt-0.5">{setupStep}</div>}
+              </div>
+            </div>
+          )}
 
           {/* Company profile — flat, no cards */}
           <div className="space-y-3">
@@ -986,9 +1044,11 @@ export default function CompanyDetail() {
             meetings={meetings}
             company={company}
           />
+
+
         </TabsContent>
 
-        <TabsContent value="contacts" className="mt-6">
+        <TabsContent value="contacts" className="mt-0">
           <ContactDetailView
             companyId={id!}
             company={company}
@@ -1012,8 +1072,6 @@ export default function CompanyDetail() {
             onSetDeleteContactId={setDeleteContactId}
             deletingContact={deletingContact}
             onConfirmDelete={() => deleteContactId && handleDeleteContact(deleteContactId)}
-            generatingContactId={generatingContactId}
-            onGenerateForContact={generateForContact}
             setupRunning={setupRunning}
             companyCards={companyCards}
             cardsLoading={cardsLoading}
@@ -1021,8 +1079,71 @@ export default function CompanyDetail() {
             onRegenerateSection={(section) => regenerateSection(section as any)}
           />
         </TabsContent>
-
       </Tabs>
+    </div>
+  );
+}
+
+function ContactMetaLine({ contact }: { contact: any }) {
+  const hp = (contact.hubspot_properties as any) || {};
+  const isCreator = !!hp.first_tutorial_create_date;
+  const isViewer = !!(hp.first_tutorial_view_date || hp.first_tutorial_learn_date);
+  const hasExtension = parseInt(hp.extension_connections || "0", 10) > 0;
+  const cp = contact.contact_profile || {};
+
+  return (
+    <div className="pl-8 space-y-1">
+      <div className="flex items-center gap-3 text-caption text-foreground/40">
+        {contact.email && (
+          <a href={`mailto:${contact.email}`} className="hover:text-primary transition-colors">
+            {contact.email}
+          </a>
+        )}
+        {contact.linkedin && (
+          <a href={contact.linkedin} target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors flex items-center gap-1">
+            <Linkedin className="w-3 h-3" /> LinkedIn
+          </a>
+        )}
+        {contact.title && (
+          <>
+            <span className="text-foreground/15">·</span>
+            <span>{contact.title}</span>
+          </>
+        )}
+      </div>
+
+      <div className="flex items-center gap-1.5 pl-0">
+        {isCreator && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-micro font-medium bg-primary/10 text-primary border border-primary/20">
+            Creator
+          </span>
+        )}
+        {isViewer && !isCreator && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-micro font-medium bg-secondary text-foreground/50 border border-border/40">
+            Viewer
+          </span>
+        )}
+        {hasExtension && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-micro font-medium bg-secondary text-foreground/50 border border-border/40">
+            Extension
+          </span>
+        )}
+        {!isCreator && !isViewer && !hasExtension && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-micro font-medium text-foreground/25 border border-border/30 border-dashed">
+            No product usage
+          </span>
+        )}
+        {cp.key_metrics?.tutorials_created !== undefined && (
+          <span className="text-micro text-foreground/30">
+            {cp.key_metrics.tutorials_created} created
+          </span>
+        )}
+        {cp.key_metrics?.tutorials_viewed !== undefined && (
+          <span className="text-micro text-foreground/30">
+            {cp.key_metrics.tutorials_viewed} viewed
+          </span>
+        )}
+      </div>
     </div>
   );
 }
