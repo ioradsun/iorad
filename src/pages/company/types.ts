@@ -3,7 +3,9 @@ import { Json } from "@/integrations/supabase/types";
 export interface ScoreBreakdown {
   relevance?: number; urgency?: number; buyer_signal?: number;
   hiring?: number; news?: number; expansion?: number;
+  tutorial?: number; commercial?: number; recency?: number; intent?: number;
   rules_fired?: string[]; evidence_urls?: string[];
+  [key: string]: number | string[] | undefined;
 }
 
 export interface SnapshotJSON {
