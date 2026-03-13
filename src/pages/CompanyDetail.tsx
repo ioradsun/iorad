@@ -569,9 +569,9 @@ export default function CompanyDetail() {
     if (hasProfile && hasStrategy && hasOutreach) return;
 
     // 7-day skip: if contact cards were updated recently, refresh silently
-    const cardUpdatedAt = companyCards?.updated_at;
-    const daysSinceCardUpdate = cardUpdatedAt
-      ? (Date.now() - new Date(cardUpdatedAt).getTime()) / (1000 * 60 * 60 * 24)
+    const cardCreatedAt = companyCards?.created_at;
+    const daysSinceCardUpdate = cardCreatedAt
+      ? (Date.now() - new Date(cardCreatedAt).getTime()) / (1000 * 60 * 60 * 24)
       : Infinity;
 
     if (daysSinceCardUpdate < 7 && (hasStrategy || hasOutreach)) {
