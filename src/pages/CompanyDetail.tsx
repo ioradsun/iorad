@@ -29,6 +29,7 @@ export default function CompanyDetail() {
   const { data: meetings = [] } = useMeetings(id);
   const { data: activityEvents = [] } = useCustomerActivity(id);
   const updateCompany = useUpdateCompany();
+  const trackRecent = useTrackRecent();
   const queryClient = useQueryClient();
   const [regenerating, setRegenerating] = useState(false);
   const [deleteContactId, setDeleteContactId] = useState<string | null>(null);
