@@ -7,7 +7,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { motion } from "framer-motion";
 import { toast } from "sonner";
 import HubSpotPickerModal from "@/components/HubSpotPickerModal";
 import ImportStatusBanner from "@/components/ImportStatusBanner";
@@ -136,6 +135,7 @@ export default function Dashboard() {
   const [partnerFilter, setPartnerFilter] = useState<string>("all");
   const [activeTab, setActiveTab] = useState<CategoryTab>("business");
   const [stageFilter, setStageFilter] = useState<StageFilter>("all");
+  const [visibleCount, setVisibleCount] = useState(50);
 
   // Phase 1: fast first page (50 companies for current tab) — renders immediately
   const { data: firstPage = [], isLoading: firstPageLoading } = useCompaniesPage(activeTab);
@@ -237,6 +237,12 @@ export default function Dashboard() {
     return list;
   }, [search, sorted, byCategory, activeTab, stageFilter]);
 
+
+  // Reset pagination when tab/search/filter changes
+  useEffect(() => {
+    setVisibleCount(50);
+  }, [activeTab, search, stageFilter, partnerFilter]);
+
   const partners = useMemo(() => {
     const set = new Set(companies.map(c => c.partner).filter(Boolean) as string[]);
     return Array.from(set).sort();
@@ -268,7 +274,7 @@ export default function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="max-w-6xl mx-auto px-1 space-y-8">
+      <div className="max-w-6xl mx-auto px-1 space-y-6">
         <div className="grid grid-cols-3 gap-3 pt-1">
           {[1, 2, 3].map(i => (
             <div key={i} className="bg-card rounded-lg px-5 py-4 animate-pulse">
@@ -285,7 +291,6 @@ export default function Dashboard() {
                 <div className="h-3 bg-foreground/[0.04] rounded w-32" />
               </div>
               <div className="h-5 bg-foreground/[0.04] rounded w-16" />
-              <div className="h-5 bg-foreground/[0.04] rounded w-12" />
             </div>
           ))}
         </div>
@@ -294,6 +299,8 @@ export default function Dashboard() {
   }
 
   const stageFilters: StageFilter[] = ["all", "prospect", "active_opp", "customer", "expansion"];
+  const visibleList = activeList.slice(0, visibleCount);
+  const hasMore = activeList.length > visibleCount;
 
   return (
     <div className="max-w-6xl mx-auto px-1 space-y-8">
@@ -467,12 +474,9 @@ export default function Dashboard() {
             </tr>
           </thead>
           <tbody>
-            {activeList.map((company, i) => (
-              <motion.tr
+            {visibleList.map((company) => (
+              <tr
                 key={company.id}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: Math.min(i * 0.015, 0.4) }}
                 className="group relative cursor-pointer transition-colors border-b border-border/30 hover:border-border/50 hover:bg-secondary/50"
                 onClick={() => navigate(`/company/${company.id}`)}
               >
@@ -528,9 +532,9 @@ export default function Dashboard() {
                     </Link>
                   )}
                 </td>
-              </motion.tr>
+              </tr>
             ))}
-            {activeList.length === 0 && (
+            {visibleList.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-5 py-16 text-center text-sm text-muted-foreground">
                   {companies.length === 0
@@ -542,6 +546,17 @@ export default function Dashboard() {
           </tbody>
         </table>
       </div>
+
+      {hasMore && (
+        <div className="flex justify-center py-4">
+          <button
+            onClick={() => setVisibleCount(prev => prev + 50)}
+            className="text-caption text-primary hover:text-primary/80 font-medium transition-colors"
+          >
+            Show more ({activeList.length - visibleCount} remaining)
+          </button>
+        </div>
+      )}
 
       <HubSpotPickerModal open={hubspotPickerOpen} onClose={() => setHubspotPickerOpen(false)} />
     </div>
