@@ -694,7 +694,7 @@ export default function CompanyDetail() {
     }
 
     return () => observers.forEach((observer) => observer.disconnect());
-  }, [viewMode, effectiveContactId]);
+  }, [viewMode, effectiveContactId, companyCards, cardsLoading]);
 
   useEffect(() => {
     if (viewMode !== "contact") return;
