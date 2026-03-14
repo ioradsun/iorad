@@ -10,7 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useRecentCompanies } from "@/hooks/useRecentCompanies";
-import { useContacts } from "@/hooks/useSupabase";
+import { useContacts, useContactIdsWithStories } from "@/hooks/useSupabase";
 import { useRecentContacts } from "@/hooks/useRecentContacts";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -41,6 +41,7 @@ export default function AppSidebar() {
   const companyMatch = location.pathname.match(/^\/company\/([^/?#]+)/);
   const companyId = companyMatch ? companyMatch[1] : null;
   const { data: companyContacts = [] } = useContacts(companyId || undefined);
+  const { data: storyContactIds } = useContactIdsWithStories(companyId || undefined);
   const currentCompany = recents.find((r) => r.company_id === companyId);
   const { recentContactIds, trackContact, isRecent } = useRecentContacts(companyId);
 
@@ -190,6 +191,9 @@ export default function AppSidebar() {
                         : "text-foreground/40 hover:text-foreground/70 hover:bg-secondary/50"
                     }`}
                   >
+                    {storyContactIds?.has(c.id) && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                    )}
                     <div className="min-w-0 flex-1">
                       <div className="text-caption font-medium truncate">{c.name}</div>
                       {c.title && <div className="text-micro text-foreground/20 truncate">{c.title}</div>}

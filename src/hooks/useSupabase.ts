@@ -128,6 +128,35 @@ export function useContacts(companyId: string | undefined) {
   });
 }
 
+export function useContactIdsWithStories(companyId: string | undefined) {
+  return useQuery({
+    queryKey: ["contact_story_ids", companyId],
+    enabled: !!companyId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("company_cards")
+        .select("contact_id, account_json")
+        .eq("company_id", companyId!)
+        .not("contact_id", "is", null);
+
+      if (error) throw error;
+
+      const ids = new Set<string>();
+      for (const row of data || []) {
+        if (!row.contact_id) continue;
+        const json = row.account_json as Record<string, unknown> | null;
+        if (!json) continue;
+        if ((json as any)._type || (json as any).opening_hook || (json as any).behavior_acknowledged) {
+          ids.add(row.contact_id);
+        }
+      }
+
+      return ids;
+    },
+    staleTime: 30_000,
+  });
+}
+
 // ---- Snapshots ----
 export function useSnapshots(companyId: string | undefined) {
   return useQuery({
