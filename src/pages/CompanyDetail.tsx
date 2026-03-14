@@ -7,6 +7,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import ScoreCell from "@/components/ScoreCell";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ExternalLink, Loader2, ChevronRight, Plus, X, CheckCircle2, AlertCircle, RefreshCw, Sparkles } from "lucide-react";
 import { Json } from "@/integrations/supabase/types";
@@ -1450,6 +1453,26 @@ export default function CompanyDetail() {
                 )}
               </div>
           </section>
+
+          {/* Add Contact dialog — company view */}
+          <Dialog open={addContactOpen} onOpenChange={setAddContactOpen}>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Add Contact</DialogTitle></DialogHeader>
+              <div className="space-y-3">
+                <div><Label>Name *</Label><Input value={newContact.name} onChange={e => setNewContact(p => ({ ...p, name: e.target.value }))} placeholder="Jane Smith" /></div>
+                <div><Label>Title</Label><Input value={newContact.title} onChange={e => setNewContact(p => ({ ...p, title: e.target.value }))} placeholder="VP of Learning" /></div>
+                <div><Label>Email</Label><Input type="email" value={newContact.email} onChange={e => setNewContact(p => ({ ...p, email: e.target.value }))} placeholder="jane@company.com" /></div>
+                <div><Label>LinkedIn</Label><Input value={newContact.linkedin} onChange={e => setNewContact(p => ({ ...p, linkedin: e.target.value }))} placeholder="https://linkedin.com/in/..." /></div>
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button variant="ghost" onClick={() => setAddContactOpen(false)}>Cancel</Button>
+                  <Button onClick={handleAddContact} disabled={savingContact || !newContact.name.trim()}>
+                    {savingContact ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                    Add Contact
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       ) : (
         <div>
