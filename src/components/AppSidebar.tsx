@@ -172,7 +172,7 @@ export default function AppSidebar() {
                   value={contactSearch}
                   onChange={(e) => setContactSearch(e.target.value)}
                   onClear={() => setContactSearch("")}
-                  className="w-full h-6 px-2 text-micro bg-secondary/50 border border-border/30 rounded text-foreground placeholder:text-foreground/25 focus:outline-none focus:ring-1 focus:ring-primary/30"
+                  className="w-full h-6 px-0 text-micro bg-transparent border-0 border-b border-border/20 rounded-none text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-foreground/30 transition-colors"
                 />
               </div>
             )}
