@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Menu } from "lucide-react";
 import AppSidebar from "@/components/AppSidebar";
@@ -9,6 +9,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isMobile = useMobile();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
+  const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     if (drawerOpen) {
@@ -16,8 +17,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [location.pathname, location.search, drawerOpen]);
 
+  useEffect(() => {
+    mainRef.current?.scrollTo(0, 0);
+  }, [location.pathname, location.search]);
+
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="h-screen bg-background flex overflow-hidden">
       {!isMobile && <AppSidebar />}
 
       {isMobile && (
@@ -28,7 +33,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </Sheet>
       )}
 
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         {isMobile && (
           <header className="sticky top-0 z-40 flex items-center h-12 px-4 border-b border-border/30 bg-background safe-top">
             <button
@@ -41,8 +46,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </header>
         )}
 
-        <main className="flex-1 min-w-0 px-4 md:px-6 py-6 md:py-8 max-w-5xl mx-auto w-full">
-          {children}
+        <main ref={mainRef} className="flex-1 min-w-0 overflow-y-auto">
+          <div className="px-4 md:px-6 py-6 md:py-8 max-w-5xl mx-auto w-full">
+            {children}
+          </div>
         </main>
       </div>
     </div>
