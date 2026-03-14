@@ -118,66 +118,68 @@ export default function AppSidebar({ onNavigate }: { onNavigate?: () => void } =
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
+      <nav className={`flex-1 min-h-0 px-2 py-3 ${companyId ? "flex flex-col overflow-hidden" : "overflow-y-auto space-y-1"}`}>
         {companyId ? (
           <>
-            {/* Company name doubles as back button — single truncated line */}
-            <button
-              onClick={() => navigate("/")}
-              className="flex items-center gap-1.5 px-3 py-2 text-micro text-foreground/30 hover:text-foreground/50 transition-colors w-full"
-            >
-              <ChevronLeft className="w-3 h-3 shrink-0" />
-              <span className="truncate">{currentCompany?.company_name || "Company"}</span>
-            </button>
-
-            {/* Overview + Contacts header + add button — single row */}
-            <div className="flex items-center gap-2 px-3 pb-1.5">
-              <Link
-                to={`/company/${companyId}`}
-                className={`text-micro font-medium transition-colors ${
-                  location.pathname === `/company/${companyId}` && !location.search.includes("contact=")
-                    ? "text-foreground"
-                    : "text-foreground/25 hover:text-foreground/50"
-                }`}
+            <div className="shrink-0 space-y-1">
+              {/* Company name doubles as back button — single truncated line */}
+              <button
+                onClick={() => navigate("/")}
+                className="flex items-center gap-1.5 px-3 py-2 text-micro text-foreground/30 hover:text-foreground/50 transition-colors w-full"
               >
-                Overview
-              </Link>
-              <span className="text-foreground/10">·</span>
-              <span className="text-micro text-foreground/25">
-                {companyContacts.length > 0 ? `${companyContacts.length} contacts` : "Contacts"}
-              </span>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => {
-                      const params = new URLSearchParams(window.location.search);
-                      params.set("addContact", "true");
-                      navigate(`/company/${companyId}?${params.toString()}`);
-                      onNavigate?.();
-                    }}
-                    className="text-foreground/25 hover:text-primary transition-colors p-0.5 rounded hover:bg-secondary/50 ml-auto"
-                  >
-                    <Plus className="w-3 h-3" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="text-xs">Add contact</TooltipContent>
-              </Tooltip>
+                <ChevronLeft className="w-3 h-3 shrink-0" />
+                <span className="truncate">{currentCompany?.company_name || "Company"}</span>
+              </button>
+
+              {/* Overview + Contacts header + add button — single row */}
+              <div className="flex items-center gap-2 px-3 pb-1.5">
+                <Link
+                  to={`/company/${companyId}`}
+                  className={`text-micro font-medium transition-colors ${
+                    location.pathname === `/company/${companyId}` && !location.search.includes("contact=")
+                      ? "text-foreground"
+                      : "text-foreground/25 hover:text-foreground/50"
+                  }`}
+                >
+                  Overview
+                </Link>
+                <span className="text-foreground/10">·</span>
+                <span className="text-micro text-foreground/25">
+                  {companyContacts.length > 0 ? `${companyContacts.length} contacts` : "Contacts"}
+                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => {
+                        const params = new URLSearchParams(window.location.search);
+                        params.set("addContact", "true");
+                        navigate(`/company/${companyId}?${params.toString()}`);
+                        onNavigate?.();
+                      }}
+                      className="text-foreground/25 hover:text-primary transition-colors p-0.5 rounded hover:bg-secondary/50 ml-auto"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="text-xs">Add contact</TooltipContent>
+                </Tooltip>
+              </div>
+
+              {/* Search — underline style, only if enough contacts */}
+              {companyContacts.length > 3 && (
+                <div className="px-3 pb-1.5">
+                  <input
+                    type="text"
+                    placeholder="Filter…"
+                    value={contactSearch}
+                    onChange={(e) => setContactSearch(e.target.value)}
+                    className="w-full h-5 px-0 text-micro bg-transparent border-0 border-b border-border/15 rounded-none text-foreground placeholder:text-foreground/15 focus:outline-none focus:border-foreground/25 transition-colors"
+                  />
+                </div>
+              )}
             </div>
 
-            {/* Search — underline style, only if enough contacts */}
-            {companyContacts.length > 3 && (
-              <div className="px-3 pb-1.5">
-                <input
-                  type="text"
-                  placeholder="Filter…"
-                  value={contactSearch}
-                  onChange={(e) => setContactSearch(e.target.value)}
-                  className="w-full h-5 px-0 text-micro bg-transparent border-0 border-b border-border/15 rounded-none text-foreground placeholder:text-foreground/15 focus:outline-none focus:border-foreground/25 transition-colors"
-                />
-              </div>
-            )}
-
-            <div className="overflow-y-auto space-y-0.5 scrollbar-thin">
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-0.5 scrollbar-thin">
               {sortContactsByActivity(filteredContacts).map((c: any) => {
                 const isSelected = selectedContactId === c.id;
                 const activity = getContactActivity((c.hubspot_properties as any) || null);
