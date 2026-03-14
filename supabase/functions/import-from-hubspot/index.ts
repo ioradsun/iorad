@@ -243,15 +243,17 @@ Deno.serve(async (req) => {
   }
 });
 
-// Fetch a single company from HubSpot by ID — pull ALL properties
+// Fetch a single company from HubSpot by ID using essential properties only
 async function fetchHubSpotCompany(objectId: string | number) {
   const apiKey = Deno.env.get("HUBSPOT_API_KEY");
   if (!apiKey) throw new Error("HUBSPOT_API_KEY not configured");
 
-  const allProps = await getAllCompanyPropertyNames(apiKey);
-  const properties = allProps.length > 0
-    ? allProps
-    : ["name", "domain", "industry", "country", "numberofemployees", "hubspot_owner_id"];
+  const ESSENTIAL_PROPS = [
+    "name", "domain", "industry", "country", "numberofemployees",
+    "lifecyclestage", "hubspot_owner_id", "hs_object_id",
+    "hs_lastmodifieddate", "createdate",
+  ];
+  const properties = ESSENTIAL_PROPS;
 
   // Use POST batch read instead of GET to avoid URL length limits
   const res = await hubspotFetch("https://api.hubapi.com/crm/v3/objects/companies/batch/read", {
@@ -1179,8 +1181,18 @@ async function upsertCompany(supabase: any, hubspotCompany: any): Promise<{ comp
   const name = (props.name || "").trim() || domain || "";
   if (!name) throw new Error("No company name or domain");
 
-  // Fetch associated deals for accurate stage derivation
-  const deals = await fetchDealsForCompany(hubspotCompany.id, apiKey);
+  // Fetch associated deals for accurate stage derivation, but avoid blocking sync
+  let deals = { hasClosedWon: false, hasOpenDeal: false, dealCount: 0 };
+  try {
+    const dealPromise = fetchDealsForCompany(hubspotCompany.id, apiKey);
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("deal fetch timeout")), 5000)
+    );
+    deals = await Promise.race([dealPromise, timeoutPromise]);
+  } catch (e: any) {
+    console.warn(`upsertCompany: deal fetch skipped for ${hubspotCompany.id}: ${e.message}`);
+    // Falls back to lifecycle-stage-only derivation, which is fine
+  }
 
   const companyData: Record<string, any> = {
     name,
@@ -1368,6 +1380,12 @@ async function importContactsForCompany(supabase: any, hubspotCompanyId: string 
       contactIds.push(...ids);
       after = data.paging?.next?.after || null;
     } while (after);
+
+    // Cap at 200 contacts for single-company sync to avoid timeout
+    if (contactIds.length > 200) {
+      console.warn(`importContactsForCompany: capping ${contactIds.length} contacts to 200 for ${hubspotCompanyId}`);
+      contactIds.length = 200;
+    }
 
     if (contactIds.length === 0) return;
 

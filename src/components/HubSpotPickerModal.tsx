@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Search, Loader2, Check, Building2, RefreshCw } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { ClearableInput } from "@/components/ui/clearable-input";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -91,7 +91,12 @@ export default function HubSpotPickerModal({ open, onClose }: Props) {
       await qc.invalidateQueries({ queryKey: ["companies"] });
       toast.success(`${company.name} ${data.is_new ? "added to" : "updated in"} Scout`);
     } catch (err: any) {
-      toast.error(`Failed to sync ${company.name}: ${err?.message}`);
+      const msg = err?.message || "Unknown error";
+      if (msg.includes("non-2xx") || msg.includes("timeout")) {
+        toast.error(`${company.name} has too many records to sync instantly. It will be picked up by the next automatic sync.`);
+      } else {
+        toast.error(`Failed to sync ${company.name}: ${msg}`);
+      }
     } finally {
       setSyncing(prev => ({ ...prev, [company.hubspot_id]: false }));
     }
@@ -117,12 +122,18 @@ export default function HubSpotPickerModal({ open, onClose }: Props) {
         <div className="px-6 py-3 border-b border-border shrink-0">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
+            <ClearableInput
               autoFocus
-              placeholder="Search by company name or domain…"
+              placeholder="Search HubSpot companies…"
               value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-9 bg-secondary border-0 focus-visible:ring-1 focus-visible:ring-ring/30"
+              onChange={e => {
+                setSearch(e.target.value);
+              }}
+              onClear={() => {
+                setSearch("");
+                fetchCompanies("");
+              }}
+              className="pl-9 bg-secondary/50 border-border/50 h-10"
             />
           </div>
         </div>
