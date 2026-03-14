@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Building2, Signal, ChevronLeft,
-  LogOut, Shield, Briefcase, GraduationCap, Handshake, Info, Plus, RefreshCw,
+  LogOut, Shield, Briefcase, GraduationCap, Handshake, Plus, RefreshCw,
 } from "lucide-react";
 import ioradLogoDark from "@/assets/iorad-logo-new.png";
 import ioradLogoLight from "@/assets/iorad-logo-light.png";
@@ -21,7 +21,6 @@ import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { getContactActivity, sortContactsByActivity } from "@/lib/contactScore";
-import { ClearableInput } from "@/components/ui/clearable-input";
 
 const categoryItems = [
   { key: "business", label: "Business", icon: Briefcase },
@@ -121,32 +120,30 @@ export default function AppSidebar() {
       <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
         {companyId ? (
           <>
+            {/* Company name doubles as back button — single truncated line */}
             <button
               onClick={() => navigate("/")}
-              className="flex items-center gap-2 px-3 py-1.5 text-caption text-foreground/30 hover:text-foreground/60 transition-colors w-full"
+              className="flex items-center gap-1.5 px-3 py-2 text-micro text-foreground/30 hover:text-foreground/50 transition-colors w-full"
             >
-              <ChevronLeft className="w-3.5 h-3.5" />
-              <span>Companies</span>
+              <ChevronLeft className="w-3 h-3 shrink-0" />
+              <span className="truncate">{currentCompany?.company_name || "Company"}</span>
             </button>
 
-            <div className="my-2 border-t border-border/20" />
-
-            <div className="text-micro font-semibold uppercase tracking-wider text-foreground/40 px-3 pb-1">
-              {currentCompany?.company_name || "Company"}
-            </div>
-
-            <NavItem
-              to={`/company/${companyId}`}
-              icon={Info}
-              label="Overview"
-              active={location.pathname === `/company/${companyId}` && !location.search.includes("contact=")}
-            />
-
-            <div className="my-2 border-t border-border/20" />
-
-            <div className="flex items-center justify-between px-3 pb-1">
-              <span className="text-micro font-medium uppercase tracking-wider text-foreground/25">
-                Contacts {companyContacts.length > 0 && `(${companyContacts.length})`}
+            {/* Overview + Contacts header + add button — single row */}
+            <div className="flex items-center gap-2 px-3 pb-1.5">
+              <Link
+                to={`/company/${companyId}`}
+                className={`text-micro font-medium transition-colors ${
+                  location.pathname === `/company/${companyId}` && !location.search.includes("contact=")
+                    ? "text-foreground"
+                    : "text-foreground/25 hover:text-foreground/50"
+                }`}
+              >
+                Overview
+              </Link>
+              <span className="text-foreground/10">·</span>
+              <span className="text-micro text-foreground/25">
+                {companyContacts.length > 0 ? `${companyContacts.length} contacts` : "Contacts"}
               </span>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -156,7 +153,7 @@ export default function AppSidebar() {
                       params.set("addContact", "true");
                       navigate(`/company/${companyId}?${params.toString()}`);
                     }}
-                    className="text-foreground/25 hover:text-primary transition-colors p-0.5 rounded hover:bg-secondary/50"
+                    className="text-foreground/25 hover:text-primary transition-colors p-0.5 rounded hover:bg-secondary/50 ml-auto"
                   >
                     <Plus className="w-3 h-3" />
                   </button>
@@ -165,14 +162,15 @@ export default function AppSidebar() {
               </Tooltip>
             </div>
 
+            {/* Search — underline style, only if enough contacts */}
             {companyContacts.length > 3 && (
-              <div className="px-3 pb-1">
-                <ClearableInput
-                  placeholder="Search contacts…"
+              <div className="px-3 pb-1.5">
+                <input
+                  type="text"
+                  placeholder="Filter…"
                   value={contactSearch}
                   onChange={(e) => setContactSearch(e.target.value)}
-                  onClear={() => setContactSearch("")}
-                  className="w-full h-6 px-0 text-micro bg-transparent border-0 border-b border-border/20 rounded-none text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-foreground/30 transition-colors"
+                  className="w-full h-5 px-0 text-micro bg-transparent border-0 border-b border-border/15 rounded-none text-foreground placeholder:text-foreground/15 focus:outline-none focus:border-foreground/25 transition-colors"
                 />
               </div>
             )}
