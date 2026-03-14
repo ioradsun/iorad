@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -16,7 +16,7 @@ const Dashboard = React.lazy(() => import("@/pages/Dashboard"));
 const UploadPage = React.lazy(() => import("@/pages/Upload"));
 const CompanyDetail = React.lazy(() => import("@/pages/CompanyDetail"));
 const AdminSettings = React.lazy(() => import("@/pages/AdminSettings"));
-const JobHistory = React.lazy(() => import("@/pages/JobHistory"));
+const HubSpotStatus = React.lazy(() => import("@/pages/HubSpotStatus"));
 const InternalSignals = React.lazy(() => import("@/pages/InternalSignals"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
@@ -58,7 +58,8 @@ const App = () => (
                           <Route path="/company/:id" element={<CompanyDetail />} />
                           <Route path="/settings" element={<AdminSettings />} />
                           <Route path="/signals" element={<InternalSignals />} />
-                          <Route path="/jobs" element={<JobHistory />} />
+                          <Route path="/hubspot" element={<HubSpotStatus />} />
+                          <Route path="/jobs" element={<Navigate to="/hubspot" replace />} />
                           <Route path="*" element={<NotFound />} />
                         </Routes>
                       </AppLayout>

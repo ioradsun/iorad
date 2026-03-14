@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Building2, Signal, ChevronLeft,
-  LogOut, Shield, Briefcase, GraduationCap, Handshake, Info, Plus,
+  LogOut, Shield, Briefcase, GraduationCap, Handshake, Info, Plus, RefreshCw,
 } from "lucide-react";
 import ioradLogoDark from "@/assets/iorad-logo-new.png";
 import ioradLogoLight from "@/assets/iorad-logo-light.png";
@@ -273,6 +273,12 @@ export default function AppSidebar() {
                 <Link to="/signals" className="flex items-center gap-2 cursor-pointer">
                   <Signal className="w-4 h-4" />
                   Feedback
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/hubspot" className="flex items-center gap-2 cursor-pointer">
+                  <RefreshCw className="w-4 h-4" />
+                  HubSpot Sync
                 </Link>
               </DropdownMenuItem>
               {isAdmin && (
