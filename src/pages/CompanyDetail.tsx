@@ -979,7 +979,7 @@ export default function CompanyDetail() {
                   </p>
                 )}
                 {company.scout_summary && (
-                  <p className="text-caption text-foreground/40 leading-relaxed italic">
+                  <p className="text-caption text-foreground/40 leading-relaxed">
                     {company.scout_summary}
                   </p>
                 )}
@@ -1155,7 +1155,7 @@ export default function CompanyDetail() {
                           <div className="space-y-1.5 pt-2">
                             <div className="field-label">Evidence</div>
                             {snippets.map((snippet, i) => (
-                              <p key={i} className="text-caption text-foreground/40 italic pl-3 border-l border-border/20">
+                              <p key={i} className="text-caption text-foreground/40 pl-3 border-l border-border/20">
                                 {snippet}
                               </p>
                             ))}
@@ -1285,7 +1285,7 @@ export default function CompanyDetail() {
                                 </div>
                               ) : null}
                               {snap.partner_platform_ceiling.key_insight && (
-                                <p className="text-body text-foreground/60 italic">{snap.partner_platform_ceiling.key_insight}</p>
+                                <p className="text-body text-foreground/60">{snap.partner_platform_ceiling.key_insight}</p>
                               )}
                             </div>
                           </AccordionContent>
@@ -1365,19 +1365,19 @@ export default function CompanyDetail() {
                               {snap.outbound_positioning.executive_framing && (
                                 <div className="py-2">
                                   <div className="field-label">Executive Framing</div>
-                                  <p className="text-body text-foreground/60 italic">{snap.outbound_positioning.executive_framing}</p>
+                                  <p className="text-body text-foreground/60">{snap.outbound_positioning.executive_framing}</p>
                                 </div>
                               )}
                               {snap.outbound_positioning.efficiency_framing && (
                                 <div className="py-2">
                                   <div className="field-label">Efficiency / Revenue</div>
-                                  <p className="text-body text-foreground/60 italic">{snap.outbound_positioning.efficiency_framing}</p>
+                                  <p className="text-body text-foreground/60">{snap.outbound_positioning.efficiency_framing}</p>
                                 </div>
                               )}
                               {snap.outbound_positioning.risk_framing && (
                                 <div className="py-2">
                                   <div className="field-label">Risk Mitigation</div>
-                                  <p className="text-body text-foreground/60 italic">{snap.outbound_positioning.risk_framing}</p>
+                                  <p className="text-body text-foreground/60">{snap.outbound_positioning.risk_framing}</p>
                                 </div>
                               )}
                             </div>
@@ -1409,7 +1409,7 @@ export default function CompanyDetail() {
                             <div className="space-y-2">
                               {snap.evidence.map((ev, i) => (
                                 <div key={i} className="py-2 border-b border-border/10 last:border-0">
-                                  <p className="text-caption text-foreground/40 italic">{ev.snippet || ev.detail}</p>
+                                  <p className="text-caption text-foreground/40">{ev.snippet || ev.detail}</p>
                                   <a href={ev.source_url || ev.url || "#"} target="_blank" rel="noopener noreferrer" className="text-micro text-primary/60 hover:text-primary transition-colors mt-0.5 inline-flex items-center gap-1">
                                     <ExternalLink className="w-3 h-3" />
                                     {ev.source_type || ev.signal_type || "source"} · {ev.date || "no date"}
