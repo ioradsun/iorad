@@ -29,7 +29,7 @@ const categoryItems = [
   { key: "partner", label: "Partner", icon: Handshake },
 ];
 
-export default function AppSidebar() {
+export default function AppSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const [contactSearch, setContactSearch] = useState("");
   const { user, signOut } = useAuth();
   const isAdmin = useIsAdmin();
@@ -97,6 +97,7 @@ export default function AppSidebar() {
   const NavItem = ({ to, icon: Icon, label, active }: { to: string; icon: any; label: string; active: boolean }) => (
     <Link
       to={to}
+      onClick={() => onNavigate?.()}
       className={`flex items-center gap-3 px-3 py-2 rounded-lg text-caption font-medium transition-colors ${
         active
           ? "bg-secondary text-foreground"
@@ -109,10 +110,10 @@ export default function AppSidebar() {
   );
 
   return (
-    <aside className="w-56 shrink-0 border-r border-border/50 bg-background flex flex-col h-screen sticky top-0 overflow-hidden">
+    <aside className="w-56 md:w-56 shrink-0 border-r border-border/50 bg-background flex flex-col h-screen sticky top-0 overflow-hidden max-md:w-full max-md:border-r-0 max-md:h-full">
       {/* Logo */}
       <div className="flex items-center px-3 h-12 border-b border-border/30">
-        <Link to="/" className="flex items-center gap-2">
+        <Link to="/" onClick={() => onNavigate?.()} className="flex items-center gap-2">
           <img src={ioradLogo} alt="iorad" className="h-6 w-auto object-contain" />
         </Link>
       </div>
@@ -122,7 +123,10 @@ export default function AppSidebar() {
         {companyId ? (
           <>
             <button
-              onClick={() => navigate("/")}
+              onClick={() => {
+                navigate("/");
+                onNavigate?.();
+              }}
               className="flex items-center gap-2 px-3 py-1.5 text-caption text-foreground/30 hover:text-foreground/60 transition-colors w-full"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
@@ -155,8 +159,9 @@ export default function AppSidebar() {
                       const params = new URLSearchParams(window.location.search);
                       params.set("addContact", "true");
                       navigate(`/company/${companyId}?${params.toString()}`);
+                      onNavigate?.();
                     }}
-                    className="text-foreground/25 hover:text-primary transition-colors p-0.5 rounded hover:bg-secondary/50"
+                    className="text-foreground/25 hover:text-primary transition-colors p-2 md:p-0.5 rounded hover:bg-secondary/50"
                   >
                     <Plus className="w-3 h-3" />
                   </button>
@@ -184,8 +189,11 @@ export default function AppSidebar() {
                 return (
                   <button
                     key={c.id}
-                    onClick={() => navigate(`/company/${companyId}?contact=${c.id}`)}
-                    className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-left transition-colors ${
+                    onClick={() => {
+                      navigate(`/company/${companyId}?contact=${c.id}`);
+                      onNavigate?.();
+                    }}
+                    className={`w-full flex items-center gap-2 px-3 py-2.5 md:py-1.5 rounded-lg text-left transition-colors ${
                       isSelected
                         ? "bg-secondary text-foreground"
                         : "text-foreground/40 hover:text-foreground/70 hover:bg-secondary/50"
@@ -241,7 +249,10 @@ export default function AppSidebar() {
                 {recents.map((r) => (
                   <button
                     key={r.company_id}
-                    onClick={() => navigate(`/company/${r.company_id}`)}
+                    onClick={() => {
+                      navigate(`/company/${r.company_id}`);
+                      onNavigate?.();
+                    }}
                     className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-caption transition-colors text-left ${
                       location.pathname === `/company/${r.company_id}`
                         ? "bg-secondary text-foreground font-medium"
@@ -260,7 +271,7 @@ export default function AppSidebar() {
 
       {/* Profile at bottom */}
       {user && (
-        <div className="border-t border-border/30 p-2">
+        <div className="border-t border-border/30 p-2 safe-bottom">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="w-full flex items-center gap-2 rounded-lg p-2 hover:bg-secondary transition-colors focus:outline-none">
