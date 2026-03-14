@@ -143,7 +143,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-5">
-      <div className="relative max-w-xl mb-2">
+      <div className="relative max-w-xl mb-2 max-md:max-w-full">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/25 z-10" />
         <ClearableInput
           placeholder="Search companies…"
@@ -154,7 +154,51 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="rounded-lg border border-border/30 bg-card overflow-hidden">
+      <div className="md:hidden space-y-2">
+        {visibleList.map((company) => (
+          <button
+            key={company.id}
+            onClick={() => navigate(`/company/${company.id}`)}
+            className="w-full flex items-center gap-3 p-3 rounded-lg border border-border/20 bg-card text-left active:bg-secondary/50 transition-colors"
+          >
+            <div className="flex-1 min-w-0">
+              <div className="text-body font-medium text-foreground truncate">{company.name}</div>
+              <div className="text-micro text-foreground/40 mt-0.5 flex items-center gap-2">
+                {company.domain && <span className="truncate">{company.domain}</span>}
+                <StagePill stage={(company as any).stage || "prospect"} />
+              </div>
+            </div>
+            {(company as any).scout_score != null && (
+              <ScoutBadge score={(company as any).scout_score} />
+            )}
+            <ChevronRight className="w-4 h-4 text-foreground/15 shrink-0" />
+          </button>
+        ))}
+
+        {visibleList.length === 0 && !isLoading && (
+          <div className="px-5 py-16 text-center rounded-lg border border-border/30 bg-card">
+            {search ? (
+              <>
+                <p className="text-body text-foreground/45 mb-1">
+                  No companies match "{search}"
+                </p>
+                <button
+                  onClick={() => setHubspotPickerOpen(true)}
+                  className="text-caption text-primary hover:text-primary/80 font-medium transition-colors"
+                >
+                  Import from HubSpot →
+                </button>
+              </>
+            ) : (
+              <p className="text-body text-foreground/45">
+                No {CATEGORY_LABELS[activeTab].toLowerCase()} companies yet.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="hidden md:block rounded-lg border border-border/30 bg-card overflow-hidden">
         <table className="w-full">
           <thead>
             <tr className="border-b border-border/40">

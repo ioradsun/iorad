@@ -29,14 +29,14 @@ export default function AdminSettings() {
     <div>
       <div className="max-w-3xl">
         <Tabs defaultValue="people" className="space-y-8">
-        <TabsList className="grid w-full grid-cols-7">
-          <TabsTrigger value="people">People</TabsTrigger>
-          <TabsTrigger value="appearance">Appearance</TabsTrigger>
-          <TabsTrigger value="ai">AI & Prompts</TabsTrigger>
-          <TabsTrigger value="events">Events</TabsTrigger>
-          <TabsTrigger value="partners">Partners</TabsTrigger>
-          <TabsTrigger value="processing">Processing</TabsTrigger>
-          <TabsTrigger value="scout">Scout</TabsTrigger>
+        <TabsList className="flex w-full overflow-x-auto scrollbar-none md:grid md:grid-cols-7">
+          <TabsTrigger value="people" className="shrink-0">People</TabsTrigger>
+          <TabsTrigger value="appearance" className="shrink-0">Appearance</TabsTrigger>
+          <TabsTrigger value="ai" className="shrink-0">AI & Prompts</TabsTrigger>
+          <TabsTrigger value="events" className="shrink-0">Events</TabsTrigger>
+          <TabsTrigger value="partners" className="shrink-0">Partners</TabsTrigger>
+          <TabsTrigger value="processing" className="shrink-0">Processing</TabsTrigger>
+          <TabsTrigger value="scout" className="shrink-0">Scout</TabsTrigger>
         </TabsList>
         <TabsContent value="people"><PeopleTab /></TabsContent>
         <TabsContent value="appearance"><AppearanceTab /></TabsContent>

@@ -110,7 +110,7 @@ export default function HubSpotPickerModal({ open, onClose }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col gap-0 p-0">
+      <DialogContent className="max-w-2xl max-h-[80vh] max-md:max-w-[calc(100vw-2rem)] max-md:max-h-[calc(100vh-4rem)] flex flex-col gap-0 p-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b border-border shrink-0">
           <DialogTitle className="text-[17px] font-semibold">Import from HubSpot</DialogTitle>
           <p className="text-sm text-muted-foreground mt-1">

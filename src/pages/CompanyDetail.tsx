@@ -904,11 +904,11 @@ export default function CompanyDetail() {
       {viewMode === "company" ? (
         <div>
           {/* ── Sticky company header ── */}
-          <div className="sticky top-0 z-30 bg-background pb-4 -mx-6 px-6 pt-2">
+          <div className="sticky top-0 z-30 bg-background pb-4 -mx-4 px-4 md:-mx-6 md:px-6 pt-2">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h1 className="text-display font-semibold tracking-tight">{company.name}</h1>
-                <div className="flex items-center gap-2 mt-1 text-caption text-foreground/40">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-caption text-foreground/40">
                   {company.domain && <span>{company.domain}</span>}
                   {company.domain && <span className="text-foreground/15">·</span>}
                   <Select
@@ -918,7 +918,7 @@ export default function CompanyDetail() {
                       queryClient.invalidateQueries({ queryKey: ["company", id] });
                     }}
                   >
-                    <SelectTrigger className="h-5 text-micro w-auto border-0 bg-transparent p-0 gap-1 text-foreground/40 hover:text-foreground [&>svg]:w-3 [&>svg]:h-3">
+                    <SelectTrigger className="h-8 md:h-5 text-micro w-auto border-0 bg-transparent px-2 md:px-0 gap-1 text-foreground/40 hover:text-foreground [&>svg]:w-3 [&>svg]:h-3">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -935,7 +935,7 @@ export default function CompanyDetail() {
                       queryClient.invalidateQueries({ queryKey: ["company", id] });
                     }}
                   >
-                    <SelectTrigger className="h-5 text-micro w-auto border-0 bg-transparent p-0 gap-1 text-foreground/40 hover:text-foreground [&>svg]:w-3 [&>svg]:h-3">
+                    <SelectTrigger className="h-8 md:h-5 text-micro w-auto border-0 bg-transparent px-2 md:px-0 gap-1 text-foreground/40 hover:text-foreground [&>svg]:w-3 [&>svg]:h-3">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -966,7 +966,7 @@ export default function CompanyDetail() {
             </div>
 
             {/* Anchor nav */}
-            <nav className="flex items-center gap-5 border-b border-border/15 pb-2">
+            <nav className="flex items-center gap-5 border-b border-border/15 pb-2 overflow-x-auto scrollbar-none">
               {["about", "score", "signals", "analysis"].map((section) => (
                 <button
                   key={section}
@@ -1041,7 +1041,7 @@ export default function CompanyDetail() {
                       <ChevronRight className="w-3 h-3 transition-transform group-open:rotate-90" />
                       HubSpot data ({Object.entries(companyAny.hubspot_properties).filter(([_, v]) => v != null && v !== "").length} fields)
                     </summary>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 mt-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3 mt-4">
                       {Object.entries(companyAny.hubspot_properties as Record<string, any>)
                         .filter(([_, v]) => v !== null && v !== "" && v !== undefined)
                         .filter(([k]) => !["name", "domain", "industry", "country", "numberofemployees", "hs_object_id", "createdate", "hs_lastmodifieddate", "hs_pipeline"].includes(k))
@@ -1477,7 +1477,7 @@ export default function CompanyDetail() {
       ) : (
         <div>
           {/* ── Sticky contact header ── */}
-          <div className="sticky top-0 z-30 bg-background pb-4 -mx-6 px-6 pt-2">
+          <div className="sticky top-0 z-30 bg-background pb-4 -mx-4 px-4 md:-mx-6 md:px-6 pt-2">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h1 className="text-display font-semibold tracking-tight">{effectiveContact?.name}</h1>
@@ -1508,7 +1508,7 @@ export default function CompanyDetail() {
             </div>
 
             {/* Anchor nav */}
-            <nav className="flex items-center gap-5 border-b border-border/15 pb-2">
+            <nav className="flex items-center gap-5 border-b border-border/15 pb-2 overflow-x-auto scrollbar-none">
               {["about", "strategy", "outreach", "story"].map((section) => (
                 <button
                   key={section}
