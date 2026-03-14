@@ -8,7 +8,6 @@ import ScoreCell from "@/components/ScoreCell";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ExternalLink, Loader2, ChevronRight, Plus, X, CheckCircle2, AlertCircle, RefreshCw, Sparkles } from "lucide-react";
 import { Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
@@ -677,8 +676,9 @@ export default function CompanyDetail() {
 
 
   useEffect(() => {
-    if (viewMode !== "contact") return;
-    const sections = ["about", "strategy", "outreach", "story"];
+    const sections = viewMode === "contact"
+      ? ["about", "strategy", "outreach", "story"]
+      : ["about", "score", "signals", "analysis"];
     const observers: IntersectionObserver[] = [];
 
     for (const sectionId of sections) {
@@ -697,13 +697,12 @@ export default function CompanyDetail() {
     }
 
     return () => observers.forEach((observer) => observer.disconnect());
-  }, [viewMode, effectiveContactId]);
+  }, [viewMode, effectiveContactId, id]);
 
   useEffect(() => {
-    if (viewMode !== "contact") return;
     setActiveSection("about");
     window.scrollTo({ top: 0, behavior: "auto" });
-  }, [effectiveContactId, viewMode]);
+  }, [viewMode === "contact" ? effectiveContactId : id, viewMode]);
 
   // Reset ensure ref when contact changes
   useEffect(() => {
@@ -901,77 +900,93 @@ export default function CompanyDetail() {
 
       {viewMode === "company" ? (
         <div>
-          <div className="mb-6">
-            <h1 className="text-display font-semibold tracking-tight">{company.name}</h1>
-            <div className="flex items-center gap-2 mt-1 text-caption text-foreground/40">
-              {company.domain && <span>{company.domain}</span>}
-              {company.domain && <span className="text-foreground/15">·</span>}
-              <Select
-                value={companyCategory}
-                onValueChange={async (val) => {
-                  await updateCompany.mutateAsync({ id: id!, updates: { category: val } as any });
-                  queryClient.invalidateQueries({ queryKey: ["company", id] });
-                }}
-              >
-                <SelectTrigger className="h-5 text-micro w-auto border-0 bg-transparent p-0 gap-1 text-foreground/40 hover:text-foreground [&>svg]:w-3 [&>svg]:h-3">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="school">School</SelectItem>
-                  <SelectItem value="business">Business</SelectItem>
-                  <SelectItem value="partner">Partner</SelectItem>
-                </SelectContent>
-              </Select>
-              <span className="text-foreground/15">·</span>
-              <Select
-                value={companyStage}
-                onValueChange={async (val) => {
-                  await updateCompany.mutateAsync({ id: id!, updates: { stage: val } as any });
-                  queryClient.invalidateQueries({ queryKey: ["company", id] });
-                }}
-              >
-                <SelectTrigger className="h-5 text-micro w-auto border-0 bg-transparent p-0 gap-1 text-foreground/40 hover:text-foreground [&>svg]:w-3 [&>svg]:h-3">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="prospect">Prospect</SelectItem>
-                  <SelectItem value="active_opp">Active Opp</SelectItem>
-                  <SelectItem value="customer">Customer</SelectItem>
-                  <SelectItem value="expansion">Expansion</SelectItem>
-                </SelectContent>
-              </Select>
-              {company.scout_score != null && (
-                <>
+          {/* ── Sticky company header ── */}
+          <div className="sticky top-0 z-30 bg-background pb-4 -mx-6 px-6 pt-2">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h1 className="text-display font-semibold tracking-tight">{company.name}</h1>
+                <div className="flex items-center gap-2 mt-1 text-caption text-foreground/40">
+                  {company.domain && <span>{company.domain}</span>}
+                  {company.domain && <span className="text-foreground/15">·</span>}
+                  <Select
+                    value={companyCategory}
+                    onValueChange={async (val) => {
+                      await updateCompany.mutateAsync({ id: id!, updates: { category: val } as any });
+                      queryClient.invalidateQueries({ queryKey: ["company", id] });
+                    }}
+                  >
+                    <SelectTrigger className="h-5 text-micro w-auto border-0 bg-transparent p-0 gap-1 text-foreground/40 hover:text-foreground [&>svg]:w-3 [&>svg]:h-3">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="school">School</SelectItem>
+                      <SelectItem value="business">Business</SelectItem>
+                      <SelectItem value="partner">Partner</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <span className="text-foreground/15">·</span>
-                  <ScoreCell score={company.scout_score} size="sm" />
-                </>
-              )}
-              <button
-                onClick={refreshAnalysis}
-                disabled={refreshingAnalysis}
-                className="inline-flex items-center gap-1.5 text-micro text-foreground/20 hover:text-foreground/40 disabled:opacity-50 transition-colors"
-              >
-                {refreshingAnalysis
-                  ? <Loader2 className="w-3 h-3 animate-spin" />
-                  : <RefreshCw className="w-3 h-3" />}
-                {refreshingAnalysis ? "Refreshing…" : "Refresh analysis"}
-              </button>
+                  <Select
+                    value={companyStage}
+                    onValueChange={async (val) => {
+                      await updateCompany.mutateAsync({ id: id!, updates: { stage: val } as any });
+                      queryClient.invalidateQueries({ queryKey: ["company", id] });
+                    }}
+                  >
+                    <SelectTrigger className="h-5 text-micro w-auto border-0 bg-transparent p-0 gap-1 text-foreground/40 hover:text-foreground [&>svg]:w-3 [&>svg]:h-3">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="prospect">Prospect</SelectItem>
+                      <SelectItem value="active_opp">Active Opp</SelectItem>
+                      <SelectItem value="customer">Customer</SelectItem>
+                      <SelectItem value="expansion">Expansion</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {company.scout_score != null && (
+                    <>
+                      <span className="text-foreground/15">·</span>
+                      <ScoreCell score={company.scout_score} size="sm" />
+                    </>
+                  )}
+                  <button
+                    onClick={refreshAnalysis}
+                    disabled={refreshingAnalysis}
+                    className="inline-flex items-center gap-1.5 text-micro text-foreground/20 hover:text-foreground/40 disabled:opacity-50 transition-colors"
+                  >
+                    {refreshingAnalysis
+                      ? <Loader2 className="w-3 h-3 animate-spin" />
+                      : <RefreshCw className="w-3 h-3" />}
+                    {refreshingAnalysis ? "Refreshing…" : "Refresh analysis"}
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-          <Tabs defaultValue="about" className="w-full">
-            <TabsList className="bg-transparent p-0 h-auto border-b border-border/15 w-full justify-start gap-0 rounded-none mb-6">
-              {["about", "score", "signals", "analysis"].map((tab) => (
-                <TabsTrigger
-                  key={tab}
-                  value={tab}
-                  className="px-4 py-2.5 text-caption font-medium rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none text-foreground/30 hover:text-foreground/50 transition-colors capitalize"
-                >
-                  {tab}
-                </TabsTrigger>
-              ))}
-            </TabsList>
 
-            <TabsContent value="about" className="mt-0">
+            {/* Anchor nav */}
+            <nav className="flex items-center gap-5 border-b border-border/15 pb-2">
+              {["about", "score", "signals", "analysis"].map((section) => (
+                <button
+                  key={section}
+                  onClick={() => {
+                    document.getElementById(`section-${section}`)?.scrollIntoView({
+                      behavior: "smooth",
+                      block: "start",
+                    });
+                  }}
+                  className={`text-caption font-medium transition-colors capitalize ${
+                    activeSection === section
+                      ? "text-foreground"
+                      : "text-foreground/30 hover:text-foreground/60"
+                  }`}
+                >
+                  {section}
+                </button>
+              ))}
+            </nav>
+          </div>
+
+          {/* ═══ ABOUT ═══ */}
+          <section id="section-about" className="scroll-mt-32">
               <div className="max-w-2xl space-y-8">
                 {accountData?.about?.text && (
                   <p className="text-body text-foreground/65 leading-relaxed">
@@ -1059,9 +1074,11 @@ export default function CompanyDetail() {
                   </details>
                 )}
               </div>
-            </TabsContent>
+          </section>
 
-            <TabsContent value="score" className="mt-0">
+          {/* ═══ SCORE ═══ */}
+          <section id="section-score" className="scroll-mt-32 pt-10">
+            <h2 className="text-title font-semibold text-foreground mb-4">Score</h2>
               <div className="max-w-lg space-y-6">
                 {scoutBreakdown ? (
                   <>
@@ -1124,9 +1141,11 @@ export default function CompanyDetail() {
                   </div>
                 )}
               </div>
-            </TabsContent>
+          </section>
 
-            <TabsContent value="signals" className="mt-0">
+          {/* ═══ SIGNALS ═══ */}
+          <section id="section-signals" className="scroll-mt-32 pt-10">
+            <h2 className="text-title font-semibold text-foreground mb-4">Signals</h2>
               <div className="max-w-2xl space-y-4">
                 {signals.length === 0 ? (
                   <p className="field-value-empty">No signals discovered yet.</p>
@@ -1186,9 +1205,11 @@ export default function CompanyDetail() {
                   </details>
                 )}
               </div>
-            </TabsContent>
+          </section>
 
-            <TabsContent value="analysis" className="mt-0">
+          {/* ═══ ANALYSIS ═══ */}
+          <section id="section-analysis" className="scroll-mt-32 pt-10">
+            <h2 className="text-title font-semibold text-foreground mb-4">Analysis</h2>
               <div className="max-w-2xl">
                 {snap && latestSnapshot ? (
                   <div className="space-y-1">
@@ -1428,8 +1449,7 @@ export default function CompanyDetail() {
                   </p>
                 )}
               </div>
-            </TabsContent>
-          </Tabs>
+          </section>
         </div>
       ) : (
         <div>
