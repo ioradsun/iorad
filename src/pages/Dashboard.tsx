@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Search, ArrowUpDown, ChevronRight } from "lucide-react";
 import { useCompanies, useCompaniesPage, useSignalCounts } from "@/hooks/useSupabase";
-import { Input } from "@/components/ui/input";
+import { ClearableInput } from "@/components/ui/clearable-input";
 import HubSpotPickerModal from "@/components/HubSpotPickerModal";
 
 type SortKey = "name" | "scout_score";
@@ -144,11 +144,12 @@ export default function Dashboard() {
   return (
     <div className="space-y-5">
       <div className="relative max-w-xl mb-2">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/25" />
-        <Input
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/25 z-10" />
+        <ClearableInput
           placeholder="Search companies…"
           value={search}
           onChange={e => setSearch(e.target.value)}
+          onClear={() => setSearch("")}
           className="pl-10 h-11 text-body bg-secondary border-0 rounded-xl focus-visible:ring-1 focus-visible:ring-ring/30"
         />
       </div>

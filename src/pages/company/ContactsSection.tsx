@@ -6,6 +6,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { ClearableInput } from "@/components/ui/clearable-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -158,7 +159,7 @@ export default function ContactsSection({
 
         {contacts.filter((c: any) => !c.email?.toLowerCase().includes("student")).length > 0 && (
           <div className="px-4 pb-3">
-            <Input placeholder="Search contacts…" value={contactSearch} onChange={e => onSetContactSearch(e.target.value)} className="h-7 text-xs" />
+            <ClearableInput placeholder="Search contacts…" value={contactSearch} onChange={e => onSetContactSearch(e.target.value)} onClear={() => onSetContactSearch("")} className="h-7 text-xs" />
           </div>
         )}
 

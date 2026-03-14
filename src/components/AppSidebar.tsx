@@ -21,6 +21,7 @@ import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { getContactActivity, sortContactsByActivity } from "@/lib/contactScore";
+import { ClearableInput } from "@/components/ui/clearable-input";
 
 const categoryItems = [
   { key: "business", label: "Business", icon: Briefcase },
@@ -165,11 +166,11 @@ export default function AppSidebar() {
 
             {companyContacts.length > 3 && (
               <div className="px-3 pb-1">
-                <input
-                  type="text"
+                <ClearableInput
                   placeholder="Search contacts…"
                   value={contactSearch}
                   onChange={(e) => setContactSearch(e.target.value)}
+                  onClear={() => setContactSearch("")}
                   className="w-full h-6 px-2 text-micro bg-secondary/50 border border-border/30 rounded text-foreground placeholder:text-foreground/25 focus:outline-none focus:ring-1 focus:ring-primary/30"
                 />
               </div>
