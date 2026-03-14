@@ -8,7 +8,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     return (
       <div className="min-h-screen bg-background">
         {/* Skeleton header matching AppLayout */}
-        <div className="border-b border-border/30 bg-card/50 h-14 flex items-center px-6">
+        <div className="hidden md:flex border-b border-border/30 bg-card/50 h-14 items-center px-6">
           <div className="h-5 w-24 bg-foreground/[0.06] rounded animate-pulse" />
           <div className="ml-6 flex gap-3">
             <div className="h-4 w-28 bg-foreground/[0.04] rounded animate-pulse" />
@@ -16,8 +16,11 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
           </div>
           <div className="ml-auto h-8 w-8 bg-foreground/[0.04] rounded-full animate-pulse" />
         </div>
+        <div className="md:hidden h-12 border-b border-border/30 bg-card/50 flex items-center px-4">
+          <div className="h-5 w-5 bg-foreground/[0.06] rounded animate-pulse" />
+        </div>
         {/* Skeleton content area */}
-        <div className="max-w-5xl mx-auto px-6 py-8">
+        <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 md:py-8">
           <div className="flex gap-3 mb-6">
             <div className="h-9 w-24 bg-foreground/[0.06] rounded-md animate-pulse" />
             <div className="h-9 w-24 bg-foreground/[0.04] rounded-md animate-pulse" />
