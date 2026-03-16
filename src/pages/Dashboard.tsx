@@ -65,6 +65,13 @@ export default function Dashboard() {
     }
 
     list.sort((a, b) => {
+      // For customer tab, float expansion_signal accounts to top
+      if (activeStage === "customer") {
+        const aSignal = (a as any).scout_score_breakdown?.expansion_signal ? 1 : 0;
+        const bSignal = (b as any).scout_score_breakdown?.expansion_signal ? 1 : 0;
+        if (bSignal !== aSignal) return bSignal - aSignal;
+      }
+
       let av: any;
       let bv: any;
       switch (sortKey) {
@@ -86,7 +93,7 @@ export default function Dashboard() {
     });
 
     return list;
-  }, [search, sortKey, sortAsc, companiesWithSignals]);
+  }, [search, sortKey, sortAsc, companiesWithSignals, activeStage]);
 
   const byStage = useMemo(() => ({
     prospect: sorted.filter(c => (c as any).lifecycle_stage === "prospect"),
