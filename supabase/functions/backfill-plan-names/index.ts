@@ -24,6 +24,8 @@ async function hubspotFetch(url: string, options?: RequestInit): Promise<Respons
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  let activeLogId: string | null = null;
+
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -34,7 +36,27 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const offset = Number(body.offset || 0);
-    const jobId  = body.job_id || null;
+    activeLogId = body.log_id || null;
+
+    // First invocation — create the log row
+    if (offset === 0) {
+      const { count } = await supabase
+        .from("contacts")
+        .select("id", { count: "exact", head: true })
+        .not("hubspot_object_id", "is", null);
+
+      const { data: logRow } = await supabase
+        .from("backfill_log")
+        .insert({
+          job_type: "plan_names",
+          status: "running",
+          contacts_total: count || 0,
+        })
+        .select("id")
+        .single();
+
+      activeLogId = logRow?.id || null;
+    }
 
     // ── Load a page of contacts that have a hubspot_object_id ────────────────
     const { data: contacts, error } = await supabase
@@ -55,8 +77,20 @@ Deno.serve(async (req) => {
         body: JSON.stringify({ action: "score_all", offset: 0 }),
       }).catch(e => console.warn("score trigger failed:", e.message));
 
+      // Mark log as completed
+      if (activeLogId) {
+        await supabase.from("backfill_log").update({
+          status: "completed",
+          finished_at: new Date().toISOString(),
+          contacts_processed: body.cumulative_processed || 0,
+          contacts_updated: body.cumulative_updated || 0,
+          contacts_skipped: body.cumulative_skipped || 0,
+          companies_rescored: body.cumulative_rescored || 0,
+        }).eq("id", activeLogId);
+      }
+
       return new Response(
-        JSON.stringify({ done: true, message: "All contacts processed. Scoring triggered." }),
+        JSON.stringify({ done: true, log_id: activeLogId, message: "All contacts processed. Scoring triggered." }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -148,11 +182,37 @@ Deno.serve(async (req) => {
     const hasMore = contacts.length === PAGE_SIZE;
     const nextOffset = offset + PAGE_SIZE;
 
+    // Cumulative counts
+    const cumulativeUpdated  = (body.cumulative_updated  || 0) + updated;
+    const cumulativeSkipped  = (body.cumulative_skipped  || 0) + skipped;
+    const cumulativeRescored = (body.cumulative_rescored || 0) + companyIdsToRescore.size;
+    const cumulativeProcessed = offset + contacts.length;
+
+    // Update log row
+    if (activeLogId) {
+      await supabase.from("backfill_log").update({
+        contacts_processed: cumulativeProcessed,
+        contacts_updated: cumulativeUpdated,
+        contacts_skipped: cumulativeSkipped,
+        companies_rescored: cumulativeRescored,
+        current_offset: offset,
+        status: hasMore ? "running" : "completed",
+        finished_at: hasMore ? null : new Date().toISOString(),
+      }).eq("id", activeLogId);
+    }
+
     if (hasMore) {
       fetch(`${supabaseUrl}/functions/v1/backfill-plan-names`, {
         method: "POST",
         headers: { Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ offset: nextOffset, job_id: jobId }),
+        body: JSON.stringify({
+          offset: nextOffset,
+          log_id: activeLogId,
+          cumulative_updated: cumulativeUpdated,
+          cumulative_skipped: cumulativeSkipped,
+          cumulative_rescored: cumulativeRescored,
+          cumulative_processed: cumulativeProcessed,
+        }),
       }).catch(e => console.warn("Self-chain failed:", e.message));
     }
 
@@ -160,6 +220,7 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
+        log_id: activeLogId,
         offset,
         updated,
         skipped,
@@ -172,6 +233,22 @@ Deno.serve(async (req) => {
 
   } catch (err: any) {
     console.error("backfill-plan-names error:", err.message);
+
+    // Mark log as failed
+    if (activeLogId) {
+      try {
+        const supabase = createClient(
+          Deno.env.get("SUPABASE_URL")!,
+          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+        );
+        await supabase.from("backfill_log").update({
+          status: "failed",
+          error: err.message,
+          finished_at: new Date().toISOString(),
+        }).eq("id", activeLogId);
+      } catch (_) { /* best effort */ }
+    }
+
     return new Response(
       JSON.stringify({ error: err.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

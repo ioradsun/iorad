@@ -168,15 +168,33 @@ export default function HubSpotStatus() {
     onError: (err: any) => toast.error(`Sync failed: ${err?.message}`),
   });
 
+  const { data: backfillStatus } = useQuery({
+    queryKey: ["backfill_log_latest"],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("backfill_log")
+        .select("*")
+        .eq("job_type", "plan_names")
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    refetchInterval: (query: any) =>
+      query.state.data?.status === "running" ? 2_000 : 30_000,
+  });
+
   const backfillPlans = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.functions.invoke("backfill-plan-names", {
+      const { data, error } = await supabase.functions.invoke("backfill-plan-names", {
         body: { offset: 0 },
       });
       if (error) throw error;
+      return data;
     },
     onSuccess: () => {
-      toast.success("Plan backfill started — runs in background, scores update automatically");
+      qc.invalidateQueries({ queryKey: ["backfill_log_latest"] });
+      toast.success("Plan backfill started");
     },
     onError: (err: any) => toast.error(`Backfill failed: ${err?.message}`),
   });
