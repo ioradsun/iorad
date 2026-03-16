@@ -588,12 +588,21 @@ async function syncCompaniesIncremental(supabase: any) {
         const isSchool = domainLow.includes(".edu") || domainLow.includes(".k12.") || domainLow.includes(".school") ||
           schoolKeys.some((k) => nameLow.includes(k)) ||
           (p.industry || "").toLowerCase().includes("education");
-        const category = isSchool ? "school" : "business";
+        const account_type = isSchool ? "school" : "company";
 
         const lifecycle = (p.lifecyclestage || "").toLowerCase();
-        let stage = "prospect";
-        if (lifecycle === "customer") stage = "customer";
-        else if (lifecycle === "opportunity" || lifecycle === "salesqualifiedlead") stage = "active_opp";
+        let lifecycle_stage = "prospect";
+        if (lifecycle === "customer" || lifecycle === "evangelist") lifecycle_stage = "customer";
+        else if (lifecycle === "opportunity" || lifecycle === "salesqualifiedlead") lifecycle_stage = "opportunity";
+
+        const sales_motion =
+          lifecycle_stage === "customer"    ? "expansion"    :
+          lifecycle_stage === "opportunity" ? "active-deal"  : "new-logo";
+        const partnerRaw = (p.partner || "").trim();
+        const relationship_type = partnerRaw ? "partner-managed" : "direct";
+        const brief_type =
+          lifecycle_stage === "customer"    ? "expansionBrief"    :
+          lifecycle_stage === "opportunity" ? "opportunityBrief"  : "prospectBrief";
 
         const headcount = p.numberofemployees ? parseInt(p.numberofemployees, 10) || null : null;
 
@@ -608,8 +617,11 @@ async function syncCompaniesIncremental(supabase: any) {
             await supabase.from("companies").update({
               name,
               domain,
-              category,
-              stage,
+              account_type,
+              lifecycle_stage,
+              sales_motion,
+              relationship_type,
+              brief_type,
               industry: p.industry || null,
               hq_country: p.country || null,
               headcount,
@@ -619,8 +631,11 @@ async function syncCompaniesIncremental(supabase: any) {
             await supabase.from("companies").insert({
               name,
               domain,
-              category,
-              stage,
+              account_type,
+              lifecycle_stage,
+              sales_motion,
+              relationship_type,
+              brief_type,
               source_type: "hubspot",
               industry: p.industry || null,
               hq_country: p.country || null,
@@ -1059,7 +1074,7 @@ function isEduName(name: string): boolean {
   return EDU_NAME_KEYWORDS.some(rx => rx.test(name));
 }
 
-function deriveCategory(props: Record<string, any>, existingPartner?: string | null): "school" | "business" | "partner" {
+function deriveAccountType(props: Record<string, any>, existingPartner?: string | null): "school" | "company" | "partner" {
   // Partner: already flagged (outbound partner company)
   if (existingPartner) return "partner";
 
@@ -1072,7 +1087,7 @@ function deriveCategory(props: Record<string, any>, existingPartner?: string | n
   const name = props.name || "";
   if (isEduName(name)) return "school";
 
-  return "business";
+  return "company";
 }
 
 // ── Deal-aware stage derivation ───────────────────────────────────────────────
@@ -1151,20 +1166,19 @@ async function fetchDealsForCompany(hubspotCompanyId: string | number, apiKey: s
 function deriveStage(
   props: Record<string, any>,
   deals?: { hasClosedWon: boolean; hasOpenDeal: boolean; dealCount: number }
-): "prospect" | "active_opp" | "customer" | "expansion" {
+): "prospect" | "opportunity" | "customer" {
   // Deal-based signals take priority over company lifecycle (more reliable)
   if (deals?.hasClosedWon) {
-    // If they also have an open deal after closing, treat as expansion
-    return deals.hasOpenDeal ? "expansion" : "customer";
+    return "customer";
   }
-  if (deals?.hasOpenDeal) return "active_opp";
+  if (deals?.hasOpenDeal) return "opportunity";
 
   // Fall back to company-level lifecycle stage
   const lifecycle = (props.lifecyclestage || "").toLowerCase();
   if (lifecycle === "customer" || lifecycle === "evangelist") return "customer";
-  if (lifecycle === "opportunity" || lifecycle === "salesqualifiedlead") return "active_opp";
+  if (lifecycle === "opportunity" || lifecycle === "salesqualifiedlead") return "opportunity";
   if (props.hs_date_entered_customer) return "customer";
-  if (props.hs_date_entered_opportunity) return "active_opp";
+  if (props.hs_date_entered_opportunity) return "opportunity";
 
   return "prospect";
 }
@@ -1209,19 +1223,26 @@ async function upsertCompany(supabase: any, hubspotCompany: any): Promise<{ comp
   if (hubspotObjectId) {
     const { data: existingByHubspotId } = await supabase
       .from("companies")
-      .select("id, snapshot_status, partner, category")
+      .select("id, snapshot_status, partner, account_type")
       .eq("hubspot_object_id", hubspotObjectId)
       .maybeSingle();
 
     if (existingByHubspotId) {
-      const category = existingByHubspotId.partner ? "partner" : deriveCategory(props, existingByHubspotId.partner);
-      const stage = deriveStage(props, deals);
-      const isCustomer = stage === "customer" || stage === "expansion";
+      const account_type = existingByHubspotId.partner ? "partner" : deriveAccountType(props, existingByHubspotId.partner);
+      const lifecycle_stage = deriveStage(props, deals);
+      const isCustomer = lifecycle_stage === "customer";
+      const sales_motion = lifecycle_stage === "customer" ? "expansion" : lifecycle_stage === "opportunity" ? "active-deal" : "new-logo";
+      const partnerRaw = (props.partner || existingByHubspotId.partner || "").trim();
+      const relationship_type = partnerRaw ? "partner-managed" : "direct";
+      const brief_type = lifecycle_stage === "customer" ? "expansionBrief" : lifecycle_stage === "opportunity" ? "opportunityBrief" : "prospectBrief";
 
       await supabase.from("companies").update({
         ...companyData,
-        category,
-        stage,
+        account_type,
+        lifecycle_stage,
+        sales_motion,
+        relationship_type,
+        brief_type,
         ...(isCustomer ? { is_existing_customer: true } : {}),
       }).eq("id", existingByHubspotId.id);
 
@@ -1234,19 +1255,26 @@ async function upsertCompany(supabase: any, hubspotCompany: any): Promise<{ comp
   if (domain) {
     const { data: existing } = await supabase
       .from("companies")
-      .select("id, snapshot_status, partner, category")
+      .select("id, snapshot_status, partner, account_type")
       .eq("domain", domain)
       .maybeSingle();
 
     if (existing) {
-      const category = existing.partner ? "partner" : deriveCategory(props, existing.partner);
-      const stage = deriveStage(props, deals);
-      const isCustomer = stage === "customer" || stage === "expansion";
+      const account_type = existing.partner ? "partner" : deriveAccountType(props, existing.partner);
+      const lifecycle_stage = deriveStage(props, deals);
+      const isCustomer = lifecycle_stage === "customer";
+      const sales_motion = lifecycle_stage === "customer" ? "expansion" : lifecycle_stage === "opportunity" ? "active-deal" : "new-logo";
+      const partnerRaw = (props.partner || existing.partner || "").trim();
+      const relationship_type = partnerRaw ? "partner-managed" : "direct";
+      const brief_type = lifecycle_stage === "customer" ? "expansionBrief" : lifecycle_stage === "opportunity" ? "opportunityBrief" : "prospectBrief";
 
       await supabase.from("companies").update({
         ...companyData,
-        category,
-        stage,
+        account_type,
+        lifecycle_stage,
+        sales_motion,
+        relationship_type,
+        brief_type,
         ...(isCustomer ? { is_existing_customer: true } : {}),
       }).eq("id", existing.id);
 
@@ -1255,17 +1283,24 @@ async function upsertCompany(supabase: any, hubspotCompany: any): Promise<{ comp
     }
   }
 
-  // Insert new company — derive category & stage from HubSpot data + deals
-  const category = deriveCategory(props, null);
-  const stage = deriveStage(props, deals);
-  const isCustomer = stage === "customer" || stage === "expansion";
+  // Insert new company — derive account_type & lifecycle_stage from HubSpot data + deals
+  const account_type = deriveAccountType(props, null);
+  const lifecycle_stage = deriveStage(props, deals);
+  const isCustomer = lifecycle_stage === "customer";
+  const sales_motion = lifecycle_stage === "customer" ? "expansion" : lifecycle_stage === "opportunity" ? "active-deal" : "new-logo";
+  const partnerRaw = (props.partner || "").trim();
+  const relationship_type = partnerRaw ? "partner-managed" : "direct";
+  const brief_type = lifecycle_stage === "customer" ? "expansionBrief" : lifecycle_stage === "opportunity" ? "opportunityBrief" : "prospectBrief";
 
   const { data: inserted, error } = await supabase
     .from("companies")
     .insert({
       ...companyData,
-      category,
-      stage,
+      account_type,
+      lifecycle_stage,
+      sales_motion,
+      relationship_type,
+      brief_type,
       ...(isCustomer ? { is_existing_customer: true } : {}),
     })
     .select("id, snapshot_status")
@@ -1749,22 +1784,29 @@ async function syncSingleCompany(supabase: any, domain: string | undefined, comp
     // Fetch associated deals for accurate stage derivation
     const deals = await fetchDealsForCompany(hsCompany.id, apiKey);
 
-    const category = deriveCategory(props, existingPartner);
-    const stage = deriveStage(props, deals);
-    const isCustomer = stage === "customer" || stage === "expansion";
+    const account_type = deriveAccountType(props, existingPartner);
+    const lifecycle_stage = deriveStage(props, deals);
+    const isCustomer = lifecycle_stage === "customer";
+    const sales_motion = lifecycle_stage === "customer" ? "expansion" : lifecycle_stage === "opportunity" ? "active-deal" : "new-logo";
+    const partnerRaw = (props.partner || existingPartner || "").trim();
+    const relationship_type = partnerRaw ? "partner-managed" : "direct";
+    const brief_type = lifecycle_stage === "customer" ? "expansionBrief" : lifecycle_stage === "opportunity" ? "opportunityBrief" : "prospectBrief";
 
     // Update company record
     if (companyId) {
       const updates: Record<string, any> = {
         hubspot_properties: props,
-        category,
-        stage,
+        account_type,
+        lifecycle_stage,
+        sales_motion,
+        relationship_type,
+        brief_type,
         ...(isCustomer ? { is_existing_customer: true } : {}),
         ...(props.industry ? { industry: props.industry } : {}),
         ...(props.numberofemployees ? { headcount: parseInt(String(props.numberofemployees), 10) || undefined } : {}),
       };
       await supabase.from("companies").update(updates).eq("id", companyId);
-      console.log(`sync_company: updated ${domain} (category: ${category}, stage: ${stage}, deals: closed_won=${deals.hasClosedWon} open=${deals.hasOpenDeal})`);
+      console.log(`sync_company: updated ${domain} (account_type: ${account_type}, lifecycle_stage: ${lifecycle_stage}, deals: closed_won=${deals.hasClosedWon} open=${deals.hasOpenDeal})`);
 
       // Import associated contacts
       let contactsImported = 0;
@@ -1784,10 +1826,13 @@ async function syncSingleCompany(supabase: any, domain: string | undefined, comp
         JSON.stringify({
           success: true,
           found: true,
-          category,
-          stage,
+          account_type,
+          lifecycle_stage,
+          sales_motion,
+          relationship_type,
+          brief_type,
           is_existing_customer: isCustomer,
-          lifecycle_stage: props.lifecyclestage || null,
+          hs_lifecycle_stage: props.lifecyclestage || null,
           deals: { closed_won: deals.hasClosedWon, open: deals.hasOpenDeal, total: deals.dealCount },
           contacts_imported: contactsImported,
           hubspot_id: hsCompany.id,
@@ -1799,9 +1844,9 @@ async function syncSingleCompany(supabase: any, domain: string | undefined, comp
     // No companyId — just return derived values
     return new Response(
       JSON.stringify({
-        success: true, found: true, category, stage,
+        success: true, found: true, account_type, lifecycle_stage, sales_motion, relationship_type, brief_type,
         is_existing_customer: isCustomer,
-        lifecycle_stage: props.lifecyclestage || null,
+        hs_lifecycle_stage: props.lifecyclestage || null,
         deals: { closed_won: deals.hasClosedWon, open: deals.hasOpenDeal, total: deals.dealCount },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

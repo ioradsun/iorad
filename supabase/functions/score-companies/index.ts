@@ -87,11 +87,12 @@ function calculateScoutScore(
 
   // ── Commercial Motion (max 20) ───────────────────────────────────────────
   let commercial = 0;
-  const stage = company.stage || "prospect";
-  if (stage === "expansion") commercial = 20;
-  else if (stage === "customer") commercial = 15;
-  else if (stage === "active_opp") commercial = 10;
-  else if (stage === "prospect" && company.is_existing_customer) commercial = 5;
+  const lifecycle_stage = company.lifecycle_stage || "prospect";
+  const sales_motion = company.sales_motion || "new-logo";
+  if (lifecycle_stage === "customer" && sales_motion === "expansion") commercial = 20;
+  else if (lifecycle_stage === "customer") commercial = 15;
+  else if (lifecycle_stage === "opportunity") commercial = 10;
+  else if (lifecycle_stage === "prospect" && company.is_existing_customer) commercial = 5;
 
   // ── Recency (max 10) ─────────────────────────────────────────────────────
   let recency = 0;
@@ -181,7 +182,10 @@ async function generateScoutSummary(
   );
 
   const userInput = `Company: ${company.name}
-Stage: ${company.stage}
+Lifecycle: ${company.lifecycle_stage}
+Sales motion: ${company.sales_motion}
+Account type: ${company.account_type}
+Brief type: ${company.brief_type}
 Scout Score: ${breakdown.total}/100 (tutorial: ${breakdown.tutorial}, commercial: ${breakdown.commercial}, recency: ${breakdown.recency}, intent: ${breakdown.intent})
 
 Contacts with iorad activity (${contactSummaries.length} of ${contacts.length} total):
@@ -230,7 +234,7 @@ async function scoreOneCompany(
   // Fetch company
   const { data: company, error: cErr } = await supabase
     .from("companies")
-    .select("id, name, stage, is_existing_customer, scout_score, scout_scored_at")
+    .select("id, name, lifecycle_stage, sales_motion, account_type, brief_type, is_existing_customer, scout_score, scout_scored_at")
     .eq("id", companyId)
     .maybeSingle();
 
@@ -417,7 +421,7 @@ Deno.serve(async (req) => {
 
     const { data: companies, error } = await supabase
       .from("companies")
-      .select("id, name, stage, is_existing_customer, scout_score, scout_scored_at")
+      .select("id, name, lifecycle_stage, sales_motion, account_type, brief_type, is_existing_customer, scout_score, scout_scored_at")
       .order("created_at", { ascending: true })
       .range(offset, offset + batchSize - 1);
 

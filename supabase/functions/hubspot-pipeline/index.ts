@@ -131,9 +131,27 @@ async function upsertCompany(
       .eq("domain", domain)
       .maybeSingle();
     if (existing) {
+      const updateLifecycle = (p.lifecyclestage || "").toLowerCase();
+      let updateLifecycleStage = "prospect";
+      if (updateLifecycle === "customer" || updateLifecycle === "evangelist") updateLifecycleStage = "customer";
+      else if (updateLifecycle === "opportunity" || updateLifecycle === "salesqualifiedlead") updateLifecycleStage = "opportunity";
+
+      const updateAccountType = (domainLow.includes(".edu") || domainLow.includes(".k12.") || domainLow.includes(".school") ||
+        schoolKeys.some(k => nameLow.includes(k)) || industry.includes("education") || industry.includes("higher education"))
+        ? "school" : "company";
+      const updateSalesMotion = updateLifecycleStage === "customer" ? "expansion" : updateLifecycleStage === "opportunity" ? "active-deal" : "new-logo";
+      const updatePartnerValue = (p.partner || "").trim();
+      const updateRelType = updatePartnerValue ? "partner-managed" : "direct";
+      const updateBriefType = updateLifecycleStage === "customer" ? "expansionBrief" : updateLifecycleStage === "opportunity" ? "opportunityBrief" : "prospectBrief";
+
       await supabase.from("companies").update({
         hubspot_properties: p,
         name,
+        account_type: updateAccountType,
+        lifecycle_stage: updateLifecycleStage,
+        sales_motion: updateSalesMotion,
+        relationship_type: updateRelType,
+        brief_type: updateBriefType,
         updated_at: new Date().toISOString(),
       }).eq("id", existing.id);
       return existing.id;
@@ -148,18 +166,29 @@ async function upsertCompany(
     domainLow.includes(".edu") || domainLow.includes(".k12.") || domainLow.includes(".school") ||
     schoolKeys.some(k => nameLow.includes(k)) ||
     industry.includes("education") || industry.includes("higher education");
-  const category = isSchool ? "school" : "business";
+  const account_type = isSchool ? "school" : "company";
 
   const lifecycle = (p.lifecyclestage || "").toLowerCase();
-  let stage = "prospect";
-  if (lifecycle === "customer") stage = "customer";
-  else if (lifecycle === "opportunity" || lifecycle === "salesqualifiedlead") stage = "active_opp";
+  let lifecycle_stage = "prospect";
+  if (lifecycle === "customer" || lifecycle === "evangelist") lifecycle_stage = "customer";
+  else if (lifecycle === "opportunity" || lifecycle === "salesqualifiedlead") lifecycle_stage = "opportunity";
+
+  const sales_motion =
+    lifecycle_stage === "customer"    ? "expansion"    :
+    lifecycle_stage === "opportunity" ? "active-deal"  : "new-logo";
+
+  const partnerValue = (p.partner || "").trim();
+  const relationship_type = partnerValue ? "partner-managed" : "direct";
+  const brief_type =
+    lifecycle_stage === "customer"    ? "expansionBrief"    :
+    lifecycle_stage === "opportunity" ? "opportunityBrief"  : "prospectBrief";
 
   const headcount = p.numberofemployees ? parseInt(p.numberofemployees, 10) || null : null;
 
   const { data: inserted, error } = await supabase
     .from("companies")
-    .insert({ name, domain, category, stage, source_type: "hubspot",
+    .insert({ name, domain, account_type, lifecycle_stage, sales_motion, relationship_type, brief_type,
+              source_type: "hubspot",
               industry: p.industry || null, hq_country: p.country || null,
               headcount, hubspot_properties: p })
     .select("id")
@@ -436,9 +465,9 @@ function calculateScoutScore(company: any, contacts: any[]): ScoreBreakdown {
   if (contacts.some(c => parseInt((c.hubspot_properties as any)?.extension_connections || "0", 10) > 0)) tutorial += 5;
 
   let commercial = 0;
-  const stage = (company.stage || "").toLowerCase();
-  if (stage === "customer" || stage === "expansion") commercial += 15;
-  else if (stage === "active_opp") commercial += 10;
+  const lifecycle_stage = company.lifecycle_stage || "prospect";
+  if (lifecycle_stage === "customer") commercial += 15;
+  else if (lifecycle_stage === "opportunity") commercial += 10;
   if (company.is_existing_customer) commercial += 10;
 
   let recency = 0;
@@ -466,7 +495,7 @@ function calculateScoutScore(company: any, contacts: any[]): ScoreBreakdown {
 
 async function scoreOneCompany(supabase: any, companyId: string): Promise<boolean> {
   const { data: company } = await supabase
-    .from("companies").select("id, name, stage, is_existing_customer, scout_score")
+    .from("companies").select("id, name, lifecycle_stage, sales_motion, is_existing_customer, scout_score")
     .eq("id", companyId).maybeSingle();
   if (!company) return false;
 
