@@ -167,6 +167,19 @@ export default function HubSpotStatus() {
     onError: (err: any) => toast.error(`Sync failed: ${err?.message}`),
   });
 
+  const backfillPlans = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.functions.invoke("backfill-plan-names", {
+        body: { offset: 0 },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Plan backfill started — runs in background, scores update automatically");
+    },
+    onError: (err: any) => toast.error(`Backfill failed: ${err?.message}`),
+  });
+
   const health = (() => {
     if (!history.length) return { label: "Never synced", tone: "neutral" as const };
     if (latest?.status === "running") return { label: "Sync in progress…", tone: "running" as const };
