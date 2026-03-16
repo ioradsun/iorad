@@ -186,6 +186,10 @@ export default function HubSpotStatus() {
           {syncNow.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
           Sync Now
         </Button>
+        <Button variant="outline" className="gap-1.5" onClick={() => backfillPlans.mutate()} disabled={backfillPlans.isPending}>
+          {backfillPlans.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+          Backfill Plans
+        </Button>
       </div>
 
       <div className="rounded-xl border border-border bg-card p-6 space-y-4">

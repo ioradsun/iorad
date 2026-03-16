@@ -368,6 +368,8 @@ async function importContactsForCompany(
           answers_with_own_tutorial_previous_month_count: cp.answers_with_own_tutorial_previous_month_count || null,
           answers: cp.answers || null,
           extension_connections: cp.extension_connections || null,
+          plan_name: cp.plan_name || null,
+          account_type: cp.account_type || cp.account__type || null,
         },
       });
     }
