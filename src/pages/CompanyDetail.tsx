@@ -915,9 +915,14 @@ export default function CompanyDetail() {
                   {company.domain && <span>{company.domain}</span>}
                   {company.domain && <span className="text-foreground/15">·</span>}
                   <Select
-                    value={companyCategory}
+                    value={companyAccountType}
                     onValueChange={async (val) => {
-                      await updateCompany.mutateAsync({ id: id!, updates: { category: val } as any });
+                      const updates: Record<string, unknown> = {
+                        account_type: val,
+                        relationship_type: val === "partner" ? "partner-managed" : "direct",
+                        brief_type: companyLifecycleStage === "customer" ? "expansionBrief" : companyLifecycleStage === "opportunity" ? "opportunityBrief" : "prospectBrief",
+                      };
+                      await updateCompany.mutateAsync({ id: id!, updates });
                       queryClient.invalidateQueries({ queryKey: ["company", id] });
                     }}
                   >
@@ -925,16 +930,22 @@ export default function CompanyDetail() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="company">Company</SelectItem>
                       <SelectItem value="school">School</SelectItem>
-                      <SelectItem value="business">Business</SelectItem>
                       <SelectItem value="partner">Partner</SelectItem>
                     </SelectContent>
                   </Select>
                   <span className="text-foreground/15">·</span>
                   <Select
-                    value={companyStage}
+                    value={companyLifecycleStage}
                     onValueChange={async (val) => {
-                      await updateCompany.mutateAsync({ id: id!, updates: { stage: val } as any });
+                      const updates: Record<string, unknown> = {
+                        lifecycle_stage: val,
+                        sales_motion: val === "customer" ? "expansion" : val === "opportunity" ? "active-deal" : "new-logo",
+                        brief_type: val === "customer" ? "expansionBrief" : val === "opportunity" ? "opportunityBrief" : "prospectBrief",
+                        is_existing_customer: val === "customer",
+                      };
+                      await updateCompany.mutateAsync({ id: id!, updates });
                       queryClient.invalidateQueries({ queryKey: ["company", id] });
                     }}
                   >
@@ -943,9 +954,8 @@ export default function CompanyDetail() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="prospect">Prospect</SelectItem>
-                      <SelectItem value="active_opp">Active Opp</SelectItem>
+                      <SelectItem value="opportunity">Opportunity</SelectItem>
                       <SelectItem value="customer">Customer</SelectItem>
-                      <SelectItem value="expansion">Expansion</SelectItem>
                     </SelectContent>
                   </Select>
                   {company.scout_score != null && (
