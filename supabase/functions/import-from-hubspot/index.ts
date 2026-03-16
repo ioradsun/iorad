@@ -1784,22 +1784,29 @@ async function syncSingleCompany(supabase: any, domain: string | undefined, comp
     // Fetch associated deals for accurate stage derivation
     const deals = await fetchDealsForCompany(hsCompany.id, apiKey);
 
-    const category = deriveCategory(props, existingPartner);
-    const stage = deriveStage(props, deals);
-    const isCustomer = stage === "customer" || stage === "expansion";
+    const account_type = deriveAccountType(props, existingPartner);
+    const lifecycle_stage = deriveStage(props, deals);
+    const isCustomer = lifecycle_stage === "customer";
+    const sales_motion = lifecycle_stage === "customer" ? "expansion" : lifecycle_stage === "opportunity" ? "active-deal" : "new-logo";
+    const partnerRaw = (props.partner || existingPartner || "").trim();
+    const relationship_type = partnerRaw ? "partner-managed" : "direct";
+    const brief_type = lifecycle_stage === "customer" ? "expansionBrief" : lifecycle_stage === "opportunity" ? "opportunityBrief" : "prospectBrief";
 
     // Update company record
     if (companyId) {
       const updates: Record<string, any> = {
         hubspot_properties: props,
-        category,
-        stage,
+        account_type,
+        lifecycle_stage,
+        sales_motion,
+        relationship_type,
+        brief_type,
         ...(isCustomer ? { is_existing_customer: true } : {}),
         ...(props.industry ? { industry: props.industry } : {}),
         ...(props.numberofemployees ? { headcount: parseInt(String(props.numberofemployees), 10) || undefined } : {}),
       };
       await supabase.from("companies").update(updates).eq("id", companyId);
-      console.log(`sync_company: updated ${domain} (category: ${category}, stage: ${stage}, deals: closed_won=${deals.hasClosedWon} open=${deals.hasOpenDeal})`);
+      console.log(`sync_company: updated ${domain} (account_type: ${account_type}, lifecycle_stage: ${lifecycle_stage}, deals: closed_won=${deals.hasClosedWon} open=${deals.hasOpenDeal})`);
 
       // Import associated contacts
       let contactsImported = 0;
