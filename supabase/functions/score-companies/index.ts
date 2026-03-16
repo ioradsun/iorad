@@ -87,11 +87,12 @@ function calculateScoutScore(
 
   // ── Commercial Motion (max 20) ───────────────────────────────────────────
   let commercial = 0;
-  const stage = company.stage || "prospect";
-  if (stage === "expansion") commercial = 20;
-  else if (stage === "customer") commercial = 15;
-  else if (stage === "active_opp") commercial = 10;
-  else if (stage === "prospect" && company.is_existing_customer) commercial = 5;
+  const lifecycle_stage = company.lifecycle_stage || "prospect";
+  const sales_motion = company.sales_motion || "new-logo";
+  if (lifecycle_stage === "customer" && sales_motion === "expansion") commercial = 20;
+  else if (lifecycle_stage === "customer") commercial = 15;
+  else if (lifecycle_stage === "opportunity") commercial = 10;
+  else if (lifecycle_stage === "prospect" && company.is_existing_customer) commercial = 5;
 
   // ── Recency (max 10) ─────────────────────────────────────────────────────
   let recency = 0;
