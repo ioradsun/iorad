@@ -1208,7 +1208,7 @@ async function upsertCompany(supabase: any, hubspotCompany: any): Promise<{ comp
   if (hubspotObjectId) {
     const { data: existingByHubspotId } = await supabase
       .from("companies")
-      .select("id, snapshot_status, partner, category")
+      .select("id, snapshot_status, partner, account_type")
       .eq("hubspot_object_id", hubspotObjectId)
       .maybeSingle();
 
