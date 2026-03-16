@@ -308,9 +308,8 @@ export function useCompanyStats() {
         newThisWeek: recentRes.count ?? 0,
         stageCounts: {
           prospect: stagesRes[0].count ?? 0,
-          active_opp: stagesRes[1].count ?? 0,
+          opportunity: stagesRes[1].count ?? 0,
           customer: stagesRes[2].count ?? 0,
-          expansion: stagesRes[3].count ?? 0,
         },
       };
     },
