@@ -22,6 +22,20 @@ import type { ScoreBreakdown, SnapshotJSON } from "./company/types";
 import OnboardingTab from "./company/OnboardingTab";
 import ContactDetailView from "./company/ContactDetailView";
 
+function PlanBadge({ plan }: { plan: string | null }) {
+  if (!plan) return null;
+  const styles: Record<string, string> = {
+    Enterprise: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+    Team:       "bg-blue-500/10 text-blue-400 border-blue-500/20",
+    Free:       "bg-muted text-muted-foreground border-border",
+  };
+  return (
+    <span className={`inline-flex items-center text-micro font-medium px-2 py-0.5 rounded border ${styles[plan] || styles.Free}`}>
+      {plan}
+    </span>
+  );
+}
+
 
 function ContactMetaLine({ contact }: { contact: any }) {
   if (!contact) return null;
@@ -958,6 +972,12 @@ export default function CompanyDetail() {
                       <SelectItem value="customer">Customer</SelectItem>
                     </SelectContent>
                   </Select>
+                  {companyAny?.iorad_plan && (
+                    <>
+                      <span className="text-foreground/15">·</span>
+                      <PlanBadge plan={companyAny.iorad_plan} />
+                    </>
+                  )}
                   {company.scout_score != null && (
                     <>
                       <span className="text-foreground/15">·</span>
@@ -1114,6 +1134,12 @@ export default function CompanyDetail() {
                         { label: "Commercial Intent", value: scoutBreakdown.commercial || 0, max: 20 },
                         { label: "Recency", value: scoutBreakdown.recency || 0, max: 10 },
                         { label: "Intent Signals", value: scoutBreakdown.intent || 0, max: 10 },
+                        ...((scoutBreakdown as any).expansion_bonus > 0 ? [
+                          { label: "Expansion Signal", value: (scoutBreakdown as any).expansion_bonus, max: 20 }
+                        ] : []),
+                        ...((scoutBreakdown as any).pql_bonus > 0 ? [
+                          { label: "PQL Signal", value: (scoutBreakdown as any).pql_bonus, max: 15 }
+                        ] : []),
                       ].map(({ label, value, max }) => (
                         <div key={label}>
                           <div className="flex justify-between mb-1.5">
@@ -1129,6 +1155,26 @@ export default function CompanyDetail() {
                         </div>
                       ))}
                     </div>
+
+                    {/* Signal flags */}
+                    {((scoutBreakdown as any)?.expansion_signal || (scoutBreakdown as any)?.pql_signal) && (
+                      <div className="space-y-2 pt-2">
+                        {(scoutBreakdown as any)?.expansion_signal && (
+                          <div className="flex items-center gap-2 text-caption px-3 py-2 rounded-lg bg-amber-500/[0.08] border border-amber-500/15">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                            <span className="text-amber-400 font-medium">Expansion signal</span>
+                            <span className="text-foreground/40">— paid plan + free users actively creating tutorials</span>
+                          </div>
+                        )}
+                        {(scoutBreakdown as any)?.pql_signal && (
+                          <div className="flex items-center gap-2 text-caption px-3 py-2 rounded-lg bg-emerald-500/[0.08] border border-emerald-500/15">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                            <span className="text-emerald-400 font-medium">Product-qualified lead</span>
+                            <span className="text-foreground/40">— free users creating tutorials, no paid plan yet</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {snapshots.length > 1 && (
                       <details className="group pt-4">
