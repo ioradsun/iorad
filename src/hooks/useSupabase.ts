@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tables, TablesInsert } from "@/integrations/supabase/types";
 
 export type DbAppSettings = Tables<"app_settings">;
-const COMPANY_LIST_COLUMNS = "id, name, domain, partner, partner_rep_email, partner_rep_name, snapshot_status, created_at, account_type, lifecycle_stage, scout_score, scout_score_breakdown, iorad_plan, source_type, last_score_total, industry, headcount";
+const COMPANY_LIST_COLUMNS = "id, name, domain, partner, partner_rep_email, partner_rep_name, snapshot_status, created_at, account_type, lifecycle_stage, sales_motion, relationship_type, brief_type, iorad_plan, scout_score, scout_score_breakdown, source_type, last_score_total, industry, headcount";
 
 // ---- Companies ----
 // Fast first page for immediate render — server-side lifecycle_stage filter
@@ -38,7 +38,7 @@ export function useCompanies() {
       while (true) {
         const { data, error } = await (supabase
           .from("companies")
-          .select("id, name, domain, partner, partner_rep_email, partner_rep_name, snapshot_status, created_at, account_type, lifecycle_stage, scout_score, source_type, last_score_total, industry, headcount") as any)
+          .select(COMPANY_LIST_COLUMNS) as any)
           .order("last_score_total", { ascending: false, nullsFirst: false })
           .range(from, from + PAGE - 1);
         if (error) throw error;
