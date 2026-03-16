@@ -443,7 +443,20 @@ async function runPhase2(supabase: any, apiKey: string, jobId: string, snap: any
 
 // ── Scoring helpers (adapted from score-companies) ────────────────────────────
 interface ScoreBreakdown {
-  tutorial: number; commercial: number; recency: number; intent: number; total: number;
+  tutorial: number; commercial: number; recency: number; intent: number;
+  expansion_signal: boolean; expansion_bonus: number; total: number;
+}
+
+const PAID_PLANS = ["team", "enterprise"];
+const PLAN_TIER: Record<string, number> = { "free": 1, "team": 2, "enterprise": 3 };
+
+function normalizePlan(raw: string | null): string | null {
+  if (!raw) return null;
+  const lower = raw.toLowerCase().trim();
+  if (lower.includes("enterprise")) return "Enterprise";
+  if (lower.includes("team"))       return "Team";
+  if (lower.includes("free"))       return "Free";
+  return null;
 }
 
 function calculateScoutScore(company: any, contacts: any[]): ScoreBreakdown {
@@ -466,9 +479,11 @@ function calculateScoutScore(company: any, contacts: any[]): ScoreBreakdown {
 
   let commercial = 0;
   const lifecycle_stage = company.lifecycle_stage || "prospect";
-  if (lifecycle_stage === "customer") commercial += 15;
-  else if (lifecycle_stage === "opportunity") commercial += 10;
-  if (company.is_existing_customer) commercial += 10;
+  const sales_motion = company.sales_motion || "new-logo";
+  if (lifecycle_stage === "customer" && sales_motion === "expansion") commercial = 20;
+  else if (lifecycle_stage === "customer") commercial = 15;
+  else if (lifecycle_stage === "opportunity") commercial = 10;
+  else if (lifecycle_stage === "prospect" && company.is_existing_customer) commercial = 5;
 
   let recency = 0;
   const lastContacted = contacts
@@ -489,8 +504,33 @@ function calculateScoutScore(company: any, contacts: any[]): ScoreBreakdown {
   if (totalClicks  > 3) intent += 5;
   if (totalAnswers > 0) intent += 5;
 
-  const total = Math.min(100, tutorial + commercial + recency + intent);
-  return { tutorial: Math.min(tutorial, 60), commercial: Math.min(commercial, 25), recency: Math.min(recency, 15), intent: Math.min(intent, 15), total };
+  // ── iorad Plan derivation ────────────────────────────────────────────────
+  const planValues = contacts
+    .map((c: any) => normalizePlan((c.hubspot_properties as any)?.plan_name || null))
+    .filter(Boolean) as string[];
+  const topPlan = planValues.length > 0
+    ? planValues.reduce((best, cur) =>
+        (PLAN_TIER[cur.toLowerCase()] || 0) > (PLAN_TIER[best.toLowerCase()] || 0) ? cur : best
+      )
+    : null;
+
+  // ── Expansion Signal (max 20 bonus) ──────────────────────────────────────
+  const hasPaidContact = contacts.some((c: any) => {
+    const plan = normalizePlan((c.hubspot_properties as any)?.plan_name || null);
+    return plan !== null && PAID_PLANS.includes(plan.toLowerCase());
+  });
+  const hasFreeCreator = contacts.some((c: any) => {
+    const hp = (c.hubspot_properties as any) || {};
+    const plan = normalizePlan(hp.plan_name || null);
+    return plan?.toLowerCase() === "free" && !!hp.first_tutorial_create_date;
+  });
+  const expansion_signal = hasPaidContact && hasFreeCreator;
+  const expansion_bonus = expansion_signal ? 20 : 0;
+
+  (company as any)._derived_plan = topPlan;
+
+  const total = Math.min(100, Math.min(tutorial, 60) + Math.min(commercial, 25) + Math.min(recency, 15) + Math.min(intent, 15) + expansion_bonus);
+  return { tutorial: Math.min(tutorial, 60), commercial: Math.min(commercial, 25), recency: Math.min(recency, 15), intent: Math.min(intent, 15), expansion_signal, expansion_bonus, total };
 }
 
 async function scoreOneCompany(supabase: any, companyId: string): Promise<boolean> {
