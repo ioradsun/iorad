@@ -1826,10 +1826,13 @@ async function syncSingleCompany(supabase: any, domain: string | undefined, comp
         JSON.stringify({
           success: true,
           found: true,
-          category,
-          stage,
+          account_type,
+          lifecycle_stage,
+          sales_motion,
+          relationship_type,
+          brief_type,
           is_existing_customer: isCustomer,
-          lifecycle_stage: props.lifecyclestage || null,
+          hs_lifecycle_stage: props.lifecyclestage || null,
           deals: { closed_won: deals.hasClosedWon, open: deals.hasOpenDeal, total: deals.dealCount },
           contacts_imported: contactsImported,
           hubspot_id: hsCompany.id,
@@ -1841,9 +1844,9 @@ async function syncSingleCompany(supabase: any, domain: string | undefined, comp
     // No companyId — just return derived values
     return new Response(
       JSON.stringify({
-        success: true, found: true, category, stage,
+        success: true, found: true, account_type, lifecycle_stage, sales_motion, relationship_type, brief_type,
         is_existing_customer: isCustomer,
-        lifecycle_stage: props.lifecyclestage || null,
+        hs_lifecycle_stage: props.lifecyclestage || null,
         deals: { closed_won: deals.hasClosedWon, open: deals.hasOpenDeal, total: deals.dealCount },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
