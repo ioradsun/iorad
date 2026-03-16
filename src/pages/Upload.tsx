@@ -344,15 +344,14 @@ const PARTNERS = ["seismic", "workramp", "360learning", "docebo", "gainsight"];
 
 const CATEGORIES = [
   { value: "school", label: "School (EDU)" },
-  { value: "business", label: "Business (B2B)" },
+  { value: "company", label: "Company (B2B)" },
   { value: "partner", label: "Partner (LMS Reseller)" },
 ];
 
 const STAGES = [
   { value: "prospect", label: "Prospect" },
-  { value: "active_opp", label: "Active Opp" },
+  { value: "opportunity", label: "Opportunity" },
   { value: "customer", label: "Customer" },
-  { value: "expansion", label: "Expansion" },
 ];
 
 function ManualAddForm() {
