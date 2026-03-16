@@ -186,10 +186,7 @@ function calculateScoutScore(
 
   const total = Math.min(100, Math.max(0, tutorial + commercial + recency + intent + expansion_bonus));
 
-  // Attach topPlan to company object for DB write in scoreOneCompany
-  (company as any)._derived_plan = topPlan;
-
-  return { tutorial, commercial, recency, intent, expansion_signal, expansion_bonus, total };
+  return { tutorial, commercial, recency, intent, expansion_signal, expansion_bonus, top_plan: topPlan, total };
 }
 
 // ── AI Activity Summary ───────────────────────────────────────────────────────
