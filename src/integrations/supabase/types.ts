@@ -16,10 +16,10 @@ export type Database = {
     Tables: {
       ai_config: {
         Row: {
-          business_prompt_template: string
-          business_system_prompt: string
           cards_prompt_template: string
           company_prompt: string
+          expansion_brief_system_prompt: string
+          expansion_brief_template: string
           id: number
           inbound_outreach_prompt: string
           inbound_story_prompt: string
@@ -27,12 +27,12 @@ export type Database = {
           inbound_system_prompt: string
           inbound_transcript_prompt: string
           model: string
+          opportunity_brief_system_prompt: string
+          opportunity_brief_template: string
           outreach_prompt: string
-          partner_prompt_template: string
-          partner_system_prompt: string
           prompt_template: string
-          school_prompt_template: string
-          school_system_prompt: string
+          prospect_brief_system_prompt: string
+          prospect_brief_template: string
           scout_scoring_prompt: string
           story_prompt: string
           strategy_prompt: string
@@ -41,10 +41,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          business_prompt_template?: string
-          business_system_prompt?: string
           cards_prompt_template?: string
           company_prompt?: string
+          expansion_brief_system_prompt?: string
+          expansion_brief_template?: string
           id?: number
           inbound_outreach_prompt?: string
           inbound_story_prompt?: string
@@ -52,12 +52,12 @@ export type Database = {
           inbound_system_prompt?: string
           inbound_transcript_prompt?: string
           model?: string
+          opportunity_brief_system_prompt?: string
+          opportunity_brief_template?: string
           outreach_prompt?: string
-          partner_prompt_template?: string
-          partner_system_prompt?: string
           prompt_template?: string
-          school_prompt_template?: string
-          school_system_prompt?: string
+          prospect_brief_system_prompt?: string
+          prospect_brief_template?: string
           scout_scoring_prompt?: string
           story_prompt?: string
           strategy_prompt?: string
@@ -66,10 +66,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          business_prompt_template?: string
-          business_system_prompt?: string
           cards_prompt_template?: string
           company_prompt?: string
+          expansion_brief_system_prompt?: string
+          expansion_brief_template?: string
           id?: number
           inbound_outreach_prompt?: string
           inbound_story_prompt?: string
@@ -77,12 +77,12 @@ export type Database = {
           inbound_system_prompt?: string
           inbound_transcript_prompt?: string
           model?: string
+          opportunity_brief_system_prompt?: string
+          opportunity_brief_template?: string
           outreach_prompt?: string
-          partner_prompt_template?: string
-          partner_system_prompt?: string
           prompt_template?: string
-          school_prompt_template?: string
-          school_system_prompt?: string
+          prospect_brief_system_prompt?: string
+          prospect_brief_template?: string
           scout_scoring_prompt?: string
           story_prompt?: string
           strategy_prompt?: string
@@ -148,11 +148,12 @@ export type Database = {
       }
       companies: {
         Row: {
+          account_type: string
+          brief_type: string
           buyer_email: string | null
           buyer_linkedin: string | null
           buyer_name: string | null
           buyer_title: string | null
-          category: string
           clay_pushed_at: string | null
           created_at: string
           domain: string | null
@@ -165,12 +166,15 @@ export type Database = {
           is_existing_customer: boolean
           last_processed_at: string | null
           last_score_total: number | null
+          lifecycle_stage: string
           loom_url: string | null
           name: string
           partner: string | null
           partner_rep_email: string | null
           partner_rep_name: string | null
           persona: string | null
+          relationship_type: string
+          sales_motion: string
           scout_score: number | null
           scout_score_breakdown: Json | null
           scout_scored_at: string | null
@@ -178,15 +182,15 @@ export type Database = {
           scout_synced_at: string | null
           snapshot_status: string | null
           source_type: string
-          stage: string
           updated_at: string
         }
         Insert: {
+          account_type?: string
+          brief_type?: string
           buyer_email?: string | null
           buyer_linkedin?: string | null
           buyer_name?: string | null
           buyer_title?: string | null
-          category?: string
           clay_pushed_at?: string | null
           created_at?: string
           domain?: string | null
@@ -199,12 +203,15 @@ export type Database = {
           is_existing_customer?: boolean
           last_processed_at?: string | null
           last_score_total?: number | null
+          lifecycle_stage?: string
           loom_url?: string | null
           name: string
           partner?: string | null
           partner_rep_email?: string | null
           partner_rep_name?: string | null
           persona?: string | null
+          relationship_type?: string
+          sales_motion?: string
           scout_score?: number | null
           scout_score_breakdown?: Json | null
           scout_scored_at?: string | null
@@ -212,15 +219,15 @@ export type Database = {
           scout_synced_at?: string | null
           snapshot_status?: string | null
           source_type?: string
-          stage?: string
           updated_at?: string
         }
         Update: {
+          account_type?: string
+          brief_type?: string
           buyer_email?: string | null
           buyer_linkedin?: string | null
           buyer_name?: string | null
           buyer_title?: string | null
-          category?: string
           clay_pushed_at?: string | null
           created_at?: string
           domain?: string | null
@@ -233,12 +240,15 @@ export type Database = {
           is_existing_customer?: boolean
           last_processed_at?: string | null
           last_score_total?: number | null
+          lifecycle_stage?: string
           loom_url?: string | null
           name?: string
           partner?: string | null
           partner_rep_email?: string | null
           partner_rep_name?: string | null
           persona?: string | null
+          relationship_type?: string
+          sales_motion?: string
           scout_score?: number | null
           scout_score_breakdown?: Json | null
           scout_scored_at?: string | null
@@ -246,7 +256,6 @@ export type Database = {
           scout_synced_at?: string | null
           snapshot_status?: string | null
           source_type?: string
-          stage?: string
           updated_at?: string
         }
         Relationships: []
