@@ -131,9 +131,27 @@ async function upsertCompany(
       .eq("domain", domain)
       .maybeSingle();
     if (existing) {
+      const updateLifecycle = (p.lifecyclestage || "").toLowerCase();
+      let updateLifecycleStage = "prospect";
+      if (updateLifecycle === "customer" || updateLifecycle === "evangelist") updateLifecycleStage = "customer";
+      else if (updateLifecycle === "opportunity" || updateLifecycle === "salesqualifiedlead") updateLifecycleStage = "opportunity";
+
+      const updateAccountType = (domainLow.includes(".edu") || domainLow.includes(".k12.") || domainLow.includes(".school") ||
+        schoolKeys.some(k => nameLow.includes(k)) || industry.includes("education") || industry.includes("higher education"))
+        ? "school" : "company";
+      const updateSalesMotion = updateLifecycleStage === "customer" ? "expansion" : updateLifecycleStage === "opportunity" ? "active-deal" : "new-logo";
+      const updatePartnerValue = (p.partner || "").trim();
+      const updateRelType = updatePartnerValue ? "partner-managed" : "direct";
+      const updateBriefType = updateLifecycleStage === "customer" ? "expansionBrief" : updateLifecycleStage === "opportunity" ? "opportunityBrief" : "prospectBrief";
+
       await supabase.from("companies").update({
         hubspot_properties: p,
         name,
+        account_type: updateAccountType,
+        lifecycle_stage: updateLifecycleStage,
+        sales_motion: updateSalesMotion,
+        relationship_type: updateRelType,
+        brief_type: updateBriefType,
         updated_at: new Date().toISOString(),
       }).eq("id", existing.id);
       return existing.id;
