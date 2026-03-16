@@ -143,8 +143,12 @@ export default function CompanyDetail() {
   }, [id, effectiveContactId, queryClient]);
 
   // companyAny declared above
-  const companyCategory = companyAny?.category || (companyAny?.source_type === "inbound" ? "business" : companyAny?.partner ? "partner" : "business");
-  const isPartnerCategory = companyCategory === "partner";
+  const companyAccountType = companyAny?.account_type || "company";
+  const companyLifecycleStage = companyAny?.lifecycle_stage || "prospect";
+  const companySalesMotion = companyAny?.sales_motion || "new-logo";
+  const companyRelationshipType = companyAny?.relationship_type || "direct";
+  const companyBriefType = companyAny?.brief_type || "prospectBrief";
+  const isPartnerManaged = companyRelationshipType === "partner-managed";
 
   const handleAddContact = async () => {
     if (!id || !newContact.name.trim()) return;
