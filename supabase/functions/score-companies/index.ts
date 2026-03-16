@@ -309,12 +309,11 @@ async function scoreOneCompany(
   }
 
   // Write back to DB
-  const topPlan = (company as any)._derived_plan || null;
   const updateData: Record<string, any> = {
     scout_score: breakdown.total,
     scout_score_breakdown: breakdown,
     scout_scored_at: new Date().toISOString(),
-    iorad_plan: topPlan,
+    iorad_plan: breakdown.top_plan,
   };
   if (summary) updateData.scout_summary = summary;
 

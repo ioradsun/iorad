@@ -575,12 +575,11 @@ async function scoreOneCompany(supabase: any, companyId: string): Promise<boolea
   if (!contacts || contacts.length === 0) return false;
 
   const breakdown = calculateScoutScore(company, contacts);
-  const topPlan = (company as any)._derived_plan || null;
   await supabase.from("companies").update({
     scout_score: breakdown.total,
     scout_score_breakdown: breakdown,
     scout_scored_at: new Date().toISOString(),
-    iorad_plan: topPlan,
+    iorad_plan: breakdown.top_plan,
   }).eq("id", companyId);
 
   return true;
