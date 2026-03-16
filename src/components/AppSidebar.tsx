@@ -88,9 +88,10 @@ export default function AppSidebar({ onNavigate }: { onNavigate?: () => void } =
     .slice(0, 2);
 
   const isActive = (path: string) => location.pathname === path;
-  const isCompanyCategory = (cat: string) => {
+  const isStageActive = (stage: string) => {
     const params = new URLSearchParams(location.search);
-    return location.pathname === "/" && params.get("category") === cat;
+    const current = params.get("stage") || "prospect";
+    return location.pathname === "/" && current === stage;
   };
 
   const NavItem = ({ to, icon: Icon, label, active }: { to: string; icon: any; label: string; active: boolean }) => (
