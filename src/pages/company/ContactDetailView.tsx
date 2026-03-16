@@ -14,6 +14,7 @@ import StrategyTab from "./StrategyTab";
 import { parseJson, toIoradEmbedUrl, toLoomEmbedUrl } from "./types";
 import type { DashboardCard, EmailTouch, LinkedInStep, StoryAssets } from "./types";
 import { getContactActivity } from "@/lib/contactScore";
+import { PlanBadge } from "@/components/PlanBadge";
 
 interface ContactDetailViewProps {
   companyId: string;

@@ -4,6 +4,7 @@ import { Search, ArrowUpDown, ChevronRight } from "lucide-react";
 import { useCompanies, useCompaniesPage, useSignalCounts } from "@/hooks/useSupabase";
 import { ClearableInput } from "@/components/ui/clearable-input";
 import HubSpotPickerModal from "@/components/HubSpotPickerModal";
+import { PlanBadge } from "@/components/PlanBadge";
 
 type SortKey = "name" | "scout_score";
 type StageTab = "prospect" | "opportunity" | "customer";
