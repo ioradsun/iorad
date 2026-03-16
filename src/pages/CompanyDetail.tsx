@@ -793,11 +793,10 @@ export default function CompanyDetail() {
   const snap = latestSnapshot ? parseJson<SnapshotJSON>(latestSnapshot.snapshot_json) : null;
   const scoutBreakdown = parseJson<ScoreBreakdown>(companyAny?.scout_score_breakdown);
 
-  const companyStage = companyAny?.stage || "prospect";
   const companyNameSlug = company.name.toLowerCase().replace(/\s+/g, "-");
   const effectiveContact = contacts.find((c: any) => c.id === effectiveContactId) || contacts[0] || null;
   const storyBaseUrl = effectiveContact
-    ? (!isPartnerCategory
+    ? (!isPartnerManaged
       ? `/stories/${companyNameSlug}/${(effectiveContact?.name || "contact").split(" ")[0].toLowerCase().replace(/[^a-z]/g, "")}`
       : company.partner
         ? `/${company.partner}/${companyNameSlug}/stories/${(effectiveContact?.name || "contact").split(" ")[0].toLowerCase().replace(/[^a-z]/g, "")}`
