@@ -283,6 +283,9 @@ export default function Dashboard() {
                 <td className="px-5 py-3.5 hidden sm:table-cell">
                   <StagePill stage={(company as any).lifecycle_stage || "prospect"} />
                 </td>
+                <td className="px-5 py-3.5 hidden lg:table-cell">
+                  <PlanBadge plan={(company as any).iorad_plan ?? null} />
+                </td>
                 <td className="px-5 py-3.5 hidden md:table-cell">
                   <ScoutBadge score={(company as any).scout_score ?? null} />
                 </td>
