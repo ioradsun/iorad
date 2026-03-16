@@ -177,8 +177,18 @@ async function upsertCompany(
         brief_type: updateBriefType,
         updated_at: new Date().toISOString(),
         last_sync_changes: hasChanges
-          ? { changed_at: new Date().toISOString(), fields: changes }
-          : { changed_at: new Date().toISOString(), fields: {} },
+          ? {
+              changed_at: new Date().toISOString(),
+              trigger: changes.lifecyclestage ? "lifecycle_change" : "crm_update",
+              fields: changes,
+              activity: {},
+            }
+          : {
+              changed_at: new Date().toISOString(),
+              trigger: "no_change",
+              fields: {},
+              activity: {},
+            },
       }).eq("id", existing.id);
       return existing.id;
     }
