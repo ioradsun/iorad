@@ -410,27 +410,27 @@ function ManualAddForm() {
 
       {/* Category selector */}
       <div className="space-y-2">
-        <Label className="text-xs">Category</Label>
+        <Label className="text-xs">Account Type</Label>
         <div className="flex items-center bg-secondary rounded-md p-0.5 gap-0.5 w-fit">
           {CATEGORIES.map(cat => (
             <button
               key={cat.value}
               type="button"
-              onClick={() => { update("category", cat.value); if (cat.value !== "partner") update("partner", ""); }}
+              onClick={() => { update("account_type", cat.value); if (cat.value !== "partner") update("partner", ""); }}
               className={`px-4 py-1.5 rounded text-xs font-medium transition-all ${
-                form.category === cat.value
+                form.account_type === cat.value
                   ? "bg-card text-foreground shadow-sm shadow-black/[0.06]"
                   : "text-foreground/45 hover:text-foreground"
               }`}
             >
-              {cat.value === "school" ? "School" : cat.value === "business" ? "Business" : "Partner"}
+              {cat.value === "school" ? "School" : cat.value === "company" ? "Company" : "Partner"}
             </button>
           ))}
         </div>
         <p className="text-micro text-foreground/45">
-          {form.category === "school" && "EDU institution or university"}
-          {form.category === "business" && "Corporate / B2B prospect or customer"}
-          {form.category === "partner" && "LMS reseller (Seismic, Docebo, etc.)"}
+          {form.account_type === "school" && "EDU institution or university"}
+          {form.account_type === "company" && "Corporate / B2B prospect or customer"}
+          {form.account_type === "partner" && "LMS reseller (Seismic, Docebo, etc.)"}
         </p>
       </div>
 
