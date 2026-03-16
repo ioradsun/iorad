@@ -401,7 +401,11 @@ export default function ContactDetailView({
                 {activity.plan && (
                   <div>
                     <div className="field-label">Plan</div>
-                    <div className="text-caption text-foreground/50">{activity.plan}</div>
+                    <PlanBadge plan={
+                      activity.plan.toLowerCase().includes("enterprise") ? "Enterprise"
+                      : activity.plan.toLowerCase().includes("team") ? "Team"
+                      : "Free"
+                    } />
                   </div>
                 )}
               </div>
