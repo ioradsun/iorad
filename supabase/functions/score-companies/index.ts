@@ -22,6 +22,7 @@ interface ScoreBreakdown {
   intent: number;
   expansion_signal: boolean;
   expansion_bonus: number;
+  top_plan: string | null;
   total: number;
 }
 
