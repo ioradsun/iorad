@@ -224,7 +224,79 @@ export default function HubSpotStatus() {
         </Button>
       </div>
 
-      <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+      {/* Backfill progress panel */}
+      {backfillStatus && (
+        <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {backfillStatus.status === "running" && (
+                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+              )}
+              {backfillStatus.status === "completed" && (
+                <CheckCircle2 className="w-4 h-4 text-success" />
+              )}
+              {backfillStatus.status === "failed" && (
+                <AlertCircle className="w-4 h-4 text-destructive" />
+              )}
+              <span className="text-caption font-medium">
+                {backfillStatus.status === "running"  && "Backfilling plan names…"}
+                {backfillStatus.status === "completed" && "Plan backfill complete"}
+                {backfillStatus.status === "failed"    && "Backfill failed"}
+              </span>
+            </div>
+            <span className="text-micro text-foreground/40">
+              {formatDistanceToNow(new Date(backfillStatus.started_at), { addSuffix: true })}
+            </span>
+          </div>
+
+          {backfillStatus.contacts_total > 0 && (
+            <div>
+              <div className="flex justify-between text-micro text-foreground/40 mb-1.5">
+                <span>
+                  {backfillStatus.contacts_processed.toLocaleString()} / {backfillStatus.contacts_total.toLocaleString()} contacts
+                </span>
+                <span>
+                  {Math.round((backfillStatus.contacts_processed / backfillStatus.contacts_total) * 100)}%
+                </span>
+              </div>
+              <div className="h-1.5 bg-foreground/[0.06] rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary rounded-full transition-all duration-500"
+                  style={{
+                    width: `${Math.min(100, Math.round(
+                      (backfillStatus.contacts_processed / backfillStatus.contacts_total) * 100
+                    ))}%`
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center gap-5 text-micro text-foreground/50">
+            <span>
+              <span className="text-foreground font-medium tabular-nums">
+                {backfillStatus.contacts_updated.toLocaleString()}
+              </span> updated
+            </span>
+            <span>
+              <span className="text-foreground font-medium tabular-nums">
+                {backfillStatus.contacts_skipped.toLocaleString()}
+              </span> skipped
+            </span>
+            <span>
+              <span className="text-foreground font-medium tabular-nums">
+                {backfillStatus.companies_rescored.toLocaleString()}
+              </span> companies rescored
+            </span>
+          </div>
+
+          {backfillStatus.status === "failed" && backfillStatus.error && (
+            <p className="text-micro text-destructive/70">{backfillStatus.error}</p>
+          )}
+        </div>
+      )}
+
+
         <div className="flex items-center gap-3">
           {health.tone === "healthy" && <CheckCircle2 className="w-5 h-5 text-success" />}
           {(health.tone === "stale" || health.tone === "down" || health.tone === "neutral") && <AlertCircle className={`w-5 h-5 ${health.tone === "down" ? "text-destructive" : health.tone === "stale" ? "text-warning" : "text-foreground/25"}`} />}
