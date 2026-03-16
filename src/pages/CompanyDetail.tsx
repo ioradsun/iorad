@@ -255,7 +255,7 @@ export default function CompanyDetail() {
       }
 
       // Step 3: For non-partner companies, extract contact profiles and generate company cards
-      if (companyAny?.category !== "partner") {
+      if (!isPartnerManaged) {
         // Extract AI profiles from HubSpot data
         toast.info("Extracting contact profiles…");
         try {
