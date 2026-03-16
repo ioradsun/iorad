@@ -465,9 +465,9 @@ function calculateScoutScore(company: any, contacts: any[]): ScoreBreakdown {
   if (contacts.some(c => parseInt((c.hubspot_properties as any)?.extension_connections || "0", 10) > 0)) tutorial += 5;
 
   let commercial = 0;
-  const stage = (company.stage || "").toLowerCase();
-  if (stage === "customer" || stage === "expansion") commercial += 15;
-  else if (stage === "active_opp") commercial += 10;
+  const lifecycle_stage = company.lifecycle_stage || "prospect";
+  if (lifecycle_stage === "customer") commercial += 15;
+  else if (lifecycle_stage === "opportunity") commercial += 10;
   if (company.is_existing_customer) commercial += 10;
 
   let recency = 0;
