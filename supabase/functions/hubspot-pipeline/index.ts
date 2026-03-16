@@ -124,6 +124,15 @@ async function upsertCompany(
   const name = (p.name || "").trim() || `HubSpot-${hs.id}`;
   const domain: string | null = (p.domain || "").trim() || null;
 
+  const industry   = (p.industry || "").toLowerCase();
+  const domainLow  = (domain || "").toLowerCase();
+  const nameLow    = name.toLowerCase();
+  const schoolKeys = ["university", "college", "school", "academy", "education", "institute", "district", "k12", "edu"];
+  const isSchool   =
+    domainLow.includes(".edu") || domainLow.includes(".k12.") || domainLow.includes(".school") ||
+    schoolKeys.some(k => nameLow.includes(k)) ||
+    industry.includes("education") || industry.includes("higher education");
+
   if (domain) {
     const { data: existing } = await supabase
       .from("companies")
@@ -136,9 +145,7 @@ async function upsertCompany(
       if (updateLifecycle === "customer" || updateLifecycle === "evangelist") updateLifecycleStage = "customer";
       else if (updateLifecycle === "opportunity" || updateLifecycle === "salesqualifiedlead") updateLifecycleStage = "opportunity";
 
-      const updateAccountType = (domainLow.includes(".edu") || domainLow.includes(".k12.") || domainLow.includes(".school") ||
-        schoolKeys.some(k => nameLow.includes(k)) || industry.includes("education") || industry.includes("higher education"))
-        ? "school" : "company";
+      const updateAccountType = isSchool ? "school" : "company";
       const updateSalesMotion = updateLifecycleStage === "customer" ? "expansion" : updateLifecycleStage === "opportunity" ? "active-deal" : "new-logo";
       const updatePartnerValue = (p.partner || "").trim();
       const updateRelType = updatePartnerValue ? "partner-managed" : "direct";
@@ -157,15 +164,6 @@ async function upsertCompany(
       return existing.id;
     }
   }
-
-  const industry   = (p.industry || "").toLowerCase();
-  const domainLow  = (domain || "").toLowerCase();
-  const nameLow    = name.toLowerCase();
-  const schoolKeys = ["university", "college", "school", "academy", "education", "institute", "district", "k12", "edu"];
-  const isSchool   =
-    domainLow.includes(".edu") || domainLow.includes(".k12.") || domainLow.includes(".school") ||
-    schoolKeys.some(k => nameLow.includes(k)) ||
-    industry.includes("education") || industry.includes("higher education");
   const account_type = isSchool ? "school" : "company";
 
   const lifecycle = (p.lifecyclestage || "").toLowerCase();
