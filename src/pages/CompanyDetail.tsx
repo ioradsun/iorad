@@ -236,7 +236,7 @@ export default function CompanyDetail() {
       }
 
       // Step 3: Find contacts via Apollo (skip for partner companies — contacts come from HubSpot)
-      if (companyAny?.category === "partner" || (!companyAny?.category && companyAny?.source_type !== "inbound")) {
+      if (isPartnerManaged) {
         toast.info("Step 3/3 — Finding contacts via Apollo…");
         try {
           const { data: contactData, error: contactErr } = await supabase.functions.invoke("find-contacts", { body: { company_id: id } });
