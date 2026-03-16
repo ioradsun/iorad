@@ -218,7 +218,7 @@ async function upsertCompany(
               source_type: "hubspot",
               industry: p.industry || null, hq_country: p.country || null,
               headcount, hubspot_properties: p,
-              last_sync_changes: { changed_at: new Date().toISOString(), created: true, fields: {} } })
+              last_sync_changes: { changed_at: new Date().toISOString(), trigger: "new_record", fields: {}, activity: {} } })
     .select("id")
     .single();
 
