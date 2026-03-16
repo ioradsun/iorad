@@ -361,8 +361,8 @@ function ManualAddForm() {
     name: "",
     domain: "",
     partner: "",
-    category: "business",
-    stage: "prospect",
+    account_type: "company",
+    lifecycle_stage: "prospect",
   });
   const [saving, setSaving] = useState(false);
 
