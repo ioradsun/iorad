@@ -345,6 +345,7 @@ export type Database = {
           contact_profile: Json | null
           created_at: string
           email: string | null
+          hubspot_object_id: string | null
           hubspot_properties: Json | null
           id: string
           linkedin: string | null
@@ -363,6 +364,7 @@ export type Database = {
           contact_profile?: Json | null
           created_at?: string
           email?: string | null
+          hubspot_object_id?: string | null
           hubspot_properties?: Json | null
           id?: string
           linkedin?: string | null
@@ -381,6 +383,7 @@ export type Database = {
           contact_profile?: Json | null
           created_at?: string
           email?: string | null
+          hubspot_object_id?: string | null
           hubspot_properties?: Json | null
           id?: string
           linkedin?: string | null
