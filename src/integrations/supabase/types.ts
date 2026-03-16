@@ -167,6 +167,7 @@ export type Database = {
           is_existing_customer: boolean
           last_processed_at: string | null
           last_score_total: number | null
+          last_sync_changes: Json | null
           lifecycle_stage: string
           loom_url: string | null
           name: string
@@ -205,6 +206,7 @@ export type Database = {
           is_existing_customer?: boolean
           last_processed_at?: string | null
           last_score_total?: number | null
+          last_sync_changes?: Json | null
           lifecycle_stage?: string
           loom_url?: string | null
           name: string
@@ -243,6 +245,7 @@ export type Database = {
           is_existing_customer?: boolean
           last_processed_at?: string | null
           last_score_total?: number | null
+          last_sync_changes?: Json | null
           lifecycle_stage?: string
           loom_url?: string | null
           name?: string
