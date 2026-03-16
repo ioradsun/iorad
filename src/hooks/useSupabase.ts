@@ -17,14 +17,14 @@ export function useCompaniesPage(category: string, limit = 50) {
         .order("scout_score", { ascending: false, nullsFirst: false })
         .limit(limit);
 
-      // Server-side category filter
+      // Server-side account_type filter
       if (category === "school") {
-        query = query.eq("category", "school");
+        query = query.eq("account_type" as any, "school");
       } else if (category === "partner") {
-        query = query.eq("category", "partner");
+        query = query.eq("account_type" as any, "partner");
       } else {
-        // "business" is the default — includes null/missing category
-        query = query.or("category.eq.business,category.is.null");
+        // "company" is the default — includes null/missing account_type
+        query = query.or("account_type.eq.company,account_type.is.null" as any);
       }
 
       const { data, error } = await query;
