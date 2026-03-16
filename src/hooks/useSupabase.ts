@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tables, TablesInsert } from "@/integrations/supabase/types";
 
 export type DbAppSettings = Tables<"app_settings">;
-const COMPANY_LIST_COLUMNS = "id, name, domain, partner, partner_rep_email, partner_rep_name, snapshot_status, created_at, category, stage, scout_score, source_type, last_score_total, industry, headcount";
+const COMPANY_LIST_COLUMNS = "id, name, domain, partner, partner_rep_email, partner_rep_name, snapshot_status, created_at, account_type, lifecycle_stage, scout_score, source_type, last_score_total, industry, headcount";
 
 // ---- Companies ----
 // Fast first page for immediate render — server-side category filter
@@ -11,20 +11,20 @@ export function useCompaniesPage(category: string, limit = 50) {
   return useQuery({
     queryKey: ["companies_page", category, limit],
     queryFn: async () => {
-      let query = supabase
+      let query = (supabase
         .from("companies")
-        .select(COMPANY_LIST_COLUMNS)
+        .select(COMPANY_LIST_COLUMNS) as any)
         .order("scout_score", { ascending: false, nullsFirst: false })
         .limit(limit);
 
-      // Server-side category filter
+      // Server-side account_type filter
       if (category === "school") {
-        query = query.eq("category", "school");
+        query = query.eq("account_type" as any, "school");
       } else if (category === "partner") {
-        query = query.eq("category", "partner");
+        query = query.eq("account_type" as any, "partner");
       } else {
-        // "business" is the default — includes null/missing category
-        query = query.or("category.eq.business,category.is.null");
+        // "company" is the default — includes null/missing account_type
+        query = query.or("account_type.eq.company,account_type.is.null" as any);
       }
 
       const { data, error } = await query;
@@ -43,9 +43,9 @@ export function useCompanies() {
       let allData: any[] = [];
       let from = 0;
       while (true) {
-        const { data, error } = await supabase
+        const { data, error } = await (supabase
           .from("companies")
-          .select("id, name, domain, partner, partner_rep_email, partner_rep_name, snapshot_status, created_at, category, stage, scout_score, source_type, last_score_total, industry, headcount")
+          .select("id, name, domain, partner, partner_rep_email, partner_rep_name, snapshot_status, created_at, account_type, lifecycle_stage, scout_score, source_type, last_score_total, industry, headcount") as any)
           .order("last_score_total", { ascending: false, nullsFirst: false })
           .range(from, from + PAGE - 1);
         if (error) throw error;
@@ -287,19 +287,14 @@ export function useCompanyStats() {
   return useQuery({
     queryKey: ["company_stats"],
     queryFn: async () => {
-      const [totalRes, schoolRes, businessRes, partnerRes, recentRes, stagesRes] = await Promise.all([
-        supabase.from("companies").select("id", { count: "exact", head: true }),
-        supabase.from("companies").select("id", { count: "exact", head: true }).eq("category", "school"),
-        supabase.from("companies").select("id", { count: "exact", head: true }).or("category.eq.business,category.is.null"),
-        supabase.from("companies").select("id", { count: "exact", head: true }).eq("category", "partner"),
-        supabase.from("companies").select("id", { count: "exact", head: true }).gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
-        Promise.all([
-          supabase.from("companies").select("id", { count: "exact", head: true }).eq("stage", "prospect"),
-          supabase.from("companies").select("id", { count: "exact", head: true }).eq("stage", "active_opp"),
-          supabase.from("companies").select("id", { count: "exact", head: true }).eq("stage", "customer"),
-          supabase.from("companies").select("id", { count: "exact", head: true }).eq("stage", "expansion"),
-        ]),
-      ]);
+      const totalRes = await supabase.from("companies").select("id", { count: "exact", head: true });
+      const schoolRes = await (supabase.from("companies").select("id", { count: "exact", head: true }) as any).eq("account_type", "school");
+      const businessRes = await (supabase.from("companies").select("id", { count: "exact", head: true }) as any).or("account_type.eq.company,account_type.is.null");
+      const partnerRes = await (supabase.from("companies").select("id", { count: "exact", head: true }) as any).eq("account_type", "partner");
+      const recentRes = await supabase.from("companies").select("id", { count: "exact", head: true }).gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+      const prospectRes = await (supabase.from("companies").select("id", { count: "exact", head: true }) as any).eq("lifecycle_stage", "prospect");
+      const oppRes = await (supabase.from("companies").select("id", { count: "exact", head: true }) as any).eq("lifecycle_stage", "opportunity");
+      const custRes = await (supabase.from("companies").select("id", { count: "exact", head: true }) as any).eq("lifecycle_stage", "customer");
 
       return {
         total: totalRes.count ?? 0,
@@ -308,10 +303,9 @@ export function useCompanyStats() {
         partner: partnerRes.count ?? 0,
         newThisWeek: recentRes.count ?? 0,
         stageCounts: {
-          prospect: stagesRes[0].count ?? 0,
-          active_opp: stagesRes[1].count ?? 0,
-          customer: stagesRes[2].count ?? 0,
-          expansion: stagesRes[3].count ?? 0,
+          prospect: prospectRes.count ?? 0,
+          opportunity: oppRes.count ?? 0,
+          customer: custRes.count ?? 0,
         },
       };
     },
