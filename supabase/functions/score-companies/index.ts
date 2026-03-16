@@ -421,7 +421,7 @@ Deno.serve(async (req) => {
 
     const { data: companies, error } = await supabase
       .from("companies")
-      .select("id, name, stage, is_existing_customer, scout_score, scout_scored_at")
+      .select("id, name, lifecycle_stage, sales_motion, account_type, brief_type, is_existing_customer, scout_score, scout_scored_at")
       .order("created_at", { ascending: true })
       .range(offset, offset + batchSize - 1);
 
