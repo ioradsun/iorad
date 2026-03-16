@@ -1240,19 +1240,26 @@ async function upsertCompany(supabase: any, hubspotCompany: any): Promise<{ comp
   if (domain) {
     const { data: existing } = await supabase
       .from("companies")
-      .select("id, snapshot_status, partner, category")
+      .select("id, snapshot_status, partner, account_type")
       .eq("domain", domain)
       .maybeSingle();
 
     if (existing) {
-      const category = existing.partner ? "partner" : deriveCategory(props, existing.partner);
-      const stage = deriveStage(props, deals);
-      const isCustomer = stage === "customer" || stage === "expansion";
+      const account_type = existing.partner ? "partner" : deriveAccountType(props, existing.partner);
+      const lifecycle_stage = deriveStage(props, deals);
+      const isCustomer = lifecycle_stage === "customer";
+      const sales_motion = lifecycle_stage === "customer" ? "expansion" : lifecycle_stage === "opportunity" ? "active-deal" : "new-logo";
+      const partnerRaw = (props.partner || existing.partner || "").trim();
+      const relationship_type = partnerRaw ? "partner-managed" : "direct";
+      const brief_type = lifecycle_stage === "customer" ? "expansionBrief" : lifecycle_stage === "opportunity" ? "opportunityBrief" : "prospectBrief";
 
       await supabase.from("companies").update({
         ...companyData,
-        category,
-        stage,
+        account_type,
+        lifecycle_stage,
+        sales_motion,
+        relationship_type,
+        brief_type,
         ...(isCustomer ? { is_existing_customer: true } : {}),
       }).eq("id", existing.id);
 
@@ -1261,17 +1268,24 @@ async function upsertCompany(supabase: any, hubspotCompany: any): Promise<{ comp
     }
   }
 
-  // Insert new company — derive category & stage from HubSpot data + deals
-  const category = deriveCategory(props, null);
-  const stage = deriveStage(props, deals);
-  const isCustomer = stage === "customer" || stage === "expansion";
+  // Insert new company — derive account_type & lifecycle_stage from HubSpot data + deals
+  const account_type = deriveAccountType(props, null);
+  const lifecycle_stage = deriveStage(props, deals);
+  const isCustomer = lifecycle_stage === "customer";
+  const sales_motion = lifecycle_stage === "customer" ? "expansion" : lifecycle_stage === "opportunity" ? "active-deal" : "new-logo";
+  const partnerRaw = (props.partner || "").trim();
+  const relationship_type = partnerRaw ? "partner-managed" : "direct";
+  const brief_type = lifecycle_stage === "customer" ? "expansionBrief" : lifecycle_stage === "opportunity" ? "opportunityBrief" : "prospectBrief";
 
   const { data: inserted, error } = await supabase
     .from("companies")
     .insert({
       ...companyData,
-      category,
-      stage,
+      account_type,
+      lifecycle_stage,
+      sales_motion,
+      relationship_type,
+      brief_type,
       ...(isCustomer ? { is_existing_customer: true } : {}),
     })
     .select("id, snapshot_status")
