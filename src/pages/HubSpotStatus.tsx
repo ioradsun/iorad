@@ -241,6 +241,43 @@ export default function HubSpotStatus() {
                   <span className={`px-1.5 py-0.5 rounded border ${pillClass(company.lifecycle_stage)}`}>{company.lifecycle_stage || "prospect"}</span>
                   {isNew && <span className="px-1.5 py-0.5 rounded border border-emerald-500/20 bg-emerald-500/10 text-emerald-400">NEW</span>}
                 </div>
+                {/* What changed in this sync */}
+                {(() => {
+                  const changes = (company as any).last_sync_changes;
+                  if (!changes) return null;
+                  if (changes.created) {
+                    return (
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="text-micro px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">new</span>
+                      </div>
+                    );
+                  }
+                  const fields = changes.fields as Record<string, { from: any; to: any }>;
+                  if (!fields || Object.keys(fields).length === 0) return null;
+                  const FIELD_LABELS: Record<string, string> = {
+                    lifecyclestage: "lifecycle", numberofemployees: "headcount",
+                    industry: "industry", country: "country", hubspot_owner_id: "owner", name: "name",
+                  };
+                  return (
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                      {Object.entries(fields).map(([field, { from, to }]) => {
+                        const label = FIELD_LABELS[field] || field;
+                        if (field === "lifecyclestage") {
+                          return (
+                            <span key={field} className="text-micro px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                              {from || "—"} → {to}
+                            </span>
+                          );
+                        }
+                        return (
+                          <span key={field} className="text-micro px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
+                            {label} changed
+                          </span>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
               <div className="text-right text-micro text-foreground/40">
                 {company.scout_score != null && <div>Score {company.scout_score}</div>}
