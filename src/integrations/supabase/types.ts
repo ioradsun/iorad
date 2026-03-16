@@ -162,6 +162,7 @@ export type Database = {
           hubspot_properties: Json | null
           id: string
           industry: string | null
+          iorad_plan: string | null
           iorad_url: string | null
           is_existing_customer: boolean
           last_processed_at: string | null
@@ -199,6 +200,7 @@ export type Database = {
           hubspot_properties?: Json | null
           id?: string
           industry?: string | null
+          iorad_plan?: string | null
           iorad_url?: string | null
           is_existing_customer?: boolean
           last_processed_at?: string | null
@@ -236,6 +238,7 @@ export type Database = {
           hubspot_properties?: Json | null
           id?: string
           industry?: string | null
+          iorad_plan?: string | null
           iorad_url?: string | null
           is_existing_customer?: boolean
           last_processed_at?: string | null
