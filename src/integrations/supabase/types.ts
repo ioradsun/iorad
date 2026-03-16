@@ -146,6 +146,51 @@ export type Database = {
         }
         Relationships: []
       }
+      backfill_log: {
+        Row: {
+          companies_rescored: number | null
+          contacts_processed: number | null
+          contacts_skipped: number | null
+          contacts_total: number | null
+          contacts_updated: number | null
+          current_offset: number | null
+          error: string | null
+          finished_at: string | null
+          id: string
+          job_type: string
+          started_at: string
+          status: string
+        }
+        Insert: {
+          companies_rescored?: number | null
+          contacts_processed?: number | null
+          contacts_skipped?: number | null
+          contacts_total?: number | null
+          contacts_updated?: number | null
+          current_offset?: number | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          job_type?: string
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          companies_rescored?: number | null
+          contacts_processed?: number | null
+          contacts_skipped?: number | null
+          contacts_total?: number | null
+          contacts_updated?: number | null
+          current_offset?: number | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          job_type?: string
+          started_at?: string
+          status?: string
+        }
+        Relationships: []
+      }
       companies: {
         Row: {
           account_type: string
