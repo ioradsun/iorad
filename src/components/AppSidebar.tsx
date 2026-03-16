@@ -22,10 +22,10 @@ import {
 } from "@/components/ui/tooltip";
 import { getContactActivity, sortContactsByActivity } from "@/lib/contactScore";
 
-const categoryItems = [
-  { key: "business", label: "Business", icon: Briefcase },
-  { key: "school", label: "School", icon: GraduationCap },
-  { key: "partner", label: "Partner", icon: Handshake },
+const stageItems = [
+  { key: "prospect", label: "Prospects", icon: Briefcase },
+  { key: "opportunity", label: "Opportunities", icon: Handshake },
+  { key: "customer", label: "Expansion", icon: GraduationCap },
 ];
 
 export default function AppSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
