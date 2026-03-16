@@ -207,7 +207,8 @@ async function upsertCompany(
     .insert({ name, domain, account_type, lifecycle_stage, sales_motion, relationship_type, brief_type,
               source_type: "hubspot",
               industry: p.industry || null, hq_country: p.country || null,
-              headcount, hubspot_properties: p })
+              headcount, hubspot_properties: p,
+              last_sync_changes: { changed_at: new Date().toISOString(), created: true, fields: {} } })
     .select("id")
     .single();
 
