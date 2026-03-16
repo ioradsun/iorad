@@ -40,9 +40,7 @@ Deno.serve(async (req) => {
 
     // First invocation — create the log row
     if (offset === 0) {
-      const { count } = await supabase
-        .from("contacts")
-        .select("id", { count: "exact", head: true });
+      const { count } = await supabase.from("contacts").select("id", { count: "exact", head: true });
 
       const { data: logRow } = await supabase
         .from("backfill_log")
@@ -57,10 +55,10 @@ Deno.serve(async (req) => {
       activeLogId = logRow?.id || null;
     }
 
-    // Load a page of contacts (all), we'll derive HubSpot ID from either column or hubspot_properties.hs_object_id
+    // Load a page of contacts (all), HubSpot ID can come from column OR hubspot_properties.hs_object_id
     const { data: contacts, error } = await supabase
       .from("contacts")
-      .select("id, company_id, hubspot_object_id, hubspot_properties")
+      .select("id, company_id, email, hubspot_object_id, hubspot_properties")
       .order("created_at", { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1);
 
@@ -70,6 +68,7 @@ Deno.serve(async (req) => {
       console.log("backfill-plan-names: all contacts processed, triggering score-companies");
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
       fetch(`${supabaseUrl}/functions/v1/score-companies`, {
         method: "POST",
         headers: { Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
@@ -97,24 +96,31 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Batch-read plan_name from HubSpot in chunks of 100 using derived HubSpot IDs
+    // Batch-read plan_name from HubSpot in chunks of 100 using derived HubSpot IDs and email fallback
     let updated = 0;
     let skipped = 0;
     const companyIdsToRescore = new Set<string>();
 
     for (let i = 0; i < contacts.length; i += BATCH_SIZE) {
       const batch = contacts.slice(i, i + BATCH_SIZE);
+      const hsResultByContactId = new Map<string, { hsId: string; props: any }>();
 
-      const inputs = batch
+      const withHsId = batch
         .map((c: any) => {
           const hsId = c.hubspot_object_id || (c.hubspot_properties as any)?.hs_object_id || null;
-          return hsId ? { id: String(hsId), _db_id: c.id } : null;
+          return hsId ? { contactId: c.id, hsId: String(hsId) } : null;
         })
-        .filter(Boolean) as { id: string; _db_id: string }[];
+        .filter(Boolean) as Array<{ contactId: string; hsId: string }>;
 
-      const hsById = new Map<string, any>();
+      const withoutHsId = batch
+        .map((c: any) => ({ contactId: c.id, email: c.email ? String(c.email).trim().toLowerCase() : null }))
+        .filter((c: any) => c.email) as Array<{ contactId: string; email: string }>;
 
-      if (inputs.length > 0) {
+      // Strategy A: batch read by HubSpot object ID
+      if (withHsId.length > 0) {
+        const idToContact = new Map<string, string>();
+        for (const item of withHsId) idToContact.set(item.hsId, item.contactId);
+
         const res = await hubspotFetch("https://api.hubapi.com/crm/v3/objects/contacts/batch/read", {
           method: "POST",
           headers: {
@@ -122,50 +128,80 @@ Deno.serve(async (req) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            inputs: inputs.map((i) => ({ id: i.id })),
+            inputs: withHsId.map((i) => ({ id: i.hsId })),
             properties: ["plan_name", "account_type", "account__type"],
           }),
         });
 
-        if (!res.ok) {
+        if (res.ok) {
+          const data = await res.json();
+          for (const result of data.results || []) {
+            const hsId = String(result.id);
+            const contactId = idToContact.get(hsId);
+            if (contactId) {
+              hsResultByContactId.set(contactId, { hsId, props: result.properties || {} });
+            }
+          }
+        } else {
           const text = await res.text();
-          console.warn(`HubSpot batch failed (${res.status}): ${text.slice(0, 200)}`);
-          skipped += batch.length;
-          continue;
-        }
-
-        const data = await res.json();
-        for (const result of data.results || []) {
-          hsById.set(String(result.id), result.properties || {});
+          console.warn(`HubSpot batch by ID failed (${res.status}): ${text.slice(0, 200)}`);
         }
       }
 
-      for (const contact of batch) {
-        const hsId =
-          (contact as any).hubspot_object_id ||
-          ((contact as any).hubspot_properties as any)?.hs_object_id ||
-          null;
+      // Strategy B: batch read by email for contacts still unmatched
+      const unmatchedById = withoutHsId.filter((c) => !hsResultByContactId.has(c.contactId));
+      if (unmatchedById.length > 0) {
+        const emailToContact = new Map<string, string>();
+        for (const item of unmatchedById) emailToContact.set(item.email, item.contactId);
 
-        if (!hsId) {
+        const res = await hubspotFetch("https://api.hubapi.com/crm/v3/objects/contacts/batch/read", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            idProperty: "email",
+            inputs: unmatchedById.map((i) => ({ id: i.email })),
+            properties: ["plan_name", "account_type", "account__type", "email"],
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          for (const result of data.results || []) {
+            const props = result.properties || {};
+            const email = String(props.email || "").trim().toLowerCase();
+            if (!email) continue;
+            const contactId = emailToContact.get(email);
+            if (contactId) {
+              hsResultByContactId.set(contactId, { hsId: String(result.id), props });
+            }
+          }
+        } else {
+          const text = await res.text();
+          console.warn(`HubSpot batch by email failed (${res.status}): ${text.slice(0, 200)}`);
+        }
+      }
+
+      for (const contact of batch as any[]) {
+        const hs = hsResultByContactId.get(contact.id);
+        if (!hs) {
           skipped++;
           continue;
         }
 
-        const hsProps = hsById.get(String(hsId));
-        if (!hsProps) {
-          skipped++;
-          continue;
-        }
-
+        const hsId = hs.hsId;
+        const hsProps = hs.props || {};
         const planName = hsProps.plan_name || null;
         if (!planName) {
           skipped++;
           continue;
         }
 
-        const existingProps = ((contact as any).hubspot_properties as any) || {};
+        const existingProps = (contact.hubspot_properties as any) || {};
         const alreadyHasPlan = existingProps.plan_name === planName;
-        if (alreadyHasPlan && (contact as any).hubspot_object_id) {
+        if (alreadyHasPlan && contact.hubspot_object_id) {
           skipped++;
           continue;
         }
@@ -180,16 +216,16 @@ Deno.serve(async (req) => {
           .from("contacts")
           .update({
             hubspot_properties: mergedProps,
-            hubspot_object_id: (contact as any).hubspot_object_id || String(hsId),
+            hubspot_object_id: contact.hubspot_object_id || String(hsId),
           })
-          .eq("id", (contact as any).id);
+          .eq("id", contact.id);
 
         if (updateErr) {
-          console.warn(`Failed to update contact ${(contact as any).id}: ${updateErr.message}`);
+          console.warn(`Failed to update contact ${contact.id}: ${updateErr.message}`);
           skipped++;
         } else {
           updated++;
-          if ((contact as any).company_id) companyIdsToRescore.add((contact as any).company_id);
+          if (contact.company_id) companyIdsToRescore.add(contact.company_id);
         }
       }
     }
