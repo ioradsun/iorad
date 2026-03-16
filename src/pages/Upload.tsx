@@ -436,15 +436,15 @@ function ManualAddForm() {
 
       {/* Stage selector */}
       <div className="space-y-2">
-        <Label className="text-xs">Stage</Label>
+        <Label className="text-xs">Lifecycle Stage</Label>
         <div className="flex items-center bg-secondary rounded-md p-0.5 gap-0.5 w-fit">
           {STAGES.map(s => (
             <button
               key={s.value}
               type="button"
-              onClick={() => update("stage", s.value)}
+              onClick={() => update("lifecycle_stage", s.value)}
               className={`px-3.5 py-1.5 rounded text-xs font-medium transition-all ${
-                form.stage === s.value
+                form.lifecycle_stage === s.value
                   ? "bg-card text-foreground shadow-sm shadow-black/[0.06]"
                   : "text-foreground/45 hover:text-foreground"
               }`}
