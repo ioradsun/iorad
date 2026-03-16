@@ -267,7 +267,10 @@ export default function Dashboard() {
                 onClick={() => navigate(`/company/${company.id}`)}
               >
                 <td className="px-5 py-3.5">
-                  <div className="font-medium text-body text-foreground">{company.name}</div>
+                  <div className="flex items-center gap-1">
+                    <span className="font-medium text-body text-foreground">{company.name}</span>
+                    <ExpansionSignalDot breakdown={(company as any).scout_score_breakdown} />
+                  </div>
                   {company.domain && (
                     <div className="text-caption text-foreground/45 mt-0.5">{company.domain}</div>
                   )}
