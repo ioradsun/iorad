@@ -33,10 +33,10 @@ const COLUMN_MAP: Record<string, keyof CSVRow> = {
   "existing customer": "is_existing_customer",
   "is_existing_customer": "is_existing_customer",
   "persona": "persona",
-  "category": "category",
-  "stage": "stage",
+  "account_type": "account_type",
+  "category": "account_type",
   // backward compat: map source_type values via post-processing
-  "source_type": "category",
+  "source_type": "account_type",
 };
 
 function guessDomain(name: string): string | null {
