@@ -77,16 +77,21 @@ Deno.serve(async (req) => {
         body: JSON.stringify({ action: "score_all", offset: 0 }),
       }).catch(e => console.warn("score trigger failed:", e.message));
 
-      // Mark log as completed
+      // Mark log as completed — use cumulative values from self-chain body
       if (activeLogId) {
-        await supabase.from("backfill_log").update({
+        const finalUpdate: Record<string, any> = {
           status: "completed",
           finished_at: new Date().toISOString(),
-          contacts_processed: body.cumulative_processed || 0,
-          contacts_updated: body.cumulative_updated || 0,
-          contacts_skipped: body.cumulative_skipped || 0,
-          companies_rescored: body.cumulative_rescored || 0,
-        }).eq("id", activeLogId);
+          current_offset: offset,
+        };
+        // Only overwrite counts if we have cumulative data (i.e., this wasn't the first call)
+        if (body.cumulative_processed != null) {
+          finalUpdate.contacts_processed = body.cumulative_processed;
+          finalUpdate.contacts_updated = body.cumulative_updated || 0;
+          finalUpdate.contacts_skipped = body.cumulative_skipped || 0;
+          finalUpdate.companies_rescored = body.cumulative_rescored || 0;
+        }
+        await supabase.from("backfill_log").update(finalUpdate).eq("id", activeLogId);
       }
 
       return new Response(
