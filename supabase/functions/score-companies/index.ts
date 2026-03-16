@@ -20,7 +20,22 @@ interface ScoreBreakdown {
   commercial: number;
   recency: number;
   intent: number;
+  expansion_signal: boolean;
+  expansion_bonus: number;
   total: number;
+}
+
+// ── Plan tier helpers ──────────────────────────────────────────────────────
+const PAID_PLANS = ["team", "enterprise"];
+const PLAN_TIER: Record<string, number> = { "free": 1, "team": 2, "enterprise": 3 };
+
+function normalizePlan(raw: string | null): string | null {
+  if (!raw) return null;
+  const lower = raw.toLowerCase().trim();
+  if (lower.includes("enterprise")) return "Enterprise";
+  if (lower.includes("team"))       return "Team";
+  if (lower.includes("free"))       return "Free";
+  return null;
 }
 
 function calculateScoutScore(
