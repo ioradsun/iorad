@@ -182,7 +182,10 @@ async function generateScoutSummary(
   );
 
   const userInput = `Company: ${company.name}
-Stage: ${company.stage}
+Lifecycle: ${company.lifecycle_stage}
+Sales motion: ${company.sales_motion}
+Account type: ${company.account_type}
+Brief type: ${company.brief_type}
 Scout Score: ${breakdown.total}/100 (tutorial: ${breakdown.tutorial}, commercial: ${breakdown.commercial}, recency: ${breakdown.recency}, intent: ${breakdown.intent})
 
 Contacts with iorad activity (${contactSummaries.length} of ${contacts.length} total):
