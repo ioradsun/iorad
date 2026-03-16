@@ -806,6 +806,15 @@ async function processContactPage(
     }
   }
 
+  // ── iorad activity fields worth diffing ──────────────────────────────────
+  const ACTIVITY_FIELDS = [
+    "first_tutorial_create_date",
+    "answers_with_own_tutorial_month_count",
+    "extension_connections",
+    "first_tutorial_view_date",
+    "plan_name",
+  ];
+
   // Now upsert contacts for each resolved company
   for (const [hsCompanyId, rows] of rowsByCompany.entries()) {
     const companyId = companyIdMap.get(hsCompanyId);
@@ -816,18 +825,22 @@ async function processContactPage(
 
     const { data: existing } = await supabase
       .from("contacts")
-      .select("id, email, hubspot_object_id")
+      .select("id, email, hubspot_object_id, hubspot_properties")
       .eq("company_id", companyId);
 
     const byHubspotId = new Map<string, string>();
     const byEmail = new Map<string, string>();
+    const existingPropsById = new Map<string, any>();
     for (const ec of existing || []) {
       if (ec.hubspot_object_id) byHubspotId.set(ec.hubspot_object_id, ec.id);
       if (ec.email) byEmail.set(ec.email.toLowerCase(), ec.id);
+      existingPropsById.set(ec.id, ec.hubspot_properties || {});
     }
 
     const toInsert: any[] = [];
     const toUpdate: { id: string; data: any }[] = [];
+    let hasProductActivity = false;
+    const allActivityChanges: Record<string, Record<string, { from: any; to: any }>> = {};
 
     for (const row of rows) {
       const { _hs_company_id, ...contactData } = row;
@@ -839,6 +852,31 @@ async function processContactPage(
         null;
 
       if (existingId && existingId !== "pending") {
+        // Diff activity fields before updating
+        const oldProps = existingPropsById.get(existingId) || {};
+        const newProps = contactData.hubspot_properties || {};
+        const activityChanges: Record<string, { from: any; to: any }> = {};
+
+        for (const field of ACTIVITY_FIELDS) {
+          const oldVal = oldProps[field] ?? null;
+          const newVal = newProps[field] ?? null;
+          if (String(oldVal ?? "") !== String(newVal ?? "")) {
+            activityChanges[field] = { from: oldVal, to: newVal };
+          }
+        }
+
+        // Detect meaningful product activity
+        const isProductActivity =
+          (!oldProps.first_tutorial_create_date && newProps.first_tutorial_create_date) ||
+          (parseInt(newProps.answers_with_own_tutorial_month_count || "0", 10) >
+           parseInt(oldProps.answers_with_own_tutorial_month_count || "0", 10)) ||
+          (!oldProps.extension_connections && newProps.extension_connections);
+
+        if (isProductActivity) hasProductActivity = true;
+        if (Object.keys(activityChanges).length > 0) {
+          allActivityChanges[contactData.name || existingId] = activityChanges;
+        }
+
         toUpdate.push({ id: existingId, data: contactData });
       } else if (!existingId) {
         toInsert.push(contactData);
@@ -860,9 +898,41 @@ async function processContactPage(
       ));
     }
 
-    processed += rows.length;
+    // Bubble up activity changes to company last_sync_changes
+    if (Object.keys(allActivityChanges).length > 0 || hasProductActivity) {
+      await supabase.from("companies").update({
+        last_sync_changes: {
+          changed_at: new Date().toISOString(),
+          trigger: hasProductActivity ? "product_activity" : "contact_update",
+          activity: allActivityChanges,
+          fields: {},
+        },
+      }).eq("id", companyId);
+    }
 
-    scoreCompanyAsync(companyId);
+    // Auto-trigger scoring + brief generation on product activity
+    if (hasProductActivity) {
+      const supabaseUrl2 = Deno.env.get("SUPABASE_URL")!;
+      const serviceKey2 = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+      fetch(`${supabaseUrl2}/functions/v1/score-companies`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${serviceKey2}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "score_one", company_id: companyId }),
+      }).catch(e => console.warn("auto-score failed:", e.message));
+
+      fetch(`${supabaseUrl2}/functions/v1/generate-cards`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${serviceKey2}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ company_id: companyId, tab: "strategy", auto_triggered: true }),
+      }).catch(e => console.warn("auto-brief failed:", e.message));
+
+      console.log(`sync_contacts: product_activity detected for company ${companyId} — auto-score + auto-brief triggered`);
+    } else {
+      scoreCompanyAsync(companyId);
+    }
+
+    processed += rows.length;
   }
 
   if (orphanRows.length > 0) {

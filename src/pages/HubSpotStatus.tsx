@@ -64,6 +64,7 @@ function useRecentlyUpdatedCompanies() {
         .from("companies")
         .select("id, name, domain, account_type, lifecycle_stage, sales_motion, scout_score, last_sync_changes, updated_at, created_at")
         .gte("updated_at", since)
+        .not("last_sync_changes->>trigger", "eq", "no_change")
         .order("updated_at", { ascending: false })
         .limit(50);
       return data || [];
@@ -245,9 +246,28 @@ export default function HubSpotStatus() {
         <h3 className="text-title font-semibold">Recently synced companies (24h)</h3>
         {companies.map((company: any) => {
           const isNew = Date.now() - new Date(company.created_at).getTime() < 24 * 60 * 60 * 1000;
-          const updatedAt = new Date(company.updated_at);
-          const createdAt = new Date(company.created_at);
-          const label = updatedAt.getTime() === createdAt.getTime() ? "Created" : "Updated";
+
+          function getSyncLabel(c: any): { label: string; tone: "new" | "hot" | "warm" | "neutral" } {
+            const changes = c.last_sync_changes;
+            const trigger = changes?.trigger;
+            if (!trigger || trigger === "no_change") return { label: "No changes", tone: "neutral" };
+            if (trigger === "new_record")       return { label: "New",               tone: "new"  };
+            if (trigger === "product_activity") return { label: "Product activity",  tone: "hot"  };
+            if (trigger === "lifecycle_change") return { label: "Lifecycle changed", tone: "warm" };
+            if (trigger === "crm_update")       return { label: "CRM updated",       tone: "neutral" };
+            if (trigger === "contact_update")   return { label: "Contact updated",   tone: "neutral" };
+            return { label: "Updated", tone: "neutral" };
+          }
+
+          const TONE_STYLES: Record<string, string> = {
+            hot:     "text-amber-400",
+            warm:    "text-primary",
+            new:     "text-emerald-400",
+            neutral: "text-foreground/40",
+          };
+
+          const { label: triggerLabel, tone } = getSyncLabel(company);
+
           return (
             <div key={company.id} className="flex items-start justify-between gap-3 border-b border-border/40 pb-2 last:border-0">
               <div className="min-w-0">
@@ -261,44 +281,67 @@ export default function HubSpotStatus() {
                 {/* What changed in this sync */}
                 {(() => {
                   const changes = (company as any).last_sync_changes;
-                  if (!changes) return null;
-                  if (changes.created) {
-                    return (
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <span className="text-micro px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">new</span>
-                      </div>
-                    );
-                  }
-                  const fields = changes.fields as Record<string, { from: any; to: any }>;
-                  if (!fields || Object.keys(fields).length === 0) return null;
+                  if (!changes || changes.trigger === "no_change") return null;
+
                   const FIELD_LABELS: Record<string, string> = {
-                    lifecyclestage: "lifecycle", numberofemployees: "headcount",
-                    industry: "industry", country: "country", hubspot_owner_id: "owner", name: "name",
+                    lifecyclestage:                        "lifecycle",
+                    numberofemployees:                     "headcount",
+                    industry:                              "industry",
+                    country:                               "country",
+                    hubspot_owner_id:                      "owner",
+                    name:                                  "name",
+                    first_tutorial_create_date:            "new tutorial creator",
+                    answers_with_own_tutorial_month_count: "monthly usage",
+                    extension_connections:                 "extension installed",
+                    first_tutorial_view_date:              "new viewer",
+                    plan_name:                             "plan changed",
                   };
+
+                  const fieldEntries = Object.entries(changes.fields || {}) as [string, { from: any; to: any }][];
+                  const activityEntries: { contact: string; field: string; from: any; to: any }[] = [];
+                  for (const [contactName, fieldChanges] of Object.entries(changes.activity || {})) {
+                    for (const [field, diff] of Object.entries(fieldChanges as any)) {
+                      activityEntries.push({ contact: contactName, field, ...(diff as any) });
+                    }
+                  }
+
+                  if (fieldEntries.length === 0 && activityEntries.length === 0 && changes.trigger !== "new_record") return null;
+
                   return (
-                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                      {Object.entries(fields).map(([field, { from, to }]) => {
-                        const label = FIELD_LABELS[field] || field;
-                        if (field === "lifecyclestage") {
-                          return (
-                            <span key={field} className="text-micro px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
-                              {from || "—"} → {to}
-                            </span>
-                          );
-                        }
-                        return (
-                          <span key={field} className="text-micro px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
-                            {label} changed
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                      {fieldEntries.map(([field, { from, to }]) => (
+                        field === "lifecyclestage" ? (
+                          <span key={field} className="text-micro px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                            {from || "—"} → {to}
                           </span>
-                        );
-                      })}
+                        ) : (
+                          <span key={field} className="text-micro px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
+                            {FIELD_LABELS[field] || field} changed
+                          </span>
+                        )
+                      ))}
+                      {activityEntries.map(({ contact, field }, i) => (
+                        <span key={i} className="text-micro px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                          {contact.split(" ")[0]}: {FIELD_LABELS[field] || field}
+                        </span>
+                      ))}
+                      {changes.trigger === "new_record" && (
+                        <span className="text-micro px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          new
+                        </span>
+                      )}
                     </div>
                   );
                 })()}
               </div>
-              <div className="text-right text-micro text-foreground/40">
-                {company.scout_score != null && <div>Score {company.scout_score}</div>}
-                <div>{label} {formatDistanceToNow(new Date(label === "Created" ? company.created_at : company.updated_at), { addSuffix: true })}</div>
+              <div className="text-right shrink-0 space-y-0.5">
+                <div className={`text-micro font-medium ${TONE_STYLES[tone]}`}>{triggerLabel}</div>
+                {company.scout_score != null && (
+                  <div className="text-micro text-foreground/40">Score {company.scout_score}</div>
+                )}
+                <div className="text-micro text-foreground/30">
+                  {formatDistanceToNow(new Date(company.updated_at), { addSuffix: true })}
+                </div>
               </div>
             </div>
           );
