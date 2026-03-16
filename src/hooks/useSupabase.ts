@@ -289,15 +289,14 @@ export function useCompanyStats() {
     queryFn: async () => {
       const [totalRes, schoolRes, businessRes, partnerRes, recentRes, stagesRes] = await Promise.all([
         supabase.from("companies").select("id", { count: "exact", head: true }),
-        supabase.from("companies").select("id", { count: "exact", head: true }).eq("category", "school"),
-        supabase.from("companies").select("id", { count: "exact", head: true }).or("category.eq.business,category.is.null"),
-        supabase.from("companies").select("id", { count: "exact", head: true }).eq("category", "partner"),
+        supabase.from("companies").select("id", { count: "exact", head: true }).eq("account_type" as any, "school"),
+        supabase.from("companies").select("id", { count: "exact", head: true }).or("account_type.eq.company,account_type.is.null" as any),
+        supabase.from("companies").select("id", { count: "exact", head: true }).eq("account_type" as any, "partner"),
         supabase.from("companies").select("id", { count: "exact", head: true }).gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
         Promise.all([
-          supabase.from("companies").select("id", { count: "exact", head: true }).eq("stage", "prospect"),
-          supabase.from("companies").select("id", { count: "exact", head: true }).eq("stage", "active_opp"),
-          supabase.from("companies").select("id", { count: "exact", head: true }).eq("stage", "customer"),
-          supabase.from("companies").select("id", { count: "exact", head: true }).eq("stage", "expansion"),
+          supabase.from("companies").select("id", { count: "exact", head: true }).eq("lifecycle_stage" as any, "prospect"),
+          supabase.from("companies").select("id", { count: "exact", head: true }).eq("lifecycle_stage" as any, "opportunity"),
+          supabase.from("companies").select("id", { count: "exact", head: true }).eq("lifecycle_stage" as any, "customer"),
         ]),
       ]);
 
