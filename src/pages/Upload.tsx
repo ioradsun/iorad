@@ -378,14 +378,22 @@ function ManualAddForm() {
 
     setSaving(true);
     try {
+      const lifecycle_stage = form.lifecycle_stage;
+      const sales_motion = lifecycle_stage === "customer" ? "expansion" : lifecycle_stage === "opportunity" ? "active-deal" : "new-logo";
+      const relationship_type = form.account_type === "partner" ? "partner-managed" : "direct";
+      const brief_type = lifecycle_stage === "customer" ? "expansionBrief" : lifecycle_stage === "opportunity" ? "opportunityBrief" : "prospectBrief";
+
       await insertCompanies.mutateAsync([{
         name,
         domain,
-        partner: form.category === "partner" ? (form.partner || null) : null,
-        is_existing_customer: false,
-        category: form.category,
-        stage: form.stage,
-        source_type: form.category === "partner" ? "outbound" : "inbound",
+        partner: form.account_type === "partner" ? (form.partner || null) : null,
+        is_existing_customer: lifecycle_stage === "customer",
+        account_type: form.account_type,
+        lifecycle_stage,
+        sales_motion,
+        relationship_type,
+        brief_type,
+        source_type: form.account_type === "partner" ? "outbound" : "inbound",
       } as any]);
       toast.success(`Added ${name}`);
       navigate("/");
