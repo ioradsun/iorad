@@ -14,6 +14,7 @@ import StrategyTab from "./StrategyTab";
 import { parseJson, toIoradEmbedUrl, toLoomEmbedUrl } from "./types";
 import type { DashboardCard, EmailTouch, LinkedInStep, StoryAssets } from "./types";
 import { getContactActivity } from "@/lib/contactScore";
+import { PlanBadge } from "@/components/PlanBadge";
 
 interface ContactDetailViewProps {
   companyId: string;
@@ -401,7 +402,11 @@ export default function ContactDetailView({
                 {activity.plan && (
                   <div>
                     <div className="field-label">Plan</div>
-                    <div className="text-caption text-foreground/50">{activity.plan}</div>
+                    <PlanBadge plan={
+                      activity.plan.toLowerCase().includes("enterprise") ? "Enterprise"
+                      : activity.plan.toLowerCase().includes("team") ? "Team"
+                      : "Free"
+                    } />
                   </div>
                 )}
               </div>

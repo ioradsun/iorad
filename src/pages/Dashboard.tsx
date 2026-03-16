@@ -4,6 +4,7 @@ import { Search, ArrowUpDown, ChevronRight } from "lucide-react";
 import { useCompanies, useCompaniesPage, useSignalCounts } from "@/hooks/useSupabase";
 import { ClearableInput } from "@/components/ui/clearable-input";
 import HubSpotPickerModal from "@/components/HubSpotPickerModal";
+import { PlanBadge } from "@/components/PlanBadge";
 
 type SortKey = "name" | "scout_score";
 type StageTab = "prospect" | "opportunity" | "customer";
@@ -375,19 +376,6 @@ function ScoutBadge({ score }: { score: number | null }) {
   );
 }
 
-function PlanBadge({ plan }: { plan: string | null }) {
-  if (!plan) return <span className="text-foreground/20 text-xs">—</span>;
-  const styles: Record<string, string> = {
-    Enterprise: "bg-purple-500/10 text-purple-400 border-purple-500/20",
-    Team:       "bg-blue-500/10 text-blue-400 border-blue-500/20",
-    Free:       "bg-muted text-muted-foreground border-border",
-  };
-  return (
-    <span className={`inline-flex items-center text-micro font-medium px-2 py-0.5 rounded border ${styles[plan] || styles.Free}`}>
-      {plan}
-    </span>
-  );
-}
 
 function ExpansionSignalDot({ breakdown }: { breakdown: any }) {
   const signal = breakdown?.expansion_signal;
