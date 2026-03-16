@@ -109,20 +109,28 @@ export default function UploadPage() {
           const existingRaw = (mappedRow.is_existing_customer as any || "").toString().toLowerCase();
           const isExisting = existingRaw === "true" || existingRaw === "yes" || existingRaw === "1";
 
-          // Backward compat: map source_type="inbound" → category="business"
-          let category = (mappedRow.category as any) || null;
-          if (!category) category = "business";
-          if (category === "inbound") category = "business";
-          if (category === "outbound") category = (mappedRow.partner as any) ? "partner" : "business";
+          // Backward compat: map source_type → account_type
+          let account_type = (mappedRow.account_type as any) || null;
+          if (!account_type) account_type = "company";
+          if (account_type === "inbound") account_type = "company";
+          if (account_type === "outbound") account_type = (mappedRow.partner as any) ? "partner" : "company";
+          if (account_type === "business") account_type = "company";
 
-          const stage = (mappedRow.stage as any) || "prospect";
+          // Map old stage values
+          let lifecycle_stage = (mappedRow.lifecycle_stage as any) || "prospect";
+          if (lifecycle_stage === "active_opp") lifecycle_stage = "opportunity";
+          if (lifecycle_stage === "expansion") lifecycle_stage = "customer";
+
+          const sales_motion = lifecycle_stage === "customer" ? "expansion" : lifecycle_stage === "opportunity" ? "active-deal" : "new-logo";
+          const relationship_type = (mappedRow.partner as any) ? "partner-managed" : "direct";
+          const brief_type = lifecycle_stage === "customer" ? "expansionBrief" : lifecycle_stage === "opportunity" ? "opportunityBrief" : "prospectBrief";
 
           valid.push({
             company_name: name, domain: domain || null, partner: (mappedRow.partner as any) || null,
             partner_rep_email: (mappedRow.partner_rep_email as any) || null, partner_rep_name: (mappedRow.partner_rep_name as any) || null,
             hq_country: (mappedRow.hq_country as any) || null, industry: (mappedRow.industry as any) || null,
             headcount, is_existing_customer: isExisting, persona: (mappedRow.persona as any) || null,
-            category, stage,
+            account_type, lifecycle_stage, sales_motion, relationship_type, brief_type,
           });
         });
 
