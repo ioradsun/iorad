@@ -588,12 +588,21 @@ async function syncCompaniesIncremental(supabase: any) {
         const isSchool = domainLow.includes(".edu") || domainLow.includes(".k12.") || domainLow.includes(".school") ||
           schoolKeys.some((k) => nameLow.includes(k)) ||
           (p.industry || "").toLowerCase().includes("education");
-        const category = isSchool ? "school" : "business";
+        const account_type = isSchool ? "school" : "company";
 
         const lifecycle = (p.lifecyclestage || "").toLowerCase();
-        let stage = "prospect";
-        if (lifecycle === "customer") stage = "customer";
-        else if (lifecycle === "opportunity" || lifecycle === "salesqualifiedlead") stage = "active_opp";
+        let lifecycle_stage = "prospect";
+        if (lifecycle === "customer" || lifecycle === "evangelist") lifecycle_stage = "customer";
+        else if (lifecycle === "opportunity" || lifecycle === "salesqualifiedlead") lifecycle_stage = "opportunity";
+
+        const sales_motion =
+          lifecycle_stage === "customer"    ? "expansion"    :
+          lifecycle_stage === "opportunity" ? "active-deal"  : "new-logo";
+        const partnerRaw = (p.partner || "").trim();
+        const relationship_type = partnerRaw ? "partner-managed" : "direct";
+        const brief_type =
+          lifecycle_stage === "customer"    ? "expansionBrief"    :
+          lifecycle_stage === "opportunity" ? "opportunityBrief"  : "prospectBrief";
 
         const headcount = p.numberofemployees ? parseInt(p.numberofemployees, 10) || null : null;
 
@@ -608,8 +617,11 @@ async function syncCompaniesIncremental(supabase: any) {
             await supabase.from("companies").update({
               name,
               domain,
-              category,
-              stage,
+              account_type,
+              lifecycle_stage,
+              sales_motion,
+              relationship_type,
+              brief_type,
               industry: p.industry || null,
               hq_country: p.country || null,
               headcount,
@@ -619,8 +631,11 @@ async function syncCompaniesIncremental(supabase: any) {
             await supabase.from("companies").insert({
               name,
               domain,
-              category,
-              stage,
+              account_type,
+              lifecycle_stage,
+              sales_motion,
+              relationship_type,
+              brief_type,
               source_type: "hubspot",
               industry: p.industry || null,
               hq_country: p.country || null,
