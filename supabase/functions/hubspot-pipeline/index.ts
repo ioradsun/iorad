@@ -287,6 +287,8 @@ const CONTACT_PROPS = [
   "first_tutorial_create_date", "first_tutorial_view_date", "first_tutorial_learn_date",
   "answers_with_own_tutorial_month_count", "answers_with_own_tutorial_previous_month_count",
   "answers", "extension_connections",
+  // iorad account info
+  "plan_name", "account_type", "account__type",
 ];
 
 async function importContactsForCompany(
