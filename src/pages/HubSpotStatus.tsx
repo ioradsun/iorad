@@ -64,6 +64,7 @@ function useRecentlyUpdatedCompanies() {
         .from("companies")
         .select("id, name, domain, account_type, lifecycle_stage, sales_motion, scout_score, last_sync_changes, updated_at, created_at")
         .gte("updated_at", since)
+        .not("last_sync_changes->>trigger", "eq", "no_change")
         .order("updated_at", { ascending: false })
         .limit(50);
       return data || [];
