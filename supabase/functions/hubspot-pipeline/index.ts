@@ -287,6 +287,8 @@ const CONTACT_PROPS = [
   "first_tutorial_create_date", "first_tutorial_view_date", "first_tutorial_learn_date",
   "answers_with_own_tutorial_month_count", "answers_with_own_tutorial_previous_month_count",
   "answers", "extension_connections",
+  // iorad account info
+  "plan_name", "account_type", "account__type",
 ];
 
 async function importContactsForCompany(
@@ -366,6 +368,8 @@ async function importContactsForCompany(
           answers_with_own_tutorial_previous_month_count: cp.answers_with_own_tutorial_previous_month_count || null,
           answers: cp.answers || null,
           extension_connections: cp.extension_connections || null,
+          plan_name: cp.plan_name || null,
+          account_type: cp.account_type || cp.account__type || null,
         },
       });
     }

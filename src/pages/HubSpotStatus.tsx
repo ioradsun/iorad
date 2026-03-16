@@ -167,6 +167,19 @@ export default function HubSpotStatus() {
     onError: (err: any) => toast.error(`Sync failed: ${err?.message}`),
   });
 
+  const backfillPlans = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.functions.invoke("backfill-plan-names", {
+        body: { offset: 0 },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Plan backfill started — runs in background, scores update automatically");
+    },
+    onError: (err: any) => toast.error(`Backfill failed: ${err?.message}`),
+  });
+
   const health = (() => {
     if (!history.length) return { label: "Never synced", tone: "neutral" as const };
     if (latest?.status === "running") return { label: "Sync in progress…", tone: "running" as const };
@@ -185,6 +198,10 @@ export default function HubSpotStatus() {
         <Button className="gap-1.5" onClick={() => syncNow.mutate()} disabled={syncNow.isPending}>
           {syncNow.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
           Sync Now
+        </Button>
+        <Button variant="outline" className="gap-1.5" onClick={() => backfillPlans.mutate()} disabled={backfillPlans.isPending}>
+          {backfillPlans.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+          Backfill Plans
         </Button>
       </div>
 
