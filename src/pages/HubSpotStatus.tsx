@@ -296,7 +296,7 @@ export default function HubSpotStatus() {
         </div>
       )}
 
-
+      <div className="rounded-xl border border-border bg-card p-6 space-y-4">
         <div className="flex items-center gap-3">
           {health.tone === "healthy" && <CheckCircle2 className="w-5 h-5 text-success" />}
           {(health.tone === "stale" || health.tone === "down" || health.tone === "neutral") && <AlertCircle className={`w-5 h-5 ${health.tone === "down" ? "text-destructive" : health.tone === "stale" ? "text-warning" : "text-foreground/25"}`} />}
