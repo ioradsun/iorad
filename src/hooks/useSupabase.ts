@@ -38,7 +38,7 @@ export function useCompanies() {
       while (true) {
         const { data, error } = await (supabase
           .from("companies")
-          .select("id, name, domain, partner, partner_rep_email, partner_rep_name, snapshot_status, created_at, account_type, lifecycle_stage, scout_score, source_type, last_score_total, industry, headcount") as any)
+          .select(COMPANY_LIST_COLUMNS) as any)
           .order("last_score_total", { ascending: false, nullsFirst: false })
           .range(from, from + PAGE - 1);
         if (error) throw error;
