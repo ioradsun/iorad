@@ -1213,14 +1213,21 @@ async function upsertCompany(supabase: any, hubspotCompany: any): Promise<{ comp
       .maybeSingle();
 
     if (existingByHubspotId) {
-      const category = existingByHubspotId.partner ? "partner" : deriveCategory(props, existingByHubspotId.partner);
-      const stage = deriveStage(props, deals);
-      const isCustomer = stage === "customer" || stage === "expansion";
+      const account_type = existingByHubspotId.partner ? "partner" : deriveAccountType(props, existingByHubspotId.partner);
+      const lifecycle_stage = deriveStage(props, deals);
+      const isCustomer = lifecycle_stage === "customer";
+      const sales_motion = lifecycle_stage === "customer" ? "expansion" : lifecycle_stage === "opportunity" ? "active-deal" : "new-logo";
+      const partnerRaw = (props.partner || existingByHubspotId.partner || "").trim();
+      const relationship_type = partnerRaw ? "partner-managed" : "direct";
+      const brief_type = lifecycle_stage === "customer" ? "expansionBrief" : lifecycle_stage === "opportunity" ? "opportunityBrief" : "prospectBrief";
 
       await supabase.from("companies").update({
         ...companyData,
-        category,
-        stage,
+        account_type,
+        lifecycle_stage,
+        sales_motion,
+        relationship_type,
+        brief_type,
         ...(isCustomer ? { is_existing_customer: true } : {}),
       }).eq("id", existingByHubspotId.id);
 
