@@ -477,7 +477,7 @@ function ManualAddForm() {
             maxLength={255}
           />
         </div>
-        {form.category === "partner" && (
+        {form.account_type === "partner" && (
           <div className="space-y-2 col-span-2">
             <Label className="text-xs">Partner</Label>
             <Select value={form.partner} onValueChange={v => update("partner", v)}>
