@@ -158,9 +158,37 @@ function calculateScoutScore(
 
   intent = Math.min(10, intent);
 
-  const total = Math.min(100, Math.max(0, tutorial + commercial + recency + intent));
+  // ── iorad Plan derivation (bubble up highest plan to company level) ────────
+  const planValues = contacts
+    .map((c: any) => normalizePlan((c.hubspot_properties as any)?.plan_name || null))
+    .filter(Boolean) as string[];
+  const topPlan = planValues.length > 0
+    ? planValues.reduce((best, cur) =>
+        (PLAN_TIER[cur.toLowerCase()] || 0) > (PLAN_TIER[best.toLowerCase()] || 0) ? cur : best
+      )
+    : null;
 
-  return { tutorial, commercial, recency, intent, total };
+  // ── Expansion Signal (max 20 bonus) ───────────────────────────────────────
+  const hasPaidContact = contacts.some((c: any) => {
+    const plan = normalizePlan((c.hubspot_properties as any)?.plan_name || null);
+    return plan !== null && PAID_PLANS.includes(plan.toLowerCase());
+  });
+
+  const hasFreeCreator = contacts.some((c: any) => {
+    const hp = (c.hubspot_properties as any) || {};
+    const plan = normalizePlan(hp.plan_name || null);
+    return plan?.toLowerCase() === "free" && !!hp.first_tutorial_create_date;
+  });
+
+  const expansion_signal = hasPaidContact && hasFreeCreator;
+  const expansion_bonus = expansion_signal ? 20 : 0;
+
+  const total = Math.min(100, Math.max(0, tutorial + commercial + recency + intent + expansion_bonus));
+
+  // Attach topPlan to company object for DB write in scoreOneCompany
+  (company as any)._derived_plan = topPlan;
+
+  return { tutorial, commercial, recency, intent, expansion_signal, expansion_bonus, total };
 }
 
 // ── AI Activity Summary ───────────────────────────────────────────────────────
