@@ -62,7 +62,7 @@ function useRecentlyUpdatedCompanies() {
       const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const { data } = await supabase
         .from("companies")
-        .select("id, name, domain, category, stage, scout_score, updated_at, created_at")
+        .select("id, name, domain, account_type, lifecycle_stage, sales_motion, scout_score, updated_at, created_at")
         .gte("updated_at", since)
         .order("updated_at", { ascending: false })
         .limit(50);
