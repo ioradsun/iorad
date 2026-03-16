@@ -1059,7 +1059,7 @@ function isEduName(name: string): boolean {
   return EDU_NAME_KEYWORDS.some(rx => rx.test(name));
 }
 
-function deriveCategory(props: Record<string, any>, existingPartner?: string | null): "school" | "business" | "partner" {
+function deriveAccountType(props: Record<string, any>, existingPartner?: string | null): "school" | "company" | "partner" {
   // Partner: already flagged (outbound partner company)
   if (existingPartner) return "partner";
 
@@ -1072,7 +1072,7 @@ function deriveCategory(props: Record<string, any>, existingPartner?: string | n
   const name = props.name || "";
   if (isEduName(name)) return "school";
 
-  return "business";
+  return "company";
 }
 
 // ── Deal-aware stage derivation ───────────────────────────────────────────────
