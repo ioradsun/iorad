@@ -1547,7 +1547,7 @@ export default function CompanyDetail() {
             companyId={id!}
             company={company}
             companyNameSlug={companyNameSlug}
-            isPartnerCategory={isPartnerCategory}
+            isPartnerCategory={isPartnerManaged}
             contacts={contacts}
             selectedContactId={selectedContactId || contacts[0]?.id || ""}
             addContactOpen={addContactOpen}
