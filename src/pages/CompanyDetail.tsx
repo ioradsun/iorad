@@ -143,8 +143,12 @@ export default function CompanyDetail() {
   }, [id, effectiveContactId, queryClient]);
 
   // companyAny declared above
-  const companyCategory = companyAny?.category || (companyAny?.source_type === "inbound" ? "business" : companyAny?.partner ? "partner" : "business");
-  const isPartnerCategory = companyCategory === "partner";
+  const companyAccountType = companyAny?.account_type || "company";
+  const companyLifecycleStage = companyAny?.lifecycle_stage || "prospect";
+  const companySalesMotion = companyAny?.sales_motion || "new-logo";
+  const companyRelationshipType = companyAny?.relationship_type || "direct";
+  const companyBriefType = companyAny?.brief_type || "prospectBrief";
+  const isPartnerManaged = companyRelationshipType === "partner-managed";
 
   const handleAddContact = async () => {
     if (!id || !newContact.name.trim()) return;
@@ -232,7 +236,7 @@ export default function CompanyDetail() {
       }
 
       // Step 3: Find contacts via Apollo (skip for partner companies — contacts come from HubSpot)
-      if (companyAny?.category === "partner" || (!companyAny?.category && companyAny?.source_type !== "inbound")) {
+      if (isPartnerManaged) {
         toast.info("Step 3/3 — Finding contacts via Apollo…");
         try {
           const { data: contactData, error: contactErr } = await supabase.functions.invoke("find-contacts", { body: { company_id: id } });
@@ -251,7 +255,7 @@ export default function CompanyDetail() {
       }
 
       // Step 3: For non-partner companies, extract contact profiles and generate company cards
-      if (companyAny?.category !== "partner") {
+      if (!isPartnerManaged) {
         // Extract AI profiles from HubSpot data
         toast.info("Extracting contact profiles…");
         try {
@@ -789,11 +793,10 @@ export default function CompanyDetail() {
   const snap = latestSnapshot ? parseJson<SnapshotJSON>(latestSnapshot.snapshot_json) : null;
   const scoutBreakdown = parseJson<ScoreBreakdown>(companyAny?.scout_score_breakdown);
 
-  const companyStage = companyAny?.stage || "prospect";
   const companyNameSlug = company.name.toLowerCase().replace(/\s+/g, "-");
   const effectiveContact = contacts.find((c: any) => c.id === effectiveContactId) || contacts[0] || null;
   const storyBaseUrl = effectiveContact
-    ? (!isPartnerCategory
+    ? (!isPartnerManaged
       ? `/stories/${companyNameSlug}/${(effectiveContact?.name || "contact").split(" ")[0].toLowerCase().replace(/[^a-z]/g, "")}`
       : company.partner
         ? `/${company.partner}/${companyNameSlug}/stories/${(effectiveContact?.name || "contact").split(" ")[0].toLowerCase().replace(/[^a-z]/g, "")}`
@@ -912,9 +915,14 @@ export default function CompanyDetail() {
                   {company.domain && <span>{company.domain}</span>}
                   {company.domain && <span className="text-foreground/15">·</span>}
                   <Select
-                    value={companyCategory}
+                    value={companyAccountType}
                     onValueChange={async (val) => {
-                      await updateCompany.mutateAsync({ id: id!, updates: { category: val } as any });
+                      const updates: Record<string, unknown> = {
+                        account_type: val,
+                        relationship_type: val === "partner" ? "partner-managed" : "direct",
+                        brief_type: companyLifecycleStage === "customer" ? "expansionBrief" : companyLifecycleStage === "opportunity" ? "opportunityBrief" : "prospectBrief",
+                      };
+                      await updateCompany.mutateAsync({ id: id!, updates });
                       queryClient.invalidateQueries({ queryKey: ["company", id] });
                     }}
                   >
@@ -922,16 +930,22 @@ export default function CompanyDetail() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="company">Company</SelectItem>
                       <SelectItem value="school">School</SelectItem>
-                      <SelectItem value="business">Business</SelectItem>
                       <SelectItem value="partner">Partner</SelectItem>
                     </SelectContent>
                   </Select>
                   <span className="text-foreground/15">·</span>
                   <Select
-                    value={companyStage}
+                    value={companyLifecycleStage}
                     onValueChange={async (val) => {
-                      await updateCompany.mutateAsync({ id: id!, updates: { stage: val } as any });
+                      const updates: Record<string, unknown> = {
+                        lifecycle_stage: val,
+                        sales_motion: val === "customer" ? "expansion" : val === "opportunity" ? "active-deal" : "new-logo",
+                        brief_type: val === "customer" ? "expansionBrief" : val === "opportunity" ? "opportunityBrief" : "prospectBrief",
+                        is_existing_customer: val === "customer",
+                      };
+                      await updateCompany.mutateAsync({ id: id!, updates });
                       queryClient.invalidateQueries({ queryKey: ["company", id] });
                     }}
                   >
@@ -940,9 +954,8 @@ export default function CompanyDetail() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="prospect">Prospect</SelectItem>
-                      <SelectItem value="active_opp">Active Opp</SelectItem>
+                      <SelectItem value="opportunity">Opportunity</SelectItem>
                       <SelectItem value="customer">Customer</SelectItem>
-                      <SelectItem value="expansion">Expansion</SelectItem>
                     </SelectContent>
                   </Select>
                   {company.scout_score != null && (
@@ -1534,7 +1547,7 @@ export default function CompanyDetail() {
             companyId={id!}
             company={company}
             companyNameSlug={companyNameSlug}
-            isPartnerCategory={isPartnerCategory}
+            isPartnerCategory={isPartnerManaged}
             contacts={contacts}
             selectedContactId={selectedContactId || contacts[0]?.id || ""}
             addContactOpen={addContactOpen}

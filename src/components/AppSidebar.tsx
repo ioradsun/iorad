@@ -22,10 +22,10 @@ import {
 } from "@/components/ui/tooltip";
 import { getContactActivity, sortContactsByActivity } from "@/lib/contactScore";
 
-const categoryItems = [
-  { key: "business", label: "Business", icon: Briefcase },
-  { key: "school", label: "School", icon: GraduationCap },
-  { key: "partner", label: "Partner", icon: Handshake },
+const stageItems = [
+  { key: "prospect", label: "Prospects", icon: Briefcase },
+  { key: "opportunity", label: "Opportunities", icon: Handshake },
+  { key: "customer", label: "Expansion", icon: GraduationCap },
 ];
 
 export default function AppSidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
@@ -88,9 +88,10 @@ export default function AppSidebar({ onNavigate }: { onNavigate?: () => void } =
     .slice(0, 2);
 
   const isActive = (path: string) => location.pathname === path;
-  const isCompanyCategory = (cat: string) => {
+  const isStageActive = (stage: string) => {
     const params = new URLSearchParams(location.search);
-    return location.pathname === "/" && params.get("category") === cat;
+    const current = params.get("stage") || "prospect";
+    return location.pathname === "/" && current === stage;
   };
 
   const NavItem = ({ to, icon: Icon, label, active }: { to: string; icon: any; label: string; active: boolean }) => (
@@ -223,13 +224,13 @@ export default function AppSidebar({ onNavigate }: { onNavigate?: () => void } =
             <div className="text-micro font-medium uppercase tracking-wider text-foreground/25 px-3 pb-1">
               Companies
             </div>
-            {categoryItems.map(({ key, label, icon }) => (
+            {stageItems.map(({ key, label, icon }) => (
               <NavItem
                 key={key}
-                to={`/?category=${key}`}
+                to={`/?stage=${key}`}
                 icon={icon}
                 label={label}
-                active={isCompanyCategory(key) || (key === "business" && location.pathname === "/" && !location.search)}
+                active={isStageActive(key)}
               />
             ))}
 

@@ -6,10 +6,10 @@ export type DbAppSettings = Tables<"app_settings">;
 const COMPANY_LIST_COLUMNS = "id, name, domain, partner, partner_rep_email, partner_rep_name, snapshot_status, created_at, account_type, lifecycle_stage, scout_score, source_type, last_score_total, industry, headcount";
 
 // ---- Companies ----
-// Fast first page for immediate render — server-side category filter
-export function useCompaniesPage(category: string, limit = 50) {
+// Fast first page for immediate render — server-side lifecycle_stage filter
+export function useCompaniesPage(stage: string, limit = 50) {
   return useQuery({
-    queryKey: ["companies_page", category, limit],
+    queryKey: ["companies_page", stage, limit],
     queryFn: async () => {
       let query = (supabase
         .from("companies")
@@ -17,15 +17,8 @@ export function useCompaniesPage(category: string, limit = 50) {
         .order("scout_score", { ascending: false, nullsFirst: false })
         .limit(limit);
 
-      // Server-side account_type filter
-      if (category === "school") {
-        query = query.eq("account_type" as any, "school");
-      } else if (category === "partner") {
-        query = query.eq("account_type" as any, "partner");
-      } else {
-        // "company" is the default — includes null/missing account_type
-        query = query.or("account_type.eq.company,account_type.is.null" as any);
-      }
+      // Server-side lifecycle_stage filter
+      query = query.eq("lifecycle_stage", stage);
 
       const { data, error } = await query;
       if (error) throw error;

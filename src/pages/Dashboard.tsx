@@ -6,26 +6,30 @@ import { ClearableInput } from "@/components/ui/clearable-input";
 import HubSpotPickerModal from "@/components/HubSpotPickerModal";
 
 type SortKey = "name" | "scout_score";
-type CategoryTab = "school" | "business" | "partner";
-
-const CATEGORY_LABELS: Record<CategoryTab, string> = {
-  school: "School",
-  business: "Business",
-  partner: "Partner",
-};
+type StageTab = "prospect" | "opportunity" | "customer";
 
 const STAGE_LABELS: Record<string, string> = {
   prospect: "Prospect",
-  active_opp: "Active Opp",
+  opportunity: "Opportunity",
   customer: "Customer",
-  expansion: "Expansion",
 };
 
 const STAGE_COLORS: Record<string, string> = {
   prospect: "bg-muted text-muted-foreground border-border",
-  active_opp: "bg-info/10 text-info border-info/20",
+  opportunity: "bg-info/10 text-info border-info/20",
   customer: "bg-success/10 text-success border-success/20",
-  expansion: "bg-primary/10 text-primary border-primary/20",
+};
+
+const ACCOUNT_TYPE_LABELS: Record<string, string> = {
+  company: "Company",
+  school: "School",
+  partner: "Partner",
+};
+
+const EMPTY_STATE_LABELS: Record<string, string> = {
+  prospect: "No prospects yet.",
+  opportunity: "No active opportunities.",
+  customer: "No expansion accounts yet.",
 };
 
 export default function Dashboard() {
@@ -36,11 +40,12 @@ export default function Dashboard() {
   const [sortKey, setSortKey] = useState<SortKey>("scout_score");
   const [sortAsc, setSortAsc] = useState(false);
   const [search, setSearch] = useState("");
-  const categoryFromUrl = (searchParams.get("category") as CategoryTab) || "business";
-  const activeTab = categoryFromUrl;
+  const stageFromUrl = (searchParams.get("stage") as StageTab) || "prospect";
+  const activeStage = stageFromUrl;
   const [visibleCount, setVisibleCount] = useState(50);
+  const [accountTypeFilter, setAccountTypeFilter] = useState<string>("all");
 
-  const { data: firstPage = [], isLoading: firstPageLoading } = useCompaniesPage(activeTab);
+  const { data: firstPage = [], isLoading: firstPageLoading } = useCompaniesPage(activeStage);
   const { data: fullList } = useCompanies();
 
   const companies = fullList ?? firstPage;
@@ -83,20 +88,23 @@ export default function Dashboard() {
     return list;
   }, [search, sortKey, sortAsc, companiesWithSignals]);
 
-  const byCategory = useMemo(() => ({
-    school: sorted.filter(c => (c as any).category === "school"),
-    business: sorted.filter(c => (c as any).category === "business" || !(c as any).category),
-    partner: sorted.filter(c => (c as any).category === "partner"),
+  const byStage = useMemo(() => ({
+    prospect: sorted.filter(c => (c as any).lifecycle_stage === "prospect"),
+    opportunity: sorted.filter(c => (c as any).lifecycle_stage === "opportunity"),
+    customer: sorted.filter(c => (c as any).lifecycle_stage === "customer"),
   }), [sorted]);
 
   const activeList = useMemo(() => {
-    if (search) return sorted;
-    return byCategory[activeTab] || [];
-  }, [search, sorted, byCategory, activeTab]);
+    let list = search ? sorted : (byStage[activeStage] || []);
+    if (accountTypeFilter !== "all") {
+      list = list.filter(c => (c as any).account_type === accountTypeFilter);
+    }
+    return list;
+  }, [search, sorted, byStage, activeStage, accountTypeFilter]);
 
   useEffect(() => {
     setVisibleCount(50);
-  }, [activeTab, search]);
+  }, [activeStage, search, accountTypeFilter]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -154,6 +162,28 @@ export default function Dashboard() {
         />
       </div>
 
+      {/* Account type filter chips */}
+      <div className="flex items-center gap-1.5">
+        {[
+          { key: "all", label: "All" },
+          { key: "company", label: "Company" },
+          { key: "school", label: "School" },
+          { key: "partner", label: "Partner" },
+        ].map(chip => (
+          <button
+            key={chip.key}
+            onClick={() => setAccountTypeFilter(chip.key)}
+            className={`px-3 py-1 rounded-full text-micro font-medium transition-colors border ${
+              accountTypeFilter === chip.key
+                ? "bg-foreground/10 text-foreground border-foreground/20"
+                : "text-foreground/35 border-transparent hover:text-foreground/60"
+            }`}
+          >
+            {chip.label}
+          </button>
+        ))}
+      </div>
+
       <div className="md:hidden space-y-2">
         {visibleList.map((company) => (
           <button
@@ -165,7 +195,7 @@ export default function Dashboard() {
               <div className="text-body font-medium text-foreground truncate">{company.name}</div>
               <div className="text-micro text-foreground/40 mt-0.5 flex items-center gap-2">
                 {company.domain && <span className="truncate">{company.domain}</span>}
-                <StagePill stage={(company as any).stage || "prospect"} />
+                <StagePill stage={(company as any).lifecycle_stage || "prospect"} />
               </div>
             </div>
             {(company as any).scout_score != null && (
@@ -191,7 +221,7 @@ export default function Dashboard() {
               </>
             ) : (
               <p className="text-body text-foreground/45">
-                No {CATEGORY_LABELS[activeTab].toLowerCase()} companies yet.
+                {EMPTY_STATE_LABELS[activeStage] || "No companies yet."}
               </p>
             )}
           </div>
@@ -207,7 +237,7 @@ export default function Dashboard() {
               </th>
               {search && (
                 <th className="text-left px-5 py-3 hidden sm:table-cell">
-                  <span className="text-micro font-medium uppercase tracking-wide text-foreground/45">Category</span>
+                  <span className="text-micro font-medium uppercase tracking-wide text-foreground/45">Type</span>
                 </th>
               )}
               <th className="text-left px-5 py-3 hidden sm:table-cell">
@@ -234,11 +264,11 @@ export default function Dashboard() {
                 </td>
                 {search && (
                   <td className="px-5 py-3.5 hidden sm:table-cell">
-                    <CategoryPill category={(company as any).category || "business"} />
+                    <AccountTypePill accountType={(company as any).account_type || "company"} />
                   </td>
                 )}
                 <td className="px-5 py-3.5 hidden sm:table-cell">
-                  <StagePill stage={(company as any).stage || "prospect"} />
+                  <StagePill stage={(company as any).lifecycle_stage || "prospect"} />
                 </td>
                 <td className="px-5 py-3.5 hidden md:table-cell">
                   <ScoutBadge score={(company as any).scout_score ?? null} />
@@ -267,7 +297,7 @@ export default function Dashboard() {
               </>
             ) : (
               <p className="text-body text-foreground/45">
-                No {CATEGORY_LABELS[activeTab].toLowerCase()} companies yet.
+                {EMPTY_STATE_LABELS[activeStage] || "No companies yet."}
               </p>
             )}
           </div>
@@ -300,17 +330,16 @@ function StagePill({ stage }: { stage: string }) {
   );
 }
 
-function CategoryPill({ category }: { category: string }) {
+function AccountTypePill({ accountType }: { accountType: string }) {
   const colorMap: Record<string, string> = {
     school: "bg-info/10 text-info border-info/20",
-    business: "bg-muted text-muted-foreground border-border",
+    company: "bg-muted text-muted-foreground border-border",
     partner: "bg-primary/10 text-primary border-primary/20",
   };
-  const colors = colorMap[category] || colorMap.business;
-  const labelMap: Record<string, string> = { school: "School", business: "Business", partner: "Partner" };
+  const colors = colorMap[accountType] || colorMap.company;
   return (
     <span className={`inline-flex items-center text-micro font-medium px-2 py-0.5 rounded border ${colors}`}>
-      {labelMap[category] || category}
+      {ACCOUNT_TYPE_LABELS[accountType] || accountType}
     </span>
   );
 }

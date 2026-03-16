@@ -33,10 +33,10 @@ const COLUMN_MAP: Record<string, keyof CSVRow> = {
   "existing customer": "is_existing_customer",
   "is_existing_customer": "is_existing_customer",
   "persona": "persona",
-  "category": "category",
-  "stage": "stage",
+  "account_type": "account_type",
+  "category": "account_type",
   // backward compat: map source_type values via post-processing
-  "source_type": "category",
+  "source_type": "account_type",
 };
 
 function guessDomain(name: string): string | null {
@@ -109,20 +109,28 @@ export default function UploadPage() {
           const existingRaw = (mappedRow.is_existing_customer as any || "").toString().toLowerCase();
           const isExisting = existingRaw === "true" || existingRaw === "yes" || existingRaw === "1";
 
-          // Backward compat: map source_type="inbound" → category="business"
-          let category = (mappedRow.category as any) || null;
-          if (!category) category = "business";
-          if (category === "inbound") category = "business";
-          if (category === "outbound") category = (mappedRow.partner as any) ? "partner" : "business";
+          // Backward compat: map source_type → account_type
+          let account_type = (mappedRow.account_type as any) || null;
+          if (!account_type) account_type = "company";
+          if (account_type === "inbound") account_type = "company";
+          if (account_type === "outbound") account_type = (mappedRow.partner as any) ? "partner" : "company";
+          if (account_type === "business") account_type = "company";
 
-          const stage = (mappedRow.stage as any) || "prospect";
+          // Map old stage values
+          let lifecycle_stage = (mappedRow.lifecycle_stage as any) || "prospect";
+          if (lifecycle_stage === "active_opp") lifecycle_stage = "opportunity";
+          if (lifecycle_stage === "expansion") lifecycle_stage = "customer";
+
+          const sales_motion = lifecycle_stage === "customer" ? "expansion" : lifecycle_stage === "opportunity" ? "active-deal" : "new-logo";
+          const relationship_type = (mappedRow.partner as any) ? "partner-managed" : "direct";
+          const brief_type = lifecycle_stage === "customer" ? "expansionBrief" : lifecycle_stage === "opportunity" ? "opportunityBrief" : "prospectBrief";
 
           valid.push({
             company_name: name, domain: domain || null, partner: (mappedRow.partner as any) || null,
             partner_rep_email: (mappedRow.partner_rep_email as any) || null, partner_rep_name: (mappedRow.partner_rep_name as any) || null,
             hq_country: (mappedRow.hq_country as any) || null, industry: (mappedRow.industry as any) || null,
             headcount, is_existing_customer: isExisting, persona: (mappedRow.persona as any) || null,
-            category, stage,
+            account_type, lifecycle_stage, sales_motion, relationship_type, brief_type,
           });
         });
 
@@ -157,8 +165,11 @@ export default function UploadPage() {
         headcount: r.headcount,
         is_existing_customer: r.is_existing_customer,
         persona: r.persona,
-        category: r.category || "business",
-        stage: r.stage || "prospect",
+        account_type: (r as any).account_type || "company",
+        lifecycle_stage: (r as any).lifecycle_stage || "prospect",
+        sales_motion: (r as any).sales_motion || "new-logo",
+        relationship_type: (r as any).relationship_type || "direct",
+        brief_type: (r as any).brief_type || "prospectBrief",
       }));
       await insertCompanies.mutateAsync(dbRows);
       toast.success(`Imported ${validCount} companies into the database`);
@@ -333,15 +344,14 @@ const PARTNERS = ["seismic", "workramp", "360learning", "docebo", "gainsight"];
 
 const CATEGORIES = [
   { value: "school", label: "School (EDU)" },
-  { value: "business", label: "Business (B2B)" },
+  { value: "company", label: "Company (B2B)" },
   { value: "partner", label: "Partner (LMS Reseller)" },
 ];
 
 const STAGES = [
   { value: "prospect", label: "Prospect" },
-  { value: "active_opp", label: "Active Opp" },
+  { value: "opportunity", label: "Opportunity" },
   { value: "customer", label: "Customer" },
-  { value: "expansion", label: "Expansion" },
 ];
 
 function ManualAddForm() {
@@ -351,8 +361,8 @@ function ManualAddForm() {
     name: "",
     domain: "",
     partner: "",
-    category: "business",
-    stage: "prospect",
+    account_type: "company",
+    lifecycle_stage: "prospect",
   });
   const [saving, setSaving] = useState(false);
 
@@ -368,14 +378,22 @@ function ManualAddForm() {
 
     setSaving(true);
     try {
+      const lifecycle_stage = form.lifecycle_stage;
+      const sales_motion = lifecycle_stage === "customer" ? "expansion" : lifecycle_stage === "opportunity" ? "active-deal" : "new-logo";
+      const relationship_type = form.account_type === "partner" ? "partner-managed" : "direct";
+      const brief_type = lifecycle_stage === "customer" ? "expansionBrief" : lifecycle_stage === "opportunity" ? "opportunityBrief" : "prospectBrief";
+
       await insertCompanies.mutateAsync([{
         name,
         domain,
-        partner: form.category === "partner" ? (form.partner || null) : null,
-        is_existing_customer: false,
-        category: form.category,
-        stage: form.stage,
-        source_type: form.category === "partner" ? "outbound" : "inbound",
+        partner: form.account_type === "partner" ? (form.partner || null) : null,
+        is_existing_customer: lifecycle_stage === "customer",
+        account_type: form.account_type,
+        lifecycle_stage,
+        sales_motion,
+        relationship_type,
+        brief_type,
+        source_type: form.account_type === "partner" ? "outbound" : "inbound",
       } as any]);
       toast.success(`Added ${name}`);
       navigate("/");
@@ -392,41 +410,41 @@ function ManualAddForm() {
 
       {/* Category selector */}
       <div className="space-y-2">
-        <Label className="text-xs">Category</Label>
+        <Label className="text-xs">Account Type</Label>
         <div className="flex items-center bg-secondary rounded-md p-0.5 gap-0.5 w-fit">
           {CATEGORIES.map(cat => (
             <button
               key={cat.value}
               type="button"
-              onClick={() => { update("category", cat.value); if (cat.value !== "partner") update("partner", ""); }}
+              onClick={() => { update("account_type", cat.value); if (cat.value !== "partner") update("partner", ""); }}
               className={`px-4 py-1.5 rounded text-xs font-medium transition-all ${
-                form.category === cat.value
+                form.account_type === cat.value
                   ? "bg-card text-foreground shadow-sm shadow-black/[0.06]"
                   : "text-foreground/45 hover:text-foreground"
               }`}
             >
-              {cat.value === "school" ? "School" : cat.value === "business" ? "Business" : "Partner"}
+              {cat.value === "school" ? "School" : cat.value === "company" ? "Company" : "Partner"}
             </button>
           ))}
         </div>
         <p className="text-micro text-foreground/45">
-          {form.category === "school" && "EDU institution or university"}
-          {form.category === "business" && "Corporate / B2B prospect or customer"}
-          {form.category === "partner" && "LMS reseller (Seismic, Docebo, etc.)"}
+          {form.account_type === "school" && "EDU institution or university"}
+          {form.account_type === "company" && "Corporate / B2B prospect or customer"}
+          {form.account_type === "partner" && "LMS reseller (Seismic, Docebo, etc.)"}
         </p>
       </div>
 
       {/* Stage selector */}
       <div className="space-y-2">
-        <Label className="text-xs">Stage</Label>
+        <Label className="text-xs">Lifecycle Stage</Label>
         <div className="flex items-center bg-secondary rounded-md p-0.5 gap-0.5 w-fit">
           {STAGES.map(s => (
             <button
               key={s.value}
               type="button"
-              onClick={() => update("stage", s.value)}
+              onClick={() => update("lifecycle_stage", s.value)}
               className={`px-3.5 py-1.5 rounded text-xs font-medium transition-all ${
-                form.stage === s.value
+                form.lifecycle_stage === s.value
                   ? "bg-card text-foreground shadow-sm shadow-black/[0.06]"
                   : "text-foreground/45 hover:text-foreground"
               }`}
@@ -459,7 +477,7 @@ function ManualAddForm() {
             maxLength={255}
           />
         </div>
-        {form.category === "partner" && (
+        {form.account_type === "partner" && (
           <div className="space-y-2 col-span-2">
             <Label className="text-xs">Partner</Label>
             <Select value={form.partner} onValueChange={v => update("partner", v)}>
