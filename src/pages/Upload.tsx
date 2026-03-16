@@ -165,8 +165,11 @@ export default function UploadPage() {
         headcount: r.headcount,
         is_existing_customer: r.is_existing_customer,
         persona: r.persona,
-        category: r.category || "business",
-        stage: r.stage || "prospect",
+        account_type: (r as any).account_type || "company",
+        lifecycle_stage: (r as any).lifecycle_stage || "prospect",
+        sales_motion: (r as any).sales_motion || "new-logo",
+        relationship_type: (r as any).relationship_type || "direct",
+        brief_type: (r as any).brief_type || "prospectBrief",
       }));
       await insertCompanies.mutateAsync(dbRows);
       toast.success(`Imported ${validCount} companies into the database`);
