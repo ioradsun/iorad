@@ -1151,20 +1151,19 @@ async function fetchDealsForCompany(hubspotCompanyId: string | number, apiKey: s
 function deriveStage(
   props: Record<string, any>,
   deals?: { hasClosedWon: boolean; hasOpenDeal: boolean; dealCount: number }
-): "prospect" | "active_opp" | "customer" | "expansion" {
+): "prospect" | "opportunity" | "customer" {
   // Deal-based signals take priority over company lifecycle (more reliable)
   if (deals?.hasClosedWon) {
-    // If they also have an open deal after closing, treat as expansion
-    return deals.hasOpenDeal ? "expansion" : "customer";
+    return "customer";
   }
-  if (deals?.hasOpenDeal) return "active_opp";
+  if (deals?.hasOpenDeal) return "opportunity";
 
   // Fall back to company-level lifecycle stage
   const lifecycle = (props.lifecyclestage || "").toLowerCase();
   if (lifecycle === "customer" || lifecycle === "evangelist") return "customer";
-  if (lifecycle === "opportunity" || lifecycle === "salesqualifiedlead") return "active_opp";
+  if (lifecycle === "opportunity" || lifecycle === "salesqualifiedlead") return "opportunity";
   if (props.hs_date_entered_customer) return "customer";
-  if (props.hs_date_entered_opportunity) return "active_opp";
+  if (props.hs_date_entered_opportunity) return "opportunity";
 
   return "prospect";
 }
