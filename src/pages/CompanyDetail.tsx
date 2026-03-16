@@ -958,6 +958,12 @@ export default function CompanyDetail() {
                       <SelectItem value="customer">Customer</SelectItem>
                     </SelectContent>
                   </Select>
+                  {companyAny?.iorad_plan && (
+                    <>
+                      <span className="text-foreground/15">·</span>
+                      <PlanBadge plan={companyAny.iorad_plan} />
+                    </>
+                  )}
                   {company.scout_score != null && (
                     <>
                       <span className="text-foreground/15">·</span>
