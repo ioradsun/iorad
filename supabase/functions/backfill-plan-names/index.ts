@@ -40,10 +40,12 @@ Deno.serve(async (req) => {
 
     // First invocation — create the log row
     if (offset === 0) {
+      // Count all HubSpot-sourced contacts with email (our lookup key)
       const { count } = await supabase
         .from("contacts")
         .select("id", { count: "exact", head: true })
-        .not("hubspot_object_id", "is", null);
+        .eq("source", "hubspot")
+        .not("email", "is", null);
 
       const { data: logRow } = await supabase
         .from("backfill_log")
@@ -58,11 +60,12 @@ Deno.serve(async (req) => {
       activeLogId = logRow?.id || null;
     }
 
-    // ── Load a page of contacts that have a hubspot_object_id ────────────────
+    // ── Load a page of HubSpot-sourced contacts with email ──────────────────
     const { data: contacts, error } = await supabase
       .from("contacts")
-      .select("id, company_id, hubspot_object_id, hubspot_properties")
-      .not("hubspot_object_id", "is", null)
+      .select("id, company_id, email, hubspot_object_id, hubspot_properties")
+      .eq("source", "hubspot")
+      .not("email", "is", null)
       .order("created_at", { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1);
 
@@ -77,14 +80,12 @@ Deno.serve(async (req) => {
         body: JSON.stringify({ action: "score_all", offset: 0 }),
       }).catch(e => console.warn("score trigger failed:", e.message));
 
-      // Mark log as completed — use cumulative values from self-chain body
       if (activeLogId) {
         const finalUpdate: Record<string, any> = {
           status: "completed",
           finished_at: new Date().toISOString(),
           current_offset: offset,
         };
-        // Only overwrite counts if we have cumulative data (i.e., this wasn't the first call)
         if (body.cumulative_processed != null) {
           finalUpdate.contacts_processed = body.cumulative_processed;
           finalUpdate.contacts_updated = body.cumulative_updated || 0;
@@ -100,67 +101,119 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ── Batch-read plan_name from HubSpot in chunks of 100 ──────────────────
+    // ── Batch-read from HubSpot using email lookup ──────────────────────────
     let updated = 0;
     let skipped = 0;
     const companyIdsToRescore = new Set<string>();
 
     for (let i = 0; i < contacts.length; i += BATCH_SIZE) {
       const batch = contacts.slice(i, i + BATCH_SIZE);
-      const inputs = batch
-        .map((c: any) => ({ id: String(c.hubspot_object_id) }))
-        .filter((c: any) => c.id && c.id !== "null");
 
-      if (inputs.length === 0) continue;
+      // For contacts that already have hubspot_object_id, use batch read by ID
+      // For others, use email-based search
+      const withId = batch.filter((c: any) => c.hubspot_object_id);
+      const withoutId = batch.filter((c: any) => !c.hubspot_object_id && c.email);
 
-      const res = await hubspotFetch(
-        "https://api.hubapi.com/crm/v3/objects/contacts/batch/read",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            inputs,
-            properties: ["plan_name", "account_type", "account__type"],
-          }),
+      const hsResultMap = new Map<string, { hsId: string; props: any }>();
+
+      // Strategy A: batch read by ID (fast, up to 100)
+      if (withId.length > 0) {
+        const inputs = withId.map((c: any) => ({ id: String(c.hubspot_object_id) }));
+        const res = await hubspotFetch(
+          "https://api.hubapi.com/crm/v3/objects/contacts/batch/read",
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              inputs,
+              properties: ["plan_name", "account_type", "account__type"],
+            }),
+          }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          for (const r of data.results || []) {
+            // Match back to our contact by hubspot_object_id
+            const contact = withId.find((c: any) => String(c.hubspot_object_id) === String(r.id));
+            if (contact) {
+              hsResultMap.set(contact.id, { hsId: String(r.id), props: r.properties || {} });
+            }
+          }
+        } else {
+          const text = await res.text();
+          console.warn(`HubSpot batch-read failed (${res.status}): ${text.slice(0, 200)}`);
         }
-      );
-
-      if (!res.ok) {
-        const text = await res.text();
-        console.warn(`HubSpot batch failed (${res.status}): ${text.slice(0, 200)}`);
-        skipped += batch.length;
-        continue;
       }
 
-      const data = await res.json();
-      const hsById = new Map<string, any>();
-      for (const result of data.results || []) {
-        hsById.set(String(result.id), result.properties || {});
+      // Strategy B: search by email for contacts without hubspot_object_id
+      // Process in sub-batches of 10 to avoid search API limits
+      for (let j = 0; j < withoutId.length; j += 10) {
+        const emailBatch = withoutId.slice(j, j + 10);
+        for (const contact of emailBatch) {
+          try {
+            const res = await hubspotFetch(
+              "https://api.hubapi.com/crm/v3/objects/contacts/search",
+              {
+                method: "POST",
+                headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  filterGroups: [{
+                    filters: [{ propertyName: "email", operator: "EQ", value: contact.email }],
+                  }],
+                  properties: ["plan_name", "account_type", "account__type"],
+                  limit: 1,
+                }),
+              }
+            );
+            if (res.ok) {
+              const data = await res.json();
+              const result = data.results?.[0];
+              if (result) {
+                hsResultMap.set(contact.id, { hsId: String(result.id), props: result.properties || {} });
+              }
+            }
+          } catch (e: any) {
+            console.warn(`Email search failed for ${contact.email}: ${e.message}`);
+          }
+        }
       }
 
+      // Now process results
       for (const contact of batch) {
-        const hsProps = hsById.get(String((contact as any).hubspot_object_id));
-        if (!hsProps) { skipped++; continue; }
+        const hs = hsResultMap.get(contact.id);
+        if (!hs) { skipped++; continue; }
 
-        const planName = hsProps.plan_name || null;
-        if (!planName) { skipped++; continue; }
-
+        const planName = hs.props.plan_name || null;
         const existingProps = (contact.hubspot_properties as any) || {};
-        const alreadyHasPlan = existingProps.plan_name === planName;
-        if (alreadyHasPlan) { skipped++; continue; }
 
-        const mergedProps = {
-          ...existingProps,
-          plan_name: planName,
-          account_type: hsProps.account_type || hsProps.account__type || existingProps.account_type || null,
-        };
+        // Check if anything needs updating
+        const alreadyHasPlan = existingProps.plan_name === planName;
+        const alreadyHasObjId = !!contact.hubspot_object_id;
+
+        if (alreadyHasPlan && alreadyHasObjId) { skipped++; continue; }
+        if (!planName && alreadyHasObjId) { skipped++; continue; }
+
+        const updateData: Record<string, any> = {};
+
+        // Always backfill hubspot_object_id if missing
+        if (!contact.hubspot_object_id) {
+          updateData.hubspot_object_id = hs.hsId;
+        }
+
+        // Update plan_name in hubspot_properties if changed
+        if (planName && !alreadyHasPlan) {
+          updateData.hubspot_properties = {
+            ...existingProps,
+            plan_name: planName,
+            account_type: hs.props.account_type || hs.props.account__type || existingProps.account_type || null,
+          };
+        }
+
+        if (Object.keys(updateData).length === 0) { skipped++; continue; }
 
         const { error: updateErr } = await supabase
           .from("contacts")
-          .update({ hubspot_properties: mergedProps })
+          .update(updateData)
           .eq("id", contact.id);
 
         if (updateErr) {
@@ -187,13 +240,11 @@ Deno.serve(async (req) => {
     const hasMore = contacts.length === PAGE_SIZE;
     const nextOffset = offset + PAGE_SIZE;
 
-    // Cumulative counts
     const cumulativeUpdated  = (body.cumulative_updated  || 0) + updated;
     const cumulativeSkipped  = (body.cumulative_skipped  || 0) + skipped;
     const cumulativeRescored = (body.cumulative_rescored || 0) + companyIdsToRescore.size;
     const cumulativeProcessed = offset + contacts.length;
 
-    // Update log row
     if (activeLogId) {
       await supabase.from("backfill_log").update({
         contacts_processed: cumulativeProcessed,
@@ -239,7 +290,6 @@ Deno.serve(async (req) => {
   } catch (err: any) {
     console.error("backfill-plan-names error:", err.message);
 
-    // Mark log as failed
     if (activeLogId) {
       try {
         const supabase = createClient(
