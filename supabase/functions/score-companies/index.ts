@@ -20,7 +20,22 @@ interface ScoreBreakdown {
   commercial: number;
   recency: number;
   intent: number;
+  expansion_signal: boolean;
+  expansion_bonus: number;
   total: number;
+}
+
+// ── Plan tier helpers ──────────────────────────────────────────────────────
+const PAID_PLANS = ["team", "enterprise"];
+const PLAN_TIER: Record<string, number> = { "free": 1, "team": 2, "enterprise": 3 };
+
+function normalizePlan(raw: string | null): string | null {
+  if (!raw) return null;
+  const lower = raw.toLowerCase().trim();
+  if (lower.includes("enterprise")) return "Enterprise";
+  if (lower.includes("team"))       return "Team";
+  if (lower.includes("free"))       return "Free";
+  return null;
 }
 
 function calculateScoutScore(
@@ -143,9 +158,37 @@ function calculateScoutScore(
 
   intent = Math.min(10, intent);
 
-  const total = Math.min(100, Math.max(0, tutorial + commercial + recency + intent));
+  // ── iorad Plan derivation (bubble up highest plan to company level) ────────
+  const planValues = contacts
+    .map((c: any) => normalizePlan((c.hubspot_properties as any)?.plan_name || null))
+    .filter(Boolean) as string[];
+  const topPlan = planValues.length > 0
+    ? planValues.reduce((best, cur) =>
+        (PLAN_TIER[cur.toLowerCase()] || 0) > (PLAN_TIER[best.toLowerCase()] || 0) ? cur : best
+      )
+    : null;
 
-  return { tutorial, commercial, recency, intent, total };
+  // ── Expansion Signal (max 20 bonus) ───────────────────────────────────────
+  const hasPaidContact = contacts.some((c: any) => {
+    const plan = normalizePlan((c.hubspot_properties as any)?.plan_name || null);
+    return plan !== null && PAID_PLANS.includes(plan.toLowerCase());
+  });
+
+  const hasFreeCreator = contacts.some((c: any) => {
+    const hp = (c.hubspot_properties as any) || {};
+    const plan = normalizePlan(hp.plan_name || null);
+    return plan?.toLowerCase() === "free" && !!hp.first_tutorial_create_date;
+  });
+
+  const expansion_signal = hasPaidContact && hasFreeCreator;
+  const expansion_bonus = expansion_signal ? 20 : 0;
+
+  const total = Math.min(100, Math.max(0, tutorial + commercial + recency + intent + expansion_bonus));
+
+  // Attach topPlan to company object for DB write in scoreOneCompany
+  (company as any)._derived_plan = topPlan;
+
+  return { tutorial, commercial, recency, intent, expansion_signal, expansion_bonus, total };
 }
 
 // ── AI Activity Summary ───────────────────────────────────────────────────────
@@ -186,7 +229,8 @@ Lifecycle: ${company.lifecycle_stage}
 Sales motion: ${company.sales_motion}
 Account type: ${company.account_type}
 Brief type: ${company.brief_type}
-Scout Score: ${breakdown.total}/100 (tutorial: ${breakdown.tutorial}, commercial: ${breakdown.commercial}, recency: ${breakdown.recency}, intent: ${breakdown.intent})
+Plan: ${company.iorad_plan || "unknown"}
+Scout Score: ${breakdown.total}/100 (tutorial: ${breakdown.tutorial}, commercial: ${breakdown.commercial}, recency: ${breakdown.recency}, intent: ${breakdown.intent}, expansion_bonus: ${breakdown.expansion_bonus})
 
 Contacts with iorad activity (${contactSummaries.length} of ${contacts.length} total):
 ${JSON.stringify(contactSummaries, null, 2)}`;
@@ -234,7 +278,7 @@ async function scoreOneCompany(
   // Fetch company
   const { data: company, error: cErr } = await supabase
     .from("companies")
-    .select("id, name, lifecycle_stage, sales_motion, account_type, brief_type, is_existing_customer, scout_score, scout_scored_at")
+    .select("id, name, lifecycle_stage, sales_motion, account_type, brief_type, iorad_plan, is_existing_customer, scout_score, scout_scored_at")
     .eq("id", companyId)
     .maybeSingle();
 
@@ -267,10 +311,12 @@ async function scoreOneCompany(
   }
 
   // Write back to DB
+  const topPlan = (company as any)._derived_plan || null;
   const updateData: Record<string, any> = {
     scout_score: breakdown.total,
     scout_score_breakdown: breakdown,
     scout_scored_at: new Date().toISOString(),
+    iorad_plan: topPlan,
   };
   if (summary) updateData.scout_summary = summary;
 
@@ -421,7 +467,7 @@ Deno.serve(async (req) => {
 
     const { data: companies, error } = await supabase
       .from("companies")
-      .select("id, name, lifecycle_stage, sales_motion, account_type, brief_type, is_existing_customer, scout_score, scout_scored_at")
+      .select("id, name, lifecycle_stage, sales_motion, account_type, brief_type, iorad_plan, is_existing_customer, scout_score, scout_scored_at")
       .order("created_at", { ascending: true })
       .range(offset, offset + batchSize - 1);
 

@@ -65,6 +65,13 @@ export default function Dashboard() {
     }
 
     list.sort((a, b) => {
+      // For customer tab, float expansion_signal accounts to top
+      if (activeStage === "customer") {
+        const aSignal = (a as any).scout_score_breakdown?.expansion_signal ? 1 : 0;
+        const bSignal = (b as any).scout_score_breakdown?.expansion_signal ? 1 : 0;
+        if (bSignal !== aSignal) return bSignal - aSignal;
+      }
+
       let av: any;
       let bv: any;
       switch (sortKey) {
@@ -86,7 +93,7 @@ export default function Dashboard() {
     });
 
     return list;
-  }, [search, sortKey, sortAsc, companiesWithSignals]);
+  }, [search, sortKey, sortAsc, companiesWithSignals, activeStage]);
 
   const byStage = useMemo(() => ({
     prospect: sorted.filter(c => (c as any).lifecycle_stage === "prospect"),
@@ -243,6 +250,9 @@ export default function Dashboard() {
               <th className="text-left px-5 py-3 hidden sm:table-cell">
                 <span className="text-micro font-medium uppercase tracking-wide text-foreground/45">Stage</span>
               </th>
+              <th className="text-left px-5 py-3 hidden lg:table-cell">
+                <span className="text-micro font-medium uppercase tracking-wide text-foreground/45">Plan</span>
+              </th>
               <th className="text-left px-5 py-3 hidden md:table-cell">
                 <SortHeader label="Score" field="scout_score" />
               </th>
@@ -257,7 +267,10 @@ export default function Dashboard() {
                 onClick={() => navigate(`/company/${company.id}`)}
               >
                 <td className="px-5 py-3.5">
-                  <div className="font-medium text-body text-foreground">{company.name}</div>
+                  <div className="flex items-center gap-1">
+                    <span className="font-medium text-body text-foreground">{company.name}</span>
+                    <ExpansionSignalDot breakdown={(company as any).scout_score_breakdown} />
+                  </div>
                   {company.domain && (
                     <div className="text-caption text-foreground/45 mt-0.5">{company.domain}</div>
                   )}
@@ -269,6 +282,9 @@ export default function Dashboard() {
                 )}
                 <td className="px-5 py-3.5 hidden sm:table-cell">
                   <StagePill stage={(company as any).lifecycle_stage || "prospect"} />
+                </td>
+                <td className="px-5 py-3.5 hidden lg:table-cell">
+                  <PlanBadge plan={(company as any).iorad_plan ?? null} />
                 </td>
                 <td className="px-5 py-3.5 hidden md:table-cell">
                   <ScoutBadge score={(company as any).scout_score ?? null} />
@@ -356,5 +372,30 @@ function ScoutBadge({ score }: { score: number | null }) {
     <span className={`inline-flex items-center gap-1 text-micro font-semibold px-2 py-0.5 rounded border ${cls}`}>
       {score} <span className="font-normal opacity-70">{tier}</span>
     </span>
+  );
+}
+
+function PlanBadge({ plan }: { plan: string | null }) {
+  if (!plan) return <span className="text-foreground/20 text-xs">—</span>;
+  const styles: Record<string, string> = {
+    Enterprise: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+    Team:       "bg-blue-500/10 text-blue-400 border-blue-500/20",
+    Free:       "bg-muted text-muted-foreground border-border",
+  };
+  return (
+    <span className={`inline-flex items-center text-micro font-medium px-2 py-0.5 rounded border ${styles[plan] || styles.Free}`}>
+      {plan}
+    </span>
+  );
+}
+
+function ExpansionSignalDot({ breakdown }: { breakdown: any }) {
+  const signal = breakdown?.expansion_signal;
+  if (!signal) return null;
+  return (
+    <span
+      className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 ml-1.5"
+      title="Expansion signal: paid + free creators"
+    />
   );
 }
