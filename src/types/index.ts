@@ -15,8 +15,11 @@ export interface CSVRow {
   headcount: number | null;
   is_existing_customer: boolean;
   persona: string | null;
-  category: string | null;
-  stage: string | null;
+  account_type: string | null;
+  lifecycle_stage: string | null;
+  sales_motion: string | null;
+  relationship_type: string | null;
+  brief_type: string | null;
 }
 
 export interface ValidationError {
