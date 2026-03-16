@@ -229,7 +229,8 @@ Lifecycle: ${company.lifecycle_stage}
 Sales motion: ${company.sales_motion}
 Account type: ${company.account_type}
 Brief type: ${company.brief_type}
-Scout Score: ${breakdown.total}/100 (tutorial: ${breakdown.tutorial}, commercial: ${breakdown.commercial}, recency: ${breakdown.recency}, intent: ${breakdown.intent})
+Plan: ${company.iorad_plan || "unknown"}
+Scout Score: ${breakdown.total}/100 (tutorial: ${breakdown.tutorial}, commercial: ${breakdown.commercial}, recency: ${breakdown.recency}, intent: ${breakdown.intent}, expansion_bonus: ${breakdown.expansion_bonus})
 
 Contacts with iorad activity (${contactSummaries.length} of ${contacts.length} total):
 ${JSON.stringify(contactSummaries, null, 2)}`;
