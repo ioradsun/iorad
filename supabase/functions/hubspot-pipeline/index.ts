@@ -136,10 +136,26 @@ async function upsertCompany(
   if (domain) {
     const { data: existing } = await supabase
       .from("companies")
-      .select("id")
+      .select("id, hubspot_properties")
       .eq("domain", domain)
       .maybeSingle();
     if (existing) {
+      // ── Diff tracked fields ──────────────────────────────────────────────
+      const TRACKED_FIELDS = [
+        "lifecyclestage", "name", "numberofemployees",
+        "industry", "country", "hubspot_owner_id",
+      ];
+      const oldProps = (existing.hubspot_properties as any) || {};
+      const changes: Record<string, { from: any; to: any }> = {};
+      for (const field of TRACKED_FIELDS) {
+        const oldVal = oldProps[field] ?? null;
+        const newVal = p[field] ?? null;
+        if (String(oldVal ?? "") !== String(newVal ?? "")) {
+          changes[field] = { from: oldVal, to: newVal };
+        }
+      }
+      const hasChanges = Object.keys(changes).length > 0;
+
       const updateLifecycle = (p.lifecyclestage || "").toLowerCase();
       let updateLifecycleStage = "prospect";
       if (updateLifecycle === "customer" || updateLifecycle === "evangelist") updateLifecycleStage = "customer";
@@ -160,6 +176,9 @@ async function upsertCompany(
         relationship_type: updateRelType,
         brief_type: updateBriefType,
         updated_at: new Date().toISOString(),
+        last_sync_changes: hasChanges
+          ? { changed_at: new Date().toISOString(), fields: changes }
+          : { changed_at: new Date().toISOString(), fields: {} },
       }).eq("id", existing.id);
       return existing.id;
     }
@@ -188,7 +207,8 @@ async function upsertCompany(
     .insert({ name, domain, account_type, lifecycle_stage, sales_motion, relationship_type, brief_type,
               source_type: "hubspot",
               industry: p.industry || null, hq_country: p.country || null,
-              headcount, hubspot_properties: p })
+              headcount, hubspot_properties: p,
+              last_sync_changes: { changed_at: new Date().toISOString(), created: true, fields: {} } })
     .select("id")
     .single();
 
