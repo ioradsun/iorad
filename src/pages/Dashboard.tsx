@@ -250,6 +250,9 @@ export default function Dashboard() {
               <th className="text-left px-5 py-3 hidden sm:table-cell">
                 <span className="text-micro font-medium uppercase tracking-wide text-foreground/45">Stage</span>
               </th>
+              <th className="text-left px-5 py-3 hidden lg:table-cell">
+                <span className="text-micro font-medium uppercase tracking-wide text-foreground/45">Plan</span>
+              </th>
               <th className="text-left px-5 py-3 hidden md:table-cell">
                 <SortHeader label="Score" field="scout_score" />
               </th>
