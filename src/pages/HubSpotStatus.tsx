@@ -110,8 +110,10 @@ function useCompanyContactCounts() {
 function pillClass(value?: string | null) {
   if (value === "school") return "bg-blue-500/10 text-blue-400 border-blue-500/20";
   if (value === "partner") return "bg-purple-500/10 text-purple-400 border-purple-500/20";
-  if (value === "active_opp") return "bg-amber-500/10 text-amber-400 border-amber-500/20";
+  if (value === "company") return "bg-secondary text-foreground/60 border-border";
+  if (value === "opportunity") return "bg-amber-500/10 text-amber-400 border-amber-500/20";
   if (value === "customer") return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+  if (value === "prospect") return "bg-secondary text-foreground/60 border-border";
   return "bg-secondary text-foreground/60 border-border";
 }
 
