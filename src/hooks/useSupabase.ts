@@ -11,9 +11,9 @@ export function useCompaniesPage(category: string, limit = 50) {
   return useQuery({
     queryKey: ["companies_page", category, limit],
     queryFn: async () => {
-      let query = supabase
+      let query = (supabase
         .from("companies")
-        .select(COMPANY_LIST_COLUMNS)
+        .select(COMPANY_LIST_COLUMNS) as any)
         .order("scout_score", { ascending: false, nullsFirst: false })
         .limit(limit);
 
