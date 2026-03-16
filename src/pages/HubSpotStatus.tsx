@@ -237,8 +237,8 @@ export default function HubSpotStatus() {
                 <Link to={`/company/${company.id}`} className="text-caption font-medium hover:underline">{company.name || "Unnamed"}</Link>
                 <div className="text-micro text-foreground/40">{company.domain || "—"}</div>
                 <div className="flex items-center gap-1 mt-1 text-micro">
-                  <span className={`px-1.5 py-0.5 rounded border ${pillClass(company.category)}`}>{company.category || "business"}</span>
-                  <span className={`px-1.5 py-0.5 rounded border ${pillClass(company.stage)}`}>{company.stage || "prospect"}</span>
+                  <span className={`px-1.5 py-0.5 rounded border ${pillClass(company.account_type)}`}>{company.account_type || "company"}</span>
+                  <span className={`px-1.5 py-0.5 rounded border ${pillClass(company.lifecycle_stage)}`}>{company.lifecycle_stage || "prospect"}</span>
                   {isNew && <span className="px-1.5 py-0.5 rounded border border-emerald-500/20 bg-emerald-500/10 text-emerald-400">NEW</span>}
                 </div>
               </div>

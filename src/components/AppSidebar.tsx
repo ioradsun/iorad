@@ -224,13 +224,13 @@ export default function AppSidebar({ onNavigate }: { onNavigate?: () => void } =
             <div className="text-micro font-medium uppercase tracking-wider text-foreground/25 px-3 pb-1">
               Companies
             </div>
-            {categoryItems.map(({ key, label, icon }) => (
+            {stageItems.map(({ key, label, icon }) => (
               <NavItem
                 key={key}
-                to={`/?category=${key}`}
+                to={`/?stage=${key}`}
                 icon={icon}
                 label={label}
-                active={isCompanyCategory(key) || (key === "business" && location.pathname === "/" && !location.search)}
+                active={isStageActive(key)}
               />
             ))}
 
