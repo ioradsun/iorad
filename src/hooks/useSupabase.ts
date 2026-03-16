@@ -287,18 +287,14 @@ export function useCompanyStats() {
   return useQuery({
     queryKey: ["company_stats"],
     queryFn: async () => {
-      const [totalRes, schoolRes, businessRes, partnerRes, recentRes, stagesRes] = await Promise.all([
-        supabase.from("companies").select("id", { count: "exact", head: true }),
-        supabase.from("companies").select("id", { count: "exact", head: true }).eq("account_type" as any, "school"),
-        supabase.from("companies").select("id", { count: "exact", head: true }).or("account_type.eq.company,account_type.is.null" as any),
-        supabase.from("companies").select("id", { count: "exact", head: true }).eq("account_type" as any, "partner"),
-        supabase.from("companies").select("id", { count: "exact", head: true }).gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
-        Promise.all([
-          supabase.from("companies").select("id", { count: "exact", head: true }).eq("lifecycle_stage" as any, "prospect"),
-          supabase.from("companies").select("id", { count: "exact", head: true }).eq("lifecycle_stage" as any, "opportunity"),
-          supabase.from("companies").select("id", { count: "exact", head: true }).eq("lifecycle_stage" as any, "customer"),
-        ]),
-      ]);
+      const totalRes = await supabase.from("companies").select("id", { count: "exact", head: true });
+      const schoolRes = await supabase.from("companies").select("id", { count: "exact", head: true }).eq("account_type" as any, "school");
+      const businessRes = await supabase.from("companies").select("id", { count: "exact", head: true }).or("account_type.eq.company,account_type.is.null" as any);
+      const partnerRes = await supabase.from("companies").select("id", { count: "exact", head: true }).eq("account_type" as any, "partner");
+      const recentRes = await supabase.from("companies").select("id", { count: "exact", head: true }).gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+      const prospectRes = await supabase.from("companies").select("id", { count: "exact", head: true }).eq("lifecycle_stage" as any, "prospect");
+      const oppRes = await supabase.from("companies").select("id", { count: "exact", head: true }).eq("lifecycle_stage" as any, "opportunity");
+      const custRes = await supabase.from("companies").select("id", { count: "exact", head: true }).eq("lifecycle_stage" as any, "customer");
 
       return {
         total: totalRes.count ?? 0,
