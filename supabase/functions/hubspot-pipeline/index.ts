@@ -476,7 +476,7 @@ async function runPhase2(supabase: any, apiKey: string, jobId: string, snap: any
 // ── Scoring helpers (adapted from score-companies) ────────────────────────────
 interface ScoreBreakdown {
   tutorial: number; commercial: number; recency: number; intent: number;
-  expansion_signal: boolean; expansion_bonus: number; total: number;
+  expansion_signal: boolean; expansion_bonus: number; top_plan: string | null; total: number;
 }
 
 const PAID_PLANS = ["team", "enterprise"];
@@ -559,10 +559,8 @@ function calculateScoutScore(company: any, contacts: any[]): ScoreBreakdown {
   const expansion_signal = hasPaidContact && hasFreeCreator;
   const expansion_bonus = expansion_signal ? 20 : 0;
 
-  (company as any)._derived_plan = topPlan;
-
   const total = Math.min(100, Math.min(tutorial, 60) + Math.min(commercial, 25) + Math.min(recency, 15) + Math.min(intent, 15) + expansion_bonus);
-  return { tutorial: Math.min(tutorial, 60), commercial: Math.min(commercial, 25), recency: Math.min(recency, 15), intent: Math.min(intent, 15), expansion_signal, expansion_bonus, total };
+  return { tutorial: Math.min(tutorial, 60), commercial: Math.min(commercial, 25), recency: Math.min(recency, 15), intent: Math.min(intent, 15), expansion_signal, expansion_bonus, top_plan: topPlan, total };
 }
 
 async function scoreOneCompany(supabase: any, companyId: string): Promise<boolean> {
@@ -577,12 +575,11 @@ async function scoreOneCompany(supabase: any, companyId: string): Promise<boolea
   if (!contacts || contacts.length === 0) return false;
 
   const breakdown = calculateScoutScore(company, contacts);
-  const topPlan = (company as any)._derived_plan || null;
   await supabase.from("companies").update({
     scout_score: breakdown.total,
     scout_score_breakdown: breakdown,
     scout_scored_at: new Date().toISOString(),
-    iorad_plan: topPlan,
+    iorad_plan: breakdown.top_plan,
   }).eq("id", companyId);
 
   return true;
