@@ -315,19 +315,31 @@ export default function HubSpotStatus() {
                     {event.action}
                   </span>
 
-                  {/* Name */}
-                  <div className="min-w-0 flex-1 truncate">
-                    {event.entity_id ? (
-                      <Link
-                        to={`/company/${event.entity_id}`}
-                        className="text-caption font-medium hover:underline truncate"
-                      >
-                        {event.entity_name || "—"}
-                      </Link>
-                    ) : (
-                      <span className="text-caption font-medium truncate">
-                        {event.entity_name || "—"}
-                      </span>
+                  {/* Name + email + company */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      {event.entity_id ? (
+                        <Link
+                          to={event.entity_type === "company" ? `/company/${event.entity_id}` : `/company/${event.meta?.company_id || event.entity_id}`}
+                          className="text-caption font-medium hover:underline truncate"
+                        >
+                          {event.entity_name || "—"}
+                        </Link>
+                      ) : (
+                        <span className="text-caption font-medium truncate">
+                          {event.entity_name || "—"}
+                        </span>
+                      )}
+                      {event._email && (
+                        <span className="text-micro text-foreground/25 truncate hidden sm:inline">
+                          {event._email}
+                        </span>
+                      )}
+                    </div>
+                    {event.entity_type === "contact" && event._company_name && (
+                      <div className="text-micro text-foreground/30 truncate">
+                        {event._company_name}
+                      </div>
                     )}
                   </div>
 
