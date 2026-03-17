@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
-import { AlertCircle, Loader2, RefreshCw, RotateCcw, Signal } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, RefreshCw, RotateCcw, Signal } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 
+// ... keep existing code (SyncEvent type, SOURCE_LABELS, ACTION_STYLES)
 type SyncEvent = {
   id: number;
   created_at: string;
@@ -28,6 +29,7 @@ const SOURCE_LABELS: Record<string, string> = {
   daily_sync: "Daily Sync",
   watch_signups: "Watch Signups",
   backfill_plans: "Backfill Plans",
+  "backfill-plan-names": "Backfill Plans",
   import_webhook: "Webhook",
   import_bulk: "Bulk Import",
   import_backfill_contacts: "Contact Backfill",
@@ -113,6 +115,66 @@ export default function HubSpotStatus() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
+  // Sync Health query
+  const { data: syncHealth, refetch: refetchHealth } = useQuery({
+    queryKey: ["sync_health"],
+    queryFn: async () => {
+      const [
+        backfillLogRes,
+        companiesWithPlanRes,
+        companiesNoPlanRes,
+        expansionRes,
+        pqlRes,
+        contactsWithPlanRes,
+        contactsNoPlanRes,
+      ] = await Promise.all([
+        (supabase as any)
+          .from("backfill_log")
+          .select("*")
+          .eq("job_type", "plan_names")
+          .order("started_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("companies")
+          .select("id", { count: "exact", head: true })
+          .not("iorad_plan", "is", null),
+        supabase
+          .from("companies")
+          .select("id", { count: "exact", head: true })
+          .is("iorad_plan", null),
+        supabase
+          .from("companies")
+          .select("id", { count: "exact", head: true })
+          .eq("expansion_signal", true),
+        supabase
+          .from("companies")
+          .select("id", { count: "exact", head: true })
+          .eq("pql_signal", true),
+        supabase
+          .from("contacts")
+          .select("id", { count: "exact", head: true })
+          .not("hubspot_properties->plan_name", "is", null),
+        supabase
+          .from("contacts")
+          .select("id", { count: "exact", head: true })
+          .not("hubspot_object_id", "is", null)
+          .is("hubspot_properties->plan_name", null),
+      ]);
+
+      return {
+        backfill: backfillLogRes.data,
+        companiesWithPlan: companiesWithPlanRes.count ?? 0,
+        companiesNoPlan: companiesNoPlanRes.count ?? 0,
+        expansionSignals: expansionRes.count ?? 0,
+        pqlSignals: pqlRes.count ?? 0,
+        contactsWithPlan: contactsWithPlanRes.count ?? 0,
+        contactsNoPlan: contactsNoPlanRes.count ?? 0,
+      };
+    },
+    refetchInterval: 30_000,
+  });
+
   // Mutations
   const syncNow = useMutation({
     mutationFn: async () => {
@@ -137,6 +199,7 @@ export default function HubSpotStatus() {
     },
     onSuccess: (data: any) => {
       qc.invalidateQueries({ queryKey: ["sync_events_initial"] });
+      qc.invalidateQueries({ queryKey: ["sync_health"] });
       toast.success(
         `Signups: ${data.signups_found} found · ${data.expansion} expansion · ${data.pql} PQL · ${data.watchlist} watching`
       );
@@ -154,6 +217,7 @@ export default function HubSpotStatus() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sync_events_initial"] });
+      qc.invalidateQueries({ queryKey: ["sync_health"] });
       toast.success("Plan backfill started");
     },
     onError: (err: any) => toast.error(`Backfill failed: ${err?.message}`),
@@ -265,6 +329,132 @@ export default function HubSpotStatus() {
           <div className="text-display font-semibold tabular-nums mt-1">{(counts?.contacts || 0).toLocaleString()}</div>
         </div>
       </div>
+
+      {/* Sync Health Panel */}
+      {syncHealth && (
+        <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-caption font-medium">Sync Health</span>
+            <button
+              onClick={() => refetchHealth()}
+              className="text-micro text-foreground/30 hover:text-foreground/50 transition-colors"
+            >
+              Refresh
+            </button>
+          </div>
+
+          {/* Backfill status row */}
+          {syncHealth.backfill && (
+            <div className="flex items-center justify-between py-2 border-b border-border/20">
+              <div className="flex items-center gap-2">
+                {syncHealth.backfill.status === "completed" && (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                )}
+                {syncHealth.backfill.status === "running" && (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />
+                )}
+                {syncHealth.backfill.status === "failed" && (
+                  <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
+                )}
+                <span className="text-caption">
+                  Plan backfill — {syncHealth.backfill.status}
+                </span>
+              </div>
+              <div className="text-right">
+                <div className="text-caption font-medium tabular-nums">
+                  {(syncHealth.backfill.contacts_updated ?? 0).toLocaleString()} updated
+                </div>
+                <div className="text-micro text-foreground/40">
+                  {syncHealth.backfill.finished_at
+                    ? formatDistanceToNow(new Date(syncHealth.backfill.finished_at), { addSuffix: true })
+                    : "in progress"}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Coverage grid */}
+          <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+            {/* Plan coverage */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="field-label">Plan coverage</span>
+                <span className="text-micro text-foreground/40 tabular-nums">
+                  {syncHealth.contactsWithPlan.toLocaleString()} / {(syncHealth.contactsWithPlan + syncHealth.contactsNoPlan).toLocaleString()}
+                </span>
+              </div>
+              <div className="h-1.5 bg-foreground/[0.06] rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary rounded-full transition-all duration-500"
+                  style={{
+                    width: `${Math.round(
+                      (syncHealth.contactsWithPlan /
+                        Math.max(1, syncHealth.contactsWithPlan + syncHealth.contactsNoPlan)) * 100
+                    )}%`
+                  }}
+                />
+              </div>
+              {syncHealth.contactsNoPlan > 0 && (
+                <div className="text-micro text-foreground/30 mt-1">
+                  {syncHealth.contactsNoPlan.toLocaleString()} contacts missing plan —{" "}
+                  <button
+                    onClick={() => backfillPlans.mutate()}
+                    disabled={backfillPlans.isPending}
+                    className="text-primary hover:text-primary/80 transition-colors"
+                  >
+                    run backfill
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Company plan coverage */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="field-label">Companies with plan</span>
+                <span className="text-micro text-foreground/40 tabular-nums">
+                  {syncHealth.companiesWithPlan.toLocaleString()} / {(syncHealth.companiesWithPlan + syncHealth.companiesNoPlan).toLocaleString()}
+                </span>
+              </div>
+              <div className="h-1.5 bg-foreground/[0.06] rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary rounded-full transition-all duration-500"
+                  style={{
+                    width: `${Math.round(
+                      (syncHealth.companiesWithPlan /
+                        Math.max(1, syncHealth.companiesWithPlan + syncHealth.companiesNoPlan)) * 100
+                    )}%`
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Expansion signals */}
+            <div>
+              <div className="field-label mb-0.5">Expansion signals</div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                <span className="text-body font-semibold tabular-nums text-foreground">
+                  {syncHealth.expansionSignals.toLocaleString()}
+                </span>
+                <span className="text-caption text-foreground/40">companies</span>
+              </div>
+            </div>
+
+            {/* PQL signals */}
+            <div>
+              <div className="field-label mb-0.5">PQL signals</div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                <span className="text-body font-semibold tabular-nums text-foreground">
+                  {syncHealth.pqlSignals.toLocaleString()}
+                </span>
+                <span className="text-caption text-foreground/40">companies</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filter pills */}
       <div className="flex items-center gap-1.5 flex-wrap">
