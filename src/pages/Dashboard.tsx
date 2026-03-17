@@ -114,7 +114,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     setVisibleCount(50);
-  }, [activeStage, search, accountTypeFilter]);
+  }, [activeStage, search, accountTypeFilter, signalOnly]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
