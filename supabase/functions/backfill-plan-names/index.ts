@@ -306,24 +306,26 @@ Deno.serve(async (req) => {
 
     // Emit heartbeat with resume payload before self-chaining
     if (hasMore && activeLogId) {
-      await supabase.from("sync_events").insert({
-        source: "backfill-plan-names",
-        job_id: activeLogId,
-        entity_type: "system",
-        action: "heartbeat",
-        entity_name: `Backfill: offset ${offset}, updated ${cumulativeUpdated}`,
-        meta: {
-          resume_function: "backfill-plan-names",
-          resume_payload: {
-            offset: nextOffset,
-            log_id: activeLogId,
-            cumulative_updated: cumulativeUpdated,
-            cumulative_skipped: cumulativeSkipped,
-            cumulative_rescored: cumulativeRescored,
-            cumulative_processed: cumulativeProcessed,
+      try {
+        await supabase.from("sync_events").insert({
+          source: "backfill-plan-names",
+          job_id: activeLogId,
+          entity_type: "system",
+          action: "heartbeat",
+          entity_name: `Backfill: offset ${offset}, updated ${cumulativeUpdated}`,
+          meta: {
+            resume_function: "backfill-plan-names",
+            resume_payload: {
+              offset: nextOffset,
+              log_id: activeLogId,
+              cumulative_updated: cumulativeUpdated,
+              cumulative_skipped: cumulativeSkipped,
+              cumulative_rescored: cumulativeRescored,
+              cumulative_processed: cumulativeProcessed,
+            },
           },
-        },
-      }).catch(e => console.warn("heartbeat insert failed:", e.message));
+        });
+      } catch (e: any) { console.warn("heartbeat insert failed:", e.message); }
     }
 
     if (hasMore) {
