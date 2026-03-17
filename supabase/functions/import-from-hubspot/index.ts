@@ -144,7 +144,7 @@ Deno.serve(async (req) => {
               filters: [{
                 propertyName: "lastmodifieddate",
                 operator: "GTE",
-                value: TWO_YEARS_AGO,
+                value: ONE_YEAR_AGO,
               }],
             }],
             limit: 1,
