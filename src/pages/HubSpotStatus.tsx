@@ -431,35 +431,6 @@ export default function HubSpotStatus() {
             </button>
           </div>
 
-          {/* Backfill status row */}
-          {syncHealth.backfill && (
-            <div className="flex items-center justify-between py-2 border-b border-border/20">
-              <div className="flex items-center gap-2">
-                {syncHealth.backfill.status === "completed" && (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                )}
-                {syncHealth.backfill.status === "running" && (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />
-                )}
-                {syncHealth.backfill.status === "failed" && (
-                  <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
-                )}
-                <span className="text-caption">
-                  Plan backfill — {syncHealth.backfill.status}
-                </span>
-              </div>
-              <div className="text-right">
-                <div className="text-caption font-medium tabular-nums">
-                  {(syncHealth.backfill.contacts_updated ?? 0).toLocaleString()} updated
-                </div>
-                <div className="text-micro text-foreground/40">
-                  {syncHealth.backfill.finished_at
-                    ? formatDistanceToNow(new Date(syncHealth.backfill.finished_at), { addSuffix: true })
-                    : "in progress"}
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Rescore status row */}
           {syncHealth.rescoreLog && (
