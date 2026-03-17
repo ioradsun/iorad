@@ -1016,6 +1016,42 @@ export type Database = {
         }
         Relationships: []
       }
+      sync_log: {
+        Row: {
+          companies_scored: number | null
+          contacts_found: number | null
+          error_count: number | null
+          errors: Json | null
+          finished_at: string | null
+          hours_back: number
+          id: string
+          started_at: string
+          status: string
+        }
+        Insert: {
+          companies_scored?: number | null
+          contacts_found?: number | null
+          error_count?: number | null
+          errors?: Json | null
+          finished_at?: string | null
+          hours_back?: number
+          id?: string
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          companies_scored?: number | null
+          contacts_found?: number | null
+          error_count?: number | null
+          errors?: Json | null
+          finished_at?: string | null
+          hours_back?: number
+          id?: string
+          started_at?: string
+          status?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
