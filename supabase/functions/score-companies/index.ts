@@ -196,9 +196,13 @@ function calculateScoutScore(
   const expansion_signal = hasPaidContact && hasFreeCreator;
   const expansion_bonus = expansion_signal ? 20 : 0;
 
-  const total = Math.min(100, Math.max(0, tutorial + commercial + recency + intent + expansion_bonus));
+  // PQL signal: free user actively creating, NO paid plan at company yet
+  const pql_signal = !hasPaidContact && hasFreeCreator;
+  const pql_bonus  = pql_signal ? 15 : 0;
 
-  return { tutorial, commercial, recency, intent, expansion_signal, expansion_bonus, top_plan: topPlan, total };
+  const total = Math.min(100, Math.max(0, tutorial + commercial + recency + intent + expansion_bonus + pql_bonus));
+
+  return { tutorial, commercial, recency, intent, expansion_signal, expansion_bonus, pql_signal, pql_bonus, top_plan: topPlan, total };
 }
 
 // ── AI Activity Summary ───────────────────────────────────────────────────────
