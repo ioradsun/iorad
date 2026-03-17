@@ -28,8 +28,6 @@ const SOURCE_LABELS: Record<string, string> = {
   hubspot_pipeline: "Pipeline",
   daily_sync: "Daily Sync",
   watch_signups: "Watch Signups",
-  backfill_plans: "Backfill Plans",
-  "backfill-plan-names": "Backfill Plans",
   import_webhook: "Webhook",
   import_bulk: "Bulk Import",
   import_backfill_contacts: "Contact Backfill",
