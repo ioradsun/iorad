@@ -72,6 +72,11 @@ Deno.serve(async (req) => {
         .single();
 
       activeLogId = logRow?.id || null;
+
+      await logSyncEvent(supabase, {
+        source: "backfill_plans", job_id: activeLogId, entity_type: "contact",
+        action: "job_start", meta: { contacts_total: count || 0 },
+      });
     }
 
     // Load a page of contacts (all), HubSpot ID can come from column OR hubspot_properties.hs_object_id
