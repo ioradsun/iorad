@@ -198,17 +198,6 @@ export default function HubSpotStatus() {
     onError: (err: any) => toast.error(`Sync failed: ${err?.message}`),
   });
 
-  const fullRebuild = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.functions.invoke("hubspot-pipeline", {});
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Full rebuild started — this takes 10-20 minutes");
-      qc.invalidateQueries({ queryKey: ["sync_events_initial"] });
-    },
-    onError: (err: any) => toast.error(`Rebuild failed: ${err?.message}`),
-  });
 
 
   const rescoreAll = useMutation({
