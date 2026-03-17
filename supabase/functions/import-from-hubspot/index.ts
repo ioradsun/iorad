@@ -214,6 +214,7 @@ Deno.serve(async (req) => {
       );
     }
 
+    if (body.action === "sync_companies") {
       return await syncCompaniesIncremental(supabase);
     }
 
