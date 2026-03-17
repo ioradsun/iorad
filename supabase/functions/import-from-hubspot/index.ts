@@ -168,12 +168,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    // HubSpot total company count (active 2 years) — for sync completeness display
+    // HubSpot total company count (active 1 year) — for sync completeness display
     if (body.action === "company_count") {
       const apiKey = Deno.env.get("HUBSPOT_API_KEY");
       if (!apiKey) throw new Error("HUBSPOT_API_KEY not configured");
 
-      const TWO_YEARS_AGO = String(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000);
+      const ONE_YEAR_AGO = String(Date.now() - 365 * 24 * 60 * 60 * 1000);
 
       const searchRes = await hubspotFetch(
         "https://api.hubapi.com/crm/v3/objects/companies/search",
