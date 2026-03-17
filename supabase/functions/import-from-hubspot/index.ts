@@ -542,7 +542,7 @@ async function syncContactsIncremental(supabase: any) {
   const MAX_PAGES = 5; // Process up to 500 contacts per invocation
 
   while (pageCount < MAX_PAGES) {
-    const TWO_YEARS_AGO = new Date(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000).toISOString();
+    const ONE_YEAR_AGO = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
 
     const searchBody: any = {
       filterGroups: [{
