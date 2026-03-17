@@ -18,6 +18,9 @@ type SyncEvent = {
   entity_name: string | null;
   action: string;
   meta: any;
+  // Enriched client-side
+  _email?: string | null;
+  _company_name?: string | null;
 };
 
 export default function HubSpotStatus() {
