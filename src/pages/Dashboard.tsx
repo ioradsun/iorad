@@ -78,32 +78,23 @@ export default function Dashboard() {
       list = list.filter(c => c.name.toLowerCase().includes(q) || (c.domain || "").toLowerCase().includes(q));
     }
 
+    const now = Date.now();
     list.sort((a, b) => {
-      // For customer tab, float expansion_signal accounts to top
-      if (activeStage === "customer") {
-        const aSignal = (a as any).expansion_signal ? 1 : 0;
-        const bSignal = (b as any).expansion_signal ? 1 : 0;
-        if (bSignal !== aSignal) return bSignal - aSignal;
+      const aPriority = getRowPriority(a as any, activeStage, now);
+      const bPriority = getRowPriority(b as any, activeStage, now);
+      if (bPriority !== aPriority) return bPriority - aPriority;
+
+      if (sortKey === "name") {
+        const av = a.name.toLowerCase();
+        const bv = b.name.toLowerCase();
+        if (av < bv) return sortAsc ? -1 : 1;
+        if (av > bv) return sortAsc ? 1 : -1;
+        return 0;
       }
 
-      let av: any;
-      let bv: any;
-      switch (sortKey) {
-        case "name":
-          av = a.name.toLowerCase();
-          bv = b.name.toLowerCase();
-          break;
-        case "scout_score":
-          av = (a as any).scout_score ?? -1;
-          bv = (b as any).scout_score ?? -1;
-          break;
-        default:
-          av = 0;
-          bv = 0;
-      }
-      if (av < bv) return sortAsc ? -1 : 1;
-      if (av > bv) return sortAsc ? 1 : -1;
-      return 0;
+      const aScore = (a as any).scout_score ?? -1;
+      const bScore = (b as any).scout_score ?? -1;
+      return bScore - aScore;
     });
 
     return list;
