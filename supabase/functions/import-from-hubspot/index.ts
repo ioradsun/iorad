@@ -227,7 +227,7 @@ Deno.serve(async (req) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // ── Catchup: one-time sweep of all 2-year active contacts ──────────────
+    // ── Catchup: one-time sweep of all 1-year active contacts ──────────────
     if (body.action === "catchup_contacts") {
       return await catchupContacts(supabase, body.after || null);
     }
