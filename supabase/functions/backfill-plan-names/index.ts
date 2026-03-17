@@ -106,17 +106,19 @@ Deno.serve(async (req) => {
         }
         await supabase.from("backfill_log").update(finalUpdate).eq("id", activeLogId);
 
-        await supabase.from("sync_events").insert({
-          source: "backfill-plan-names",
-          job_id: activeLogId,
-          entity_type: "system",
-          action: "job_complete",
-          entity_name: "Backfill complete",
-          meta: {
-            cumulative_updated: body.cumulative_updated || 0,
-            cumulative_skipped: body.cumulative_skipped || 0,
-          },
-        }).catch(e => console.warn("job_complete insert failed:", e.message));
+        try {
+          await supabase.from("sync_events").insert({
+            source: "backfill-plan-names",
+            job_id: activeLogId,
+            entity_type: "system",
+            action: "job_complete",
+            entity_name: "Backfill complete",
+            meta: {
+              cumulative_updated: body.cumulative_updated || 0,
+              cumulative_skipped: body.cumulative_skipped || 0,
+            },
+          });
+        } catch (e: any) { console.warn("job_complete insert failed:", e.message); }
       }
 
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
