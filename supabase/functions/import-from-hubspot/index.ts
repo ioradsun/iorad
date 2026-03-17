@@ -131,9 +131,9 @@ Deno.serve(async (req) => {
       const apiKey = Deno.env.get("HUBSPOT_API_KEY");
       if (!apiKey) throw new Error("HUBSPOT_API_KEY not configured");
 
-      const TWO_YEARS_AGO = String(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000);
+      const ONE_YEAR_AGO = String(Date.now() - 365 * 24 * 60 * 60 * 1000);
 
-      // Count contacts active in last 2 years using the same filter as sync
+      // Count contacts active in last year using the same filter as sync
       const searchRes = await hubspotFetch(
         "https://api.hubapi.com/crm/v3/objects/contacts/search",
         {
