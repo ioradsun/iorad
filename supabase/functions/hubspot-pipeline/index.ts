@@ -627,8 +627,12 @@ function calculateScoutScore(company: any, contacts: any[]): ScoreBreakdown {
   const expansion_signal = hasPaidContact && hasFreeCreator;
   const expansion_bonus = expansion_signal ? 20 : 0;
 
-  const total = Math.min(100, Math.min(tutorial, 60) + Math.min(commercial, 25) + Math.min(recency, 15) + Math.min(intent, 15) + expansion_bonus);
-  return { tutorial: Math.min(tutorial, 60), commercial: Math.min(commercial, 25), recency: Math.min(recency, 15), intent: Math.min(intent, 15), expansion_signal, expansion_bonus, top_plan: topPlan, total };
+  // PQL signal: free user actively creating, NO paid plan at company yet
+  const pql_signal = !hasPaidContact && hasFreeCreator;
+  const pql_bonus  = pql_signal ? 15 : 0;
+
+  const total = Math.min(100, Math.min(tutorial, 60) + Math.min(commercial, 25) + Math.min(recency, 15) + Math.min(intent, 15) + expansion_bonus + pql_bonus);
+  return { tutorial: Math.min(tutorial, 60), commercial: Math.min(commercial, 25), recency: Math.min(recency, 15), intent: Math.min(intent, 15), expansion_signal, expansion_bonus, pql_signal, pql_bonus, top_plan: topPlan, total };
 }
 
 async function scoreOneCompany(supabase: any, companyId: string): Promise<boolean> {
