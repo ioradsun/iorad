@@ -122,7 +122,13 @@ Deno.serve(async (req) => {
         updated_at: companyTouchAt,
       }).eq("id", co.id);
       if (error) stats.errors.push(error.message);
-      else stats.companies_scored += 1;
+      else {
+        stats.companies_scored += 1;
+        await logSyncEvent(supabase, {
+          source: "daily_sync", job_id: logId, entity_type: "company",
+          entity_id: co.id, entity_name: co.name, action: "updated",
+        });
+      }
     }
 
     const hasMore = false;
