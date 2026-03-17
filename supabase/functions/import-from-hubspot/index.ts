@@ -170,7 +170,50 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (body.action === "sync_companies") {
+    // HubSpot total company count (active 2 years) — for sync completeness display
+    if (body.action === "company_count") {
+      const apiKey = Deno.env.get("HUBSPOT_API_KEY");
+      if (!apiKey) throw new Error("HUBSPOT_API_KEY not configured");
+
+      const TWO_YEARS_AGO = new Date(
+        Date.now() - 2 * 365 * 24 * 60 * 60 * 1000
+      ).toISOString();
+
+      const searchRes = await hubspotFetch(
+        "https://api.hubapi.com/crm/v3/objects/companies/search",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filterGroups: [{
+              filters: [{
+                propertyName: "hs_lastmodifieddate",
+                operator: "GTE",
+                value: TWO_YEARS_AGO,
+              }],
+            }],
+            limit: 1,
+            properties: ["hs_object_id"],
+          }),
+        }
+      );
+
+      if (!searchRes.ok) throw new Error(`HubSpot company count failed: ${searchRes.status}`);
+      const data = await searchRes.json();
+      const hubspotTotal = data.total || 0;
+
+      await supabase.from("sync_checkpoints").upsert({
+        key: "hubspot_company_count",
+        value: String(hubspotTotal),
+        updated_at: new Date().toISOString(),
+      });
+
+      return new Response(
+        JSON.stringify({ success: true, hubspot_total: hubspotTotal }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
       return await syncCompaniesIncremental(supabase);
     }
 

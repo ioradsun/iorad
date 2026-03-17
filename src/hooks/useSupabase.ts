@@ -377,3 +377,63 @@ export function useBulkImport() {
     },
   });
 }
+
+// ---- Sync Health (shared between Dashboard + HubSpotStatus) ----
+export function useSyncHealth() {
+  return useQuery({
+    queryKey: ["sync_health_counts"],
+    queryFn: async () => {
+      const [
+        dbContactsRes,
+        dbCompaniesRes,
+        hubspotContactRes,
+        hubspotCompanyRes,
+        lastSyncRes,
+      ] = await Promise.all([
+        supabase.from("contacts").select("id", { count: "exact", head: true }),
+        supabase.from("companies").select("id", { count: "exact", head: true }),
+        (supabase as any)
+          .from("sync_checkpoints")
+          .select("value, updated_at")
+          .eq("key", "hubspot_contact_count")
+          .maybeSingle(),
+        (supabase as any)
+          .from("sync_checkpoints")
+          .select("value, updated_at")
+          .eq("key", "hubspot_company_count")
+          .maybeSingle(),
+        (supabase as any)
+          .from("sync_checkpoints")
+          .select("value, updated_at")
+          .eq("key", "last_contact_sync_result")
+          .maybeSingle(),
+      ]);
+
+      const dbContacts  = dbContactsRes.count  ?? 0;
+      const dbCompanies = dbCompaniesRes.count ?? 0;
+      const hsContacts  = hubspotContactRes.data
+        ? parseInt(hubspotContactRes.data.value || "0", 10) : null;
+      const hsCompanies = hubspotCompanyRes.data
+        ? parseInt(hubspotCompanyRes.data.value || "0", 10) : null;
+      const lastSync    = lastSyncRes.data
+        ? { ...JSON.parse(lastSyncRes.data.value || "{}"), at: lastSyncRes.data.updated_at }
+        : null;
+
+      const contactPct  = hsContacts  ? Math.round(dbContacts  / hsContacts  * 100) : null;
+      const companyPct  = hsCompanies ? Math.round(dbCompanies / hsCompanies * 100) : null;
+      const contactGap  = hsContacts  ? hsContacts  - dbContacts  : null;
+      const companyGap  = hsCompanies ? hsCompanies - dbCompanies : null;
+      const inSync      = (contactPct ?? 0) >= 99 && (companyPct ?? 0) >= 99;
+
+      return {
+        dbContacts, dbCompanies,
+        hsContacts, hsCompanies,
+        contactPct, companyPct,
+        contactGap, companyGap,
+        lastSync, inSync,
+      };
+    },
+    refetchInterval: 30_000,
+    staleTime: 20_000,
+  });
+}
