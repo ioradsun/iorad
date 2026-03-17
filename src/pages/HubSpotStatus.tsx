@@ -138,6 +138,14 @@ export default function HubSpotStatus() {
         ? { ...JSON.parse(lastSyncRes.data.value || "{}"), at: lastSyncRes.data.updated_at }
         : null;
 
+      const catchupRaw = catchupRes.data?.value || null;
+      let catchupStatus: any = null;
+      if (catchupRaw === "complete") {
+        catchupStatus = "complete";
+      } else if (catchupRaw) {
+        try { catchupStatus = JSON.parse(catchupRaw); } catch { catchupStatus = null; }
+      }
+
       return {
         dbContacts, dbCompanies, hsContacts, hsCompanies, lastSync,
         contactGap:  hsContacts  ? hsContacts  - dbContacts  : null,
@@ -147,6 +155,7 @@ export default function HubSpotStatus() {
         expansion:   expansionRes.count  ?? 0,
         pql:         pqlRes.count        ?? 0,
         rescoreLog:  rescoreRes.data,
+        catchupStatus,
       };
     },
     refetchInterval: (query) => {
