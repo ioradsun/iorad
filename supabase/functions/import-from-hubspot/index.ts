@@ -497,13 +497,22 @@ async function syncContactsIncremental(supabase: any) {
   const MAX_PAGES = 5; // Process up to 500 contacts per invocation
 
   while (pageCount < MAX_PAGES) {
+    const TWO_YEARS_AGO = new Date(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000).toISOString();
+
     const searchBody: any = {
       filterGroups: [{
-        filters: [{
-          propertyName: "hs_lastmodifieddate",
-          operator: "GTE",
-          value: searchFrom,
-        }],
+        filters: [
+          {
+            propertyName: "hs_lastmodifieddate",
+            operator: "GTE",
+            value: searchFrom,
+          },
+          {
+            propertyName: "hs_lastmodifieddate",
+            operator: "GTE",
+            value: TWO_YEARS_AGO,
+          },
+        ],
       }],
       properties: CONTACT_PROPS,
       sorts: [{ propertyName: "hs_lastmodifieddate", direction: "ASCENDING" }],
