@@ -324,6 +324,10 @@ async function scoreOneCompany(
     scout_score_breakdown: breakdown,
     scout_scored_at: new Date().toISOString(),
     iorad_plan: breakdown.top_plan,
+    expansion_signal: breakdown.expansion_signal,
+    expansion_signal_at: breakdown.expansion_signal
+      ? (company.expansion_signal_at || new Date().toISOString())
+      : null,
   };
   if (summary) updateData.scout_summary = summary;
 
