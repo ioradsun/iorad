@@ -6,6 +6,23 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// ── Sync event logger ─────────────────────────────────────────────────────────
+async function logSyncEvent(supabase: any, event: {
+  source: string; job_id?: string | null;
+  entity_type?: string; entity_id?: string | null;
+  entity_name?: string | null; action: string; meta?: any;
+}) {
+  try {
+    await supabase.from("sync_events").insert({
+      source: event.source, job_id: event.job_id || null,
+      entity_type: event.entity_type || "system",
+      entity_id: event.entity_id || null,
+      entity_name: event.entity_name || null,
+      action: event.action, meta: event.meta || {},
+    });
+  } catch (e: any) { console.warn("logSyncEvent failed:", e.message); }
+}
+
 // ── Tier labels ───────────────────────────────────────────────────────────────
 export function getTier(score: number): "hot" | "warm" | "lukewarm" | "cold" {
   if (score >= 75) return "hot";
