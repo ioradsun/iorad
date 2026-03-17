@@ -168,6 +168,24 @@ export default function HubSpotStatus() {
     onError: (err: any) => toast.error(`Sync failed: ${err?.message}`),
   });
 
+  const watchSignups = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("watch-signups", {
+        body: { hours_back: 24 },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data: any) => {
+      qc.invalidateQueries({ queryKey: ["recent_companies_24h"] });
+      qc.invalidateQueries({ queryKey: ["recent_contacts_24h"] });
+      toast.success(
+        `Signups: ${data.signups_found} found · ${data.expansion} expansion · ${data.pql} PQL · ${data.watchlist} watching`
+      );
+    },
+    onError: (err: any) => toast.error(`Watch signups failed: ${err?.message}`),
+  });
+
   const { data: backfillStatus } = useQuery({
     queryKey: ["backfill_log_latest"],
     queryFn: async () => {
