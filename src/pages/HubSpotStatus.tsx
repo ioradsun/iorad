@@ -128,6 +128,7 @@ export default function HubSpotStatus() {
         supabase.from("companies").select("id", { count: "exact", head: true }).eq("pql_signal", true),
         (supabase as any).from("backfill_log").select("*").eq("job_type", "score_all").order("started_at", { ascending: false }).limit(1).maybeSingle(),
         (supabase as any).from("sync_checkpoints").select("value, updated_at").eq("key", "contact_catchup_status").maybeSingle(),
+      ]);
 
       const dbContacts  = dbContactsRes.count  ?? 0;
       const dbCompanies = dbCompaniesRes.count  ?? 0;
