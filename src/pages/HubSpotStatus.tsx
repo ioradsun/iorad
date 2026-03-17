@@ -318,6 +318,30 @@ export default function HubSpotStatus() {
         />
       </div>
 
+      {/* Catchup status */}
+      {health?.catchupStatus && health.catchupStatus !== "complete" && (
+        <div className="text-micro text-amber-400/80 flex items-center gap-1.5">
+          <Loader2 className="w-3 h-3 animate-spin" />
+          Catchup in progress · cursor {health.catchupStatus.cursor?.slice(0, 10)}
+          · {health.catchupStatus.processed_this_run?.toLocaleString()} this run
+        </div>
+      )}
+
+      {health?.catchupStatus === "complete" && (
+        <div className="text-micro text-emerald-400/70">✓ Full catchup complete</div>
+      )}
+
+      {health?.contactGap != null && health.contactGap > 1000 && !health?.catchupStatus && (
+        <button
+          onClick={() => catchupContacts.mutate()}
+          disabled={catchupContacts.isPending}
+          className="text-micro text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
+        >
+          {catchupContacts.isPending && <Loader2 className="w-3 h-3 animate-spin" />}
+          Import all {health.contactGap.toLocaleString()} missing contacts →
+        </button>
+      )}
+
       {/* ── 2. What's coming in ── */}
       <div className="rounded-xl border border-border bg-card">
         <div className="flex items-center justify-between p-4 pb-0">
