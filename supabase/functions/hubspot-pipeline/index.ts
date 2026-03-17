@@ -642,7 +642,7 @@ async function scoreOneCompany(supabase: any, companyId: string): Promise<boolea
   if (!contacts || contacts.length === 0) return false;
 
   const breakdown = calculateScoutScore(company, contacts);
-  await supabase.from("companies").update({
+  const updateData: Record<string, any> = {
     scout_score: breakdown.total,
     scout_score_breakdown: breakdown,
     scout_scored_at: new Date().toISOString(),
@@ -651,7 +651,17 @@ async function scoreOneCompany(supabase: any, companyId: string): Promise<boolea
     expansion_signal_at: breakdown.expansion_signal
       ? (company.expansion_signal_at || new Date().toISOString())
       : null,
-  }).eq("id", companyId);
+  };
+
+  // Auto-promote to customer if paid plan detected
+  if (breakdown.top_plan && ["Team", "Enterprise"].includes(breakdown.top_plan) &&
+      company.lifecycle_stage !== "customer") {
+    updateData.lifecycle_stage = "customer";
+    updateData.sales_motion = "expansion";
+    updateData.brief_type = "expansionBrief";
+  }
+
+  await supabase.from("companies").update(updateData).eq("id", companyId);
 
   return true;
 }

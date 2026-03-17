@@ -331,6 +331,14 @@ async function scoreOneCompany(
   };
   if (summary) updateData.scout_summary = summary;
 
+  // Auto-promote to customer if paid plan detected
+  if (breakdown.top_plan && ["Team", "Enterprise"].includes(breakdown.top_plan) &&
+      company.lifecycle_stage !== "customer") {
+    updateData.lifecycle_stage = "customer";
+    updateData.sales_motion = "expansion";
+    updateData.brief_type = "expansionBrief";
+  }
+
   const { error: uErr } = await supabase
     .from("companies")
     .update(updateData)
