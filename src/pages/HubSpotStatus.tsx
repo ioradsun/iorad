@@ -161,6 +161,7 @@ export default function HubSpotStatus() {
     refetchInterval: (query) => {
       const d = query.state.data;
       if (d?.rescoreLog?.status === "running") return 2_000;
+      if (d?.catchupStatus && d.catchupStatus !== "complete") return 5_000;
       return 30_000;
     },
   });
