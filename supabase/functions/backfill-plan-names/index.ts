@@ -87,7 +87,6 @@ Deno.serve(async (req) => {
     const { data: contacts, error } = await supabase
       .from("contacts")
       .select("id, company_id, email, hubspot_object_id, hubspot_properties")
-      .or('hubspot_properties->plan_name.is.null,hubspot_properties->plan_name.eq.""')
       .is("hubspot_properties->_plan_checked", null)
       .order("created_at", { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1);
