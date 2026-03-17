@@ -191,6 +191,20 @@ export default function HubSpotStatus() {
     onError: (err: any) => toast.error(`Rescore failed: ${err?.message}`),
   });
 
+  const catchupContacts = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.functions.invoke("import-from-hubspot", {
+        body: { action: "catchup_contacts" },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Catchup started — importing all 2-year active contacts");
+      qc.invalidateQueries({ queryKey: ["sync_health_v2"] });
+    },
+    onError: (err: any) => toast.error(`Catchup failed: ${err?.message}`),
+  });
+
   // ── Helpers ─────────────────────────────────────────────────────────────
   function relativeTime(dateStr: string) {
     const s = Math.max(0, Math.floor((now - new Date(dateStr).getTime()) / 1000));
