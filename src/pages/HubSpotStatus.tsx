@@ -128,6 +128,8 @@ export default function HubSpotStatus() {
         pqlRes,
         contactsWithPlanRes,
         contactsNoPlanRes,
+        hubspotCountRes,
+        lastSyncRes,
       ] = await Promise.all([
         (supabase as any)
           .from("backfill_log")
@@ -168,13 +170,11 @@ export default function HubSpotStatus() {
           .select("id", { count: "exact", head: true })
           .not("hubspot_object_id", "is", null)
           .is("hubspot_properties->plan_name", null),
-        // HubSpot contact count from checkpoint
         (supabase as any)
           .from("sync_checkpoints")
           .select("value, updated_at")
           .eq("key", "hubspot_contact_count")
           .maybeSingle(),
-        // Last contact sync result
         (supabase as any)
           .from("sync_checkpoints")
           .select("value, updated_at")
@@ -182,8 +182,8 @@ export default function HubSpotStatus() {
           .maybeSingle(),
       ]);
 
-      const hubspotCountData = (results as any)[8]?.data;
-      const lastSyncData = (results as any)[9]?.data;
+      const hubspotCountData = hubspotCountRes?.data;
+      const lastSyncData = lastSyncRes?.data;
 
       return {
         backfill: backfillLogRes.data,
