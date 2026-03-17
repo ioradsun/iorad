@@ -2519,12 +2519,12 @@ async function catchupContacts(supabase: any, afterParam: string | null) {
       filterGroups: [{
         filters: [
           {
-            propertyName: "hs_lastmodifieddate",
+            propertyName: "lastmodifieddate",
             operator: "GTE",
             value: cursor,
           },
           {
-            propertyName: "hs_lastmodifieddate",
+            propertyName: "lastmodifieddate",
             operator: "LT",
             value: windowEnd,
           },
