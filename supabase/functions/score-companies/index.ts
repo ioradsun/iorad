@@ -6,6 +6,23 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// ── Sync event logger ─────────────────────────────────────────────────────────
+async function logSyncEvent(supabase: any, event: {
+  source: string; job_id?: string | null;
+  entity_type?: string; entity_id?: string | null;
+  entity_name?: string | null; action: string; meta?: any;
+}) {
+  try {
+    await supabase.from("sync_events").insert({
+      source: event.source, job_id: event.job_id || null,
+      entity_type: event.entity_type || "system",
+      entity_id: event.entity_id || null,
+      entity_name: event.entity_name || null,
+      action: event.action, meta: event.meta || {},
+    });
+  } catch (e: any) { console.warn("logSyncEvent failed:", e.message); }
+}
+
 // ── Tier labels ───────────────────────────────────────────────────────────────
 export function getTier(score: number): "hot" | "warm" | "lukewarm" | "cold" {
   if (score >= 75) return "hot";
@@ -490,6 +507,7 @@ Deno.serve(async (req) => {
     if (action === "score_recent") {
       const hoursBack = body.hours_back || 2;
       const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
+      const parentJobId = body.job_id || null;
 
       const { data: recentCompanies } = await supabase
         .from("companies")
@@ -497,6 +515,15 @@ Deno.serve(async (req) => {
         .gte("updated_at", since)
         .order("updated_at", { ascending: false })
         .limit(500);
+
+      const total = recentCompanies?.length || 0;
+
+      await logSyncEvent(supabase, {
+        source: "score_companies", job_id: parentJobId,
+        entity_type: "system", action: "heartbeat",
+        entity_name: `score_recent: scoring ${total} companies updated in last ${hoursBack}h`,
+        meta: { total, hours_back: hoursBack },
+      });
 
       let scored = 0;
       for (const c of recentCompanies || []) {
@@ -508,8 +535,15 @@ Deno.serve(async (req) => {
         }
       }
 
+      await logSyncEvent(supabase, {
+        source: "score_companies", job_id: parentJobId,
+        entity_type: "system", action: "job_complete",
+        entity_name: `score_recent: ${scored}/${total} companies scored`,
+        meta: { scored, total, hours_back: hoursBack },
+      });
+
       return new Response(
-        JSON.stringify({ success: true, scored, total: recentCompanies?.length || 0 }),
+        JSON.stringify({ success: true, scored, total }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
     const scoreRes = await fetch(`${supabaseUrl}/functions/v1/score-companies`, {
       method: "POST",
       headers: { Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "score_recent", hours_back: hoursBack }),
+      body: JSON.stringify({ action: "score_recent", hours_back: hoursBack, job_id: logId }),
     });
     if (scoreRes.ok) {
       const scoreData = await scoreRes.json();
