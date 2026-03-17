@@ -274,6 +274,9 @@ export default function HubSpotStatus() {
           </span>
         </div>
       )}
+
+      {/* ── 1. The numbers ── */}
+      <div className="grid grid-cols-2 gap-6">
         <StatPair
           label="Contacts"
           db={health?.dbContacts ?? 0}
@@ -289,21 +292,6 @@ export default function HubSpotStatus() {
           pct={health?.companyPct ?? null}
         />
       </div>
-
-      {/* Last sync meta */}
-      {health?.lastSync?.at && (
-        <div className="flex items-center gap-3 text-micro text-foreground/30">
-          <span>
-            {isSyncing
-              ? <span className="text-amber-400">syncing — backlog in progress…</span>
-              : <>synced {formatDistanceToNow(new Date(health.lastSync.at), { addSuffix: true })}</>
-            }
-          </span>
-          {health.lastSync.processed > 0 && (
-            <span>{health.lastSync.processed.toLocaleString()} contacts last run</span>
-          )}
-        </div>
-      )}
 
       {/* ── 2. What's coming in ── */}
       <div className="rounded-xl border border-border bg-card">
