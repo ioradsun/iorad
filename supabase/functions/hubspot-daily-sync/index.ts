@@ -46,6 +46,11 @@ Deno.serve(async (req) => {
       .single();
     logId = logRow?.id || null;
 
+    await logSyncEvent(supabase, {
+      source: "daily_sync", job_id: logId, entity_type: "company",
+      action: "job_start", meta: { hours_back: hoursBack },
+    });
+
     const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
 
     const stats = {
