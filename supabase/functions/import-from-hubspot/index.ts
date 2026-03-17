@@ -828,6 +828,7 @@ async function processContactPage(
   supabase: any,
   hsContacts: any[],
   apiKey: string,
+  opts?: { skipScoring?: boolean },
 ): Promise<{ processed: number; newest: string }> {
   let newest = "";
   const rowsByCompany = new Map<string, any[]>(); // companyId → contact rows
