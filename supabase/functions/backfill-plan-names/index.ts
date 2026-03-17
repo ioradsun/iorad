@@ -62,7 +62,6 @@ Deno.serve(async (req) => {
       const { count } = await supabase
         .from("contacts")
         .select("id", { count: "exact", head: true })
-        .or('hubspot_properties->plan_name.is.null,hubspot_properties->plan_name.eq.""')
         .is("hubspot_properties->_plan_checked", null);
 
       const { data: logRow } = await supabase
