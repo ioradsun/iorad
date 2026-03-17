@@ -726,10 +726,21 @@ async function runPhase3(supabase: any, jobId: string, snap: any) {
 
   if (hasMore) {
     await supabase.from("processing_jobs").update({ settings_snapshot: newSnap }).eq("id", jobId);
+    await logSyncEvent(supabase, {
+      source: "hubspot_pipeline", job_id: jobId, entity_type: "company",
+      action: "heartbeat", entity_name: `Phase 3: ${newScored} companies scored`,
+      batch_seq: newOffset,
+      meta: { phase: 3, resume_function: "hubspot-pipeline", resume_payload: { job_id: jobId } },
+    });
     chainSelf(jobId);
     console.log(`pipeline phase3: chaining next batch, offset=${newOffset}`);
   } else {
     console.log(`pipeline: COMPLETE — ${snap.phase1_processed ?? 0} companies upserted, ${snap.phase2_contacts_imported ?? 0} contacts imported, ${newScored} scored.`);
+    await logSyncEvent(supabase, {
+      source: "hubspot_pipeline", job_id: jobId, entity_type: "company",
+      action: "job_complete",
+      meta: { phase1_processed: snap.phase1_processed ?? 0, phase2_contacts: snap.phase2_contacts_imported ?? 0, phase3_scored: newScored },
+    });
     await supabase.from("processing_jobs").update({
       status: "completed",
       finished_at: new Date().toISOString(),
