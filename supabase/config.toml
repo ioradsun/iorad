@@ -36,3 +36,21 @@ verify_jwt = false
 [functions.watch-signups]
 verify_jwt = false
 
+[functions.sync-watchdog]
+verify_jwt = false
+
+[functions.hubspot-daily-sync]
+verify_jwt = false
+
+[functions.backfill-plan-names]
+verify_jwt = false
+
+[functions.run-signals]
+verify_jwt = false
+
+[functions.notify-feedback]
+verify_jwt = false
+
+[functions.list-users]
+verify_jwt = false
+
