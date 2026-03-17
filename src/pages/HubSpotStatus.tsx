@@ -48,8 +48,42 @@ export default function HubSpotStatus() {
     },
   });
 
+  // Enrich events with company names and emails
   useEffect(() => {
-    if (initialEvents) setEvents(initialEvents);
+    if (!initialEvents?.length) return;
+
+    const enrichEvents = async (evts: SyncEvent[]) => {
+      // Collect unique company IDs and contact IDs
+      const companyIds = new Set<string>();
+      const contactIds = new Set<string>();
+      for (const e of evts) {
+        if (e.entity_type === "contact" && e.meta?.company_id) companyIds.add(e.meta.company_id);
+        if (e.entity_type === "company" && e.entity_id) companyIds.add(e.entity_id);
+        if (e.entity_type === "contact" && e.entity_id) contactIds.add(e.entity_id);
+      }
+
+      const [companyRes, contactRes] = await Promise.all([
+        companyIds.size > 0
+          ? supabase.from("companies").select("id, name").in("id", [...companyIds])
+          : { data: [] },
+        contactIds.size > 0
+          ? supabase.from("contacts").select("id, email").in("id", [...contactIds])
+          : { data: [] },
+      ]);
+
+      const companyMap = new Map((companyRes.data || []).map((c: any) => [c.id, c.name]));
+      const contactMap = new Map((contactRes.data || []).map((c: any) => [c.id, c.email]));
+
+      return evts.map(e => ({
+        ...e,
+        _company_name: e.entity_type === "contact"
+          ? companyMap.get(e.meta?.company_id) || null
+          : e.entity_type === "company" ? e.entity_name : null,
+        _email: e.entity_type === "contact" ? contactMap.get(e.entity_id!) || null : null,
+      }));
+    };
+
+    enrichEvents(initialEvents).then(setEvents);
   }, [initialEvents]);
 
   // ── Realtime — only contact/company creates and updates ─────────────────
