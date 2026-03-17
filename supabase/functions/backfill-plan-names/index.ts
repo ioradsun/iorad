@@ -74,8 +74,9 @@ Deno.serve(async (req) => {
       activeLogId = logRow?.id || null;
 
       await logSyncEvent(supabase, {
-        source: "backfill_plans", job_id: activeLogId, entity_type: "contact",
-        action: "job_start", meta: { contacts_total: count || 0 },
+        source: "backfill-plan-names", job_id: activeLogId, entity_type: "system",
+        action: "job_start", entity_name: "Backfill plan names started",
+        meta: { contacts_total: count || 0 },
       });
     }
 
