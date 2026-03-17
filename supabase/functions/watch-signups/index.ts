@@ -332,6 +332,13 @@ Deno.serve(async (req) => {
       }
 
       companyUpdates.set(companyId, updates);
+
+      await logSyncEvent(supabase, {
+        source: "watch_signups", entity_type: "contact",
+        entity_name: contactName,
+        action: isExpansion ? "created" : isPQL ? "created" : "updated",
+        meta: { company_id: companyId, signal: isExpansion ? "expansion" : isPQL ? "pql" : "watchlist" },
+      });
     }
 
     // Batch update companies
