@@ -286,7 +286,7 @@ async function scoreOneCompany(
   // Fetch company
   const { data: company, error: cErr } = await supabase
     .from("companies")
-    .select("id, name, lifecycle_stage, sales_motion, account_type, brief_type, iorad_plan, is_existing_customer, scout_score, scout_scored_at")
+    .select("id, name, lifecycle_stage, sales_motion, account_type, brief_type, iorad_plan, expansion_signal, expansion_signal_at, is_existing_customer, scout_score, scout_scored_at")
     .eq("id", companyId)
     .maybeSingle();
 
