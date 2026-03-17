@@ -46,6 +46,7 @@ export default function Dashboard() {
   const activeStage = stageFromUrl;
   const [visibleCount, setVisibleCount] = useState(50);
   const [accountTypeFilter, setAccountTypeFilter] = useState<string>("all");
+  const [signalOnly, setSignalOnly] = useState(false);
 
   const { data: firstPage = [], isLoading: firstPageLoading } = useCompaniesPage(activeStage);
   const { data: fullList } = useCompanies();
