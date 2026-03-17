@@ -5,6 +5,25 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+async function logSyncEvent(
+  supabase: any,
+  event: {
+    source: string; job_id?: string | null; entity_type: string;
+    entity_id?: string | null; entity_name?: string | null; action: string;
+    diff?: any; batch_seq?: number | null; cursor_val?: string | null; meta?: any;
+  }
+) {
+  try {
+    await supabase.from("sync_events").insert({
+      source: event.source, job_id: event.job_id || null,
+      entity_type: event.entity_type, entity_id: event.entity_id || null,
+      entity_name: event.entity_name || null, action: event.action,
+      diff: event.diff || {}, batch_seq: event.batch_seq ?? null,
+      cursor_val: event.cursor_val || null, meta: event.meta || {},
+    });
+  } catch (e: any) { console.warn("logSyncEvent failed:", e.message); }
+}
+
 const BATCH_SIZE = 100;
 const PAGE_SIZE = 500;
 
@@ -53,6 +72,11 @@ Deno.serve(async (req) => {
         .single();
 
       activeLogId = logRow?.id || null;
+
+      await logSyncEvent(supabase, {
+        source: "backfill_plans", job_id: activeLogId, entity_type: "contact",
+        action: "job_start", meta: { contacts_total: count || 0 },
+      });
     }
 
     // Load a page of contacts (all), HubSpot ID can come from column OR hubspot_properties.hs_object_id
@@ -66,6 +90,13 @@ Deno.serve(async (req) => {
 
     if (!contacts || contacts.length === 0) {
       console.log("backfill-plan-names: all contacts processed, triggering score-companies");
+
+      await logSyncEvent(supabase, {
+        source: "backfill_plans", job_id: activeLogId, entity_type: "contact",
+        action: "job_complete",
+        meta: { total_processed: body.cumulative_processed, total_updated: body.cumulative_updated || 0 },
+      });
+
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 

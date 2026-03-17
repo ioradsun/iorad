@@ -5,6 +5,25 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+async function logSyncEvent(
+  supabase: any,
+  event: {
+    source: string; job_id?: string | null; entity_type: string;
+    entity_id?: string | null; entity_name?: string | null; action: string;
+    diff?: any; batch_seq?: number | null; cursor_val?: string | null; meta?: any;
+  }
+) {
+  try {
+    await supabase.from("sync_events").insert({
+      source: event.source, job_id: event.job_id || null,
+      entity_type: event.entity_type, entity_id: event.entity_id || null,
+      entity_name: event.entity_name || null, action: event.action,
+      diff: event.diff || {}, batch_seq: event.batch_seq ?? null,
+      cursor_val: event.cursor_val || null, meta: event.meta || {},
+    });
+  } catch (e: any) { console.warn("logSyncEvent failed:", e.message); }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -26,6 +45,11 @@ Deno.serve(async (req) => {
       .select("id")
       .single();
     logId = logRow?.id || null;
+
+    await logSyncEvent(supabase, {
+      source: "daily_sync", job_id: logId, entity_type: "company",
+      action: "job_start", meta: { hours_back: hoursBack },
+    });
 
     const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
 
@@ -103,7 +127,13 @@ Deno.serve(async (req) => {
         updated_at: companyTouchAt,
       }).eq("id", co.id);
       if (error) stats.errors.push(error.message);
-      else stats.companies_scored += 1;
+      else {
+        stats.companies_scored += 1;
+        await logSyncEvent(supabase, {
+          source: "daily_sync", job_id: logId, entity_type: "company",
+          entity_id: co.id, entity_name: co.name, action: "updated",
+        });
+      }
     }
 
     const hasMore = false;
@@ -140,6 +170,11 @@ Deno.serve(async (req) => {
         at: new Date().toISOString(),
       }),
       updated_at: new Date().toISOString(),
+    });
+
+    await logSyncEvent(supabase, {
+      source: "daily_sync", job_id: logId, entity_type: "company",
+      action: "job_complete", meta: { ...stats },
     });
 
     const elapsed = Date.now() - startedAt;

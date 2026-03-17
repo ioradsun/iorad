@@ -5,6 +5,25 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+async function logSyncEvent(
+  supabase: any,
+  event: {
+    source: string; job_id?: string | null; entity_type: string;
+    entity_id?: string | null; entity_name?: string | null; action: string;
+    diff?: any; batch_seq?: number | null; cursor_val?: string | null; meta?: any;
+  }
+) {
+  try {
+    await supabase.from("sync_events").insert({
+      source: event.source, job_id: event.job_id || null,
+      entity_type: event.entity_type, entity_id: event.entity_id || null,
+      entity_name: event.entity_name || null, action: event.action,
+      diff: event.diff || {}, batch_seq: event.batch_seq ?? null,
+      cursor_val: event.cursor_val || null, meta: event.meta || {},
+    });
+  } catch (e: any) { console.warn("logSyncEvent failed:", e.message); }
+}
+
 let _lastHubSpotCall = 0;
 const MIN_DELAY_MS = 110;
 
@@ -54,6 +73,11 @@ Deno.serve(async (req) => {
     const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
 
     console.log(`watch-signups: looking for new contacts since ${since}`);
+
+    await logSyncEvent(supabase, {
+      source: "watch_signups", entity_type: "contact",
+      action: "job_start", meta: { hours_back: hoursBack },
+    });
 
     // ── Step 1: Find recently created contacts in HubSpot (single page) ───
     const searchBody: any = {
@@ -308,6 +332,13 @@ Deno.serve(async (req) => {
       }
 
       companyUpdates.set(companyId, updates);
+
+      await logSyncEvent(supabase, {
+        source: "watch_signups", entity_type: "contact",
+        entity_name: contactName,
+        action: isExpansion ? "created" : isPQL ? "created" : "updated",
+        meta: { company_id: companyId, signal: isExpansion ? "expansion" : isPQL ? "pql" : "watchlist" },
+      });
     }
 
     // Batch update companies
@@ -330,6 +361,12 @@ Deno.serve(async (req) => {
         body: JSON.stringify({ company_id: cid, tab: "strategy", auto_triggered: true }),
       }).catch(() => {});
     }
+
+    await logSyncEvent(supabase, {
+      source: "watch_signups", entity_type: "contact",
+      action: "job_complete",
+      meta: { signups_found: newSignups.length, expansion: expansionCount, pql: pqlCount, watchlist: watchlistCount },
+    });
 
     return new Response(
       JSON.stringify({
