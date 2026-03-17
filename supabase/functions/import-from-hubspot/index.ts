@@ -2554,7 +2554,7 @@ async function catchupContacts(supabase: any, afterParam: string | null) {
       );
     }
 
-    const { processed } = await processContactPage(supabase, contacts, apiKey);
+    const { processed } = await processContactPage(supabase, contacts, apiKey, { skipScoring: true });
     totalProcessed += processed;
     pagesProcessed++;
 
