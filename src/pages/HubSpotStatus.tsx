@@ -368,10 +368,85 @@ export default function HubSpotStatus() {
           <div className="field-label">Companies</div>
           <div className="text-display font-semibold tabular-nums mt-1">{(counts?.companies || 0).toLocaleString()}</div>
         </div>
-        <div>
-          <div className="field-label">Contacts</div>
-          <div className="text-display font-semibold tabular-nums mt-1">{(counts?.contacts || 0).toLocaleString()}</div>
+      </div>
+
+      {/* Contact sync completeness */}
+      <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-caption font-medium">Contact sync</span>
+          {syncHealth?.lastSyncResult?.at && (
+            <span className="text-micro text-foreground/30">
+              last synced {formatDistanceToNow(new Date(syncHealth.lastSyncResult.at), { addSuffix: true })}
+            </span>
+          )}
         </div>
+
+        <div className="flex items-end gap-3">
+          <div>
+            <div className="field-label mb-0.5">In Scout</div>
+            <div className="text-display font-semibold tabular-nums">
+              {(counts?.contacts || 0).toLocaleString()}
+            </div>
+          </div>
+          {syncHealth?.hubspotContactCount && (
+            <>
+              <div className="text-foreground/20 text-title pb-1">/</div>
+              <div>
+                <div className="field-label mb-0.5">In HubSpot</div>
+                <div className="text-display font-semibold tabular-nums">
+                  {syncHealth.hubspotContactCount.total.toLocaleString()}
+                </div>
+              </div>
+              <div className="pb-1">
+                {(() => {
+                  const hsTotal = syncHealth.hubspotContactCount!.total;
+                  const dbTotal = counts?.contacts || 0;
+                  const pct = hsTotal > 0 ? Math.round(dbTotal / hsTotal * 100) : 100;
+                  const gap = hsTotal - dbTotal;
+                  if (pct >= 99) return (
+                    <span className="text-micro text-emerald-400 font-medium">✓ In sync</span>
+                  );
+                  if (pct >= 90) return (
+                    <span className="text-micro text-amber-400 font-medium">{gap.toLocaleString()} missing</span>
+                  );
+                  return (
+                    <span className="text-micro text-destructive font-medium">{gap.toLocaleString()} missing — run backfill</span>
+                  );
+                })()}
+              </div>
+            </>
+          )}
+        </div>
+
+        {syncHealth?.hubspotContactCount &&
+         (counts?.contacts || 0) < syncHealth.hubspotContactCount.total && (
+          <div className="h-1.5 bg-foreground/[0.06] rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary rounded-full transition-all duration-500"
+              style={{
+                width: `${Math.min(100, Math.round(
+                  (counts?.contacts || 0) / syncHealth.hubspotContactCount.total * 100
+                ))}%`
+              }}
+            />
+          </div>
+        )}
+
+        {syncHealth?.lastSyncResult && (
+          <div className="flex items-center gap-4 text-micro text-foreground/40 pt-1">
+            <span>
+              <span className="text-foreground tabular-nums font-medium">
+                {(syncHealth.lastSyncResult.processed || 0).toLocaleString()}
+              </span> processed last run
+            </span>
+            {syncHealth.lastSyncResult.has_more && (
+              <span className="text-amber-400 font-medium">backlog — syncing…</span>
+            )}
+            <span>
+              {(syncHealth.lastSyncResult.pages || 0)} pages
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Sync Health Panel */}
