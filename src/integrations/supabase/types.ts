@@ -971,6 +971,24 @@ export type Database = {
           },
         ]
       }
+      sync_checkpoints: {
+        Row: {
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value?: string
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
+      }
       sync_events: {
         Row: {
           action: string
