@@ -66,6 +66,7 @@ export default function Dashboard() {
   const isLoading = firstPageLoading;
 
   const { data: signalCounts = {} } = useSignalCounts();
+  const { data: sync } = useSyncHealth();
 
   const companiesWithSignals = useMemo(() => {
     return companies.map(c => ({ ...c, signals_count: signalCounts[c.id] || 0 }));
