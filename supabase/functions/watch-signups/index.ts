@@ -93,8 +93,22 @@ async function fetchAndCreateCompany(
     if (!hs) return null;
 
     const p = hs.properties || {};
-    const name = p.name || `Company ${hsCompanyId}`;
+    const name = (p.name || "").trim();
+    if (!name || name.toLowerCase().startsWith("company ")) {
+      console.log(`watch-signups: skipping placeholder company ${hsCompanyId}`);
+      return null;
+    }
     const domain = (p.domain || "").toLowerCase().replace(/^www\./, "").replace(/\/$/, "") || null;
+
+    const JUNK_DOMAIN_PATTERNS = [
+      /^gmai[^l]/, /^yaho[^o]/, /test\./, /^localhost/,
+      /^\d+\./, /\.invalid$/, /\.test$/,
+    ];
+    if (domain && JUNK_DOMAIN_PATTERNS.some(rx => rx.test(domain))) {
+      console.log(`watch-signups: skipping junk domain ${domain}`);
+      return null;
+    }
+
     const headcount = parseInt(p.numberofemployees || "0", 10) || null;
 
     // Determine if this is a school/edu
