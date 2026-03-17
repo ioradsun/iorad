@@ -232,14 +232,20 @@ export default function HubSpotStatus() {
     <div className="max-w-4xl space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-display font-semibold tracking-tight">HubSpot Sync</h1>
-        <Button className="gap-1.5" onClick={() => syncNow.mutate()} disabled={syncNow.isPending}>
-          {syncNow.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-          Sync Now
-        </Button>
-        <Button variant="outline" className="gap-1.5" onClick={() => backfillPlans.mutate()} disabled={backfillPlans.isPending}>
-          {backfillPlans.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-          Backfill Plans
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button className="gap-1.5" onClick={() => syncNow.mutate()} disabled={syncNow.isPending}>
+            {syncNow.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            Sync Now
+          </Button>
+          <Button variant="outline" className="gap-1.5" onClick={() => watchSignups.mutate()} disabled={watchSignups.isPending}>
+            {watchSignups.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Signal className="w-4 h-4" />}
+            Watch Signups
+          </Button>
+          <Button variant="outline" className="gap-1.5" onClick={() => backfillPlans.mutate()} disabled={backfillPlans.isPending}>
+            {backfillPlans.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            Backfill Plans
+          </Button>
+        </div>
       </div>
 
       {/* Backfill progress panel */}
