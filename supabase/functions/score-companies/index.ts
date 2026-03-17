@@ -507,6 +507,7 @@ Deno.serve(async (req) => {
     if (action === "score_recent") {
       const hoursBack = body.hours_back || 2;
       const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
+      const parentJobId = body.job_id || null;
 
       const { data: recentCompanies } = await supabase
         .from("companies")
@@ -514,6 +515,15 @@ Deno.serve(async (req) => {
         .gte("updated_at", since)
         .order("updated_at", { ascending: false })
         .limit(500);
+
+      const total = recentCompanies?.length || 0;
+
+      await logSyncEvent(supabase, {
+        source: "score_companies", job_id: parentJobId,
+        entity_type: "system", action: "heartbeat",
+        entity_name: `score_recent: scoring ${total} companies updated in last ${hoursBack}h`,
+        meta: { total, hours_back: hoursBack },
+      });
 
       let scored = 0;
       for (const c of recentCompanies || []) {
@@ -525,8 +535,15 @@ Deno.serve(async (req) => {
         }
       }
 
+      await logSyncEvent(supabase, {
+        source: "score_companies", job_id: parentJobId,
+        entity_type: "system", action: "job_complete",
+        entity_name: `score_recent: ${scored}/${total} companies scored`,
+        meta: { scored, total, hours_back: hoursBack },
+      });
+
       return new Response(
-        JSON.stringify({ success: true, scored, total: recentCompanies?.length || 0 }),
+        JSON.stringify({ success: true, scored, total }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
