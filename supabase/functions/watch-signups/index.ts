@@ -74,6 +74,11 @@ Deno.serve(async (req) => {
 
     console.log(`watch-signups: looking for new contacts since ${since}`);
 
+    await logSyncEvent(supabase, {
+      source: "watch_signups", entity_type: "contact",
+      action: "job_start", meta: { hours_back: hoursBack },
+    });
+
     // ── Step 1: Find recently created contacts in HubSpot (single page) ───
     const searchBody: any = {
       filterGroups: [{
