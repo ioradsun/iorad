@@ -284,10 +284,6 @@ export default function HubSpotStatus() {
             {fullRebuild.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
             Full Rebuild
           </Button>
-          <Button variant="ghost" size="sm" className="gap-1.5 text-foreground/40" onClick={() => backfillPlans.mutate()} disabled={backfillPlans.isPending}>
-            {backfillPlans.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            Backfill Plans
-          </Button>
         </div>
       </div>
 
