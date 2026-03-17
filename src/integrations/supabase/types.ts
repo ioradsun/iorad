@@ -968,6 +968,51 @@ export type Database = {
           },
         ]
       }
+      sync_events: {
+        Row: {
+          action: string
+          batch_seq: number | null
+          created_at: string
+          cursor_val: string | null
+          diff: Json | null
+          entity_id: string | null
+          entity_name: string | null
+          entity_type: string
+          id: number
+          job_id: string | null
+          meta: Json | null
+          source: string
+        }
+        Insert: {
+          action: string
+          batch_seq?: number | null
+          created_at?: string
+          cursor_val?: string | null
+          diff?: Json | null
+          entity_id?: string | null
+          entity_name?: string | null
+          entity_type: string
+          id?: never
+          job_id?: string | null
+          meta?: Json | null
+          source: string
+        }
+        Update: {
+          action?: string
+          batch_seq?: number | null
+          created_at?: string
+          cursor_val?: string | null
+          diff?: Json | null
+          entity_id?: string | null
+          entity_name?: string | null
+          entity_type?: string
+          id?: never
+          job_id?: string | null
+          meta?: Json | null
+          source?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
