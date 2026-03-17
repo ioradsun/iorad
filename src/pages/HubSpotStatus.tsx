@@ -241,14 +241,39 @@ export default function HubSpotStatus() {
 
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
-        <h1 className="text-display font-semibold tracking-tight">HubSpot Sync</h1>
-        <Button className="gap-1.5" onClick={() => syncNow.mutate()} disabled={syncNow.isPending}>
+        <div>
+          <h1 className="text-display font-semibold tracking-tight">HubSpot Sync</h1>
+          <p className="text-caption text-foreground/35 mt-1">
+            Syncs automatically every hour · watchdog monitors every 2 min
+          </p>
+        </div>
+        <Button variant="outline" className="gap-1.5" onClick={() => syncNow.mutate()} disabled={syncNow.isPending}>
           {syncNow.isPending
             ? <Loader2 className="w-4 h-4 animate-spin" />
             : <RefreshCw className="w-4 h-4" />}
           Sync Now
         </Button>
       </div>
+
+      {/* Auto-sync health indicator */}
+      {health?.lastSync?.at && (
+        <div className="flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full shrink-0 ${
+            (() => {
+              const mins = (now - new Date(health.lastSync.at).getTime()) / 60_000;
+              if (mins < 70)  return "bg-emerald-400";
+              if (mins < 130) return "bg-amber-400";
+              return "bg-red-400";
+            })()
+          }`} />
+          <span className="text-micro text-foreground/40">
+            Last sync {formatDistanceToNow(new Date(health.lastSync.at), { addSuffix: true })}
+            {health.lastSync.has_more && (
+              <span className="text-amber-400 ml-1">· backlog syncing…</span>
+            )}
+          </span>
+        </div>
+      )}
 
       {/* ── 1. The numbers ── */}
       <div className="grid grid-cols-2 gap-6">
@@ -267,21 +292,6 @@ export default function HubSpotStatus() {
           pct={health?.companyPct ?? null}
         />
       </div>
-
-      {/* Last sync meta */}
-      {health?.lastSync?.at && (
-        <div className="flex items-center gap-3 text-micro text-foreground/30">
-          <span>
-            {isSyncing
-              ? <span className="text-amber-400">syncing — backlog in progress…</span>
-              : <>synced {formatDistanceToNow(new Date(health.lastSync.at), { addSuffix: true })}</>
-            }
-          </span>
-          {health.lastSync.processed > 0 && (
-            <span>{health.lastSync.processed.toLocaleString()} contacts last run</span>
-          )}
-        </div>
-      )}
 
       {/* ── 2. What's coming in ── */}
       <div className="rounded-xl border border-border bg-card">
