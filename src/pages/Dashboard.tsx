@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Search, ArrowUpDown, ChevronRight } from "lucide-react";
-import { useCompanies, useCompaniesPage, useSignalCounts } from "@/hooks/useSupabase";
+import { useCompanies, useCompaniesPage, useSignalCounts, useSyncHealth } from "@/hooks/useSupabase";
 import { ClearableInput } from "@/components/ui/clearable-input";
 import HubSpotPickerModal from "@/components/HubSpotPickerModal";
 import { PlanBadge } from "@/components/PlanBadge";
