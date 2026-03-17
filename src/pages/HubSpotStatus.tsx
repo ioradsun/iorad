@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
-import { AlertCircle, CheckCircle2, Loader2, RefreshCw, XCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, RefreshCw, Signal, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -168,6 +168,24 @@ export default function HubSpotStatus() {
     onError: (err: any) => toast.error(`Sync failed: ${err?.message}`),
   });
 
+  const watchSignups = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("watch-signups", {
+        body: { hours_back: 24 },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data: any) => {
+      qc.invalidateQueries({ queryKey: ["recent_companies_24h"] });
+      qc.invalidateQueries({ queryKey: ["recent_contacts_24h"] });
+      toast.success(
+        `Signups: ${data.signups_found} found · ${data.expansion} expansion · ${data.pql} PQL · ${data.watchlist} watching`
+      );
+    },
+    onError: (err: any) => toast.error(`Watch signups failed: ${err?.message}`),
+  });
+
   const { data: backfillStatus } = useQuery({
     queryKey: ["backfill_log_latest"],
     queryFn: async () => {
@@ -214,14 +232,20 @@ export default function HubSpotStatus() {
     <div className="max-w-4xl space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-display font-semibold tracking-tight">HubSpot Sync</h1>
-        <Button className="gap-1.5" onClick={() => syncNow.mutate()} disabled={syncNow.isPending}>
-          {syncNow.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-          Sync Now
-        </Button>
-        <Button variant="outline" className="gap-1.5" onClick={() => backfillPlans.mutate()} disabled={backfillPlans.isPending}>
-          {backfillPlans.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-          Backfill Plans
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button className="gap-1.5" onClick={() => syncNow.mutate()} disabled={syncNow.isPending}>
+            {syncNow.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            Sync Now
+          </Button>
+          <Button variant="outline" className="gap-1.5" onClick={() => watchSignups.mutate()} disabled={watchSignups.isPending}>
+            {watchSignups.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Signal className="w-4 h-4" />}
+            Watch Signups
+          </Button>
+          <Button variant="outline" className="gap-1.5" onClick={() => backfillPlans.mutate()} disabled={backfillPlans.isPending}>
+            {backfillPlans.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            Backfill Plans
+          </Button>
+        </div>
       </div>
 
       {/* Backfill progress panel */}

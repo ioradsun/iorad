@@ -33,3 +33,6 @@ verify_jwt = false
 [functions.hubspot-pipeline]
 verify_jwt = false
 
+[functions.watch-signups]
+verify_jwt = false
+
