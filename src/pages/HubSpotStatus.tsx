@@ -305,7 +305,27 @@ export default function HubSpotStatus() {
       <div className="grid grid-cols-2 gap-6">
         <div>
           <div className="field-label">Companies</div>
-          <div className="text-display font-semibold tabular-nums mt-1">{(counts?.companies || 0).toLocaleString()}</div>
+          <div className="flex items-end gap-2 mt-1">
+            <div className="text-display font-semibold tabular-nums">
+              {(sync?.dbCompanies || 0).toLocaleString()}
+            </div>
+            {sync?.hsCompanies && (
+              <>
+                <div className="text-foreground/20 text-title pb-0.5">/</div>
+                <div className="text-title font-medium tabular-nums text-foreground/40 pb-0.5">
+                  {sync.hsCompanies.toLocaleString()}
+                </div>
+                <div className="pb-0.5">
+                  {sync.companyPct !== null && sync.companyPct >= 99
+                    ? <span className="text-micro text-emerald-400 font-medium">✓ in sync</span>
+                    : sync.companyGap && sync.companyGap > 0
+                      ? <span className="text-micro text-amber-400 font-medium">{sync.companyGap.toLocaleString()} behind</span>
+                      : null
+                  }
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Contact sync completeness */}
@@ -313,44 +333,35 @@ export default function HubSpotStatus() {
           <div className="field-label">Contacts</div>
           <div className="flex items-end gap-2 mt-1">
             <div className="text-display font-semibold tabular-nums">
-              {(counts?.contacts || 0).toLocaleString()}
+              {(sync?.dbContacts || 0).toLocaleString()}
             </div>
-            {syncHealth?.hubspotContactCount && (
+            {sync?.hsContacts && (
               <>
                 <div className="text-foreground/20 text-title pb-0.5">/</div>
                 <div className="text-title font-medium tabular-nums text-foreground/40 pb-0.5">
-                  {syncHealth.hubspotContactCount.total.toLocaleString()}
+                  {sync.hsContacts.toLocaleString()}
                 </div>
                 <div className="pb-0.5">
-                  {(() => {
-                    const inScout = counts?.contacts || 0;
-                    const inHubspot = syncHealth.hubspotContactCount!.total;
-                    const gap = inHubspot - inScout;
-                    const pct = Math.round(inScout / Math.max(1, inHubspot) * 100);
-                    if (pct >= 99) return (
-                      <span className="text-micro text-emerald-400 font-medium">✓ in sync</span>
-                    );
-                    if (gap > 0) return (
-                      <span className="text-micro text-amber-400 font-medium">
-                        {gap.toLocaleString()} behind
-                      </span>
-                    );
-                    return null;
-                  })()}
+                  {sync.contactPct !== null && sync.contactPct >= 99
+                    ? <span className="text-micro text-emerald-400 font-medium">✓ in sync</span>
+                    : sync.contactGap && sync.contactGap > 0
+                      ? <span className="text-micro text-amber-400 font-medium">{sync.contactGap.toLocaleString()} behind</span>
+                      : null
+                  }
                 </div>
               </>
             )}
           </div>
 
           {/* Progress bar when behind */}
-          {syncHealth?.hubspotContactCount &&
-           (counts?.contacts || 0) < syncHealth.hubspotContactCount.total * 0.99 && (
+          {sync?.hsContacts &&
+           (sync.dbContacts || 0) < sync.hsContacts * 0.99 && (
             <div className="h-1 bg-foreground/[0.06] rounded-full overflow-hidden mt-2">
               <div
                 className="h-full bg-primary rounded-full transition-all"
                 style={{
                   width: `${Math.min(100, Math.round(
-                    (counts?.contacts || 0) / syncHealth.hubspotContactCount.total * 100
+                    (sync.dbContacts || 0) / sync.hsContacts * 100
                   ))}%`,
                 }}
               />
@@ -358,17 +369,15 @@ export default function HubSpotStatus() {
           )}
 
           {/* Last sync result */}
-          {syncHealth?.lastSyncResult && (
+          {sync?.lastSync && (
             <div className="flex items-center gap-3 mt-1.5 text-micro text-foreground/30">
-              <span>{(syncHealth.lastSyncResult.processed || 0).toLocaleString()} last run</span>
-              {syncHealth.lastSyncResult.has_more && (
+              <span>{(sync.lastSync.processed || 0).toLocaleString()} last run</span>
+              {sync.lastSync.has_more && (
                 <span className="text-amber-400">backlog — syncing…</span>
               )}
-              {syncHealth.hubspotContactCount?.at && (
+              {sync.lastSync.at && (
                 <span>
-                  counted {formatDistanceToNow(
-                    new Date(syncHealth.hubspotContactCount.at), { addSuffix: true }
-                  )}
+                  synced {formatDistanceToNow(new Date(sync.lastSync.at), { addSuffix: true })}
                 </span>
               )}
             </div>
