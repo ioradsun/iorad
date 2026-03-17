@@ -10,6 +10,17 @@ import { formatDistanceToNow } from "date-fns";
 type SortKey = "name" | "scout_score";
 type StageTab = "prospect" | "opportunity" | "customer";
 
+const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+
+function getRowPriority(c: any, activeStage: string, now: number): number {
+  const createdAt = c.created_at ? new Date(c.created_at).getTime() : 0;
+  if (now - createdAt < TWENTY_FOUR_HOURS) return 100;
+  if (activeStage === "customer" && c.expansion_signal) return 80;
+  const trigger = c.last_sync_changes?.trigger;
+  if (trigger === "product_activity" || trigger === "expansion_signal" || trigger === "pql_signal") return 60;
+  return 0;
+}
+
 const STAGE_LABELS: Record<string, string> = {
   prospect: "Prospect",
   opportunity: "Opportunity",
