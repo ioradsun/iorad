@@ -694,7 +694,13 @@ async function runPhase3(supabase: any, jobId: string, snap: any) {
   for (const { id } of slice) {
     try {
       const ok = await scoreOneCompany(supabase, id);
-      if (ok) scored++;
+      if (ok) {
+        scored++;
+        await logSyncEvent(supabase, {
+          source: "hubspot_pipeline", job_id: jobId, entity_type: "company",
+          entity_id: id, action: "scored", meta: { phase: 3 },
+        });
+      }
     } catch (e: any) {
       console.error(`phase3: score failed for ${id}: ${e.message}`);
       failed++;
