@@ -284,7 +284,7 @@ export default function HubSpotStatus() {
       {/* Stall/watchdog banner */}
       {recentWatchdogRestart ? (
         <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 flex items-center gap-2">
-          <RotateCcw className="w-4 h-4 text-emerald-400 shrink-0" />
+          <RefreshCw className="w-4 h-4 text-emerald-400 shrink-0" />
           <span className="text-caption text-emerald-400">
             Watchdog auto-restarted {SOURCE_LABELS[recentWatchdogRestart.meta?.original_source] || "sync"} · {relativeTime(recentWatchdogRestart.created_at)}
           </span>
