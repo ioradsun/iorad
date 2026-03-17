@@ -383,54 +383,100 @@ Return ONLY valid JSON matching the output schema. No markdown fences, no commen
       throw new Error(`AI gateway returned ${aiResponse.status}`);
     }
 
-    const aiData = await aiResponse.json();
-    const rawContent = aiData.choices?.[0]?.message?.content || "";
+    // ── Parse AI response with retry on empty/invalid ──────────────────────
+    let parsed: any = null;
 
-    // Parse JSON from response — robustly extract first valid JSON object or array
-    let parsed: any;
-    try {
-      // 1. Strip markdown fences and thinking tags
-      let cleaned = rawContent
-        .replace(/^```json\s*/i, "")
-        .replace(/^```\s*/i, "")
-        .replace(/```\s*$/i, "")
-        .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
-        .trim();
-
-      // 2. Try direct parse first
-      try {
-        parsed = JSON.parse(cleaned);
-      } catch {
-        // 3. Fallback: extract the first {...} or [...] block
-        const objMatch = cleaned.match(/(\{[\s\S]*\})/);
-        const arrMatch = cleaned.match(/(\[[\s\S]*\])/);
-        const candidate = objMatch?.[1] ?? arrMatch?.[1];
-        if (candidate) {
-          try {
-            parsed = JSON.parse(candidate);
-          } catch {
-            // 4. Last resort: truncated JSON — try to find the last complete top-level key
-            //    by progressively trimming from the end until we get valid JSON
-            let attempt = candidate;
-            for (let i = 0; i < 20; i++) {
-              const lastComma = attempt.lastIndexOf(",");
-              if (lastComma === -1) break;
-              attempt = attempt.substring(0, lastComma) + "}";
-              try {
-                parsed = JSON.parse(attempt);
-                console.warn(`Recovered truncated JSON after ${i + 1} trim(s)`);
-                break;
-              } catch { /* keep trimming */ }
-            }
-            if (!parsed) throw new Error("no valid JSON block found after recovery attempts");
-          }
-        } else {
-          throw new Error("no JSON block found in response");
+    for (let attempt = 0; attempt < 2; attempt++) {
+      let resp = aiResponse;
+      if (attempt > 0) {
+        // Retry: make a fresh request
+        console.warn(`Retry attempt ${attempt} for ${activeTab}/${company.name}`);
+        const ac2 = new AbortController();
+        const t2 = setTimeout(() => ac2.abort(), 45_000);
+        resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            max_tokens: 32768,
+            messages: [
+              { role: "system", content: voicePrompt },
+              { role: "user", content: userMessage },
+            ],
+          }),
+          signal: ac2.signal,
+        }).finally(() => clearTimeout(t2));
+        if (!resp.ok) {
+          const errText = await resp.text();
+          console.error(`Retry AI gateway error: ${resp.status} ${errText.slice(0, 200)}`);
+          continue;
         }
       }
-    } catch (e) {
-      console.error("Failed to parse AI response as JSON:", rawContent.substring(0, 800));
-      throw new Error("AI returned invalid JSON");
+
+      const aiData = await resp.json();
+      const rawContent = (aiData.choices?.[0]?.message?.content || "").trim();
+
+      if (!rawContent) {
+        console.warn(`AI returned empty content (attempt ${attempt + 1}), finish_reason: ${aiData.choices?.[0]?.finish_reason}`);
+        continue;
+      }
+
+      try {
+        // 1. Strip markdown fences and thinking tags
+        let cleaned = rawContent
+          .replace(/```json\s*/gi, "")
+          .replace(/```\s*/g, "")
+          .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
+          .trim();
+
+        // 2. Try direct parse
+        try {
+          parsed = JSON.parse(cleaned);
+        } catch {
+          // 3. Extract first {...} or [...] block
+          const objMatch = cleaned.match(/(\{[\s\S]*\})/);
+          const arrMatch = cleaned.match(/(\[[\s\S]*\])/);
+          const candidate = objMatch?.[1] ?? arrMatch?.[1];
+          if (candidate) {
+            try {
+              parsed = JSON.parse(candidate);
+            } catch {
+              // 4. Truncated JSON recovery
+              let truncated = candidate;
+              for (let i = 0; i < 20; i++) {
+                const lastComma = truncated.lastIndexOf(",");
+                if (lastComma === -1) break;
+                truncated = truncated.substring(0, lastComma) + "}";
+                try {
+                  parsed = JSON.parse(truncated);
+                  console.warn(`Recovered truncated JSON after ${i + 1} trim(s)`);
+                  break;
+                } catch { /* keep trimming */ }
+              }
+              // 5. Try fixing trailing commas and control chars
+              if (!parsed) {
+                let fixed = candidate
+                  .replace(/,\s*}/g, "}")
+                  .replace(/,\s*]/g, "]")
+                  .replace(/[\x00-\x1F\x7F]/g, "");
+                try { parsed = JSON.parse(fixed); } catch { /* give up */ }
+              }
+            }
+          }
+        }
+
+        if (parsed) break;
+        console.error(`Failed to parse AI response (attempt ${attempt + 1}):`, rawContent.substring(0, 500));
+      } catch (e) {
+        console.error(`Parse error (attempt ${attempt + 1}):`, (e as Error).message, rawContent.substring(0, 500));
+      }
+    }
+
+    if (!parsed) {
+      throw new Error("AI returned invalid JSON after retries");
     }
 
     // Build per-tab atomic payloads — only set the fields this tab owns
