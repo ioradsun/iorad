@@ -167,6 +167,11 @@ Deno.serve(async (req) => {
       updated_at: new Date().toISOString(),
     });
 
+    await logSyncEvent(supabase, {
+      source: "daily_sync", job_id: logId, entity_type: "company",
+      action: "job_complete", meta: { ...stats },
+    });
+
     const elapsed = Date.now() - startedAt;
     return new Response(JSON.stringify({
       success: true,

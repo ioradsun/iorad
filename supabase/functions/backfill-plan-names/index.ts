@@ -90,6 +90,13 @@ Deno.serve(async (req) => {
 
     if (!contacts || contacts.length === 0) {
       console.log("backfill-plan-names: all contacts processed, triggering score-companies");
+
+      await logSyncEvent(supabase, {
+        source: "backfill_plans", job_id: activeLogId, entity_type: "contact",
+        action: "job_complete",
+        meta: { total_processed: body.cumulative_processed, total_updated: body.cumulative_updated || 0 },
+      });
+
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 

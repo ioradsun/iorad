@@ -362,6 +362,12 @@ Deno.serve(async (req) => {
       }).catch(() => {});
     }
 
+    await logSyncEvent(supabase, {
+      source: "watch_signups", entity_type: "contact",
+      action: "job_complete",
+      meta: { signups_found: newSignups.length, expansion: expansionCount, pql: pqlCount, watchlist: watchlistCount },
+    });
+
     return new Response(
       JSON.stringify({
         success: true,
