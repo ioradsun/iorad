@@ -270,8 +270,15 @@ async function runPhase1(supabase: any, apiKey: string, jobId: string, snap: any
 
   for (const hs of companies) {
     try {
-      await upsertCompany(supabase, hs);
+      const companyId = await upsertCompany(supabase, hs);
       upserted++;
+      await logSyncEvent(supabase, {
+        source: "hubspot_pipeline", job_id: jobId, entity_type: "company",
+        entity_id: companyId,
+        entity_name: (hs.properties?.name || "").trim() || `HubSpot-${hs.id}`,
+        action: "updated", batch_seq: processed + upserted, cursor_val: nextAfter,
+        meta: { phase: 1 },
+      });
     } catch (e: any) {
       console.error(`phase1: failed to upsert ${hs.id}: ${e.message}`);
       failed++;
