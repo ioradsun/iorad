@@ -391,13 +391,15 @@ function ScoutBadge({ score }: { score: number | null }) {
 }
 
 
-function ExpansionSignalDot({ breakdown }: { breakdown: any }) {
-  const signal = breakdown?.expansion_signal;
-  if (!signal) return null;
+function ExpansionSignalDot({ company }: { company: any }) {
+  if (!company.expansion_signal) return null;
+  const since = company.expansion_signal_at
+    ? formatDistanceToNow(new Date(company.expansion_signal_at), { addSuffix: true })
+    : null;
   return (
     <span
       className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 ml-1.5"
-      title="Expansion signal: paid + free creators"
+      title={since ? `Expansion signal detected ${since}` : "Expansion signal: paid plan + active free creators"}
     />
   );
 }

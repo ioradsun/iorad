@@ -590,6 +590,10 @@ async function scoreOneCompany(supabase: any, companyId: string): Promise<boolea
     scout_score_breakdown: breakdown,
     scout_scored_at: new Date().toISOString(),
     iorad_plan: breakdown.top_plan,
+    expansion_signal: breakdown.expansion_signal,
+    expansion_signal_at: breakdown.expansion_signal
+      ? (company.expansion_signal_at || new Date().toISOString())
+      : null,
   }).eq("id", companyId);
 
   return true;
