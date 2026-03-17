@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
-import { AlertCircle, CheckCircle2, Loader2, RefreshCw, RotateCcw, Signal } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, RefreshCw, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -192,33 +192,28 @@ export default function HubSpotStatus() {
   // Mutations
   const syncNow = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.functions.invoke("hubspot-daily-sync", { body: { hours_back: 24 } });
+      const { error } = await supabase.functions.invoke("hubspot-daily-sync", { body: { hours_back: 2 } });
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Sync triggered");
+      toast.success("Sync triggered — contacts → scoring → signups");
       qc.invalidateQueries({ queryKey: ["sync_events_initial"] });
       qc.invalidateQueries({ queryKey: ["sync_counts"] });
+      qc.invalidateQueries({ queryKey: ["sync_health"] });
     },
     onError: (err: any) => toast.error(`Sync failed: ${err?.message}`),
   });
 
-  const watchSignups = useMutation({
+  const fullRebuild = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("watch-signups", {
-        body: { hours_back: 24 },
-      });
+      const { error } = await supabase.functions.invoke("hubspot-pipeline", {});
       if (error) throw error;
-      return data;
     },
-    onSuccess: (data: any) => {
+    onSuccess: () => {
+      toast.success("Full rebuild started — this takes 10-20 minutes");
       qc.invalidateQueries({ queryKey: ["sync_events_initial"] });
-      qc.invalidateQueries({ queryKey: ["sync_health"] });
-      toast.success(
-        `Signups: ${data.signups_found} found · ${data.expansion} expansion · ${data.pql} PQL · ${data.watchlist} watching`
-      );
     },
-    onError: (err: any) => toast.error(`Watch signups failed: ${err?.message}`),
+    onError: (err: any) => toast.error(`Rebuild failed: ${err?.message}`),
   });
 
   const backfillPlans = useMutation({
@@ -246,7 +241,7 @@ export default function HubSpotStatus() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sync_health"] });
-      toast.success("Full rescore started — companies with plan will update over the next few minutes");
+      toast.success("Full rescore started — companies will update over the next few minutes");
     },
     onError: (err: any) => toast.error(`Rescore failed: ${err?.message}`),
   });
@@ -291,17 +286,13 @@ export default function HubSpotStatus() {
             {syncNow.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             Sync Now
           </Button>
-          <Button variant="outline" className="gap-1.5" onClick={() => watchSignups.mutate()} disabled={watchSignups.isPending}>
-            {watchSignups.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Signal className="w-4 h-4" />}
-            Watch Signups
+          <Button variant="outline" className="gap-1.5" onClick={() => fullRebuild.mutate()} disabled={fullRebuild.isPending}>
+            {fullRebuild.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+            Full Rebuild
           </Button>
-          <Button variant="outline" className="gap-1.5" onClick={() => backfillPlans.mutate()} disabled={backfillPlans.isPending}>
+          <Button variant="ghost" size="sm" className="gap-1.5 text-foreground/40" onClick={() => backfillPlans.mutate()} disabled={backfillPlans.isPending}>
             {backfillPlans.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             Backfill Plans
-          </Button>
-          <Button variant="outline" className="gap-1.5" onClick={() => rescoreAll.mutate()} disabled={rescoreAll.isPending}>
-            {rescoreAll.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            Rescore All
           </Button>
         </div>
       </div>
@@ -450,6 +441,19 @@ export default function HubSpotStatus() {
               </div>
             </div>
           )}
+
+          {/* Rescore All — recovery action */}
+          <div className="flex items-center justify-between py-2 border-b border-border/20">
+            <span className="text-caption text-foreground/50">Recovery</span>
+            <button
+              onClick={() => rescoreAll.mutate()}
+              disabled={rescoreAll.isPending}
+              className="text-micro text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
+            >
+              {rescoreAll.isPending && <Loader2 className="w-3 h-3 animate-spin" />}
+              Rescore All Companies
+            </button>
+          </div>
 
           {/* Coverage grid */}
           <div className="grid grid-cols-2 gap-x-8 gap-y-3">
