@@ -200,11 +200,25 @@ export default function HubSpotStatus() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Catchup started — importing all 2-year active contacts");
+      toast.success("Catchup batch complete — next batch auto-starting…");
       qc.invalidateQueries({ queryKey: ["sync_health_v2"] });
     },
     onError: (err: any) => toast.error(`Catchup failed: ${err?.message}`),
   });
+
+  // Auto-trigger next catchup batch while in progress
+  useEffect(() => {
+    if (
+      health?.catchupStatus &&
+      health.catchupStatus !== "complete" &&
+      !catchupContacts.isPending
+    ) {
+      const timer = setTimeout(() => {
+        catchupContacts.mutate();
+      }, 3_000); // 3s pause between batches
+      return () => clearTimeout(timer);
+    }
+  }, [health?.catchupStatus, catchupContacts.isPending]);
 
   // ── Helpers ─────────────────────────────────────────────────────────────
   function relativeTime(dateStr: string) {
