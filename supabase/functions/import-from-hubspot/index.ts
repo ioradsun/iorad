@@ -2453,7 +2453,7 @@ async function fixMissingContacts(
   );
 }
 
-// ── Catchup: one-time full sweep of 2-year active contacts ─────────────────
+// ── Catchup: one-time full sweep of 1-year active contacts ─────────────────
 // Uses a time budget (45s) to process as many contacts as possible per invocation.
 // No self-chaining — the UI auto-triggers the next batch while status != complete.
 async function catchupContacts(supabase: any, afterParam: string | null) {
@@ -2463,7 +2463,7 @@ async function catchupContacts(supabase: any, afterParam: string | null) {
   const startTime = Date.now();
   const TIME_BUDGET_MS = 45_000; // 45s — leave buffer for edge function timeout
 
-  const TWO_YEARS_AGO_MS = String(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000);
+  const ONE_YEAR_AGO_MS = String(Date.now() - 365 * 24 * 60 * 60 * 1000);
 
   const { data: cursorRow } = await supabase
     .from("sync_checkpoints")

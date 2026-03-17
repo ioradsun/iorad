@@ -260,7 +260,7 @@ export default function HubSpotStatus() {
           </div>
         )}
         {hs !== null && (
-          <div className="text-micro text-foreground/25 mt-1">HubSpot (2yr active)</div>
+          <div className="text-micro text-foreground/25 mt-1">HubSpot (1yr active)</div>
         )}
       </div>
     );
