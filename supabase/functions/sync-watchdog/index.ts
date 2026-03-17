@@ -5,8 +5,19 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const STALL_THRESHOLD_MS = 60_000; // 1 minute with no heartbeat = stalled
+const STALL_THRESHOLD_MS = 2 * 60_000; // 2 minutes — pipeline phases can take ~90s
 const MAX_RESTARTS_PER_JOB = 5;   // Give up after 5 restarts of the same job
+
+// These sources complete in a single invocation and can't be resumed
+const NON_RESUMABLE_SOURCES = [
+  "hubspot-daily-sync",
+  "daily_sync",
+  "watch-signups",
+  "watch_signups",
+  "import-from-hubspot",
+  "score-companies",
+  "score_companies",
+];
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -85,6 +96,12 @@ Deno.serve(async (req) => {
       const resumeMeta = lastHeartbeat?.meta || lastEvent?.meta || {};
       const resumeFunction = resumeMeta.resume_function;
       const resumePayload = resumeMeta.resume_payload;
+
+      // Skip non-resumable job sources silently — they complete in one invocation
+      if (NON_RESUMABLE_SOURCES.includes(source)) {
+        skipped++;
+        continue;
+      }
 
       if (!resumeFunction || !resumePayload) {
         await supabase.from("sync_events").insert({

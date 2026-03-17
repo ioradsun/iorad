@@ -74,8 +74,9 @@ Deno.serve(async (req) => {
       activeLogId = logRow?.id || null;
 
       await logSyncEvent(supabase, {
-        source: "backfill_plans", job_id: activeLogId, entity_type: "contact",
-        action: "job_start", meta: { contacts_total: count || 0 },
+        source: "backfill-plan-names", job_id: activeLogId, entity_type: "system",
+        action: "job_start", entity_name: "Backfill plan names started",
+        meta: { contacts_total: count || 0 },
       });
     }
 
@@ -91,21 +92,6 @@ Deno.serve(async (req) => {
     if (!contacts || contacts.length === 0) {
       console.log("backfill-plan-names: all contacts processed, triggering score-companies");
 
-      await logSyncEvent(supabase, {
-        source: "backfill_plans", job_id: activeLogId, entity_type: "contact",
-        action: "job_complete",
-        meta: { total_processed: body.cumulative_processed, total_updated: body.cumulative_updated || 0 },
-      });
-
-      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-      fetch(`${supabaseUrl}/functions/v1/score-companies`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "score_all", offset: 0 }),
-      }).catch((e) => console.warn("score trigger failed:", e.message));
-
       if (activeLogId) {
         const finalUpdate: Record<string, any> = {
           status: "completed",
@@ -119,7 +105,28 @@ Deno.serve(async (req) => {
           finalUpdate.companies_rescored = body.cumulative_rescored || 0;
         }
         await supabase.from("backfill_log").update(finalUpdate).eq("id", activeLogId);
+
+        await supabase.from("sync_events").insert({
+          source: "backfill-plan-names",
+          job_id: activeLogId,
+          entity_type: "system",
+          action: "job_complete",
+          entity_name: "Backfill complete",
+          meta: {
+            cumulative_updated: body.cumulative_updated || 0,
+            cumulative_skipped: body.cumulative_skipped || 0,
+          },
+        }).catch(e => console.warn("job_complete insert failed:", e.message));
       }
+
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+      fetch(`${supabaseUrl}/functions/v1/score-companies`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "score_all", offset: 0 }),
+      }).catch((e) => console.warn("score trigger failed:", e.message));
 
       return new Response(
         JSON.stringify({ done: true, log_id: activeLogId, message: "All contacts processed. Scoring triggered." }),
@@ -293,6 +300,28 @@ Deno.serve(async (req) => {
           finished_at: hasMore ? null : new Date().toISOString(),
         })
         .eq("id", activeLogId);
+    }
+
+    // Emit heartbeat with resume payload before self-chaining
+    if (hasMore && activeLogId) {
+      await supabase.from("sync_events").insert({
+        source: "backfill-plan-names",
+        job_id: activeLogId,
+        entity_type: "system",
+        action: "heartbeat",
+        entity_name: `Backfill: offset ${offset}, updated ${cumulativeUpdated}`,
+        meta: {
+          resume_function: "backfill-plan-names",
+          resume_payload: {
+            offset: nextOffset,
+            log_id: activeLogId,
+            cumulative_updated: cumulativeUpdated,
+            cumulative_skipped: cumulativeSkipped,
+            cumulative_rescored: cumulativeRescored,
+            cumulative_processed: cumulativeProcessed,
+          },
+        },
+      }).catch(e => console.warn("heartbeat insert failed:", e.message));
     }
 
     if (hasMore) {
