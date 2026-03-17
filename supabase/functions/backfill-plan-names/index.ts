@@ -59,7 +59,11 @@ Deno.serve(async (req) => {
 
     // First invocation — create the log row
     if (offset === 0) {
-      const { count } = await supabase.from("contacts").select("id", { count: "exact", head: true });
+      const { count } = await supabase
+        .from("contacts")
+        .select("id", { count: "exact", head: true })
+        .or('hubspot_properties->plan_name.is.null,hubspot_properties->plan_name.eq.""')
+        .is("hubspot_properties->_plan_checked", null);
 
       const { data: logRow } = await supabase
         .from("backfill_log")
