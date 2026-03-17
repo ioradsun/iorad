@@ -142,7 +142,7 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             filterGroups: [{
               filters: [{
-                propertyName: "hs_lastmodifieddate",
+                propertyName: "lastmodifieddate",
                 operator: "GTE",
                 value: TWO_YEARS_AGO,
               }],
