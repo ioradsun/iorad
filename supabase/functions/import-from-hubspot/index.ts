@@ -227,6 +227,11 @@ Deno.serve(async (req) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // ── Catchup: one-time sweep of all 2-year active contacts ──────────────
+    if (body.action === "catchup_contacts") {
+      return await catchupContacts(supabase, body.after || null);
+    }
+
     // Contact-first backfill — pages through ALL HubSpot contacts
     if (body.action === "backfill_contacts") {
       return await backfillContacts(supabase, body.after || null, body.job_id || null, body.total || 0);
