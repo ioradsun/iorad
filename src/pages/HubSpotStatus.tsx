@@ -285,6 +285,10 @@ export default function HubSpotStatus() {
             {backfillPlans.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             Backfill Plans
           </Button>
+          <Button variant="outline" className="gap-1.5" onClick={() => rescoreAll.mutate()} disabled={rescoreAll.isPending}>
+            {rescoreAll.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            Rescore All
+          </Button>
         </div>
       </div>
 

@@ -241,6 +241,13 @@ Deno.serve(async (req) => {
         const hsProps = hs.props || {};
         const planName = hsProps.plan_name || null;
         if (!planName) {
+          // Mark contact as checked so it doesn't block future runs
+          const existingPropsForMark = (contact.hubspot_properties as any) || {};
+          if (!existingPropsForMark._plan_checked) {
+            await supabase.from("contacts").update({
+              hubspot_properties: { ...existingPropsForMark, _plan_checked: true },
+            }).eq("id", contact.id);
+          }
           skipped++;
           continue;
         }
