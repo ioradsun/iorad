@@ -2498,8 +2498,8 @@ async function catchupContacts(supabase: any, afterParam: string | null) {
     "first_embed_base_domain_name",
   ];
 
-  const PAGE_SIZE = 100;
-  const MAX_PAGES = 2; // 200 contacts per invocation — keeps within timeout
+  const PAGE_SIZE = 50;
+  const MAX_PAGES = 1; // 50 contacts per invocation — processContactPage is heavy
   let after: string | null = afterParam;
   let totalProcessed = 0;
   let lastSeenModified = cursorMs;
