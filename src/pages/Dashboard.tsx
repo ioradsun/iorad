@@ -192,6 +192,18 @@ export default function Dashboard() {
             {chip.label}
           </button>
         ))}
+        {activeStage === "customer" && (
+          <button
+            onClick={() => setSignalOnly(s => !s)}
+            className={`px-3 py-1 rounded-full text-micro font-medium transition-colors border ${
+              signalOnly
+                ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+                : "text-foreground/35 border-transparent hover:text-foreground/60"
+            }`}
+          >
+            Expansion signals only
+          </button>
+        )}
       </div>
 
       <div className="md:hidden space-y-2">
