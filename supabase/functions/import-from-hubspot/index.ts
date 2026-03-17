@@ -2499,7 +2499,7 @@ async function catchupContacts(supabase: any, afterParam: string | null) {
   ];
 
   const PAGE_SIZE = 100;
-  const MAX_PAGES = 5; // 500 contacts per invocation
+  const MAX_PAGES = 2; // 200 contacts per invocation — keeps within timeout
   let after: string | null = afterParam;
   let totalProcessed = 0;
   let lastSeenModified = cursorMs;
