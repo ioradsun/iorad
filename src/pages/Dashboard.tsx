@@ -219,7 +219,11 @@ export default function Dashboard() {
             className="w-full flex items-center gap-3 p-3 rounded-lg border border-border/20 bg-card text-left active:bg-secondary/50 transition-colors"
           >
             <div className="flex-1 min-w-0">
-              <div className="text-body font-medium text-foreground truncate">{company.name}</div>
+              <div className="flex items-center gap-1">
+                <span className="text-body font-medium text-foreground truncate">{company.name}</span>
+                <NewSignupDot createdAt={(company as any).created_at ?? null} />
+                <ExpansionSignalDot company={company} />
+              </div>
               <div className="text-micro text-foreground/40 mt-0.5 flex items-center gap-2">
                 {company.domain && <span className="truncate">{company.domain}</span>}
                 <StagePill stage={(company as any).lifecycle_stage || "prospect"} />
