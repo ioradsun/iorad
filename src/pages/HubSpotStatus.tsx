@@ -28,8 +28,6 @@ const SOURCE_LABELS: Record<string, string> = {
   hubspot_pipeline: "Pipeline",
   daily_sync: "Daily Sync",
   watch_signups: "Watch Signups",
-  backfill_plans: "Backfill Plans",
-  "backfill-plan-names": "Backfill Plans",
   import_webhook: "Webhook",
   import_bulk: "Bulk Import",
   import_backfill_contacts: "Contact Backfill",
@@ -120,7 +118,6 @@ export default function HubSpotStatus() {
     queryKey: ["sync_health"],
     queryFn: async () => {
       const [
-        backfillLogRes,
         rescoreLogRes,
         companiesWithPlanRes,
         companiesNoPlanRes,
@@ -131,13 +128,6 @@ export default function HubSpotStatus() {
         hubspotCountRes,
         lastSyncRes,
       ] = await Promise.all([
-        (supabase as any)
-          .from("backfill_log")
-          .select("*")
-          .eq("job_type", "plan_names")
-          .order("started_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
         (supabase as any)
           .from("backfill_log")
           .select("*")
@@ -186,7 +176,6 @@ export default function HubSpotStatus() {
       const lastSyncData = lastSyncRes?.data;
 
       return {
-        backfill: backfillLogRes.data,
         rescoreLog: rescoreLogRes.data,
         companiesWithPlan: companiesWithPlanRes.count ?? 0,
         companiesNoPlan: companiesNoPlanRes.count ?? 0,
@@ -204,7 +193,6 @@ export default function HubSpotStatus() {
     },
     refetchInterval: (query) => {
       const d = query.state.data;
-      if (d?.backfill?.status === "running") return 2_000;
       if (d?.rescoreLog?.status === "running") return 2_000;
       return 30_000;
     },
@@ -237,21 +225,6 @@ export default function HubSpotStatus() {
     onError: (err: any) => toast.error(`Rebuild failed: ${err?.message}`),
   });
 
-  const backfillPlans = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("backfill-plan-names", {
-        body: { offset: 0 },
-      });
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["sync_events_initial"] });
-      qc.invalidateQueries({ queryKey: ["sync_health"] });
-      toast.success("Plan backfill started");
-    },
-    onError: (err: any) => toast.error(`Backfill failed: ${err?.message}`),
-  });
 
   const rescoreAll = useMutation({
     mutationFn: async () => {
@@ -310,10 +283,6 @@ export default function HubSpotStatus() {
           <Button variant="outline" className="gap-1.5" onClick={() => fullRebuild.mutate()} disabled={fullRebuild.isPending}>
             {fullRebuild.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
             Full Rebuild
-          </Button>
-          <Button variant="ghost" size="sm" className="gap-1.5 text-foreground/40" onClick={() => backfillPlans.mutate()} disabled={backfillPlans.isPending}>
-            {backfillPlans.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            Backfill Plans
           </Button>
         </div>
       </div>
@@ -462,35 +431,6 @@ export default function HubSpotStatus() {
             </button>
           </div>
 
-          {/* Backfill status row */}
-          {syncHealth.backfill && (
-            <div className="flex items-center justify-between py-2 border-b border-border/20">
-              <div className="flex items-center gap-2">
-                {syncHealth.backfill.status === "completed" && (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                )}
-                {syncHealth.backfill.status === "running" && (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />
-                )}
-                {syncHealth.backfill.status === "failed" && (
-                  <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
-                )}
-                <span className="text-caption">
-                  Plan backfill — {syncHealth.backfill.status}
-                </span>
-              </div>
-              <div className="text-right">
-                <div className="text-caption font-medium tabular-nums">
-                  {(syncHealth.backfill.contacts_updated ?? 0).toLocaleString()} updated
-                </div>
-                <div className="text-micro text-foreground/40">
-                  {syncHealth.backfill.finished_at
-                    ? formatDistanceToNow(new Date(syncHealth.backfill.finished_at), { addSuffix: true })
-                    : "in progress"}
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Rescore status row */}
           {syncHealth.rescoreLog && (
@@ -574,14 +514,7 @@ export default function HubSpotStatus() {
               </div>
               {syncHealth.contactsNoPlan > 0 && (
                 <div className="text-micro text-foreground/30 mt-1">
-                  {syncHealth.contactsNoPlan.toLocaleString()} contacts missing plan —{" "}
-                  <button
-                    onClick={() => backfillPlans.mutate()}
-                    disabled={backfillPlans.isPending}
-                    className="text-primary hover:text-primary/80 transition-colors"
-                  >
-                    run backfill
-                  </button>
+                  {syncHealth.contactsNoPlan.toLocaleString()} contacts missing plan
                 </div>
               )}
             </div>
