@@ -59,7 +59,11 @@ Deno.serve(async (req) => {
 
     // First invocation — create the log row
     if (offset === 0) {
-      const { count } = await supabase.from("contacts").select("id", { count: "exact", head: true });
+      const { count } = await supabase
+        .from("contacts")
+        .select("id", { count: "exact", head: true })
+        .or('hubspot_properties->plan_name.is.null,hubspot_properties->plan_name.eq.""')
+        .is("hubspot_properties->_plan_checked", null);
 
       const { data: logRow } = await supabase
         .from("backfill_log")
@@ -84,6 +88,8 @@ Deno.serve(async (req) => {
     const { data: contacts, error } = await supabase
       .from("contacts")
       .select("id, company_id, email, hubspot_object_id, hubspot_properties")
+      .or('hubspot_properties->plan_name.is.null,hubspot_properties->plan_name.eq.""')
+      .is("hubspot_properties->_plan_checked", null)
       .order("created_at", { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1);
 
@@ -235,6 +241,13 @@ Deno.serve(async (req) => {
         const hsProps = hs.props || {};
         const planName = hsProps.plan_name || null;
         if (!planName) {
+          // Mark contact as checked so it doesn't block future runs
+          const existingPropsForMark = (contact.hubspot_properties as any) || {};
+          if (!existingPropsForMark._plan_checked) {
+            await supabase.from("contacts").update({
+              hubspot_properties: { ...existingPropsForMark, _plan_checked: true },
+            }).eq("id", contact.id);
+          }
           skipped++;
           continue;
         }

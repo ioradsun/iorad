@@ -223,6 +223,20 @@ export default function HubSpotStatus() {
     onError: (err: any) => toast.error(`Backfill failed: ${err?.message}`),
   });
 
+  const rescoreAll = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.functions.invoke("score-companies", {
+        body: { action: "score_all", offset: 0 },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sync_health"] });
+      toast.success("Full rescore started — companies with plan will update over the next few minutes");
+    },
+    onError: (err: any) => toast.error(`Rescore failed: ${err?.message}`),
+  });
+
   // Derived state
   const lastEvent = events[0] || null;
   const lastEventAge = lastEvent
@@ -270,6 +284,10 @@ export default function HubSpotStatus() {
           <Button variant="outline" className="gap-1.5" onClick={() => backfillPlans.mutate()} disabled={backfillPlans.isPending}>
             {backfillPlans.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             Backfill Plans
+          </Button>
+          <Button variant="outline" className="gap-1.5" onClick={() => rescoreAll.mutate()} disabled={rescoreAll.isPending}>
+            {rescoreAll.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            Rescore All
           </Button>
         </div>
       </div>
