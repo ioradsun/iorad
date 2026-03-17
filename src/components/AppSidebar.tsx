@@ -21,6 +21,7 @@ import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { getContactActivity, sortContactsByActivity } from "@/lib/contactScore";
+import { PlanBadge } from "@/components/PlanBadge";
 
 const stageItems = [
   { key: "prospect", label: "Prospects", icon: Briefcase },
@@ -203,6 +204,15 @@ export default function AppSidebar({ onNavigate }: { onNavigate?: () => void } =
                     <div className="min-w-0 flex-1">
                       <div className="text-caption font-medium truncate">{c.name}</div>
                       {c.title && <div className="text-micro text-foreground/20 truncate">{c.title}</div>}
+                      {(() => {
+                        const raw = (c.hubspot_properties as any)?.plan_name;
+                        if (!raw) return null;
+                        const norm = raw.toLowerCase().includes("enterprise") ? "Enterprise"
+                          : raw.toLowerCase().includes("team") ? "Team"
+                          : raw.toLowerCase().includes("free") ? "Free"
+                          : null;
+                        return norm ? <PlanBadge plan={norm} /> : null;
+                      })()}
                     </div>
                     {activity.score > 0 && (
                       <span className={`shrink-0 text-micro tabular-nums font-medium w-6 text-center ${

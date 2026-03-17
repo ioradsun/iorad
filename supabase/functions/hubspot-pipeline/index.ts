@@ -533,7 +533,8 @@ async function runPhase2(supabase: any, apiKey: string, jobId: string, snap: any
 // ── Scoring helpers (adapted from score-companies) ────────────────────────────
 interface ScoreBreakdown {
   tutorial: number; commercial: number; recency: number; intent: number;
-  expansion_signal: boolean; expansion_bonus: number; top_plan: string | null; total: number;
+  expansion_signal: boolean; expansion_bonus: number; pql_signal: boolean; pql_bonus: number;
+  top_plan: string | null; total: number;
 }
 
 const PAID_PLANS = ["team", "enterprise"];
@@ -626,13 +627,17 @@ function calculateScoutScore(company: any, contacts: any[]): ScoreBreakdown {
   const expansion_signal = hasPaidContact && hasFreeCreator;
   const expansion_bonus = expansion_signal ? 20 : 0;
 
-  const total = Math.min(100, Math.min(tutorial, 60) + Math.min(commercial, 25) + Math.min(recency, 15) + Math.min(intent, 15) + expansion_bonus);
-  return { tutorial: Math.min(tutorial, 60), commercial: Math.min(commercial, 25), recency: Math.min(recency, 15), intent: Math.min(intent, 15), expansion_signal, expansion_bonus, top_plan: topPlan, total };
+  // PQL signal: free user actively creating, NO paid plan at company yet
+  const pql_signal = !hasPaidContact && hasFreeCreator;
+  const pql_bonus  = pql_signal ? 15 : 0;
+
+  const total = Math.min(100, Math.min(tutorial, 60) + Math.min(commercial, 25) + Math.min(recency, 15) + Math.min(intent, 15) + expansion_bonus + pql_bonus);
+  return { tutorial: Math.min(tutorial, 60), commercial: Math.min(commercial, 25), recency: Math.min(recency, 15), intent: Math.min(intent, 15), expansion_signal, expansion_bonus, pql_signal, pql_bonus, top_plan: topPlan, total };
 }
 
 async function scoreOneCompany(supabase: any, companyId: string): Promise<boolean> {
   const { data: company } = await supabase
-    .from("companies").select("id, name, lifecycle_stage, sales_motion, iorad_plan, expansion_signal, expansion_signal_at, is_existing_customer, scout_score")
+    .from("companies").select("id, name, lifecycle_stage, sales_motion, iorad_plan, expansion_signal, expansion_signal_at, pql_signal, is_existing_customer, scout_score")
     .eq("id", companyId).maybeSingle();
   if (!company) return false;
 
@@ -651,6 +656,7 @@ async function scoreOneCompany(supabase: any, companyId: string): Promise<boolea
     expansion_signal_at: breakdown.expansion_signal
       ? (company.expansion_signal_at || new Date().toISOString())
       : null,
+    pql_signal: breakdown.pql_signal,
   };
 
   // Auto-promote to customer if paid plan detected

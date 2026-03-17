@@ -22,6 +22,8 @@ interface ScoreBreakdown {
   intent: number;
   expansion_signal: boolean;
   expansion_bonus: number;
+  pql_signal: boolean;
+  pql_bonus: number;
   top_plan: string | null;
   total: number;
 }
@@ -194,9 +196,13 @@ function calculateScoutScore(
   const expansion_signal = hasPaidContact && hasFreeCreator;
   const expansion_bonus = expansion_signal ? 20 : 0;
 
-  const total = Math.min(100, Math.max(0, tutorial + commercial + recency + intent + expansion_bonus));
+  // PQL signal: free user actively creating, NO paid plan at company yet
+  const pql_signal = !hasPaidContact && hasFreeCreator;
+  const pql_bonus  = pql_signal ? 15 : 0;
 
-  return { tutorial, commercial, recency, intent, expansion_signal, expansion_bonus, top_plan: topPlan, total };
+  const total = Math.min(100, Math.max(0, tutorial + commercial + recency + intent + expansion_bonus + pql_bonus));
+
+  return { tutorial, commercial, recency, intent, expansion_signal, expansion_bonus, pql_signal, pql_bonus, top_plan: topPlan, total };
 }
 
 // ── AI Activity Summary ───────────────────────────────────────────────────────
@@ -286,7 +292,7 @@ async function scoreOneCompany(
   // Fetch company
   const { data: company, error: cErr } = await supabase
     .from("companies")
-    .select("id, name, lifecycle_stage, sales_motion, account_type, brief_type, iorad_plan, expansion_signal, expansion_signal_at, is_existing_customer, scout_score, scout_scored_at")
+    .select("id, name, lifecycle_stage, sales_motion, account_type, brief_type, iorad_plan, expansion_signal, expansion_signal_at, pql_signal, is_existing_customer, scout_score, scout_scored_at")
     .eq("id", companyId)
     .maybeSingle();
 
@@ -328,6 +334,7 @@ async function scoreOneCompany(
     expansion_signal_at: breakdown.expansion_signal
       ? (company.expansion_signal_at || new Date().toISOString())
       : null,
+    pql_signal: breakdown.pql_signal,
   };
   if (summary) updateData.scout_summary = summary;
 
@@ -486,7 +493,7 @@ Deno.serve(async (req) => {
 
     const { data: companies, error } = await supabase
       .from("companies")
-      .select("id, name, lifecycle_stage, sales_motion, account_type, brief_type, iorad_plan, expansion_signal, expansion_signal_at, is_existing_customer, scout_score, scout_scored_at")
+      .select("id, name, lifecycle_stage, sales_motion, account_type, brief_type, iorad_plan, expansion_signal, expansion_signal_at, pql_signal, is_existing_customer, scout_score, scout_scored_at")
       .order("created_at", { ascending: true })
       .range(offset, offset + batchSize - 1);
 

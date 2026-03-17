@@ -17,6 +17,8 @@ const NON_RESUMABLE_SOURCES = [
   "import-from-hubspot",
   "score-companies",
   "score_companies",
+  "backfill-plan-names",
+  "backfill_plans",
 ];
 
 Deno.serve(async (req) => {

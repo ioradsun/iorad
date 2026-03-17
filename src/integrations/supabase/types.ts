@@ -222,6 +222,7 @@ export type Database = {
           partner_rep_email: string | null
           partner_rep_name: string | null
           persona: string | null
+          pql_signal: boolean
           relationship_type: string
           sales_motion: string
           scout_score: number | null
@@ -263,6 +264,7 @@ export type Database = {
           partner_rep_email?: string | null
           partner_rep_name?: string | null
           persona?: string | null
+          pql_signal?: boolean
           relationship_type?: string
           sales_motion?: string
           scout_score?: number | null
@@ -304,6 +306,7 @@ export type Database = {
           partner_rep_email?: string | null
           partner_rep_name?: string | null
           persona?: string | null
+          pql_signal?: boolean
           relationship_type?: string
           sales_motion?: string
           scout_score?: number | null
