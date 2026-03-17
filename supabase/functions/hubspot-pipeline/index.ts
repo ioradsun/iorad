@@ -637,7 +637,7 @@ function calculateScoutScore(company: any, contacts: any[]): ScoreBreakdown {
 
 async function scoreOneCompany(supabase: any, companyId: string): Promise<boolean> {
   const { data: company } = await supabase
-    .from("companies").select("id, name, lifecycle_stage, sales_motion, iorad_plan, expansion_signal, expansion_signal_at, is_existing_customer, scout_score")
+    .from("companies").select("id, name, lifecycle_stage, sales_motion, iorad_plan, expansion_signal, expansion_signal_at, pql_signal, is_existing_customer, scout_score")
     .eq("id", companyId).maybeSingle();
   if (!company) return false;
 
