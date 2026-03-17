@@ -117,6 +117,7 @@ export default function HubSpotStatus() {
         lastSyncRes,
         expansionRes, pqlRes,
         rescoreRes,
+        catchupRes,
       ] = await Promise.all([
         supabase.from("contacts").select("id", { count: "exact", head: true }),
         supabase.from("companies").select("id", { count: "exact", head: true }),
