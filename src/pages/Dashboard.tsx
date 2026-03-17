@@ -293,6 +293,7 @@ export default function Dashboard() {
                 <td className="px-5 py-3.5">
                   <div className="flex items-center gap-1">
                     <span className="font-medium text-body text-foreground">{company.name}</span>
+                    <NewSignupDot createdAt={(company as any).created_at ?? null} />
                     <ExpansionSignalDot company={company} />
                   </div>
                   {company.domain && (
