@@ -2558,6 +2558,18 @@ async function catchupContacts(supabase: any, afterParam: string | null) {
     totalProcessed += processed;
     pagesProcessed++;
 
+    // Log a batch sync_event so the activity feed updates
+    if (processed > 0) {
+      const cursorDateForLog = new Date(Number(lastSeenModified || cursorMs)).toISOString().slice(0, 10);
+      await supabase.from("sync_events").insert({
+        source: "catchup",
+        entity_type: "contact",
+        action: "created",
+        entity_name: `Catchup: ${processed} contacts imported (cursor ${cursorDateForLog})`,
+        meta: { processed, page: pagesProcessed, cursor: cursorDateForLog },
+      });
+    }
+
     // Track lastmodifieddate for cursor advancement
     const lastContact = contacts[contacts.length - 1];
     const lastMod = lastContact?.properties?.lastmodifieddate || lastContact?.properties?.hs_lastmodifieddate;
