@@ -99,13 +99,13 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // ── Step 5: Check restart count ─────────────────────────────────
+      // ── Step 5: Check restart+error count ────────────────────────────
       const { count: restartCount } = await supabase
         .from("sync_events")
         .select("id", { count: "exact", head: true })
         .eq("job_id", jobId)
         .eq("source", "watchdog")
-        .eq("action", "restarted");
+        .in("action", ["restarted", "error"]);
 
       if ((restartCount ?? 0) >= MAX_RESTARTS_PER_JOB) {
         await supabase.from("sync_events").insert({
