@@ -168,7 +168,22 @@ export default function HubSpotStatus() {
           .select("id", { count: "exact", head: true })
           .not("hubspot_object_id", "is", null)
           .is("hubspot_properties->plan_name", null),
+        // HubSpot contact count from checkpoint
+        (supabase as any)
+          .from("sync_checkpoints")
+          .select("value, updated_at")
+          .eq("key", "hubspot_contact_count")
+          .maybeSingle(),
+        // Last contact sync result
+        (supabase as any)
+          .from("sync_checkpoints")
+          .select("value, updated_at")
+          .eq("key", "last_contact_sync_result")
+          .maybeSingle(),
       ]);
+
+      const hubspotCountData = (results as any)[8]?.data;
+      const lastSyncData = (results as any)[9]?.data;
 
       return {
         backfill: backfillLogRes.data,
@@ -179,6 +194,12 @@ export default function HubSpotStatus() {
         pqlSignals: pqlRes.count ?? 0,
         contactsWithPlan: contactsWithPlanRes.count ?? 0,
         contactsNoPlan: contactsNoPlanRes.count ?? 0,
+        hubspotContactCount: hubspotCountData
+          ? { total: parseInt(hubspotCountData.value, 10), at: hubspotCountData.updated_at }
+          : null,
+        lastSyncResult: lastSyncData
+          ? { ...JSON.parse(lastSyncData.value || "{}"), at: lastSyncData.updated_at }
+          : null,
       };
     },
     refetchInterval: (query) => {

@@ -542,12 +542,24 @@ async function syncContactsIncremental(supabase: any) {
     updated_at: new Date().toISOString(),
   });
 
-  console.log(`sync_contacts: processed ${totalProcessed} contacts across ${pageCount} pages, checkpoint=${latestModified}`);
+  console.log(`sync_contacts: processed ${totalProcessed} contacts across ${pageCount} pages, checkpoint=${latestModified}, has_more=${!!after}`);
+
+  // Self-chain if there are more pages — catch up in one continuous run
+  if (after) {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    console.log(`sync_contacts: has_more=true, self-chaining for next batch`);
+    fetch(`${supabaseUrl}/functions/v1/import-from-hubspot`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "sync_contacts" }),
+    }).catch(e => console.warn("sync_contacts self-chain failed:", e.message));
+  }
 
   return new Response(
     JSON.stringify({
       success: true,
-      contacts_processed: totalProcessed,
+      processed: totalProcessed,
       pages: pageCount,
       checkpoint: latestModified,
       has_more: !!after,
