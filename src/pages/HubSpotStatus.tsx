@@ -55,7 +55,7 @@ export default function HubSpotStatus() {
   const [events, setEvents] = useState<SyncEvent[]>([]);
   const [sourceFilter, setSourceFilter] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
-  const { data: counts } = useCompanyContactCounts();
+  const { data: sync } = useSyncHealth();
 
   // Tick every second for live relative timestamps
   useEffect(() => {
