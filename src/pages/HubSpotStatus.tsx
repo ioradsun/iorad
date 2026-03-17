@@ -121,6 +121,7 @@ export default function HubSpotStatus() {
     queryFn: async () => {
       const [
         backfillLogRes,
+        rescoreLogRes,
         companiesWithPlanRes,
         companiesNoPlanRes,
         expansionRes,
@@ -132,6 +133,13 @@ export default function HubSpotStatus() {
           .from("backfill_log")
           .select("*")
           .eq("job_type", "plan_names")
+          .order("started_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        (supabase as any)
+          .from("backfill_log")
+          .select("*")
+          .eq("job_type", "score_all")
           .order("started_at", { ascending: false })
           .limit(1)
           .maybeSingle(),
@@ -164,6 +172,7 @@ export default function HubSpotStatus() {
 
       return {
         backfill: backfillLogRes.data,
+        rescoreLog: rescoreLogRes.data,
         companiesWithPlan: companiesWithPlanRes.count ?? 0,
         companiesNoPlan: companiesNoPlanRes.count ?? 0,
         expansionSignals: expansionRes.count ?? 0,
@@ -172,7 +181,12 @@ export default function HubSpotStatus() {
         contactsNoPlan: contactsNoPlanRes.count ?? 0,
       };
     },
-    refetchInterval: 30_000,
+    refetchInterval: (query) => {
+      const d = query.state.data;
+      if (d?.backfill?.status === "running") return 2_000;
+      if (d?.rescoreLog?.status === "running") return 2_000;
+      return 30_000;
+    },
   });
 
   // Mutations
@@ -386,6 +400,52 @@ export default function HubSpotStatus() {
                   {syncHealth.backfill.finished_at
                     ? formatDistanceToNow(new Date(syncHealth.backfill.finished_at), { addSuffix: true })
                     : "in progress"}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Rescore status row */}
+          {syncHealth.rescoreLog && (
+            <div className="flex items-center justify-between py-2 border-b border-border/20">
+              <div className="flex items-center gap-2">
+                {syncHealth.rescoreLog.status === "completed" && (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                )}
+                {syncHealth.rescoreLog.status === "running" && (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />
+                )}
+                {syncHealth.rescoreLog.status === "failed" && (
+                  <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
+                )}
+                <span className="text-caption">Rescore all — {syncHealth.rescoreLog.status}</span>
+              </div>
+              <div className="text-right">
+                {syncHealth.rescoreLog.status === "running" && syncHealth.rescoreLog.contacts_total > 0 && (
+                  <div className="w-32 mb-1">
+                    <div className="h-1 bg-foreground/[0.06] rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary rounded-full transition-all duration-500"
+                        style={{
+                          width: `${Math.min(100, Math.round(
+                            ((syncHealth.rescoreLog.contacts_processed ?? 0) /
+                             syncHealth.rescoreLog.contacts_total) * 100
+                          ))}%`
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+                <div className="text-caption font-medium tabular-nums">
+                  {(syncHealth.rescoreLog.contacts_processed ?? 0).toLocaleString()}
+                  {" / "}
+                  {(syncHealth.rescoreLog.contacts_total ?? 0).toLocaleString()} companies
+                </div>
+                <div className="text-micro text-foreground/40">
+                  {(syncHealth.rescoreLog.contacts_updated ?? 0).toLocaleString()} scored
+                  {syncHealth.rescoreLog.finished_at
+                    ? ` · ${formatDistanceToNow(new Date(syncHealth.rescoreLog.finished_at), { addSuffix: true })}`
+                    : ""}
                 </div>
               </div>
             </div>
