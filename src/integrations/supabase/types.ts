@@ -206,6 +206,7 @@ export type Database = {
           expansion_signal_at: string | null
           headcount: number | null
           hq_country: string | null
+          hubspot_object_id: string | null
           hubspot_properties: Json | null
           id: string
           industry: string | null
@@ -248,6 +249,7 @@ export type Database = {
           expansion_signal_at?: string | null
           headcount?: number | null
           hq_country?: string | null
+          hubspot_object_id?: string | null
           hubspot_properties?: Json | null
           id?: string
           industry?: string | null
@@ -290,6 +292,7 @@ export type Database = {
           expansion_signal_at?: string | null
           headcount?: number | null
           hq_country?: string | null
+          hubspot_object_id?: string | null
           hubspot_properties?: Json | null
           id?: string
           industry?: string | null
