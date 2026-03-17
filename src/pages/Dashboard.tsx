@@ -10,6 +10,17 @@ import { formatDistanceToNow } from "date-fns";
 type SortKey = "name" | "scout_score";
 type StageTab = "prospect" | "opportunity" | "customer";
 
+const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+
+function getRowPriority(c: any, activeStage: string, now: number): number {
+  const createdAt = c.created_at ? new Date(c.created_at).getTime() : 0;
+  if (now - createdAt < TWENTY_FOUR_HOURS) return 100;
+  if (activeStage === "customer" && c.expansion_signal) return 80;
+  const trigger = c.last_sync_changes?.trigger;
+  if (trigger === "product_activity" || trigger === "expansion_signal" || trigger === "pql_signal") return 60;
+  return 0;
+}
+
 const STAGE_LABELS: Record<string, string> = {
   prospect: "Prospect",
   opportunity: "Opportunity",
@@ -67,32 +78,23 @@ export default function Dashboard() {
       list = list.filter(c => c.name.toLowerCase().includes(q) || (c.domain || "").toLowerCase().includes(q));
     }
 
+    const now = Date.now();
     list.sort((a, b) => {
-      // For customer tab, float expansion_signal accounts to top
-      if (activeStage === "customer") {
-        const aSignal = (a as any).expansion_signal ? 1 : 0;
-        const bSignal = (b as any).expansion_signal ? 1 : 0;
-        if (bSignal !== aSignal) return bSignal - aSignal;
+      const aPriority = getRowPriority(a as any, activeStage, now);
+      const bPriority = getRowPriority(b as any, activeStage, now);
+      if (bPriority !== aPriority) return bPriority - aPriority;
+
+      if (sortKey === "name") {
+        const av = a.name.toLowerCase();
+        const bv = b.name.toLowerCase();
+        if (av < bv) return sortAsc ? -1 : 1;
+        if (av > bv) return sortAsc ? 1 : -1;
+        return 0;
       }
 
-      let av: any;
-      let bv: any;
-      switch (sortKey) {
-        case "name":
-          av = a.name.toLowerCase();
-          bv = b.name.toLowerCase();
-          break;
-        case "scout_score":
-          av = (a as any).scout_score ?? -1;
-          bv = (b as any).scout_score ?? -1;
-          break;
-        default:
-          av = 0;
-          bv = 0;
-      }
-      if (av < bv) return sortAsc ? -1 : 1;
-      if (av > bv) return sortAsc ? 1 : -1;
-      return 0;
+      const aScore = (a as any).scout_score ?? -1;
+      const bScore = (b as any).scout_score ?? -1;
+      return bScore - aScore;
     });
 
     return list;
@@ -217,7 +219,11 @@ export default function Dashboard() {
             className="w-full flex items-center gap-3 p-3 rounded-lg border border-border/20 bg-card text-left active:bg-secondary/50 transition-colors"
           >
             <div className="flex-1 min-w-0">
-              <div className="text-body font-medium text-foreground truncate">{company.name}</div>
+              <div className="flex items-center gap-1">
+                <span className="text-body font-medium text-foreground truncate">{company.name}</span>
+                <NewSignupDot createdAt={(company as any).created_at ?? null} />
+                <ExpansionSignalDot company={company} />
+              </div>
               <div className="text-micro text-foreground/40 mt-0.5 flex items-center gap-2">
                 {company.domain && <span className="truncate">{company.domain}</span>}
                 <StagePill stage={(company as any).lifecycle_stage || "prospect"} />
@@ -287,6 +293,7 @@ export default function Dashboard() {
                 <td className="px-5 py-3.5">
                   <div className="flex items-center gap-1">
                     <span className="font-medium text-body text-foreground">{company.name}</span>
+                    <NewSignupDot createdAt={(company as any).created_at ?? null} />
                     <ExpansionSignalDot company={company} />
                   </div>
                   {company.domain && (
@@ -403,6 +410,17 @@ function ExpansionSignalDot({ company }: { company: any }) {
     <span
       className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 ml-1.5"
       title={since ? `Expansion signal detected ${since}` : "Expansion signal: paid plan + active free creators"}
+    />
+  );
+}
+
+function NewSignupDot({ createdAt }: { createdAt: string | null }) {
+  if (!createdAt) return null;
+  if (Date.now() - new Date(createdAt).getTime() >= TWENTY_FOUR_HOURS) return null;
+  return (
+    <span
+      className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"
+      title="New signup (last 24h)"
     />
   );
 }
