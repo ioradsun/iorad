@@ -70,8 +70,8 @@ export default function Dashboard() {
     list.sort((a, b) => {
       // For customer tab, float expansion_signal accounts to top
       if (activeStage === "customer") {
-        const aSignal = (a as any).scout_score_breakdown?.expansion_signal ? 1 : 0;
-        const bSignal = (b as any).scout_score_breakdown?.expansion_signal ? 1 : 0;
+        const aSignal = (a as any).expansion_signal ? 1 : 0;
+        const bSignal = (b as any).expansion_signal ? 1 : 0;
         if (bSignal !== aSignal) return bSignal - aSignal;
       }
 
