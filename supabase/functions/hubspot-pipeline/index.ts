@@ -678,6 +678,11 @@ async function runPhase3(supabase: any, jobId: string, snap: any) {
   if (slice.length === 0) {
     // All done
     console.log(`pipeline: COMPLETE — ${snap.phase1_processed ?? 0} companies upserted, ${snap.phase2_contacts_imported ?? 0} contacts imported, ${totalScored} scored.`);
+    await logSyncEvent(supabase, {
+      source: "hubspot_pipeline", job_id: jobId, entity_type: "company",
+      action: "job_complete",
+      meta: { phase1_processed: snap.phase1_processed ?? 0, phase2_contacts: snap.phase2_contacts_imported ?? 0, phase3_scored: totalScored },
+    });
     await supabase.from("processing_jobs").update({
       status: "completed",
       finished_at: new Date().toISOString(),
