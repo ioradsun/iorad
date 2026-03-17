@@ -656,6 +656,7 @@ async function scoreOneCompany(supabase: any, companyId: string): Promise<boolea
     expansion_signal_at: breakdown.expansion_signal
       ? (company.expansion_signal_at || new Date().toISOString())
       : null,
+    pql_signal: breakdown.pql_signal,
   };
 
   // Auto-promote to customer if paid plan detected
