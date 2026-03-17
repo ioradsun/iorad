@@ -2592,8 +2592,10 @@ async function catchupContacts(supabase: any, afterParam: string | null) {
     }
   }
 
-  // Time budget exhausted — save final state
-  const nextCursor = after ? cursorMs : lastSeenModified;
+  // Time budget exhausted — always advance cursor to avoid reprocessing
+  // Even if `after` exists, advance to lastSeenModified so next invocation
+  // starts from where we left off (not from the beginning of the same cursor)
+  const nextCursor = lastSeenModified;
   await supabase.from("sync_checkpoints").upsert({
     key: "contact_catchup_cursor",
     value: nextCursor,
