@@ -490,6 +490,28 @@ Deno.serve(async (req) => {
     // Paginate through all companies and score them
     const offset = body.offset || 0;
     const batchSize = 50;
+    const logId = body.log_id || null;
+    const cumulativeIn = body.cumulative_scored || 0;
+
+    // First invocation — create log row and count total
+    let activeLogId = logId;
+    if (offset === 0) {
+      const { count } = await supabase
+        .from("companies")
+        .select("id", { count: "exact", head: true });
+
+      const { data: logRow } = await supabase
+        .from("backfill_log")
+        .insert({
+          job_type: "score_all",
+          status: "running",
+          contacts_total: count || 0,
+        })
+        .select("id")
+        .single();
+
+      activeLogId = logRow?.id || null;
+    }
 
     const { data: companies, error } = await supabase
       .from("companies")
@@ -513,20 +535,36 @@ Deno.serve(async (req) => {
     }
 
     const hasMore = (companies?.length || 0) === batchSize;
+    const cumulativeScored = cumulativeIn + scored;
+
+    // Update progress log
+    if (activeLogId) {
+      await supabase.from("backfill_log").update({
+        contacts_processed: offset + (companies?.length || 0),
+        contacts_updated: cumulativeScored,
+        current_offset: offset,
+        status: hasMore ? "running" : "completed",
+        finished_at: hasMore ? null : new Date().toISOString(),
+      }).eq("id", activeLogId);
+    }
 
     // Self-chain if there are more companies
     if (hasMore) {
       const supabaseUrl2 = Deno.env.get("SUPABASE_URL")!;
       const serviceRoleKey2 = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-      // Fire and forget next batch
       fetch(`${supabaseUrl2}/functions/v1/score-companies`, {
         method: "POST",
         headers: { Authorization: `Bearer ${serviceRoleKey2}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "score_all", offset: offset + batchSize }),
+        body: JSON.stringify({
+          action: "score_all",
+          offset: offset + batchSize,
+          log_id: activeLogId,
+          cumulative_scored: cumulativeScored,
+        }),
       }).catch((e: any) => console.error("Self-chain error:", e.message));
     }
 
-    console.log(`score_all: offset=${offset}, scored=${scored}, hasMore=${hasMore}`);
+    console.log(`score_all: offset=${offset}, scored=${scored}, cumulative=${cumulativeScored}, hasMore=${hasMore}`);
 
     return new Response(
       JSON.stringify({
@@ -534,6 +572,7 @@ Deno.serve(async (req) => {
         offset,
         scored,
         has_more: hasMore,
+        log_id: activeLogId,
         errors: errors.slice(0, 10),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
