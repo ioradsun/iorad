@@ -286,17 +286,13 @@ export default function HubSpotStatus() {
             {syncNow.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             Sync Now
           </Button>
-          <Button variant="outline" className="gap-1.5" onClick={() => watchSignups.mutate()} disabled={watchSignups.isPending}>
-            {watchSignups.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Signal className="w-4 h-4" />}
-            Watch Signups
+          <Button variant="outline" className="gap-1.5" onClick={() => fullRebuild.mutate()} disabled={fullRebuild.isPending}>
+            {fullRebuild.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+            Full Rebuild
           </Button>
-          <Button variant="outline" className="gap-1.5" onClick={() => backfillPlans.mutate()} disabled={backfillPlans.isPending}>
+          <Button variant="ghost" size="sm" className="gap-1.5 text-foreground/40" onClick={() => backfillPlans.mutate()} disabled={backfillPlans.isPending}>
             {backfillPlans.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             Backfill Plans
-          </Button>
-          <Button variant="outline" className="gap-1.5" onClick={() => rescoreAll.mutate()} disabled={rescoreAll.isPending}>
-            {rescoreAll.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            Rescore All
           </Button>
         </div>
       </div>
