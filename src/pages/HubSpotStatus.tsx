@@ -49,22 +49,6 @@ const ACTION_STYLES: Record<string, string> = {
   skipped: "bg-secondary text-foreground/40 border-border",
 };
 
-function useCompanyContactCounts() {
-  return useQuery({
-    queryKey: ["sync_counts"],
-    queryFn: async () => {
-      const [compRes, contRes] = await Promise.all([
-        supabase.from("companies").select("id", { count: "exact", head: true }),
-        supabase.from("contacts").select("id", { count: "exact", head: true }),
-      ]);
-      return {
-        companies: compRes.count ?? 0,
-        contacts: contRes.count ?? 0,
-      };
-    },
-    refetchInterval: 60_000,
-  });
-}
 
 export default function HubSpotStatus() {
   const qc = useQueryClient();
