@@ -225,21 +225,6 @@ export default function HubSpotStatus() {
     onError: (err: any) => toast.error(`Rebuild failed: ${err?.message}`),
   });
 
-  const backfillPlans = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("backfill-plan-names", {
-        body: { offset: 0 },
-      });
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["sync_events_initial"] });
-      qc.invalidateQueries({ queryKey: ["sync_health"] });
-      toast.success("Plan backfill started");
-    },
-    onError: (err: any) => toast.error(`Backfill failed: ${err?.message}`),
-  });
 
   const rescoreAll = useMutation({
     mutationFn: async () => {
