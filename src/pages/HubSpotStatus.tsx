@@ -7,9 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
-import { useSyncHealth } from "@/hooks/useSupabase";
 
-// ... keep existing code (SyncEvent type, SOURCE_LABELS, ACTION_STYLES)
 type SyncEvent = {
   id: number;
   created_at: string;
@@ -19,161 +17,97 @@ type SyncEvent = {
   entity_id: string | null;
   entity_name: string | null;
   action: string;
-  diff: any;
-  batch_seq: number | null;
-  cursor_val: string | null;
   meta: any;
 };
 
-const SOURCE_LABELS: Record<string, string> = {
-  hubspot_pipeline: "Pipeline",
-  daily_sync: "Daily Sync",
-  watch_signups: "Watch Signups",
-  import_webhook: "Webhook",
-  import_bulk: "Bulk Import",
-  import_backfill_contacts: "Contact Backfill",
-  import_fix_contacts: "Fix Contacts",
-  watchdog: "Watchdog",
-};
-
-const ACTION_STYLES: Record<string, string> = {
-  created: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-  updated: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  scored: "bg-purple-500/10 text-purple-400 border-purple-500/20",
-  error: "bg-red-500/10 text-red-400 border-red-500/20",
-  heartbeat: "bg-secondary text-foreground/40 border-border",
-  job_start: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-  job_complete: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-  job_failed: "bg-red-500/10 text-red-400 border-red-500/20",
-  restarted: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-  skipped: "bg-secondary text-foreground/40 border-border",
-};
-
-
 export default function HubSpotStatus() {
   const qc = useQueryClient();
-  const [events, setEvents] = useState<SyncEvent[]>([]);
-  const [sourceFilter, setSourceFilter] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
-  const { data: sync } = useSyncHealth();
+  const [events, setEvents] = useState<SyncEvent[]>([]);
 
-  // Tick every second for live relative timestamps
   useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 1000);
+    const interval = setInterval(() => setNow(Date.now()), 5_000);
     return () => clearInterval(interval);
   }, []);
 
-  // Initial load
+  // ── Initial event load (only created/updated contact/company) ───────────
   const { data: initialEvents } = useQuery({
     queryKey: ["sync_events_initial"],
     queryFn: async () => {
       const { data } = await (supabase as any)
         .from("sync_events")
         .select("*")
+        .in("action", ["created", "updated"])
+        .in("entity_type", ["contact", "company"])
         .order("created_at", { ascending: false })
         .limit(100);
       return (data || []) as SyncEvent[];
     },
   });
 
-  // Seed events from initial load
   useEffect(() => {
-    if (initialEvents && initialEvents.length > 0) {
-      setEvents(initialEvents);
-    }
+    if (initialEvents) setEvents(initialEvents);
   }, [initialEvents]);
 
-  // Realtime subscription
+  // ── Realtime — only contact/company creates and updates ─────────────────
   useEffect(() => {
     const channel = supabase
-      .channel("sync_events_realtime")
+      .channel("sync_imports")
       .on("postgres_changes", {
         event: "INSERT",
         schema: "public",
         table: "sync_events",
       }, (payload) => {
-        setEvents(prev => [payload.new as SyncEvent, ...prev].slice(0, 100));
+        const e = payload.new as SyncEvent;
+        if (
+          ["created", "updated"].includes(e.action) &&
+          ["contact", "company"].includes(e.entity_type)
+        ) {
+          setEvents(prev => [e, ...prev].slice(0, 100));
+        }
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  // Sync Health query
-  const { data: syncHealth, refetch: refetchHealth } = useQuery({
-    queryKey: ["sync_health"],
+  // ── Health query ────────────────────────────────────────────────────────
+  const { data: health } = useQuery({
+    queryKey: ["sync_health_v2"],
     queryFn: async () => {
       const [
-        rescoreLogRes,
-        companiesWithPlanRes,
-        companiesNoPlanRes,
-        expansionRes,
-        pqlRes,
-        contactsWithPlanRes,
-        contactsNoPlanRes,
-        hubspotCountRes,
+        dbContactsRes, dbCompaniesRes,
+        hsContactRes, hsCompanyRes,
         lastSyncRes,
+        expansionRes, pqlRes,
+        rescoreRes,
       ] = await Promise.all([
-        (supabase as any)
-          .from("backfill_log")
-          .select("*")
-          .eq("job_type", "score_all")
-          .order("started_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from("companies")
-          .select("id", { count: "exact", head: true })
-          .not("iorad_plan", "is", null),
-        supabase
-          .from("companies")
-          .select("id", { count: "exact", head: true })
-          .is("iorad_plan", null),
-        supabase
-          .from("companies")
-          .select("id", { count: "exact", head: true })
-          .eq("expansion_signal", true),
-        supabase
-          .from("companies")
-          .select("id", { count: "exact", head: true })
-          .eq("pql_signal", true),
-        supabase
-          .from("contacts")
-          .select("id", { count: "exact", head: true })
-          .not("hubspot_properties->plan_name", "is", null),
-        supabase
-          .from("contacts")
-          .select("id", { count: "exact", head: true })
-          .not("hubspot_object_id", "is", null)
-          .is("hubspot_properties->plan_name", null),
-        (supabase as any)
-          .from("sync_checkpoints")
-          .select("value, updated_at")
-          .eq("key", "hubspot_contact_count")
-          .maybeSingle(),
-        (supabase as any)
-          .from("sync_checkpoints")
-          .select("value, updated_at")
-          .eq("key", "last_contact_sync_result")
-          .maybeSingle(),
+        supabase.from("contacts").select("id", { count: "exact", head: true }),
+        supabase.from("companies").select("id", { count: "exact", head: true }),
+        (supabase as any).from("sync_checkpoints").select("value, updated_at").eq("key", "hubspot_contact_count").maybeSingle(),
+        (supabase as any).from("sync_checkpoints").select("value, updated_at").eq("key", "hubspot_company_count").maybeSingle(),
+        (supabase as any).from("sync_checkpoints").select("value, updated_at").eq("key", "last_contact_sync_result").maybeSingle(),
+        supabase.from("companies").select("id", { count: "exact", head: true }).eq("expansion_signal", true),
+        supabase.from("companies").select("id", { count: "exact", head: true }).eq("pql_signal", true),
+        (supabase as any).from("backfill_log").select("*").eq("job_type", "score_all").order("started_at", { ascending: false }).limit(1).maybeSingle(),
       ]);
 
-      const hubspotCountData = hubspotCountRes?.data;
-      const lastSyncData = lastSyncRes?.data;
+      const dbContacts  = dbContactsRes.count  ?? 0;
+      const dbCompanies = dbCompaniesRes.count  ?? 0;
+      const hsContacts  = hsContactRes.data ? parseInt(hsContactRes.data.value || "0", 10) : null;
+      const hsCompanies = hsCompanyRes.data ? parseInt(hsCompanyRes.data.value || "0", 10) : null;
+      const lastSync = lastSyncRes.data
+        ? { ...JSON.parse(lastSyncRes.data.value || "{}"), at: lastSyncRes.data.updated_at }
+        : null;
 
       return {
-        rescoreLog: rescoreLogRes.data,
-        companiesWithPlan: companiesWithPlanRes.count ?? 0,
-        companiesNoPlan: companiesNoPlanRes.count ?? 0,
-        expansionSignals: expansionRes.count ?? 0,
-        pqlSignals: pqlRes.count ?? 0,
-        contactsWithPlan: contactsWithPlanRes.count ?? 0,
-        contactsNoPlan: contactsNoPlanRes.count ?? 0,
-        hubspotContactCount: hubspotCountData
-          ? { total: parseInt(hubspotCountData.value, 10), at: hubspotCountData.updated_at }
-          : null,
-        lastSyncResult: lastSyncData
-          ? { ...JSON.parse(lastSyncData.value || "{}"), at: lastSyncData.updated_at }
-          : null,
+        dbContacts, dbCompanies, hsContacts, hsCompanies, lastSync,
+        contactGap:  hsContacts  ? hsContacts  - dbContacts  : null,
+        companyGap:  hsCompanies ? hsCompanies - dbCompanies : null,
+        contactPct:  hsContacts  ? Math.round(dbContacts  / hsContacts  * 100) : null,
+        companyPct:  hsCompanies ? Math.round(dbCompanies / hsCompanies * 100) : null,
+        expansion:   expansionRes.count  ?? 0,
+        pql:         pqlRes.count        ?? 0,
+        rescoreLog:  rescoreRes.data,
       };
     },
     refetchInterval: (query) => {
@@ -183,446 +117,269 @@ export default function HubSpotStatus() {
     },
   });
 
-  // Mutations
+  // ── Mutations ───────────────────────────────────────────────────────────
   const syncNow = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.functions.invoke("hubspot-daily-sync", { body: { hours_back: 2 } });
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Sync triggered — contacts → scoring → signups");
+      toast.success("Sync started");
+      qc.invalidateQueries({ queryKey: ["sync_health_v2"] });
       qc.invalidateQueries({ queryKey: ["sync_events_initial"] });
-      qc.invalidateQueries({ queryKey: ["sync_counts"] });
-      qc.invalidateQueries({ queryKey: ["sync_health"] });
     },
     onError: (err: any) => toast.error(`Sync failed: ${err?.message}`),
   });
 
-
-
   const rescoreAll = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.functions.invoke("score-companies", {
-        body: { action: "score_all", offset: 0 },
-      });
+      const { error } = await supabase.functions.invoke("score-companies", { body: { action: "score_all", offset: 0 } });
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["sync_health"] });
-      toast.success("Full rescore started — companies will update over the next few minutes");
+      toast.success("Rescore started");
+      qc.invalidateQueries({ queryKey: ["sync_health_v2"] });
     },
     onError: (err: any) => toast.error(`Rescore failed: ${err?.message}`),
   });
 
-  // Derived state
-  const lastEvent = events[0] || null;
-  const lastEventAge = lastEvent
-    ? (now - new Date(lastEvent.created_at).getTime()) / 1000
-    : Infinity;
-
-  const isTerminal = lastEvent?.action === "job_complete" || lastEvent?.action === "job_failed";
-  const dotColor =
-    lastEventAge < 60 ? "bg-emerald-400 animate-pulse" :
-    lastEventAge < 300 ? "bg-amber-400" :
-    (!isTerminal && lastEventAge < Infinity) ? "bg-red-400" :
-    "bg-foreground/20";
-
-  // Stall detection
-  const isStalled = lastEvent && !isTerminal && lastEventAge > 60;
-  const recentWatchdogRestart = events.slice(0, 5).find(
-    e => e.source === "watchdog" && e.action === "restarted"
-  );
-
-  // Filter
-  const sources = useMemo(() => [...new Set(events.map(e => e.source))], [events]);
-  const filteredEvents = sourceFilter ? events.filter(e => e.source === sourceFilter) : events;
-
+  // ── Helpers ─────────────────────────────────────────────────────────────
   function relativeTime(dateStr: string) {
-    const seconds = Math.max(0, Math.floor((now - new Date(dateStr).getTime()) / 1000));
-    if (seconds < 60) return `${seconds}s ago`;
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    const s = Math.max(0, Math.floor((now - new Date(dateStr).getTime()) / 1000));
+    if (s < 60) return `${s}s ago`;
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
     return formatDistanceToNow(new Date(dateStr), { addSuffix: true });
   }
 
+  function StatPair({ label, db, hs, gap, pct }: {
+    label: string; db: number; hs: number | null; gap: number | null; pct: number | null;
+  }) {
+    return (
+      <div>
+        <div className="field-label">{label}</div>
+        <div className="flex items-end gap-2 mt-1">
+          <span className="text-display font-semibold tabular-nums">{db.toLocaleString()}</span>
+          {hs !== null && (
+            <span className="text-title font-medium tabular-nums text-foreground/40 pb-0.5">
+              / {hs.toLocaleString()}
+            </span>
+          )}
+          {pct !== null && pct >= 99 && (
+            <span className="text-micro text-emerald-400 font-medium pb-0.5">✓</span>
+          )}
+          {gap !== null && gap > 0 && (
+            <span className="text-micro text-amber-400 font-medium pb-0.5">
+              −{gap.toLocaleString()}
+            </span>
+          )}
+        </div>
+
+        {hs !== null && gap !== null && gap > 0 && (
+          <div className="h-1 bg-foreground/[0.06] rounded-full overflow-hidden mt-2">
+            <div
+              className="h-full bg-primary rounded-full transition-all"
+              style={{ width: `${Math.min(100, pct ?? 0)}%` }}
+            />
+          </div>
+        )}
+        {hs !== null && (
+          <div className="text-micro text-foreground/25 mt-1">HubSpot (2yr active)</div>
+        )}
+      </div>
+    );
+  }
+
+  // Today's import counts
+  const todayEvents = useMemo(() => {
+    const cutoff = now - 24 * 60 * 60 * 1000;
+    return events.filter(e => new Date(e.created_at).getTime() > cutoff);
+  }, [events, now]);
+
+  const todayCreated = todayEvents.filter(e => e.action === "created").length;
+  const todayUpdated = todayEvents.filter(e => e.action === "updated").length;
+  const isSyncing = health?.lastSync?.has_more;
+
   return (
     <div className="max-w-4xl space-y-6">
-      {/* Header */}
+
+      {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <h1 className="text-display font-semibold tracking-tight">HubSpot Sync</h1>
-        <div className="flex items-center gap-2">
-          <Button className="gap-1.5" onClick={() => syncNow.mutate()} disabled={syncNow.isPending}>
-            {syncNow.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            Sync Now
-          </Button>
-        </div>
+        <Button className="gap-1.5" onClick={() => syncNow.mutate()} disabled={syncNow.isPending}>
+          {syncNow.isPending
+            ? <Loader2 className="w-4 h-4 animate-spin" />
+            : <RefreshCw className="w-4 h-4" />}
+          Sync Now
+        </Button>
       </div>
 
-      {/* Hero banner */}
-      <div className="rounded-xl border border-border bg-card p-5">
-        <div className="flex items-center gap-3">
-          <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotColor}`} />
-          <div className="min-w-0">
-            {lastEvent ? (
-              <>
-                <div className="text-caption font-medium truncate">
-                  {lastEvent.action === "job_start" ? "Job started" :
-                   lastEvent.action === "job_complete" ? "Job completed" :
-                   lastEvent.action === "heartbeat" ? "Processing…" :
-                   lastEvent.entity_name || lastEvent.action}
-                </div>
-                <div className="text-micro text-foreground/40">
-                  {lastEvent.entity_type} {lastEvent.action} via {SOURCE_LABELS[lastEvent.source] || lastEvent.source} · {relativeTime(lastEvent.created_at)}
-                </div>
-              </>
-            ) : (
-              <div className="text-caption text-foreground/40">No sync events yet</div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Stall/watchdog banner */}
-      {recentWatchdogRestart ? (
-        <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 flex items-center gap-2">
-          <RefreshCw className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span className="text-caption text-emerald-400">
-            Watchdog auto-restarted {SOURCE_LABELS[recentWatchdogRestart.meta?.original_source] || "sync"} · {relativeTime(recentWatchdogRestart.created_at)}
-          </span>
-        </div>
-      ) : isStalled ? (
-        <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-2.5 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-          <div>
-            <span className="text-caption text-amber-400">
-              Sync may have stalled — last activity {relativeTime(lastEvent!.created_at)}
-            </span>
-            <div className="text-micro text-amber-400/60">Watchdog will auto-restart within 60 seconds</div>
-          </div>
-        </div>
-      ) : null}
-
-      {/* Stats */}
+      {/* ── 1. The numbers ── */}
       <div className="grid grid-cols-2 gap-6">
-        <div>
-          <div className="field-label">Companies</div>
-          <div className="flex items-end gap-2 mt-1">
-            <div className="text-display font-semibold tabular-nums">
-              {(sync?.dbCompanies || 0).toLocaleString()}
-            </div>
-            {sync?.hsCompanies && (
-              <>
-                <div className="text-foreground/20 text-title pb-0.5">/</div>
-                <div className="text-title font-medium tabular-nums text-foreground/40 pb-0.5">
-                  {sync.hsCompanies.toLocaleString()}
-                </div>
-                <div className="pb-0.5">
-                  {sync.companyPct !== null && sync.companyPct >= 99
-                    ? <span className="text-micro text-emerald-400 font-medium">✓ in sync</span>
-                    : sync.companyGap && sync.companyGap > 0
-                      ? <span className="text-micro text-amber-400 font-medium">{sync.companyGap.toLocaleString()} behind</span>
-                      : null
-                  }
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Contact sync completeness */}
-        <div>
-          <div className="field-label">Contacts</div>
-          <div className="flex items-end gap-2 mt-1">
-            <div className="text-display font-semibold tabular-nums">
-              {(sync?.dbContacts || 0).toLocaleString()}
-            </div>
-            {sync?.hsContacts && (
-              <>
-                <div className="text-foreground/20 text-title pb-0.5">/</div>
-                <div className="text-title font-medium tabular-nums text-foreground/40 pb-0.5">
-                  {sync.hsContacts.toLocaleString()}
-                </div>
-                <div className="pb-0.5">
-                  {sync.contactPct !== null && sync.contactPct >= 99
-                    ? <span className="text-micro text-emerald-400 font-medium">✓ in sync</span>
-                    : sync.contactGap && sync.contactGap > 0
-                      ? <span className="text-micro text-amber-400 font-medium">{sync.contactGap.toLocaleString()} behind</span>
-                      : null
-                  }
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Progress bar when behind */}
-          {sync?.hsContacts &&
-           (sync.dbContacts || 0) < sync.hsContacts * 0.99 && (
-            <div className="h-1 bg-foreground/[0.06] rounded-full overflow-hidden mt-2">
-              <div
-                className="h-full bg-primary rounded-full transition-all"
-                style={{
-                  width: `${Math.min(100, Math.round(
-                    (sync.dbContacts || 0) / sync.hsContacts * 100
-                  ))}%`,
-                }}
-              />
-            </div>
-          )}
-
-          {/* Last sync result */}
-          {sync?.lastSync && (
-            <div className="flex items-center gap-3 mt-1.5 text-micro text-foreground/30">
-              <span>{(sync.lastSync.processed || 0).toLocaleString()} last run</span>
-              {sync.lastSync.has_more && (
-                <span className="text-amber-400">backlog — syncing…</span>
-              )}
-              {sync.lastSync.at && (
-                <span>
-                  synced {formatDistanceToNow(new Date(sync.lastSync.at), { addSuffix: true })}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
+        <StatPair
+          label="Contacts"
+          db={health?.dbContacts ?? 0}
+          hs={health?.hsContacts ?? null}
+          gap={health?.contactGap ?? null}
+          pct={health?.contactPct ?? null}
+        />
+        <StatPair
+          label="Companies"
+          db={health?.dbCompanies ?? 0}
+          hs={health?.hsCompanies ?? null}
+          gap={health?.companyGap ?? null}
+          pct={health?.companyPct ?? null}
+        />
       </div>
 
-      {/* Sync Health Panel */}
-      {syncHealth && (
-        <div className="rounded-xl border border-border bg-card p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-caption font-medium">Sync Health</span>
-            <button
-              onClick={() => refetchHealth()}
-              className="text-micro text-foreground/30 hover:text-foreground/50 transition-colors"
-            >
-              Refresh
-            </button>
-          </div>
-
-
-          {/* Rescore status row */}
-          {syncHealth.rescoreLog && (
-            <div className="flex items-center justify-between py-2 border-b border-border/20">
-              <div className="flex items-center gap-2">
-                {syncHealth.rescoreLog.status === "completed" && (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                )}
-                {syncHealth.rescoreLog.status === "running" && (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />
-                )}
-                {syncHealth.rescoreLog.status === "failed" && (
-                  <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
-                )}
-                <span className="text-caption">Rescore all — {syncHealth.rescoreLog.status}</span>
-              </div>
-              <div className="text-right">
-                {syncHealth.rescoreLog.status === "running" && syncHealth.rescoreLog.contacts_total > 0 && (
-                  <div className="w-32 mb-1">
-                    <div className="h-1 bg-foreground/[0.06] rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary rounded-full transition-all duration-500"
-                        style={{
-                          width: `${Math.min(100, Math.round(
-                            ((syncHealth.rescoreLog.contacts_processed ?? 0) /
-                             syncHealth.rescoreLog.contacts_total) * 100
-                          ))}%`
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
-                <div className="text-caption font-medium tabular-nums">
-                  {(syncHealth.rescoreLog.contacts_processed ?? 0).toLocaleString()}
-                  {" / "}
-                  {(syncHealth.rescoreLog.contacts_total ?? 0).toLocaleString()} companies
-                </div>
-                <div className="text-micro text-foreground/40">
-                  {(syncHealth.rescoreLog.contacts_updated ?? 0).toLocaleString()} scored
-                  {syncHealth.rescoreLog.finished_at
-                    ? ` · ${formatDistanceToNow(new Date(syncHealth.rescoreLog.finished_at), { addSuffix: true })}`
-                    : ""}
-                </div>
-              </div>
-            </div>
+      {/* Last sync meta */}
+      {health?.lastSync?.at && (
+        <div className="flex items-center gap-3 text-micro text-foreground/30">
+          <span>
+            {isSyncing
+              ? <span className="text-amber-400">syncing — backlog in progress…</span>
+              : <>synced {formatDistanceToNow(new Date(health.lastSync.at), { addSuffix: true })}</>
+            }
+          </span>
+          {health.lastSync.processed > 0 && (
+            <span>{health.lastSync.processed.toLocaleString()} contacts last run</span>
           )}
-
-          {/* Rescore All — recovery action */}
-          <div className="flex items-center justify-between py-2 border-b border-border/20">
-            <span className="text-caption text-foreground/50">Recovery</span>
-            <button
-              onClick={() => rescoreAll.mutate()}
-              disabled={rescoreAll.isPending}
-              className="text-micro text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
-            >
-              {rescoreAll.isPending && <Loader2 className="w-3 h-3 animate-spin" />}
-              Rescore All Companies
-            </button>
-          </div>
-
-          {/* Coverage grid */}
-          <div className="grid grid-cols-2 gap-x-8 gap-y-3">
-            {/* Plan coverage */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <span className="field-label">Plan coverage</span>
-                <span className="text-micro text-foreground/40 tabular-nums">
-                  {syncHealth.contactsWithPlan.toLocaleString()} / {(syncHealth.contactsWithPlan + syncHealth.contactsNoPlan).toLocaleString()}
-                </span>
-              </div>
-              <div className="h-1.5 bg-foreground/[0.06] rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary rounded-full transition-all duration-500"
-                  style={{
-                    width: `${Math.round(
-                      (syncHealth.contactsWithPlan /
-                        Math.max(1, syncHealth.contactsWithPlan + syncHealth.contactsNoPlan)) * 100
-                    )}%`
-                  }}
-                />
-              </div>
-              {syncHealth.contactsNoPlan > 0 && (
-                <div className="text-micro text-foreground/30 mt-1">
-                  {syncHealth.contactsNoPlan.toLocaleString()} contacts missing plan
-                </div>
-              )}
-            </div>
-
-            {/* Company plan coverage */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <span className="field-label">Companies with plan</span>
-                <span className="text-micro text-foreground/40 tabular-nums">
-                  {syncHealth.companiesWithPlan.toLocaleString()} / {(syncHealth.companiesWithPlan + syncHealth.companiesNoPlan).toLocaleString()}
-                </span>
-              </div>
-              <div className="h-1.5 bg-foreground/[0.06] rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary rounded-full transition-all duration-500"
-                  style={{
-                    width: `${Math.round(
-                      (syncHealth.companiesWithPlan /
-                        Math.max(1, syncHealth.companiesWithPlan + syncHealth.companiesNoPlan)) * 100
-                    )}%`
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Expansion signals */}
-            <div>
-              <div className="field-label mb-0.5">Expansion signals</div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-                <span className="text-body font-semibold tabular-nums text-foreground">
-                  {syncHealth.expansionSignals.toLocaleString()}
-                </span>
-                <span className="text-caption text-foreground/40">companies</span>
-              </div>
-            </div>
-
-            {/* PQL signals */}
-            <div>
-              <div className="field-label mb-0.5">PQL signals</div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-                <span className="text-body font-semibold tabular-nums text-foreground">
-                  {syncHealth.pqlSignals.toLocaleString()}
-                </span>
-                <span className="text-caption text-foreground/40">companies</span>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 
-      {/* Filter pills */}
-      <div className="flex items-center gap-1.5 flex-wrap">
-        <button
-          onClick={() => setSourceFilter(null)}
-          className={`text-micro px-2.5 py-1 rounded-full border transition-colors ${
-            !sourceFilter
-              ? "bg-primary/15 text-primary border-primary/30"
-              : "text-foreground/40 border-border hover:text-foreground/70"
-          }`}
-        >
-          All
-        </button>
-        {sources.map(s => (
-          <button
-            key={s}
-            onClick={() => setSourceFilter(sourceFilter === s ? null : s)}
-            className={`text-micro px-2.5 py-1 rounded-full border transition-colors ${
-              sourceFilter === s
-                ? "bg-primary/15 text-primary border-primary/30"
-                : "text-foreground/40 border-border hover:text-foreground/70"
-            }`}
-          >
-            {SOURCE_LABELS[s] || s}
-          </button>
-        ))}
-      </div>
-
-      {/* Live feed */}
+      {/* ── 2. What's coming in ── */}
       <div className="rounded-xl border border-border bg-card">
-        <ScrollArea className="h-[480px]">
-          <div className="p-4 space-y-0">
-            {filteredEvents.length === 0 && (
-              <p className="text-caption text-foreground/40 text-center py-8">No sync events yet. Trigger a sync to see activity.</p>
-            )}
-            {filteredEvents.map((event) => {
-              const isHeartbeat = event.action === "heartbeat";
-              const isWatchdog = event.source === "watchdog";
-              const actionStyle = ACTION_STYLES[event.action] || "bg-secondary text-foreground/40 border-border";
+        <div className="flex items-center justify-between p-4 pb-0">
+          <span className="text-caption font-medium">Importing</span>
+          {(todayCreated > 0 || todayUpdated > 0) && (
+            <span className="text-micro text-foreground/30">
+              {todayCreated > 0 && `${todayCreated} new`}
+              {todayCreated > 0 && todayUpdated > 0 && " · "}
+              {todayUpdated > 0 && `${todayUpdated} updated`}
+              {" today"}
+            </span>
+          )}
+        </div>
 
-              return (
-                <div
-                  key={event.id}
-                  className="flex items-start gap-3 border-b border-border/40 py-2.5 last:border-0"
-                >
+        <ScrollArea className="h-[400px]">
+          <div className="p-4 space-y-0">
+            {events.length === 0 ? (
+              <p className="text-caption text-foreground/40 text-center py-8">
+                No imports yet — trigger a sync to see activity
+              </p>
+            ) : (
+              events.slice(0, 40).map(event => (
+                <div key={event.id} className="flex items-center gap-3 border-b border-border/40 py-2.5 last:border-0">
                   {/* Action pill */}
-                  <span className={`text-micro px-2 py-0.5 rounded border shrink-0 mt-0.5 ${actionStyle}`}>
-                    {isWatchdog && event.action === "restarted" && "↻ "}
-                    {isWatchdog && event.action === "job_failed" ? "gave up" : event.action.replace("_", " ")}
+                  <span className={`text-micro px-2 py-0.5 rounded border shrink-0 ${
+                    event.action === "created"
+                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                      : "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                  }`}>
+                    {event.action}
                   </span>
 
-                  {/* Center */}
-                  <div className="min-w-0 flex-1">
-                    <div className={`truncate ${isHeartbeat ? "text-micro text-foreground/40" : "text-caption font-medium"}`}>
-                      {event.entity_name || event.entity_type}
-                    </div>
-                    {!isHeartbeat && (
-                      <div className="text-micro text-foreground/40">
-                        {event.entity_type}
-                        {event.entity_id && (
-                          <>
-                            {" · "}
-                            <Link to={`/company/${event.entity_id}`} className="hover:underline">
-                              View
-                            </Link>
-                          </>
-                        )}
-                      </div>
+                  {/* Name */}
+                  <div className="min-w-0 flex-1 truncate">
+                    {event.entity_id ? (
+                      <Link
+                        to={`/company/${event.entity_id}`}
+                        className="text-caption font-medium hover:underline truncate"
+                      >
+                        {event.entity_name || "—"}
+                      </Link>
+                    ) : (
+                      <span className="text-caption font-medium truncate">
+                        {event.entity_name || "—"}
+                      </span>
                     )}
                   </div>
 
-                  {/* Right */}
-                  <div className="text-right shrink-0">
-                    <div className="text-micro text-foreground/40">
-                      {SOURCE_LABELS[event.source] || event.source}
-                    </div>
-                    <div className="text-micro text-foreground/30">
-                      {relativeTime(event.created_at)}
-                    </div>
+                  {/* Type + time */}
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-micro text-foreground/30">{event.entity_type}</span>
+                    <span className="text-micro text-foreground/20 tabular-nums">{relativeTime(event.created_at)}</span>
                   </div>
                 </div>
-              );
-            })}
+              ))
+            )}
           </div>
         </ScrollArea>
       </div>
 
-      <p className="text-micro text-foreground/20 leading-relaxed">
-        Sync events stream in real-time. Watchdog auto-restarts stalled jobs within 60 seconds. Events are retained for 7 days.
-      </p>
+      {/* ── 3. Scoring ── */}
+      <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+        <span className="text-caption font-medium">Scoring</span>
+
+        <div className="space-y-3">
+          {/* Signal counts */}
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <div className="field-label mb-0.5">Expansion signals</div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                <span className="text-body font-semibold tabular-nums">{(health?.expansion ?? 0).toLocaleString()}</span>
+                <span className="text-caption text-foreground/40">companies</span>
+              </div>
+            </div>
+            <div>
+              <div className="field-label mb-0.5">PQL signals</div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                <span className="text-body font-semibold tabular-nums">{(health?.pql ?? 0).toLocaleString()}</span>
+                <span className="text-caption text-foreground/40">companies</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Rescore progress */}
+          {health?.rescoreLog && health.rescoreLog.status === "running" && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-caption text-foreground/60 flex items-center gap-1.5">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Rescoring…
+                </span>
+                <span className="text-micro tabular-nums text-foreground/40">
+                  {(health.rescoreLog.contacts_processed ?? 0).toLocaleString()}
+                  {" / "}
+                  {(health.rescoreLog.contacts_total ?? 0).toLocaleString()}
+                </span>
+              </div>
+              <div className="h-1 bg-foreground/[0.06] rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary rounded-full transition-all duration-500"
+                  style={{
+                    width: `${Math.min(100, Math.round(
+                      ((health.rescoreLog.contacts_processed ?? 0) /
+                       Math.max(1, health.rescoreLog.contacts_total ?? 1)) * 100
+                    ))}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Rescore complete */}
+          {health?.rescoreLog?.status === "completed" && (
+            <div className="text-micro text-foreground/30 flex items-center gap-1.5">
+              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+              Rescore complete ·{" "}
+              {health.rescoreLog.finished_at &&
+                formatDistanceToNow(new Date(health.rescoreLog.finished_at), { addSuffix: true })}
+            </div>
+          )}
+
+          {/* Rescore button */}
+          <button
+            onClick={() => rescoreAll.mutate()}
+            disabled={rescoreAll.isPending}
+            className="text-micro text-foreground/30 hover:text-foreground/60 transition-colors flex items-center gap-1"
+          >
+            {rescoreAll.isPending && <Loader2 className="w-3 h-3 animate-spin" />}
+            Rescore all companies
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
