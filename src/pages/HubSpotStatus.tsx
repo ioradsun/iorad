@@ -254,10 +254,6 @@ export default function HubSpotStatus() {
             {syncNow.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             Sync Now
           </Button>
-          <Button variant="outline" className="gap-1.5" onClick={() => fullRebuild.mutate()} disabled={fullRebuild.isPending}>
-            {fullRebuild.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
-            Full Rebuild
-          </Button>
         </div>
       </div>
 
