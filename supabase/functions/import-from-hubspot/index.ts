@@ -2573,7 +2573,7 @@ async function catchupContacts(supabase: any, afterParam: string | null) {
 
     // Save progress every 3 pages
     if (pagesProcessed % 3 === 0) {
-      const saveCursor = after ? cursorMs : lastSeenModified;
+      const saveCursor = lastSeenModified;
       await supabase.from("sync_checkpoints").upsert({
         key: "contact_catchup_cursor",
         value: saveCursor,
