@@ -413,3 +413,14 @@ function ExpansionSignalDot({ company }: { company: any }) {
     />
   );
 }
+
+function NewSignupDot({ createdAt }: { createdAt: string | null }) {
+  if (!createdAt) return null;
+  if (Date.now() - new Date(createdAt).getTime() >= TWENTY_FOUR_HOURS) return null;
+  return (
+    <span
+      className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"
+      title="New signup (last 24h)"
+    />
+  );
+}
