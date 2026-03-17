@@ -5,6 +5,7 @@ import { useCompanies, useCompaniesPage, useSignalCounts } from "@/hooks/useSupa
 import { ClearableInput } from "@/components/ui/clearable-input";
 import HubSpotPickerModal from "@/components/HubSpotPickerModal";
 import { PlanBadge } from "@/components/PlanBadge";
+import { formatDistanceToNow } from "date-fns";
 
 type SortKey = "name" | "scout_score";
 type StageTab = "prospect" | "opportunity" | "customer";
@@ -45,6 +46,7 @@ export default function Dashboard() {
   const activeStage = stageFromUrl;
   const [visibleCount, setVisibleCount] = useState(50);
   const [accountTypeFilter, setAccountTypeFilter] = useState<string>("all");
+  const [signalOnly, setSignalOnly] = useState(false);
 
   const { data: firstPage = [], isLoading: firstPageLoading } = useCompaniesPage(activeStage);
   const { data: fullList } = useCompanies();
@@ -68,8 +70,8 @@ export default function Dashboard() {
     list.sort((a, b) => {
       // For customer tab, float expansion_signal accounts to top
       if (activeStage === "customer") {
-        const aSignal = (a as any).scout_score_breakdown?.expansion_signal ? 1 : 0;
-        const bSignal = (b as any).scout_score_breakdown?.expansion_signal ? 1 : 0;
+        const aSignal = (a as any).expansion_signal ? 1 : 0;
+        const bSignal = (b as any).expansion_signal ? 1 : 0;
         if (bSignal !== aSignal) return bSignal - aSignal;
       }
 
@@ -107,12 +109,15 @@ export default function Dashboard() {
     if (accountTypeFilter !== "all") {
       list = list.filter(c => (c as any).account_type === accountTypeFilter);
     }
+    if (signalOnly) {
+      list = list.filter(c => (c as any).expansion_signal === true);
+    }
     return list;
-  }, [search, sorted, byStage, activeStage, accountTypeFilter]);
+  }, [search, sorted, byStage, activeStage, accountTypeFilter, signalOnly]);
 
   useEffect(() => {
     setVisibleCount(50);
-  }, [activeStage, search, accountTypeFilter]);
+  }, [activeStage, search, accountTypeFilter, signalOnly]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -190,6 +195,18 @@ export default function Dashboard() {
             {chip.label}
           </button>
         ))}
+        {activeStage === "customer" && (
+          <button
+            onClick={() => setSignalOnly(s => !s)}
+            className={`px-3 py-1 rounded-full text-micro font-medium transition-colors border ${
+              signalOnly
+                ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+                : "text-foreground/35 border-transparent hover:text-foreground/60"
+            }`}
+          >
+            Expansion signals only
+          </button>
+        )}
       </div>
 
       <div className="md:hidden space-y-2">
@@ -270,7 +287,7 @@ export default function Dashboard() {
                 <td className="px-5 py-3.5">
                   <div className="flex items-center gap-1">
                     <span className="font-medium text-body text-foreground">{company.name}</span>
-                    <ExpansionSignalDot breakdown={(company as any).scout_score_breakdown} />
+                    <ExpansionSignalDot company={company} />
                   </div>
                   {company.domain && (
                     <div className="text-caption text-foreground/45 mt-0.5">{company.domain}</div>
@@ -377,13 +394,15 @@ function ScoutBadge({ score }: { score: number | null }) {
 }
 
 
-function ExpansionSignalDot({ breakdown }: { breakdown: any }) {
-  const signal = breakdown?.expansion_signal;
-  if (!signal) return null;
+function ExpansionSignalDot({ company }: { company: any }) {
+  if (!company.expansion_signal) return null;
+  const since = company.expansion_signal_at
+    ? formatDistanceToNow(new Date(company.expansion_signal_at), { addSuffix: true })
+    : null;
   return (
     <span
       className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 ml-1.5"
-      title="Expansion signal: paid + free creators"
+      title={since ? `Expansion signal detected ${since}` : "Expansion signal: paid plan + active free creators"}
     />
   );
 }

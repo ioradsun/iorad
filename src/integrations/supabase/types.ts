@@ -202,6 +202,8 @@ export type Database = {
           clay_pushed_at: string | null
           created_at: string
           domain: string | null
+          expansion_signal: boolean
+          expansion_signal_at: string | null
           headcount: number | null
           hq_country: string | null
           hubspot_properties: Json | null
@@ -241,6 +243,8 @@ export type Database = {
           clay_pushed_at?: string | null
           created_at?: string
           domain?: string | null
+          expansion_signal?: boolean
+          expansion_signal_at?: string | null
           headcount?: number | null
           hq_country?: string | null
           hubspot_properties?: Json | null
@@ -280,6 +284,8 @@ export type Database = {
           clay_pushed_at?: string | null
           created_at?: string
           domain?: string | null
+          expansion_signal?: boolean
+          expansion_signal_at?: string | null
           headcount?: number | null
           hq_country?: string | null
           hubspot_properties?: Json | null
