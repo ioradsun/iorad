@@ -97,6 +97,12 @@ Deno.serve(async (req) => {
       const resumeFunction = resumeMeta.resume_function;
       const resumePayload = resumeMeta.resume_payload;
 
+      // Skip non-resumable job sources silently — they complete in one invocation
+      if (NON_RESUMABLE_SOURCES.includes(source)) {
+        skipped++;
+        continue;
+      }
+
       if (!resumeFunction || !resumePayload) {
         await supabase.from("sync_events").insert({
           source: "watchdog",
