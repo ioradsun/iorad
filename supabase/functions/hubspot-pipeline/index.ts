@@ -533,7 +533,8 @@ async function runPhase2(supabase: any, apiKey: string, jobId: string, snap: any
 // ── Scoring helpers (adapted from score-companies) ────────────────────────────
 interface ScoreBreakdown {
   tutorial: number; commercial: number; recency: number; intent: number;
-  expansion_signal: boolean; expansion_bonus: number; top_plan: string | null; total: number;
+  expansion_signal: boolean; expansion_bonus: number; pql_signal: boolean; pql_bonus: number;
+  top_plan: string | null; total: number;
 }
 
 const PAID_PLANS = ["team", "enterprise"];
