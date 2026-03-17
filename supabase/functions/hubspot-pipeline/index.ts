@@ -476,6 +476,11 @@ async function runPhase2(supabase: any, apiKey: string, jobId: string, snap: any
       const n = await importContactsForCompany(supabase, String(hubspotId), company.id, apiKey);
       if (n > 0) {
         contactsImported += n;
+        await logSyncEvent(supabase, {
+          source: "hubspot_pipeline", job_id: jobId, entity_type: "contact",
+          entity_name: `${n} contacts for ${company.name}`, action: "created",
+          meta: { phase: 2, contacts_imported: n, company_name: company.name },
+        });
       }
     } catch (e: any) {
       console.error(`phase2: contacts failed for ${company.name}: ${e.message}`);
