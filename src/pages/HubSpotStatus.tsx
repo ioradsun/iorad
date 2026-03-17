@@ -118,7 +118,6 @@ export default function HubSpotStatus() {
     queryKey: ["sync_health"],
     queryFn: async () => {
       const [
-        backfillLogRes,
         rescoreLogRes,
         companiesWithPlanRes,
         companiesNoPlanRes,
@@ -129,13 +128,6 @@ export default function HubSpotStatus() {
         hubspotCountRes,
         lastSyncRes,
       ] = await Promise.all([
-        (supabase as any)
-          .from("backfill_log")
-          .select("*")
-          .eq("job_type", "plan_names")
-          .order("started_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
         (supabase as any)
           .from("backfill_log")
           .select("*")
@@ -184,7 +176,6 @@ export default function HubSpotStatus() {
       const lastSyncData = lastSyncRes?.data;
 
       return {
-        backfill: backfillLogRes.data,
         rescoreLog: rescoreLogRes.data,
         companiesWithPlan: companiesWithPlanRes.count ?? 0,
         companiesNoPlan: companiesNoPlanRes.count ?? 0,
@@ -202,7 +193,6 @@ export default function HubSpotStatus() {
     },
     refetchInterval: (query) => {
       const d = query.state.data;
-      if (d?.backfill?.status === "running") return 2_000;
       if (d?.rescoreLog?.status === "running") return 2_000;
       return 30_000;
     },
