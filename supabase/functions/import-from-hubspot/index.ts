@@ -1040,26 +1040,28 @@ async function processContactPage(
       }).eq("id", companyId);
     }
 
-    // Auto-trigger scoring + brief generation on product activity
-    if (hasProductActivity) {
-      const supabaseUrl2 = Deno.env.get("SUPABASE_URL")!;
-      const serviceKey2 = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    // Auto-trigger scoring + brief generation on product activity (skip during bulk catchup)
+    if (!opts?.skipScoring) {
+      if (hasProductActivity) {
+        const supabaseUrl2 = Deno.env.get("SUPABASE_URL")!;
+        const serviceKey2 = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-      fetch(`${supabaseUrl2}/functions/v1/score-companies`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${serviceKey2}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "score_one", company_id: companyId }),
-      }).catch(e => console.warn("auto-score failed:", e.message));
+        fetch(`${supabaseUrl2}/functions/v1/score-companies`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${serviceKey2}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "score_one", company_id: companyId }),
+        }).catch(e => console.warn("auto-score failed:", e.message));
 
-      fetch(`${supabaseUrl2}/functions/v1/generate-cards`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${serviceKey2}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ company_id: companyId, tab: "strategy", auto_triggered: true }),
-      }).catch(e => console.warn("auto-brief failed:", e.message));
+        fetch(`${supabaseUrl2}/functions/v1/generate-cards`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${serviceKey2}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ company_id: companyId, tab: "strategy", auto_triggered: true }),
+        }).catch(e => console.warn("auto-brief failed:", e.message));
 
-      console.log(`sync_contacts: product_activity detected for company ${companyId} — auto-score + auto-brief triggered`);
-    } else {
-      scoreCompanyAsync(companyId);
+        console.log(`sync_contacts: product_activity detected for company ${companyId} — auto-score + auto-brief triggered`);
+      } else {
+        scoreCompanyAsync(companyId);
+      }
     }
 
     processed += rows.length;
