@@ -46,7 +46,7 @@ const CONTACT_PROPS = [
 const FREE_EMAIL_DOMAINS = ["gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "aol.com", "icloud.com", "live.com"];
 const PAID_PLANS = ["team", "enterprise"];
 const DAY = 86_400_000;
-const MAX_CONTACTS_PER_RUN = 50; // Cap to stay within CPU limits
+const MAX_CONTACTS_PER_RUN = 50;
 
 function normalizePlan(raw: string | null): string | null {
   if (!raw) return null;
@@ -54,6 +54,162 @@ function normalizePlan(raw: string | null): string | null {
   if (l.includes("enterprise")) return "Enterprise";
   if (l.includes("team")) return "Team";
   if (l.includes("free")) return "Free";
+  return null;
+}
+
+// ── Fetch a HubSpot company by ID and create it in our DB ─────────────────
+async function fetchAndCreateCompany(
+  supabase: any,
+  apiKey: string,
+  hsCompanyId: string,
+): Promise<{ id: string; name: string } | null> {
+  try {
+    const res = await hubspotFetch(
+      "https://api.hubapi.com/crm/v3/objects/companies/batch/read",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          inputs: [{ id: hsCompanyId }],
+          properties: [
+            "name", "domain", "industry", "country", "numberofemployees",
+            "lifecyclestage", "hs_object_id", "createdate",
+          ],
+        }),
+      },
+    );
+
+    if (!res.ok) {
+      const text = await res.text();
+      console.warn(`Failed to fetch HS company ${hsCompanyId}: ${res.status} ${text.slice(0, 100)}`);
+      return null;
+    }
+
+    const data = await res.json();
+    const hs = data.results?.[0];
+    if (!hs) return null;
+
+    const p = hs.properties || {};
+    const name = p.name || `Company ${hsCompanyId}`;
+    const domain = (p.domain || "").toLowerCase().replace(/^www\./, "").replace(/\/$/, "") || null;
+    const headcount = parseInt(p.numberofemployees || "0", 10) || null;
+
+    // Determine if this is a school/edu
+    const isEdu = domain && (/\.edu$|\.edu\.|\.k12\.|\.ac\./.test(domain));
+    const accountType = isEdu ? "school" : "company";
+
+    // Check if company already exists by domain
+    if (domain) {
+      const { data: existing } = await supabase
+        .from("companies")
+        .select("id, name")
+        .eq("domain", domain)
+        .limit(1)
+        .maybeSingle();
+      if (existing) {
+        // Update hubspot_properties with hs_object_id for future lookups
+        await supabase.from("companies").update({
+          hubspot_properties: { hs_object_id: String(hs.id) },
+        }).eq("id", existing.id);
+        return existing;
+      }
+    }
+
+    // Create the company
+    const { data: newCompany, error } = await supabase
+      .from("companies")
+      .insert({
+        name,
+        domain,
+        industry: p.industry || null,
+        hq_country: p.country || null,
+        headcount,
+        account_type: accountType,
+        hubspot_properties: { hs_object_id: String(hs.id) },
+        source_type: "inbound",
+        lifecycle_stage: "prospect",
+        sales_motion: "new-logo",
+        brief_type: "prospectBrief",
+      })
+      .select("id, name")
+      .single();
+
+    if (error) {
+      console.warn(`Failed to insert company ${name}: ${error.message}`);
+      return null;
+    }
+
+    console.log(`watch-signups: created company "${name}" (${newCompany.id}) from HS ${hsCompanyId}`);
+
+    await logSyncEvent(supabase, {
+      source: "watch_signups", entity_type: "company",
+      entity_id: newCompany.id, entity_name: name,
+      action: "created", meta: { hubspot_id: hsCompanyId },
+    });
+
+    return newCompany;
+  } catch (err: any) {
+    console.warn(`fetchAndCreateCompany error for ${hsCompanyId}: ${err.message}`);
+    return null;
+  }
+}
+
+// ── Resolve a contact's company — DB lookup first, then HubSpot fetch ─────
+async function resolveCompany(
+  supabase: any,
+  apiKey: string,
+  hsCompanyId: string | null,
+  email: string | null,
+  companyByDomain: Record<string, string>,
+): Promise<string | null> {
+  // 1. Try domain match from email
+  if (email?.includes("@")) {
+    const domain = email.split("@")[1];
+    if (domain && !FREE_EMAIL_DOMAINS.includes(domain) && companyByDomain[domain]) {
+      return companyByDomain[domain];
+    }
+  }
+
+  // 2. Try DB lookup by hubspot_properties->hs_object_id
+  if (hsCompanyId) {
+    // Targeted query instead of loading all companies
+    const { data: matches } = await supabase
+      .from("companies")
+      .select("id")
+      .contains("hubspot_properties", { hs_object_id: hsCompanyId })
+      .limit(1);
+
+    if (matches && matches.length > 0) return matches[0].id;
+
+    // 3. Not in DB — fetch from HubSpot and create
+    const created = await fetchAndCreateCompany(supabase, apiKey, hsCompanyId);
+    if (created) {
+      // Also try domain match for future contacts
+      return created.id;
+    }
+  }
+
+  // 4. Try domain match by creating company from email domain
+  if (email?.includes("@")) {
+    const domain = email.split("@")[1];
+    if (domain && !FREE_EMAIL_DOMAINS.includes(domain)) {
+      // Check DB by domain
+      const { data: domainMatch } = await supabase
+        .from("companies")
+        .select("id")
+        .eq("domain", domain)
+        .limit(1)
+        .maybeSingle();
+      if (domainMatch) {
+        companyByDomain[domain] = domainMatch.id;
+        return domainMatch.id;
+      }
+    }
+  }
+
   return null;
 }
 
@@ -79,7 +235,7 @@ Deno.serve(async (req) => {
       action: "job_start", meta: { hours_back: hoursBack },
     });
 
-    // ── Step 1: Find recently created contacts in HubSpot (single page) ───
+    // ── Step 1: Find recently created contacts in HubSpot ─────────────────
     const searchBody: any = {
       filterGroups: [{
         filters: [{
@@ -116,28 +272,26 @@ Deno.serve(async (req) => {
     console.log(`watch-signups: found ${newSignups.length} new contacts`);
 
     if (newSignups.length === 0) {
+      await logSyncEvent(supabase, {
+        source: "watch_signups", entity_type: "contact",
+        action: "job_complete", meta: { signups_found: 0 },
+      });
       return new Response(
         JSON.stringify({ success: true, signups_found: 0, message: "No new signups in window" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // ── Step 2: Batch-load company lookup data ────────────────────────────
-    // Collect all HubSpot company IDs and email domains we need to resolve
-    const hsCompanyIds = new Set<string>();
+    // ── Step 2: Batch-load company lookup data by domain ──────────────────
     const emailDomains = new Set<string>();
-
     for (const contact of newSignups) {
-      const cp = contact.properties || {};
-      if (cp.associatedcompanyid) hsCompanyIds.add(String(cp.associatedcompanyid));
-      const email = cp.email || "";
+      const email = (contact.properties || {}).email || "";
       if (email.includes("@")) {
         const domain = email.split("@")[1];
         if (domain && !FREE_EMAIL_DOMAINS.includes(domain)) emailDomains.add(domain);
       }
     }
 
-    // Load companies by domain (batch)
     const companyByDomain: Record<string, string> = {};
     if (emailDomains.size > 0) {
       const { data: domainCompanies } = await supabase
@@ -149,25 +303,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Load companies by hubspot hs_object_id (batch) — stored in hubspot_properties jsonb
-    const companyByHsId: Record<string, { id: string; expansion_signal_at: string | null }> = {};
-    if (hsCompanyIds.size > 0) {
-      // Companies table doesn't have hubspot_object_id column, so query all and filter
-      // But limit to avoid huge scans — use domain match as primary, hs_id as fallback
-      const { data: allCompanies } = await supabase
-        .from("companies")
-        .select("id, hubspot_properties, expansion_signal_at")
-        .limit(1000);
-
-      for (const c of allCompanies || []) {
-        const hp = (c.hubspot_properties as any) || {};
-        const hsId = String(hp.hs_object_id || "");
-        if (hsId && hsCompanyIds.has(hsId)) {
-          companyByHsId[hsId] = { id: c.id, expansion_signal_at: c.expansion_signal_at };
-        }
-      }
-    }
-
     // ── Step 3: Process each signup ───────────────────────────────────────
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -176,15 +311,12 @@ Deno.serve(async (req) => {
     let expansionCount = 0;
     let watchlistCount = 0;
     let skipped = 0;
-    const errors: string[] = [];
+    let companiesCreated = 0;
 
-    // Batch: collect all contact upserts and company updates
     const contactUpserts: any[] = [];
     const companyUpdates: Map<string, any> = new Map();
     const companiesToScore: string[] = [];
     const companiesToBrief: string[] = [];
-
-    // Pre-load contacts for companies we'll need to classify
     const companyIdsToClassify = new Set<string>();
 
     for (const contact of newSignups) {
@@ -193,37 +325,24 @@ Deno.serve(async (req) => {
       if (!name) { skipped++; continue; }
 
       const hsCompanyId = cp.associatedcompanyid ? String(cp.associatedcompanyid) : null;
-      let companyId: string | null = null;
-      let existingExpansionAt: string | null = null;
+      const email = cp.email || null;
 
-      if (hsCompanyId && companyByHsId[hsCompanyId]) {
-        companyId = companyByHsId[hsCompanyId].id;
-        existingExpansionAt = companyByHsId[hsCompanyId].expansion_signal_at;
-      } else if (!hsCompanyId) {
-        const email = cp.email || "";
-        const domain = email.includes("@") ? email.split("@")[1] : null;
-        if (domain && companyByDomain[domain]) {
-          companyId = companyByDomain[domain];
-        }
-      } else {
-        // Company not in DB — fire async import, skip
-        fetch(`${supabaseUrl}/functions/v1/import-from-hubspot`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "import_company", hubspot_id: hsCompanyId }),
-        }).catch(() => {});
+      // Resolve company — will create from HubSpot if needed
+      const companyId = await resolveCompany(supabase, apiKey, hsCompanyId, email, companyByDomain);
+
+      if (!companyId) {
+        console.log(`watch-signups: skipping "${name}" — no company resolved (hs=${hsCompanyId}, email=${email})`);
         skipped++;
         continue;
       }
 
-      if (!companyId) { skipped++; continue; }
       companyIdsToClassify.add(companyId);
 
       const hsObjectId = String(contact.id || cp.hs_object_id || "").trim() || null;
       contactUpserts.push({
         company_id: companyId,
         name,
-        email: cp.email || null,
+        email,
         title: cp.jobtitle || null,
         source: "hubspot",
         hubspot_object_id: hsObjectId,
@@ -235,21 +354,17 @@ Deno.serve(async (req) => {
           extension_connections: cp.extension_connections || null,
           hs_object_id: hsObjectId,
         },
-        _meta: { companyId, existingExpansionAt, contactName: name },
+        _meta: { companyId, contactName: name },
       });
     }
 
-    // Batch upsert contacts (strip _meta first)
+    // Batch upsert contacts
     if (contactUpserts.length > 0) {
       const toInsert = contactUpserts.map(({ _meta, ...rest }) => rest);
-
-      // Upsert in chunks of 20 to avoid payload limits
       for (let i = 0; i < toInsert.length; i += 20) {
         const chunk = toInsert.slice(i, i + 20);
-        // Try upsert by hubspot_object_id — for those without, just insert
         const withHsId = chunk.filter(c => c.hubspot_object_id);
         const withoutHsId = chunk.filter(c => !c.hubspot_object_id);
-
         if (withHsId.length) {
           await supabase.from("contacts").upsert(withHsId, {
             onConflict: "company_id,hubspot_object_id",
@@ -266,14 +381,12 @@ Deno.serve(async (req) => {
     const companyContactsMap: Record<string, any[]> = {};
     if (companyIdsToClassify.size > 0) {
       const ids = [...companyIdsToClassify];
-      // Load in batches of 50 company IDs
       for (let i = 0; i < ids.length; i += 50) {
         const batch = ids.slice(i, i + 50);
         const { data: contacts } = await supabase
           .from("contacts")
           .select("company_id, hubspot_properties")
           .in("company_id", batch);
-
         for (const c of contacts || []) {
           if (!companyContactsMap[c.company_id]) companyContactsMap[c.company_id] = [];
           companyContactsMap[c.company_id].push(c);
@@ -284,7 +397,7 @@ Deno.serve(async (req) => {
     // Classify each signup
     const now = Date.now();
     for (const upsert of contactUpserts) {
-      const { companyId, existingExpansionAt, contactName } = upsert._meta;
+      const { companyId, contactName } = upsert._meta;
       const companyContacts = companyContactsMap[companyId] || [];
 
       const hasPaidContact = companyContacts.some((c: any) => {
@@ -319,7 +432,7 @@ Deno.serve(async (req) => {
       if (isExpansion) {
         expansionCount++;
         updates.expansion_signal = true;
-        updates.expansion_signal_at = existingExpansionAt || new Date().toISOString();
+        updates.expansion_signal_at = new Date().toISOString();
         if (!companiesToScore.includes(companyId)) companiesToScore.push(companyId);
         if (!companiesToBrief.includes(companyId)) companiesToBrief.push(companyId);
         console.log(`watch-signups: EXPANSION — ${contactName} at ${companyId}`);
@@ -365,7 +478,15 @@ Deno.serve(async (req) => {
     await logSyncEvent(supabase, {
       source: "watch_signups", entity_type: "contact",
       action: "job_complete",
-      meta: { signups_found: newSignups.length, expansion: expansionCount, pql: pqlCount, watchlist: watchlistCount },
+      meta: {
+        signups_found: newSignups.length,
+        processed: contactUpserts.length,
+        skipped,
+        companies_created: companiesCreated,
+        expansion: expansionCount,
+        pql: pqlCount,
+        watchlist: watchlistCount,
+      },
     });
 
     return new Response(
@@ -374,10 +495,10 @@ Deno.serve(async (req) => {
         signups_found: newSignups.length,
         processed: contactUpserts.length,
         skipped,
+        companies_created: companiesCreated,
         expansion: expansionCount,
         pql: pqlCount,
         watchlist: watchlistCount,
-        errors: errors.slice(0, 10),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
