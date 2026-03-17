@@ -109,8 +109,11 @@ export default function Dashboard() {
     if (accountTypeFilter !== "all") {
       list = list.filter(c => (c as any).account_type === accountTypeFilter);
     }
+    if (signalOnly) {
+      list = list.filter(c => (c as any).expansion_signal === true);
+    }
     return list;
-  }, [search, sorted, byStage, activeStage, accountTypeFilter]);
+  }, [search, sorted, byStage, activeStage, accountTypeFilter, signalOnly]);
 
   useEffect(() => {
     setVisibleCount(50);
