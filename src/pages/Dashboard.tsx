@@ -5,6 +5,7 @@ import { useCompanies, useCompaniesPage, useSignalCounts } from "@/hooks/useSupa
 import { ClearableInput } from "@/components/ui/clearable-input";
 import HubSpotPickerModal from "@/components/HubSpotPickerModal";
 import { PlanBadge } from "@/components/PlanBadge";
+import { formatDistanceToNow } from "date-fns";
 
 type SortKey = "name" | "scout_score";
 type StageTab = "prospect" | "opportunity" | "customer";
