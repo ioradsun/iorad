@@ -334,6 +334,7 @@ async function scoreOneCompany(
     expansion_signal_at: breakdown.expansion_signal
       ? (company.expansion_signal_at || new Date().toISOString())
       : null,
+    pql_signal: breakdown.pql_signal,
   };
   if (summary) updateData.scout_summary = summary;
 
