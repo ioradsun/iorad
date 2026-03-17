@@ -514,14 +514,7 @@ export default function HubSpotStatus() {
               </div>
               {syncHealth.contactsNoPlan > 0 && (
                 <div className="text-micro text-foreground/30 mt-1">
-                  {syncHealth.contactsNoPlan.toLocaleString()} contacts missing plan —{" "}
-                  <button
-                    onClick={() => backfillPlans.mutate()}
-                    disabled={backfillPlans.isPending}
-                    className="text-primary hover:text-primary/80 transition-colors"
-                  >
-                    run backfill
-                  </button>
+                  {syncHealth.contactsNoPlan.toLocaleString()} contacts missing plan
                 </div>
               )}
             </div>
