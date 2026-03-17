@@ -442,6 +442,19 @@ export default function HubSpotStatus() {
             </div>
           )}
 
+          {/* Rescore All — recovery action */}
+          <div className="flex items-center justify-between py-2 border-b border-border/20">
+            <span className="text-caption text-foreground/50">Recovery</span>
+            <button
+              onClick={() => rescoreAll.mutate()}
+              disabled={rescoreAll.isPending}
+              className="text-micro text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
+            >
+              {rescoreAll.isPending && <Loader2 className="w-3 h-3 animate-spin" />}
+              Rescore All Companies
+            </button>
+          </div>
+
           {/* Coverage grid */}
           <div className="grid grid-cols-2 gap-x-8 gap-y-3">
             {/* Plan coverage */}
