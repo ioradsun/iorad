@@ -1018,8 +1018,8 @@ async function processContactPage(
     if (toInsert.length > 0) {
       const { error } = await supabase
         .from("contacts")
-        .upsert(toInsert, { onConflict: "company_id,hubspot_object_id", ignoreDuplicates: false });
-      if (error) console.warn(`sync_contacts: upsert error for company ${companyId}: ${error.message}`);
+        .insert(toInsert);
+      if (error) console.warn(`sync_contacts: insert error for company ${companyId}: ${error.message}`);
     }
 
     if (toUpdate.length > 0) {
