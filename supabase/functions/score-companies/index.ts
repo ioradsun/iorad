@@ -480,10 +480,38 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ── auto_sync ───────────────────────────────────────────────────────────
+    // ── auto_sync (legacy — kept for backwards compat) ────────────────────
     if (action === "auto_sync") {
       const hoursBack = body.hours_back || 12;
       return await autoSync(supabase, systemPrompt, hoursBack);
+    }
+
+    // ── score_recent — score companies updated in the last N hours ────────
+    if (action === "score_recent") {
+      const hoursBack = body.hours_back || 2;
+      const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
+
+      const { data: recentCompanies } = await supabase
+        .from("companies")
+        .select("id")
+        .gte("updated_at", since)
+        .order("updated_at", { ascending: false })
+        .limit(500);
+
+      let scored = 0;
+      for (const c of recentCompanies || []) {
+        try {
+          await scoreOneCompany(supabase, c.id, systemPrompt);
+          scored++;
+        } catch (err: any) {
+          console.warn(`score_recent error for ${c.id}: ${err.message}`);
+        }
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, scored, total: recentCompanies?.length || 0 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // ── score_all ───────────────────────────────────────────────────────────

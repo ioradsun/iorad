@@ -192,33 +192,28 @@ export default function HubSpotStatus() {
   // Mutations
   const syncNow = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.functions.invoke("hubspot-daily-sync", { body: { hours_back: 24 } });
+      const { error } = await supabase.functions.invoke("hubspot-daily-sync", { body: { hours_back: 2 } });
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Sync triggered");
+      toast.success("Sync triggered — contacts → scoring → signups");
       qc.invalidateQueries({ queryKey: ["sync_events_initial"] });
       qc.invalidateQueries({ queryKey: ["sync_counts"] });
+      qc.invalidateQueries({ queryKey: ["sync_health"] });
     },
     onError: (err: any) => toast.error(`Sync failed: ${err?.message}`),
   });
 
-  const watchSignups = useMutation({
+  const fullRebuild = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("watch-signups", {
-        body: { hours_back: 24 },
-      });
+      const { error } = await supabase.functions.invoke("hubspot-pipeline", {});
       if (error) throw error;
-      return data;
     },
-    onSuccess: (data: any) => {
+    onSuccess: () => {
+      toast.success("Full rebuild started — this takes 10-20 minutes");
       qc.invalidateQueries({ queryKey: ["sync_events_initial"] });
-      qc.invalidateQueries({ queryKey: ["sync_health"] });
-      toast.success(
-        `Signups: ${data.signups_found} found · ${data.expansion} expansion · ${data.pql} PQL · ${data.watchlist} watching`
-      );
     },
-    onError: (err: any) => toast.error(`Watch signups failed: ${err?.message}`),
+    onError: (err: any) => toast.error(`Rebuild failed: ${err?.message}`),
   });
 
   const backfillPlans = useMutation({
@@ -246,7 +241,7 @@ export default function HubSpotStatus() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sync_health"] });
-      toast.success("Full rescore started — companies with plan will update over the next few minutes");
+      toast.success("Full rescore started — companies will update over the next few minutes");
     },
     onError: (err: any) => toast.error(`Rescore failed: ${err?.message}`),
   });
