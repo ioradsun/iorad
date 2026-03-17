@@ -223,6 +223,20 @@ export default function HubSpotStatus() {
     onError: (err: any) => toast.error(`Backfill failed: ${err?.message}`),
   });
 
+  const rescoreAll = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.functions.invoke("score-companies", {
+        body: { action: "score_all", offset: 0 },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sync_health"] });
+      toast.success("Full rescore started — companies with plan will update over the next few minutes");
+    },
+    onError: (err: any) => toast.error(`Rescore failed: ${err?.message}`),
+  });
+
   // Derived state
   const lastEvent = events[0] || null;
   const lastEventAge = lastEvent
