@@ -2454,32 +2454,27 @@ async function fixMissingContacts(
 }
 
 // ── Catchup: one-time sweep of all 2-year active contacts ──────────────────
-// Pages through contacts in 30-day windows from 2 years ago to now.
-// Self-chains continuously until caught up, then marks itself complete.
+// Simple cursor-based: searches ALL contacts modified in last 2 years, sorted ASC,
+// pages through 500 per invocation using HubSpot's `after` cursor.
+// When HubSpot's 10k search limit is hit, advances the date cursor from the last
+// contact's lastmodifieddate and starts fresh pagination.
 async function catchupContacts(supabase: any, afterParam: string | null) {
   const apiKey = Deno.env.get("HUBSPOT_API_KEY");
   if (!apiKey) throw new Error("HUBSPOT_API_KEY not configured");
 
-  const TWO_YEARS_AGO = new Date(
-    Date.now() - 2 * 365 * 24 * 60 * 60 * 1000
-  ).toISOString();
+  const TWO_YEARS_AGO_MS = String(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000);
 
-  // Read catchup cursor — starts from 2 years ago, advances forward
+  // Cursor is the lastmodifieddate millis of where we left off
   const { data: cursorRow } = await supabase
     .from("sync_checkpoints")
     .select("value")
     .eq("key", "contact_catchup_cursor")
     .maybeSingle();
 
-  const cursor = cursorRow?.value || TWO_YEARS_AGO;
+  const cursorMs = cursorRow?.value || TWO_YEARS_AGO_MS;
 
-  // If cursor has passed now, catchup is complete
-  if (cursor > new Date().toISOString()) {
-    await supabase.from("sync_checkpoints").upsert({
-      key: "contact_catchup_status",
-      value: "complete",
-      updated_at: new Date().toISOString(),
-    });
+  // Check if complete (cursor stored as "complete" sentinel)
+  if (cursorMs === "complete") {
     return new Response(
       JSON.stringify({ success: true, status: "complete" }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -2503,35 +2498,24 @@ async function catchupContacts(supabase: any, afterParam: string | null) {
     "first_embed_base_domain_name",
   ];
 
-  const windowEnd = new Date(
-    new Date(cursor).getTime() + 30 * 24 * 60 * 60 * 1000
-  ).toISOString();
-
-  const PAGE_SIZE = 100;
-  const MAX_PAGES = 5; // 500 contacts per invocation
+  const PAGE_SIZE = 50;
+  const MAX_PAGES = 1; // 50 contacts per invocation — processContactPage is heavy
   let after: string | null = afterParam;
   let totalProcessed = 0;
-  let latestModified = cursor;
+  let lastSeenModified = cursorMs;
   let pageCount = 0;
 
   while (pageCount < MAX_PAGES) {
     const searchBody: any = {
       filterGroups: [{
-        filters: [
-          {
-            propertyName: "hs_lastmodifieddate",
-            operator: "GTE",
-            value: cursor,
-          },
-          {
-            propertyName: "hs_lastmodifieddate",
-            operator: "LT",
-            value: windowEnd,
-          },
-        ],
+        filters: [{
+          propertyName: "lastmodifieddate",
+          operator: "GTE",
+          value: cursorMs,
+        }],
       }],
       properties: CONTACT_PROPS,
-      sorts: [{ propertyName: "hs_lastmodifieddate", direction: "ASCENDING" }],
+      sorts: [{ propertyName: "lastmodifieddate", direction: "ASCENDING" }],
       limit: PAGE_SIZE,
     };
     if (after) searchBody.after = after;
@@ -2547,27 +2531,53 @@ async function catchupContacts(supabase: any, afterParam: string | null) {
 
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`HubSpot catchup search failed [${res.status}]: ${text.slice(0, 200)}`);
+      throw new Error(`HubSpot catchup failed [${res.status}]: ${text.slice(0, 200)}`);
     }
 
     const data = await res.json();
     const contacts = data.results || [];
-    if (contacts.length === 0) break;
 
-    const { processed, newest } = await processContactPage(supabase, contacts, apiKey);
+    if (contacts.length === 0) {
+      // No more contacts — catchup is complete
+      await supabase.from("sync_checkpoints").upsert({
+        key: "contact_catchup_cursor", value: "complete",
+        updated_at: new Date().toISOString(),
+      });
+      await supabase.from("sync_checkpoints").upsert({
+        key: "contact_catchup_status", value: "complete",
+        updated_at: new Date().toISOString(),
+      });
+      console.log(`catchup_contacts: COMPLETE after ${totalProcessed} this run`);
+      return new Response(
+        JSON.stringify({ success: true, status: "complete", processed: totalProcessed }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { processed } = await processContactPage(supabase, contacts, apiKey);
     totalProcessed += processed;
-    if (newest > latestModified) latestModified = newest;
-
-    after = data.paging?.next?.after || null;
     pageCount++;
 
-    if (!after) break;
+    // Track the lastmodifieddate of the last contact for cursor advancement
+    const lastContact = contacts[contacts.length - 1];
+    const lastMod = lastContact?.properties?.lastmodifieddate || lastContact?.properties?.hs_lastmodifieddate;
+    if (lastMod) {
+      // Convert to millis if it's an ISO string
+      const ms = isNaN(Number(lastMod)) ? new Date(lastMod).getTime() : Number(lastMod);
+      if (ms > Number(lastSeenModified)) lastSeenModified = String(ms);
+    }
+
+    after = data.paging?.next?.after || null;
+    if (!after) {
+      // HubSpot search hit 10k limit or no more pages
+      // Advance cursor to lastSeenModified and reset pagination
+      break;
+    }
   }
 
-  // Advance cursor: if still paging within window, stay; otherwise move to next window
-  const nextCursor = after
-    ? latestModified
-    : windowEnd;
+  // Determine next cursor: if after is set, keep same cursor (more pages).
+  // If after is null, advance cursor to lastSeenModified.
+  const nextCursor = after ? cursorMs : lastSeenModified;
 
   await supabase.from("sync_checkpoints").upsert({
     key: "contact_catchup_cursor",
@@ -2575,19 +2585,20 @@ async function catchupContacts(supabase: any, afterParam: string | null) {
     updated_at: new Date().toISOString(),
   });
 
+  const cursorDate = new Date(Number(nextCursor)).toISOString().slice(0, 10);
   await supabase.from("sync_checkpoints").upsert({
     key: "contact_catchup_status",
     value: JSON.stringify({
-      cursor: nextCursor,
+      cursor: cursorDate,
       processed_this_run: totalProcessed,
       at: new Date().toISOString(),
     }),
     updated_at: new Date().toISOString(),
   });
 
-  console.log(`catchup_contacts: processed ${totalProcessed}, cursor=${nextCursor}, has_more=${after ? "page" : "window"}`);
+  console.log(`catchup_contacts: processed ${totalProcessed}, cursor=${cursorDate}`);
 
-  // Self-chain immediately — keep processing until caught up
+  // Self-chain to continue
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   fetch(`${supabaseUrl}/functions/v1/import-from-hubspot`, {
@@ -2597,7 +2608,7 @@ async function catchupContacts(supabase: any, afterParam: string | null) {
   }).catch(e => console.warn("catchup self-chain failed:", e.message));
 
   return new Response(
-    JSON.stringify({ success: true, processed: totalProcessed, cursor: nextCursor }),
+    JSON.stringify({ success: true, processed: totalProcessed, cursor: cursorDate }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 }
