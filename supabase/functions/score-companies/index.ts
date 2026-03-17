@@ -178,7 +178,17 @@ function calculateScoutScore(
   const hasFreeCreator = contacts.some((c: any) => {
     const hp = (c.hubspot_properties as any) || {};
     const plan = normalizePlan(hp.plan_name || null);
-    return plan?.toLowerCase() === "free" && !!hp.first_tutorial_create_date;
+    if (plan?.toLowerCase() !== "free") return false;
+
+    // Active this month — strongest signal
+    const monthlyAnswers = parseInt(hp.answers_with_own_tutorial_month_count || "0", 10);
+    if (monthlyAnswers > 0) return true;
+
+    // Created a tutorial within 90 days — still warm
+    const createDate = hp.first_tutorial_create_date;
+    if (createDate && (now - new Date(createDate).getTime()) <= 90 * DAY) return true;
+
+    return false;
   });
 
   const expansion_signal = hasPaidContact && hasFreeCreator;
