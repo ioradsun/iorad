@@ -131,9 +131,9 @@ Deno.serve(async (req) => {
       const apiKey = Deno.env.get("HUBSPOT_API_KEY");
       if (!apiKey) throw new Error("HUBSPOT_API_KEY not configured");
 
-      const TWO_YEARS_AGO = String(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000);
+      const ONE_YEAR_AGO = String(Date.now() - 365 * 24 * 60 * 60 * 1000);
 
-      // Count contacts active in last 2 years using the same filter as sync
+      // Count contacts active in last year using the same filter as sync
       const searchRes = await hubspotFetch(
         "https://api.hubapi.com/crm/v3/objects/contacts/search",
         {
@@ -144,7 +144,7 @@ Deno.serve(async (req) => {
               filters: [{
                 propertyName: "lastmodifieddate",
                 operator: "GTE",
-                value: TWO_YEARS_AGO,
+                value: ONE_YEAR_AGO,
               }],
             }],
             limit: 1,
@@ -168,12 +168,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    // HubSpot total company count (active 2 years) — for sync completeness display
+    // HubSpot total company count (active 1 year) — for sync completeness display
     if (body.action === "company_count") {
       const apiKey = Deno.env.get("HUBSPOT_API_KEY");
       if (!apiKey) throw new Error("HUBSPOT_API_KEY not configured");
 
-      const TWO_YEARS_AGO = String(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000);
+      const ONE_YEAR_AGO = String(Date.now() - 365 * 24 * 60 * 60 * 1000);
 
       const searchRes = await hubspotFetch(
         "https://api.hubapi.com/crm/v3/objects/companies/search",
@@ -185,7 +185,7 @@ Deno.serve(async (req) => {
               filters: [{
                 propertyName: "hs_lastmodifieddate",
                 operator: "GTE",
-                value: TWO_YEARS_AGO,
+                value: ONE_YEAR_AGO,
               }],
             }],
             limit: 1,
@@ -227,7 +227,7 @@ Deno.serve(async (req) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // ── Catchup: one-time sweep of all 2-year active contacts ──────────────
+    // ── Catchup: one-time sweep of all 1-year active contacts ──────────────
     if (body.action === "catchup_contacts") {
       return await catchupContacts(supabase, body.after || null);
     }
@@ -542,7 +542,7 @@ async function syncContactsIncremental(supabase: any) {
   const MAX_PAGES = 5; // Process up to 500 contacts per invocation
 
   while (pageCount < MAX_PAGES) {
-    const TWO_YEARS_AGO = new Date(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000).toISOString();
+    const ONE_YEAR_AGO = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
 
     const searchBody: any = {
       filterGroups: [{
@@ -555,7 +555,7 @@ async function syncContactsIncremental(supabase: any) {
           {
             propertyName: "hs_lastmodifieddate",
             operator: "GTE",
-            value: TWO_YEARS_AGO,
+            value: ONE_YEAR_AGO,
           },
         ],
       }],
@@ -2453,7 +2453,7 @@ async function fixMissingContacts(
   );
 }
 
-// ── Catchup: one-time full sweep of 2-year active contacts ─────────────────
+// ── Catchup: one-time full sweep of 1-year active contacts ─────────────────
 // Uses a time budget (45s) to process as many contacts as possible per invocation.
 // No self-chaining — the UI auto-triggers the next batch while status != complete.
 async function catchupContacts(supabase: any, afterParam: string | null) {
@@ -2463,7 +2463,7 @@ async function catchupContacts(supabase: any, afterParam: string | null) {
   const startTime = Date.now();
   const TIME_BUDGET_MS = 45_000; // 45s — leave buffer for edge function timeout
 
-  const TWO_YEARS_AGO_MS = String(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000);
+  const ONE_YEAR_AGO_MS = String(Date.now() - 365 * 24 * 60 * 60 * 1000);
 
   const { data: cursorRow } = await supabase
     .from("sync_checkpoints")
@@ -2471,7 +2471,7 @@ async function catchupContacts(supabase: any, afterParam: string | null) {
     .eq("key", "contact_catchup_cursor")
     .maybeSingle();
 
-  let cursorMs = cursorRow?.value || TWO_YEARS_AGO_MS;
+  let cursorMs = cursorRow?.value || ONE_YEAR_AGO_MS;
 
   if (cursorMs === "complete") {
     return new Response(
