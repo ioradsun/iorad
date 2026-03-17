@@ -117,6 +117,7 @@ export default function HubSpotStatus() {
         lastSyncRes,
         expansionRes, pqlRes,
         rescoreRes,
+        catchupRes,
       ] = await Promise.all([
         supabase.from("contacts").select("id", { count: "exact", head: true }),
         supabase.from("companies").select("id", { count: "exact", head: true }),
@@ -126,6 +127,7 @@ export default function HubSpotStatus() {
         supabase.from("companies").select("id", { count: "exact", head: true }).eq("expansion_signal", true),
         supabase.from("companies").select("id", { count: "exact", head: true }).eq("pql_signal", true),
         (supabase as any).from("backfill_log").select("*").eq("job_type", "score_all").order("started_at", { ascending: false }).limit(1).maybeSingle(),
+        (supabase as any).from("sync_checkpoints").select("value, updated_at").eq("key", "contact_catchup_status").maybeSingle(),
       ]);
 
       const dbContacts  = dbContactsRes.count  ?? 0;
@@ -136,6 +138,14 @@ export default function HubSpotStatus() {
         ? { ...JSON.parse(lastSyncRes.data.value || "{}"), at: lastSyncRes.data.updated_at }
         : null;
 
+      const catchupRaw = catchupRes.data?.value || null;
+      let catchupStatus: any = null;
+      if (catchupRaw === "complete") {
+        catchupStatus = "complete";
+      } else if (catchupRaw) {
+        try { catchupStatus = JSON.parse(catchupRaw); } catch { catchupStatus = null; }
+      }
+
       return {
         dbContacts, dbCompanies, hsContacts, hsCompanies, lastSync,
         contactGap:  hsContacts  ? hsContacts  - dbContacts  : null,
@@ -145,11 +155,13 @@ export default function HubSpotStatus() {
         expansion:   expansionRes.count  ?? 0,
         pql:         pqlRes.count        ?? 0,
         rescoreLog:  rescoreRes.data,
+        catchupStatus,
       };
     },
     refetchInterval: (query) => {
       const d = query.state.data;
       if (d?.rescoreLog?.status === "running") return 2_000;
+      if (d?.catchupStatus && d.catchupStatus !== "complete") return 5_000;
       return 30_000;
     },
   });
@@ -178,6 +190,20 @@ export default function HubSpotStatus() {
       qc.invalidateQueries({ queryKey: ["sync_health_v2"] });
     },
     onError: (err: any) => toast.error(`Rescore failed: ${err?.message}`),
+  });
+
+  const catchupContacts = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.functions.invoke("import-from-hubspot", {
+        body: { action: "catchup_contacts" },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Catchup started — importing all 2-year active contacts");
+      qc.invalidateQueries({ queryKey: ["sync_health_v2"] });
+    },
+    onError: (err: any) => toast.error(`Catchup failed: ${err?.message}`),
   });
 
   // ── Helpers ─────────────────────────────────────────────────────────────
@@ -292,6 +318,30 @@ export default function HubSpotStatus() {
           pct={health?.companyPct ?? null}
         />
       </div>
+
+      {/* Catchup status */}
+      {health?.catchupStatus && health.catchupStatus !== "complete" && (
+        <div className="text-micro text-amber-400/80 flex items-center gap-1.5">
+          <Loader2 className="w-3 h-3 animate-spin" />
+          Catchup in progress · cursor {health.catchupStatus.cursor?.slice(0, 10)}
+          · {health.catchupStatus.processed_this_run?.toLocaleString()} this run
+        </div>
+      )}
+
+      {health?.catchupStatus === "complete" && (
+        <div className="text-micro text-emerald-400/70">✓ Full catchup complete</div>
+      )}
+
+      {health?.contactGap != null && health.contactGap > 1000 && !health?.catchupStatus && (
+        <button
+          onClick={() => catchupContacts.mutate()}
+          disabled={catchupContacts.isPending}
+          className="text-micro text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
+        >
+          {catchupContacts.isPending && <Loader2 className="w-3 h-3 animate-spin" />}
+          Import all {health.contactGap.toLocaleString()} missing contacts →
+        </button>
+      )}
 
       {/* ── 2. What's coming in ── */}
       <div className="rounded-xl border border-border bg-card">

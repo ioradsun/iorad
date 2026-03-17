@@ -227,6 +227,11 @@ Deno.serve(async (req) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // ── Catchup: one-time sweep of all 2-year active contacts ──────────────
+    if (body.action === "catchup_contacts") {
+      return await catchupContacts(supabase, body.after || null);
+    }
+
     // Contact-first backfill — pages through ALL HubSpot contacts
     if (body.action === "backfill_contacts") {
       return await backfillContacts(supabase, body.after || null, body.job_id || null, body.total || 0);
@@ -2444,6 +2449,155 @@ async function fixMissingContacts(
 
   return new Response(
     JSON.stringify({ success: true, fixed, errors, total_so_far: newTotal, next_offset: newOffset, job_id: currentJobId }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+// ── Catchup: one-time sweep of all 2-year active contacts ──────────────────
+// Pages through contacts in 30-day windows from 2 years ago to now.
+// Self-chains continuously until caught up, then marks itself complete.
+async function catchupContacts(supabase: any, afterParam: string | null) {
+  const apiKey = Deno.env.get("HUBSPOT_API_KEY");
+  if (!apiKey) throw new Error("HUBSPOT_API_KEY not configured");
+
+  const TWO_YEARS_AGO = new Date(
+    Date.now() - 2 * 365 * 24 * 60 * 60 * 1000
+  ).toISOString();
+
+  // Read catchup cursor — starts from 2 years ago, advances forward
+  const { data: cursorRow } = await supabase
+    .from("sync_checkpoints")
+    .select("value")
+    .eq("key", "contact_catchup_cursor")
+    .maybeSingle();
+
+  const cursor = cursorRow?.value || TWO_YEARS_AGO;
+
+  // If cursor has passed now, catchup is complete
+  if (cursor > new Date().toISOString()) {
+    await supabase.from("sync_checkpoints").upsert({
+      key: "contact_catchup_status",
+      value: "complete",
+      updated_at: new Date().toISOString(),
+    });
+    return new Response(
+      JSON.stringify({ success: true, status: "complete" }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  const CONTACT_PROPS = [
+    "firstname", "lastname", "email", "jobtitle", "hs_linkedin_url",
+    "hs_lastmodifieddate", "hs_object_id", "associatedcompanyid",
+    "hs_last_contacted", "num_contacted_notes",
+    "hs_email_open_count", "hs_email_click_count", "hubspot_score",
+    "first_tutorial_create_date", "first_tutorial_view_date",
+    "first_tutorial_learn_date",
+    "tutorials_created", "tutorials_views",
+    "answers_with_own_tutorial_month_count",
+    "answers_with_own_tutorial_previous_month_count",
+    "answers", "extension_connections",
+    "plan_name", "account_type", "account__type",
+    "last_active_date", "engagement_segment",
+    "first_embed_tutorial_base_domain_name",
+    "first_embed_base_domain_name",
+  ];
+
+  const windowEnd = new Date(
+    new Date(cursor).getTime() + 30 * 24 * 60 * 60 * 1000
+  ).toISOString();
+
+  const PAGE_SIZE = 100;
+  const MAX_PAGES = 5; // 500 contacts per invocation
+  let after: string | null = afterParam;
+  let totalProcessed = 0;
+  let latestModified = cursor;
+  let pageCount = 0;
+
+  while (pageCount < MAX_PAGES) {
+    const searchBody: any = {
+      filterGroups: [{
+        filters: [
+          {
+            propertyName: "hs_lastmodifieddate",
+            operator: "GTE",
+            value: cursor,
+          },
+          {
+            propertyName: "hs_lastmodifieddate",
+            operator: "LT",
+            value: windowEnd,
+          },
+        ],
+      }],
+      properties: CONTACT_PROPS,
+      sorts: [{ propertyName: "hs_lastmodifieddate", direction: "ASCENDING" }],
+      limit: PAGE_SIZE,
+    };
+    if (after) searchBody.after = after;
+
+    const res = await hubspotFetch(
+      "https://api.hubapi.com/crm/v3/objects/contacts/search",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify(searchBody),
+      }
+    );
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`HubSpot catchup search failed [${res.status}]: ${text.slice(0, 200)}`);
+    }
+
+    const data = await res.json();
+    const contacts = data.results || [];
+    if (contacts.length === 0) break;
+
+    const { processed, newest } = await processContactPage(supabase, contacts, apiKey);
+    totalProcessed += processed;
+    if (newest > latestModified) latestModified = newest;
+
+    after = data.paging?.next?.after || null;
+    pageCount++;
+
+    if (!after) break;
+  }
+
+  // Advance cursor: if still paging within window, stay; otherwise move to next window
+  const nextCursor = after
+    ? latestModified
+    : windowEnd;
+
+  await supabase.from("sync_checkpoints").upsert({
+    key: "contact_catchup_cursor",
+    value: nextCursor,
+    updated_at: new Date().toISOString(),
+  });
+
+  await supabase.from("sync_checkpoints").upsert({
+    key: "contact_catchup_status",
+    value: JSON.stringify({
+      cursor: nextCursor,
+      processed_this_run: totalProcessed,
+      at: new Date().toISOString(),
+    }),
+    updated_at: new Date().toISOString(),
+  });
+
+  console.log(`catchup_contacts: processed ${totalProcessed}, cursor=${nextCursor}, has_more=${after ? "page" : "window"}`);
+
+  // Self-chain immediately — keep processing until caught up
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  fetch(`${supabaseUrl}/functions/v1/import-from-hubspot`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "catchup_contacts", after: after || null }),
+  }).catch(e => console.warn("catchup self-chain failed:", e.message));
+
+  return new Response(
+    JSON.stringify({ success: true, processed: totalProcessed, cursor: nextCursor }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 }
