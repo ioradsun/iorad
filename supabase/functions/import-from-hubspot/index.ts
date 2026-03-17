@@ -131,15 +131,30 @@ Deno.serve(async (req) => {
       const apiKey = Deno.env.get("HUBSPOT_API_KEY");
       if (!apiKey) throw new Error("HUBSPOT_API_KEY not configured");
 
+      const TWO_YEARS_AGO = new Date(
+        Date.now() - 2 * 365 * 24 * 60 * 60 * 1000
+      ).toISOString();
+
+      // Count contacts active in last 2 years using the same filter as sync
       const searchRes = await hubspotFetch(
         "https://api.hubapi.com/crm/v3/objects/contacts/search",
         {
           method: "POST",
           headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ filterGroups: [], limit: 1, properties: ["hs_object_id"] }),
+          body: JSON.stringify({
+            filterGroups: [{
+              filters: [{
+                propertyName: "hs_lastmodifieddate",
+                operator: "GTE",
+                value: TWO_YEARS_AGO,
+              }],
+            }],
+            limit: 1,
+            properties: ["hs_object_id"],
+          }),
         }
       );
-      if (!searchRes.ok) throw new Error(`HubSpot search count failed: ${searchRes.status}`);
+      if (!searchRes.ok) throw new Error(`HubSpot count failed: ${searchRes.status}`);
       const searchData = await searchRes.json();
       const hubspotTotal = searchData.total || 0;
 
