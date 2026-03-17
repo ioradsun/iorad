@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
-import { AlertCircle, CheckCircle2, Loader2, RefreshCw, RotateCcw } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
+import { useSyncHealth } from "@/hooks/useSupabase";
 
 // ... keep existing code (SyncEvent type, SOURCE_LABELS, ACTION_STYLES)
 type SyncEvent = {
@@ -48,29 +49,13 @@ const ACTION_STYLES: Record<string, string> = {
   skipped: "bg-secondary text-foreground/40 border-border",
 };
 
-function useCompanyContactCounts() {
-  return useQuery({
-    queryKey: ["sync_counts"],
-    queryFn: async () => {
-      const [compRes, contRes] = await Promise.all([
-        supabase.from("companies").select("id", { count: "exact", head: true }),
-        supabase.from("contacts").select("id", { count: "exact", head: true }),
-      ]);
-      return {
-        companies: compRes.count ?? 0,
-        contacts: contRes.count ?? 0,
-      };
-    },
-    refetchInterval: 60_000,
-  });
-}
 
 export default function HubSpotStatus() {
   const qc = useQueryClient();
   const [events, setEvents] = useState<SyncEvent[]>([]);
   const [sourceFilter, setSourceFilter] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
-  const { data: counts } = useCompanyContactCounts();
+  const { data: sync } = useSyncHealth();
 
   // Tick every second for live relative timestamps
   useEffect(() => {
@@ -213,17 +198,6 @@ export default function HubSpotStatus() {
     onError: (err: any) => toast.error(`Sync failed: ${err?.message}`),
   });
 
-  const fullRebuild = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.functions.invoke("hubspot-pipeline", {});
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Full rebuild started — this takes 10-20 minutes");
-      qc.invalidateQueries({ queryKey: ["sync_events_initial"] });
-    },
-    onError: (err: any) => toast.error(`Rebuild failed: ${err?.message}`),
-  });
 
 
   const rescoreAll = useMutation({
@@ -280,10 +254,6 @@ export default function HubSpotStatus() {
             {syncNow.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             Sync Now
           </Button>
-          <Button variant="outline" className="gap-1.5" onClick={() => fullRebuild.mutate()} disabled={fullRebuild.isPending}>
-            {fullRebuild.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
-            Full Rebuild
-          </Button>
         </div>
       </div>
 
@@ -314,7 +284,7 @@ export default function HubSpotStatus() {
       {/* Stall/watchdog banner */}
       {recentWatchdogRestart ? (
         <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 flex items-center gap-2">
-          <RotateCcw className="w-4 h-4 text-emerald-400 shrink-0" />
+          <RefreshCw className="w-4 h-4 text-emerald-400 shrink-0" />
           <span className="text-caption text-emerald-400">
             Watchdog auto-restarted {SOURCE_LABELS[recentWatchdogRestart.meta?.original_source] || "sync"} · {relativeTime(recentWatchdogRestart.created_at)}
           </span>
@@ -335,7 +305,27 @@ export default function HubSpotStatus() {
       <div className="grid grid-cols-2 gap-6">
         <div>
           <div className="field-label">Companies</div>
-          <div className="text-display font-semibold tabular-nums mt-1">{(counts?.companies || 0).toLocaleString()}</div>
+          <div className="flex items-end gap-2 mt-1">
+            <div className="text-display font-semibold tabular-nums">
+              {(sync?.dbCompanies || 0).toLocaleString()}
+            </div>
+            {sync?.hsCompanies && (
+              <>
+                <div className="text-foreground/20 text-title pb-0.5">/</div>
+                <div className="text-title font-medium tabular-nums text-foreground/40 pb-0.5">
+                  {sync.hsCompanies.toLocaleString()}
+                </div>
+                <div className="pb-0.5">
+                  {sync.companyPct !== null && sync.companyPct >= 99
+                    ? <span className="text-micro text-emerald-400 font-medium">✓ in sync</span>
+                    : sync.companyGap && sync.companyGap > 0
+                      ? <span className="text-micro text-amber-400 font-medium">{sync.companyGap.toLocaleString()} behind</span>
+                      : null
+                  }
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Contact sync completeness */}
@@ -343,44 +333,35 @@ export default function HubSpotStatus() {
           <div className="field-label">Contacts</div>
           <div className="flex items-end gap-2 mt-1">
             <div className="text-display font-semibold tabular-nums">
-              {(counts?.contacts || 0).toLocaleString()}
+              {(sync?.dbContacts || 0).toLocaleString()}
             </div>
-            {syncHealth?.hubspotContactCount && (
+            {sync?.hsContacts && (
               <>
                 <div className="text-foreground/20 text-title pb-0.5">/</div>
                 <div className="text-title font-medium tabular-nums text-foreground/40 pb-0.5">
-                  {syncHealth.hubspotContactCount.total.toLocaleString()}
+                  {sync.hsContacts.toLocaleString()}
                 </div>
                 <div className="pb-0.5">
-                  {(() => {
-                    const inScout = counts?.contacts || 0;
-                    const inHubspot = syncHealth.hubspotContactCount!.total;
-                    const gap = inHubspot - inScout;
-                    const pct = Math.round(inScout / Math.max(1, inHubspot) * 100);
-                    if (pct >= 99) return (
-                      <span className="text-micro text-emerald-400 font-medium">✓ in sync</span>
-                    );
-                    if (gap > 0) return (
-                      <span className="text-micro text-amber-400 font-medium">
-                        {gap.toLocaleString()} behind
-                      </span>
-                    );
-                    return null;
-                  })()}
+                  {sync.contactPct !== null && sync.contactPct >= 99
+                    ? <span className="text-micro text-emerald-400 font-medium">✓ in sync</span>
+                    : sync.contactGap && sync.contactGap > 0
+                      ? <span className="text-micro text-amber-400 font-medium">{sync.contactGap.toLocaleString()} behind</span>
+                      : null
+                  }
                 </div>
               </>
             )}
           </div>
 
           {/* Progress bar when behind */}
-          {syncHealth?.hubspotContactCount &&
-           (counts?.contacts || 0) < syncHealth.hubspotContactCount.total * 0.99 && (
+          {sync?.hsContacts &&
+           (sync.dbContacts || 0) < sync.hsContacts * 0.99 && (
             <div className="h-1 bg-foreground/[0.06] rounded-full overflow-hidden mt-2">
               <div
                 className="h-full bg-primary rounded-full transition-all"
                 style={{
                   width: `${Math.min(100, Math.round(
-                    (counts?.contacts || 0) / syncHealth.hubspotContactCount.total * 100
+                    (sync.dbContacts || 0) / sync.hsContacts * 100
                   ))}%`,
                 }}
               />
@@ -388,17 +369,15 @@ export default function HubSpotStatus() {
           )}
 
           {/* Last sync result */}
-          {syncHealth?.lastSyncResult && (
+          {sync?.lastSync && (
             <div className="flex items-center gap-3 mt-1.5 text-micro text-foreground/30">
-              <span>{(syncHealth.lastSyncResult.processed || 0).toLocaleString()} last run</span>
-              {syncHealth.lastSyncResult.has_more && (
+              <span>{(sync.lastSync.processed || 0).toLocaleString()} last run</span>
+              {sync.lastSync.has_more && (
                 <span className="text-amber-400">backlog — syncing…</span>
               )}
-              {syncHealth.hubspotContactCount?.at && (
+              {sync.lastSync.at && (
                 <span>
-                  counted {formatDistanceToNow(
-                    new Date(syncHealth.hubspotContactCount.at), { addSuffix: true }
-                  )}
+                  synced {formatDistanceToNow(new Date(sync.lastSync.at), { addSuffix: true })}
                 </span>
               )}
             </div>

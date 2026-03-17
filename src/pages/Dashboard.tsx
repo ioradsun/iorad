@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Search, ArrowUpDown, ChevronRight } from "lucide-react";
-import { useCompanies, useCompaniesPage, useSignalCounts } from "@/hooks/useSupabase";
+import { useCompanies, useCompaniesPage, useSignalCounts, useSyncHealth } from "@/hooks/useSupabase";
 import { ClearableInput } from "@/components/ui/clearable-input";
 import HubSpotPickerModal from "@/components/HubSpotPickerModal";
 import { PlanBadge } from "@/components/PlanBadge";
@@ -66,6 +66,7 @@ export default function Dashboard() {
   const isLoading = firstPageLoading;
 
   const { data: signalCounts = {} } = useSignalCounts();
+  const { data: sync } = useSyncHealth();
 
   const companiesWithSignals = useMemo(() => {
     return companies.map(c => ({ ...c, signals_count: signalCounts[c.id] || 0 }));
@@ -166,6 +167,46 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-5">
+      {/* Sync health bar */}
+      {sync && (
+        <div className="flex items-center gap-2 text-micro text-foreground/40 px-1 -mb-2 flex-wrap">
+          <span className="tabular-nums font-medium text-foreground">{sync.dbContacts.toLocaleString()}</span>
+          {sync.hsContacts && (
+            <span className="text-foreground/20">/ {sync.hsContacts.toLocaleString()}</span>
+          )}
+          <span>contacts</span>
+          {sync.contactGap !== null && sync.contactGap > 0 && (
+            <span className="text-amber-400 font-medium">−{sync.contactGap.toLocaleString()}</span>
+          )}
+          {sync.contactPct !== null && sync.contactPct >= 99 && (
+            <span className="text-emerald-400">✓</span>
+          )}
+          <span className="text-foreground/15">·</span>
+          <span className="tabular-nums font-medium text-foreground">{sync.dbCompanies.toLocaleString()}</span>
+          {sync.hsCompanies && (
+            <span className="text-foreground/20">/ {sync.hsCompanies.toLocaleString()}</span>
+          )}
+          <span>companies</span>
+          {sync.companyGap !== null && sync.companyGap > 0 && (
+            <span className="text-amber-400 font-medium">−{sync.companyGap.toLocaleString()}</span>
+          )}
+          {sync.companyPct !== null && sync.companyPct >= 99 && (
+            <span className="text-emerald-400">✓</span>
+          )}
+          {sync.lastSync?.at && (
+            <>
+              <span className="text-foreground/15">·</span>
+              <span>
+                {sync.lastSync.has_more
+                  ? <span className="text-amber-400">syncing…</span>
+                  : <>synced {formatDistanceToNow(new Date(sync.lastSync.at), { addSuffix: true })}</>
+                }
+              </span>
+            </>
+          )}
+          <Link to="/hubspot" className="text-primary hover:text-primary/80 transition-colors">↗</Link>
+        </div>
+      )}
       <div className="relative max-w-xl mb-2 max-md:max-w-full">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/25 z-10" />
         <ClearableInput
