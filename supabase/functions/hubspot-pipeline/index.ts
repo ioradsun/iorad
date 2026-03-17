@@ -789,6 +789,10 @@ Deno.serve(async (req) => {
       if (jobErr) throw new Error(`Failed to create job: ${jobErr.message}`);
       jobId = job.id;
       console.log(`pipeline: started job ${jobId}`);
+      await logSyncEvent(supabase, {
+        source: "hubspot_pipeline", job_id: jobId, entity_type: "company",
+        action: "job_start", meta: { trigger: "hubspot_pipeline" },
+      });
     }
 
     // ── ALWAYS read snapshot from DB — single source of truth ──────────────
