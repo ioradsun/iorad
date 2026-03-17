@@ -66,6 +66,13 @@ Deno.serve(async (req) => {
   };
 
   try {
+    // ── Step 0: Refresh HubSpot contact count (fire-and-forget) ───────────
+    fetch(`${supabaseUrl}/functions/v1/import-from-hubspot`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "contact_count" }),
+    }).catch(e => console.warn("contact_count failed:", e.message));
+
     // ── Step 1: Incremental contact sync from HubSpot ──────────────────────
     const syncRes = await fetch(`${supabaseUrl}/functions/v1/import-from-hubspot`, {
       method: "POST",

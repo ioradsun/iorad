@@ -126,6 +126,35 @@ Deno.serve(async (req) => {
       return await syncContactsIncremental(supabase);
     }
 
+    // HubSpot total contact count — for sync completeness display
+    if (body.action === "contact_count") {
+      const apiKey = Deno.env.get("HUBSPOT_API_KEY");
+      if (!apiKey) throw new Error("HUBSPOT_API_KEY not configured");
+
+      const searchRes = await hubspotFetch(
+        "https://api.hubapi.com/crm/v3/objects/contacts/search",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ filterGroups: [], limit: 1, properties: ["hs_object_id"] }),
+        }
+      );
+      if (!searchRes.ok) throw new Error(`HubSpot search count failed: ${searchRes.status}`);
+      const searchData = await searchRes.json();
+      const hubspotTotal = searchData.total || 0;
+
+      await supabase.from("sync_checkpoints").upsert({
+        key: "hubspot_contact_count",
+        value: String(hubspotTotal),
+        updated_at: new Date().toISOString(),
+      });
+
+      return new Response(
+        JSON.stringify({ success: true, hubspot_total: hubspotTotal }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     if (body.action === "sync_companies") {
       return await syncCompaniesIncremental(supabase);
     }
@@ -513,12 +542,24 @@ async function syncContactsIncremental(supabase: any) {
     updated_at: new Date().toISOString(),
   });
 
-  console.log(`sync_contacts: processed ${totalProcessed} contacts across ${pageCount} pages, checkpoint=${latestModified}`);
+  console.log(`sync_contacts: processed ${totalProcessed} contacts across ${pageCount} pages, checkpoint=${latestModified}, has_more=${!!after}`);
+
+  // Self-chain if there are more pages — catch up in one continuous run
+  if (after) {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    console.log(`sync_contacts: has_more=true, self-chaining for next batch`);
+    fetch(`${supabaseUrl}/functions/v1/import-from-hubspot`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "sync_contacts" }),
+    }).catch(e => console.warn("sync_contacts self-chain failed:", e.message));
+  }
 
   return new Response(
     JSON.stringify({
       success: true,
-      contacts_processed: totalProcessed,
+      processed: totalProcessed,
       pages: pageCount,
       checkpoint: latestModified,
       has_more: !!after,
