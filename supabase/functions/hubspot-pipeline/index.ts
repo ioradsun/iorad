@@ -304,6 +304,12 @@ async function runPhase1(supabase: any, apiKey: string, jobId: string, snap: any
 
   if (nextAfter) {
     // More pages in Phase 1 — chain to next page
+    await logSyncEvent(supabase, {
+      source: "hubspot_pipeline", job_id: jobId, entity_type: "company",
+      action: "heartbeat", entity_name: `Phase 1: ${newProcessed} companies upserted`,
+      cursor_val: nextAfter, batch_seq: newProcessed,
+      meta: { phase: 1, resume_function: "hubspot-pipeline", resume_payload: { job_id: jobId } },
+    });
     chainSelf(jobId);
     console.log(`pipeline phase1: chaining next page, cursor=${nextAfter}`);
   } else {
@@ -311,6 +317,12 @@ async function runPhase1(supabase: any, apiKey: string, jobId: string, snap: any
     console.log(`pipeline phase1: DONE — ${newProcessed} companies upserted. Starting phase 2.`);
     const phase2Snap = { ...newSnap, phase: 2, phase2_offset: 0, phase2_processed: 0, phase2_failed: 0 };
     await supabase.from("processing_jobs").update({ settings_snapshot: phase2Snap }).eq("id", jobId);
+    await logSyncEvent(supabase, {
+      source: "hubspot_pipeline", job_id: jobId, entity_type: "company",
+      action: "heartbeat", entity_name: `Phase 1 complete: ${newProcessed} companies. Starting phase 2.`,
+      batch_seq: newProcessed,
+      meta: { phase: 1, resume_function: "hubspot-pipeline", resume_payload: { job_id: jobId } },
+    });
     chainSelf(jobId);
   }
 }
