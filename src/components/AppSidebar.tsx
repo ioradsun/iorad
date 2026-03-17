@@ -21,6 +21,7 @@ import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { getContactActivity, sortContactsByActivity } from "@/lib/contactScore";
+import { PlanBadge } from "@/components/PlanBadge";
 
 const stageItems = [
   { key: "prospect", label: "Prospects", icon: Briefcase },
