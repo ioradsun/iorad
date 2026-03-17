@@ -505,6 +505,13 @@ async function runPhase2(supabase: any, apiKey: string, jobId: string, snap: any
   }).eq("id", jobId);
 
   if (hasMore) {
+    await logSyncEvent(supabase, {
+      source: "hubspot_pipeline", job_id: jobId, entity_type: "contact",
+      action: "heartbeat",
+      entity_name: `Phase 2: ${newProcessed} companies checked, ${newSnap.phase2_contacts_imported} contacts`,
+      batch_seq: newOffset,
+      meta: { phase: 2, resume_function: "hubspot-pipeline", resume_payload: { job_id: jobId } },
+    });
     chainSelf(jobId);
     console.log(`pipeline phase2: chaining next batch, offset=${newOffset}`);
   } else {
@@ -512,6 +519,13 @@ async function runPhase2(supabase: any, apiKey: string, jobId: string, snap: any
     console.log(`pipeline phase2: DONE — checked ${newProcessed} companies, imported ${newSnap.phase2_contacts_imported} contacts. Starting phase 3.`);
     const phase3Snap = { ...newSnap, phase: 3, phase3_offset: 0, phase3_scored: 0, phase3_failed: 0 };
     await supabase.from("processing_jobs").update({ settings_snapshot: phase3Snap }).eq("id", jobId);
+    await logSyncEvent(supabase, {
+      source: "hubspot_pipeline", job_id: jobId, entity_type: "contact",
+      action: "heartbeat",
+      entity_name: `Phase 2 complete: ${newSnap.phase2_contacts_imported} contacts. Starting phase 3.`,
+      batch_seq: newOffset,
+      meta: { phase: 2, resume_function: "hubspot-pipeline", resume_payload: { job_id: jobId } },
+    });
     chainSelf(jobId);
   }
 }
