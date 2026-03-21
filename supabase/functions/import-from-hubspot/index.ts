@@ -2466,7 +2466,7 @@ async function catchupContacts(supabase: any, afterParam: string | null) {
   const startTime = Date.now();
   const TIME_BUDGET_MS = 45_000; // 45s — leave buffer for edge function timeout
 
-  const ONE_YEAR_AGO_MS = String(Date.now() - 365 * 24 * 60 * 60 * 1000);
+  const SIX_MONTHS_AGO_MS = String(Date.now() - 182 * 24 * 60 * 60 * 1000);
 
   const { data: cursorRow } = await supabase
     .from("sync_checkpoints")
