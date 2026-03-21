@@ -555,7 +555,7 @@ async function syncContactsIncremental(supabase: any) {
           {
             propertyName: "hs_lastmodifieddate",
             operator: "GTE",
-            value: ONE_YEAR_AGO,
+            value: SIX_MONTHS_AGO,
           },
         ],
       }],
