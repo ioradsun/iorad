@@ -1,0 +1,1 @@
+UPDATE sync_checkpoints SET value = '', updated_at = now() WHERE key IN ('contact_catchup_cursor', 'contact_catchup_status');
