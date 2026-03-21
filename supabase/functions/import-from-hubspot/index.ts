@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
 
       const SIX_MONTHS_AGO = String(Date.now() - 182 * 24 * 60 * 60 * 1000);
 
-      // Count contacts active in last year using the same filter as sync
+      // Count contacts active in last 6 months using the same filter as sync
       const searchRes = await hubspotFetch(
         "https://api.hubapi.com/crm/v3/objects/contacts/search",
         {
@@ -144,7 +144,7 @@ Deno.serve(async (req) => {
               filters: [{
                 propertyName: "lastmodifieddate",
                 operator: "GTE",
-                value: ONE_YEAR_AGO,
+                value: SIX_MONTHS_AGO,
               }],
             }],
             limit: 1,
