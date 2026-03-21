@@ -2474,7 +2474,7 @@ async function catchupContacts(supabase: any, afterParam: string | null) {
     .eq("key", "contact_catchup_cursor")
     .maybeSingle();
 
-  let cursorMs = cursorRow?.value || ONE_YEAR_AGO_MS;
+  let cursorMs = cursorRow?.value || SIX_MONTHS_AGO_MS;
 
   if (cursorMs === "complete") {
     return new Response(
