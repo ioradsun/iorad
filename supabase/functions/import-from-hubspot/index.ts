@@ -173,7 +173,7 @@ Deno.serve(async (req) => {
       const apiKey = Deno.env.get("HUBSPOT_API_KEY");
       if (!apiKey) throw new Error("HUBSPOT_API_KEY not configured");
 
-      const ONE_YEAR_AGO = String(Date.now() - 365 * 24 * 60 * 60 * 1000);
+      const SIX_MONTHS_AGO = String(Date.now() - 182 * 24 * 60 * 60 * 1000);
 
       const searchRes = await hubspotFetch(
         "https://api.hubapi.com/crm/v3/objects/companies/search",
