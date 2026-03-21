@@ -131,9 +131,9 @@ Deno.serve(async (req) => {
       const apiKey = Deno.env.get("HUBSPOT_API_KEY");
       if (!apiKey) throw new Error("HUBSPOT_API_KEY not configured");
 
-      const ONE_YEAR_AGO = String(Date.now() - 365 * 24 * 60 * 60 * 1000);
+      const SIX_MONTHS_AGO = String(Date.now() - 182 * 24 * 60 * 60 * 1000);
 
-      // Count contacts active in last year using the same filter as sync
+      // Count contacts active in last 6 months using the same filter as sync
       const searchRes = await hubspotFetch(
         "https://api.hubapi.com/crm/v3/objects/contacts/search",
         {
@@ -144,7 +144,7 @@ Deno.serve(async (req) => {
               filters: [{
                 propertyName: "lastmodifieddate",
                 operator: "GTE",
-                value: ONE_YEAR_AGO,
+                value: SIX_MONTHS_AGO,
               }],
             }],
             limit: 1,
@@ -173,7 +173,7 @@ Deno.serve(async (req) => {
       const apiKey = Deno.env.get("HUBSPOT_API_KEY");
       if (!apiKey) throw new Error("HUBSPOT_API_KEY not configured");
 
-      const ONE_YEAR_AGO = String(Date.now() - 365 * 24 * 60 * 60 * 1000);
+      const SIX_MONTHS_AGO = String(Date.now() - 182 * 24 * 60 * 60 * 1000);
 
       const searchRes = await hubspotFetch(
         "https://api.hubapi.com/crm/v3/objects/companies/search",
@@ -185,7 +185,7 @@ Deno.serve(async (req) => {
               filters: [{
                 propertyName: "hs_lastmodifieddate",
                 operator: "GTE",
-                value: ONE_YEAR_AGO,
+                value: SIX_MONTHS_AGO,
               }],
             }],
             limit: 1,
@@ -542,7 +542,7 @@ async function syncContactsIncremental(supabase: any) {
   const MAX_PAGES = 5; // Process up to 500 contacts per invocation
 
   while (pageCount < MAX_PAGES) {
-    const ONE_YEAR_AGO = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+    const SIX_MONTHS_AGO = new Date(Date.now() - 182 * 24 * 60 * 60 * 1000).toISOString();
 
     const searchBody: any = {
       filterGroups: [{
@@ -555,7 +555,7 @@ async function syncContactsIncremental(supabase: any) {
           {
             propertyName: "hs_lastmodifieddate",
             operator: "GTE",
-            value: ONE_YEAR_AGO,
+            value: SIX_MONTHS_AGO,
           },
         ],
       }],
@@ -2466,7 +2466,7 @@ async function catchupContacts(supabase: any, afterParam: string | null) {
   const startTime = Date.now();
   const TIME_BUDGET_MS = 45_000; // 45s — leave buffer for edge function timeout
 
-  const ONE_YEAR_AGO_MS = String(Date.now() - 365 * 24 * 60 * 60 * 1000);
+  const SIX_MONTHS_AGO_MS = String(Date.now() - 182 * 24 * 60 * 60 * 1000);
 
   const { data: cursorRow } = await supabase
     .from("sync_checkpoints")
@@ -2474,7 +2474,7 @@ async function catchupContacts(supabase: any, afterParam: string | null) {
     .eq("key", "contact_catchup_cursor")
     .maybeSingle();
 
-  let cursorMs = cursorRow?.value || ONE_YEAR_AGO_MS;
+  let cursorMs = cursorRow?.value || SIX_MONTHS_AGO_MS;
 
   if (cursorMs === "complete") {
     return new Response(
